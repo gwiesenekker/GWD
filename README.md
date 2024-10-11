@@ -358,7 +358,9 @@ The C code you've provided is a function that generates all legal moves for a gi
 
 This code is well-suited for a performance-critical application, such as an AI engine for draughts, and its structure supports both quiescent and non-quiescent moves, as required for accurate evaluation in such games.
 
-The answer to the next question is even more remarkable: Could you take a stab at reformulating the code in a recursive fashion without the goto's?
+The answer to the next question is even more remarkable. Also note comments like 'continue in the same direction', 'ensure the same piece is not captured twice' and 'try the opposite direction':
+
+Could you take a stab at reformulating the code in a recursive fashion without the goto's?
 
 Certainly! I'll help you refactor the code into a more structured recursive approach, avoiding `goto` statements and enhancing clarity. Here's a reformulated version of the key part of the code where the recursive capture sequence is handled. I will focus primarily on replacing the multi-capture sequences that were controlled via `goto` with recursive functions.
 
