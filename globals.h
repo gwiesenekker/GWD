@@ -1,9 +1,9 @@
-//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
+//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM  gwd7
-#define REVISION "7.700"
+#define REVISION "7.701"
 
 //generic includes
 

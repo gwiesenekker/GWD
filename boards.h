@@ -1,4 +1,4 @@
-//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
+//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
 #ifndef BoardsH
 #define BoardsH
 
@@ -20,7 +20,7 @@
 #define STARTING_POSITION2FEN "W:W31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50:B01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20"
 
 #define MAN_BIT   BIT(0)
-#define CROWN_BIT BIT(1)
+#define KING_BIT BIT(1)
 #define SIDE_BIT  BIT(2)
 #define WHITE_BIT BIT(3)
 #define BLACK_BIT BIT(4)
@@ -33,7 +33,7 @@
 
 #define IS_EMPTY(X) ((X) == 0)
 #define IS_MAN(X)   ((X) & MAN_BIT)
-#define IS_CROWN(X) ((X) & CROWN_BIT)
+#define IS_KING(X) ((X) & KING_BIT)
 
 #define IS_MINE(X) ((X) & MY_BIT)
 #define IS_YOURS(X) ((X) & YOUR_BIT)

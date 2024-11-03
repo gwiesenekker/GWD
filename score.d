@@ -1,4 +1,4 @@
-//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
+//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
 int return_my_score(board_t *with)
 {
   int result = 0;
@@ -13,7 +13,7 @@ int return_my_score(board_t *with)
   int nyour_king = BIT_COUNT(with->your_king_bb);
     
   int material_score = (nmy_man - nyour_man) * SCORE_MAN +
-                       (nmy_king - nyour_king) * SCORE_CROWN;
+                       (nmy_king - nyour_king) * SCORE_KING;
 
   if (options.material_only)
   {

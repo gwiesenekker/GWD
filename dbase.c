@@ -1,4 +1,4 @@
-//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
+//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
 #include "globals.h"
 
 int execute_sql(sqlite3 *db, const void *sql, int step, int nretries)

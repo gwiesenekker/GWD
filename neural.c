@@ -1,4 +1,4 @@
-//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
+//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
 #include "globals.h"
 
 #define NETWORKS_JSON "networks.json"
@@ -1697,7 +1697,7 @@ void fen2neural(char *arg_name)
     //check_moves(with, &moves_list);
 
     int mat_score = (nwhite_man - nblack_man) * SCORE_MAN +
-                    (nwhite_king - nblack_king) * SCORE_CROWN;
+                    (nwhite_king - nblack_king) * SCORE_KING;
 
     if (result >= 0.9)
     {
@@ -2423,12 +2423,12 @@ local void append_pack(board_t *with, int *nbuffer,
   for (int ipack = 0; ipack < NPACK; ipack++)
     bformata(*bbuffer, "%3u,", pack[ipack]);
 
-  return_pack(with, WHITE_BIT, CROWN_BIT, pack);
+  return_pack(with, WHITE_BIT, KING_BIT, pack);
 
   for (int ipack = 0; ipack < NPACK; ipack++)
     bformata(*bbuffer, "%3u,", pack[ipack]);
 
-  return_pack(with, BLACK_BIT, CROWN_BIT, pack);
+  return_pack(with, BLACK_BIT, KING_BIT, pack);
 
   for (int ipack = 0; ipack < NPACK; ipack++)
     bformata(*bbuffer, "%3u,", pack[ipack]);

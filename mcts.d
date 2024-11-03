@@ -1,4 +1,4 @@
-//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
+//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
 int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta, 
   int node_type, moves_list_t *moves_list, int *best_pv)
 {
@@ -118,7 +118,7 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
     int nyour_king = BIT_COUNT(with->your_king_bb);
             
     best_score = (nmy_man - nyour_man) * SCORE_MAN +
-                 (nmy_king - nyour_king) * SCORE_CROWN;
+                 (nmy_king - nyour_king) * SCORE_KING;
 
     best_score = return_scaled_float_score(best_score, with->board_key);
 */

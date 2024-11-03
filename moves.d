@@ -1,4 +1,4 @@
-//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
+//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
 void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
 {
   BEGIN_BLOCK(__FUNC__)
@@ -230,7 +230,7 @@ void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
       }
       else
       {
-        move_score_delta += SCORE_CROWN;
+        move_score_delta += SCORE_KING;
       }
 
       captures_bb &= ~BITULL(jboard);
@@ -257,7 +257,7 @@ void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
       }
       else if (my_row[kboard] == 10)
       {
-        move_score_delta += SCORE_CROWN - SCORE_MAN;
+        move_score_delta += SCORE_KING - SCORE_MAN;
 
         move_weight = move_score_delta + 3;
 
