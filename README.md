@@ -3,9 +3,9 @@
 The source code of my Draughts program GWD. I have been working on it on and off for the last 40 years. It has the following features:
 
 - Iterative deepening
-- Alpha-beta with move reductions
-- Neural network for the evaluation
-- Uses incremental updates and AVX2 for evaluation of the neural network
+- Alpha-beta with search reductions
+- Neural networks for the evaluation
+- Uses incremental updates and AVX2 for evaluation of the neural networks
 - Supports both the DXP and HUB protocol, so Turbo Dambase can be used as the GUI
 - Uses OpenMPI for 'bulk parallelization', so on a 16 CPU machine you can play 4 HUB matches in parallel, each match using 4 threads or 16 matches in parallel, each match using 1 thread
 - Uses an embedded SQLite database for the opening book
