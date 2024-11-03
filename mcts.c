@@ -1,7 +1,9 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 mcts_globals_t mcts_globals;
+
+local my_random_t mcts_random;
 
 local int return_scaled_float_score(int best_score, ui64_t key)
 {
@@ -67,7 +69,7 @@ local int mcts_shoot_out(board_t *with, int nply, int alpha_beta_depth)
 
   for (int imove = moves_list.nmoves - 1; imove >= 1; --imove)
   {
-    int jmove = randull(0) % (imove + 1);
+    int jmove = return_my_random(&mcts_random) % (imove + 1);
 
     if (jmove != imove)
     {
@@ -183,6 +185,8 @@ int mcts_alpha_beta(board_t *with, int nply,
 
 void init_mcts(void)
 {
+  construct_my_random(&mcts_random, 0);
+
   construct_my_timer(&(mcts_globals.mcts_globals_timer), "mcts",
     STDOUT, FALSE);
   mcts_globals.mcts_globals_time_limit = 2.0;

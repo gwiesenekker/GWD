@@ -1,17 +1,61 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
-#define NBUCKETS_MAX 128
-
-class_t *bucket_class;
-
-//the object printer
-
-local void printf_bucket(void *self)
+void clear_bucket(void *self)
 {
   bucket_t *object = self;
 
-  PRINTF("object_id=%d\n", object->object_id);
+  for (i64_t ibucket = 0; ibucket < object->nbuckets; ibucket++)
+   object->buckets[ibucket] = 0;
+}
+
+void update_bucket(void *self, double value)
+{
+  bucket_t *object = self;
+
+  if (value < object->bucket_min)
+    object->bucket_nlt_min++;
+  else if (value >= object->bucket_max)
+    object->bucket_nge_max++;
+  else
+  {
+    if (object->bucket_scale == BUCKET_LINEAR)
+    {
+      i64_t ibucket = floor((value - object->bucket_min) /
+                            object->bucket_size);
+
+      if (ibucket >= object->nbuckets) ibucket = object->nbuckets - 1;
+           
+      object->buckets[ibucket]++;
+    }
+    else if (object->bucket_scale == BUCKET_LOG)
+    {
+      i64_t ibucket = 0;
+ 
+      double bucket_min = object->bucket_min;
+      double bucket_max = object->bucket_min + object->bucket_size;
+
+      while(TRUE)
+      {
+        if ((value >= bucket_min) and (value < bucket_max)) break;
+
+        ibucket++;
+
+        bucket_min = object->bucket_min + pow(object->bucket_size, ibucket);
+        bucket_max = object->bucket_min + pow(object->bucket_size, ibucket + 1);
+      }
+      if (ibucket >= object->nbuckets) ibucket = object->nbuckets - 1;
+
+      object->buckets[ibucket]++;
+    }
+    else
+      FATAL("unknown bucket_scale", EXIT_FAILURE)
+  }
+}
+
+void printf_bucket(void *self)
+{
+  bucket_t *object = self;
 
   PRINTF("bucket_size=%.2f\n", object->bucket_size);
   PRINTF("bucket_min=%.2f\n", object->bucket_min);
@@ -94,11 +138,11 @@ local void printf_bucket(void *self)
    100.0 * bucket_partial_sum / bucket_total_sum);
 }
 
-//object methods
-
-local void define_bucket(bucket_t *object, double bucket_size,
+void construct_bucket(void *self, double bucket_size,
   double bucket_min, double bucket_max, int bucket_scale)
 {
+  bucket_t *object = self;
+
   HARDBUG(bucket_size <= 0.0)
 
   HARDBUG(bucket_min >= bucket_max)
@@ -123,137 +167,48 @@ local void define_bucket(bucket_t *object, double bucket_size,
   else
     FATAL("unknown bucket_scale", EXIT_FAILURE)
 
-  MALLOC(object->buckets, i64_t, object->nbuckets)
+  MY_MALLOC(object->buckets, i64_t, object->nbuckets)
 
   for (int ibucket = 0; ibucket < object->nbuckets; ibucket++)
    object->buckets[ibucket] = 0;
 }
 
-local void update_bucket(bucket_t *object, double value)
-{
-  if (value < object->bucket_min)
-    object->bucket_nlt_min++;
-  else if (value >= object->bucket_max)
-    object->bucket_nge_max++;
-  else
-  {
-    if (object->bucket_scale == BUCKET_LINEAR)
-    {
-      i64_t ibucket = floor((value - object->bucket_min) /
-                            object->bucket_size);
-
-      if (ibucket >= object->nbuckets) ibucket = object->nbuckets - 1;
-           
-      object->buckets[ibucket]++;
-    }
-    else if (object->bucket_scale == BUCKET_LOG)
-    {
-      i64_t ibucket = 0;
- 
-      double bucket_min = object->bucket_min;
-      double bucket_max = object->bucket_min + object->bucket_size;
-
-      while(TRUE)
-      {
-        if ((value >= bucket_min) and (value < bucket_max)) break;
-
-        ibucket++;
-
-        bucket_min = object->bucket_min + pow(object->bucket_size, ibucket);
-        bucket_max = object->bucket_min + pow(object->bucket_size, ibucket + 1);
-      }
-      if (ibucket >= object->nbuckets) ibucket = object->nbuckets - 1;
-
-      object->buckets[ibucket]++;
-    }
-    else
-      FATAL("unknown bucket_scale", EXIT_FAILURE)
-  }
-}
-
-local void clear_bucket(bucket_t *object)
-{
-  for (i64_t ibucket = 0; ibucket < object->nbuckets; ibucket++)
-   object->buckets[ibucket] = 0;
-}
-
-local void *construct_bucket(void)
-{
-  bucket_t *object;
-  
-  MALLOC(object, bucket_t, 1)
-
-  object->object_id = bucket_class->register_object(bucket_class, object);
-
-  object->printf_bucket = printf_bucket;
-  object->define_bucket = define_bucket;
-  object->update_bucket = update_bucket;
-  object->clear_bucket = clear_bucket;
-
-  return(object);
-}
-
-local void destroy_bucket(void *self)
-{
-  bucket_t *object = self;
-
-  bucket_class->deregister_object(bucket_class, object);
-}
-
-
-//the object iterator
-
-local int iterate_bucket(void *self)
-{
-  bucket_t *object = self;
-
-  PRINTF("iterate object_id=%d\n", object->object_id);
-
-  object->printf_bucket(object);
-
-  return(0);
-}
-
-void init_bucket_class(void)
-{
-  bucket_class = init_class(NBUCKETS_MAX, construct_bucket, destroy_bucket,
-                           iterate_bucket);
-}
-
 #define NTEST 1000000
 
-void test_bucket_class(void)
+void test_buckets(void)
 {
+  my_random_t test_random;
+
+  construct_my_random(&test_random, 0);
+
   PRINTF("test_bucket_class\n");
 
-  bucket_t *a = bucket_class->objects_ctor();
+  bucket_t a;
 
-  a->define_bucket(a, 0.1, -1.0, 1.0, BUCKET_LINEAR);
-
-  for (int i = 0; i < NTEST; i++)
-  {
-    double value = (2.0 * (randull(0) % NTEST)) / NTEST - 1.0;
-
-    a->update_bucket(a, value);
-  }
-
-  a->printf_bucket(a);
-
-  bucket_t *b = bucket_class->objects_ctor();
-
-  b->define_bucket(b, 10, 0, NTEST, BUCKET_LOG);
+  construct_bucket(&a, 0.1, -1.0, 1.0, BUCKET_LINEAR);
 
   for (int i = 0; i < NTEST; i++)
   {
-    double value = (int) (randull(0) % (2 * NTEST))  - NTEST;
+    double value = (2.0 * (return_my_random(&test_random) % NTEST)) /
+                   NTEST - 1.0;
 
-    b->update_bucket(b, value);
+    update_bucket(&a, value);
   }
 
-  b->printf_bucket(b);
+  printf_bucket(&a);
 
-  PRINTF("iterate\n");
+  bucket_t b;
 
-  iterate_class(bucket_class);
+  construct_bucket(&b, 10, 0, NTEST, BUCKET_LOG);
+
+  for (int i = 0; i < NTEST; i++)
+  {
+    double value = (int) (return_my_random(&test_random) % (2 * NTEST)) -
+                         NTEST;
+
+    update_bucket(&b, value);
+  }
+
+  printf_bucket(&b);
 }
 

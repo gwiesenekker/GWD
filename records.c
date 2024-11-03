@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #define CJSON_FIELDS_ID      "fields"
@@ -21,7 +21,7 @@ local cJSON *find_field(cJSON *fields, char *arg_field_name)
 
     HARDBUG(!cJSON_IsString(field_name))
 
-    if (my_strcasecmp(cJSON_GetStringValue(field_name),  arg_field_name) == 0)
+    if (compat_strcasecmp(cJSON_GetStringValue(field_name),  arg_field_name) == 0)
     {
       result = field;
 
@@ -167,7 +167,7 @@ void get_field(void *self, char *arg_field_name, void *arg_value)
     HARDBUG(!cJSON_IsString(field_value))
 
     HARDBUG(bassigncstr((bstring) arg_value,
-                        cJSON_GetStringValue(field_value)) == BSTR_ERR)
+                        cJSON_GetStringValue(field_value)) != BSTR_OK)
   }
 }
 

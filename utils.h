@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef UtilsH
 #define UtilsH
 
@@ -12,8 +12,6 @@ extern int zzzzzz_invocation;
 
 void zzzzzz(char *, const char *, long, char *, int);
 int fexists(char *);
-ui64_t randull(int);
-double randdouble(int);
 
 i64_t first_prime_below(i64_t);
 void init_crc32(ui32_t *);

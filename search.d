@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 local void my_endgame_pv(board_t *with, int mate, char *pv_string)
 {
   moves_list_t moves_list;
@@ -183,8 +183,7 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
   {
     //only thread[0] should check the time limit
 
-    if ((with->board_thread_id == INVALID) or
-        (with->board_thread_id == thread_alpha_beta_master_id))
+    if (with->board_thread == thread_alpha_beta_master)
     {
       //Make sure that CLOCK_THREAD_CPUTIME_ID works in the search
 
@@ -194,9 +193,7 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
 
       //check for input
 
-      if ((with->board_thread_id != INVALID) and
-          (poll_queue(return_thread_queue(with->board_thread_id)) !=
-           INVALID))
+      if (poll_queue(return_thread_queue(with->board_thread)) != INVALID)
       {
         my_printf(with->board_my_printf, "got message\n");
 
@@ -246,7 +243,7 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
     {
       SOFTBUG(options.nthreads <= 1)
 
-      if (poll_queue(return_thread_queue(with->board_thread_id)) != INVALID)
+      if (poll_queue(return_thread_queue(with->board_thread)) != INVALID)
       {
         with->board_interrupt = BOARD_INTERRUPT_MESSAGE;
 
@@ -492,10 +489,9 @@ local int my_alpha_beta(board_t *with,
 
   SOFTBUG(IS_MINIMAL_WINDOW(node_type) and ((my_beta - my_alpha) != 1))
 
-  if ((with->board_thread_id == INVALID) or
-      (with->board_thread_id == thread_alpha_beta_master_id))
+  if (with->board_thread == thread_alpha_beta_master)
   {
-    bucket_depth->update_bucket(bucket_depth, my_depth);
+    update_bucket(&bucket_depth, my_depth);
   }
 
   if ((with->board_inode - with->board_root_inode) >= 128)
@@ -531,8 +527,7 @@ local int my_alpha_beta(board_t *with,
   {
     //only thread[0] should check the time limit
 
-    if ((with->board_thread_id == INVALID) or
-        (with->board_thread_id == thread_alpha_beta_master_id))
+    if (with->board_thread == thread_alpha_beta_master)
     {
       //Make sure that CLOCK_THREAD_CPUTIME_ID works in the search
 
@@ -542,9 +537,7 @@ local int my_alpha_beta(board_t *with,
 
       //check for input
 
-      if ((with->board_thread_id != INVALID) and
-          (poll_queue(return_thread_queue(with->board_thread_id)) !=
-           INVALID))
+      if (poll_queue(return_thread_queue(with->board_thread)) != INVALID)
       {
         my_printf(with->board_my_printf, "got message\n");
 
@@ -594,7 +587,7 @@ local int my_alpha_beta(board_t *with,
     {
       SOFTBUG(options.nthreads <= 1)
 
-      if (poll_queue(return_thread_queue(with->board_thread_id)) != INVALID)
+      if (poll_queue(return_thread_queue(with->board_thread)) != INVALID)
       {
         with->board_interrupt = BOARD_INTERRUPT_MESSAGE;
 
@@ -637,7 +630,6 @@ local int my_alpha_beta(board_t *with,
   }
 
   int alpha_beta_cache_hit = FALSE;
-  int alpha_beta_cache_depth_hit = FALSE;
 
   alpha_beta_cache_entry_t alpha_beta_cache_entry = 
     alpha_beta_cache_entry_default;
@@ -658,8 +650,6 @@ local int my_alpha_beta(board_t *with,
       {
         ++(with->total_alpha_beta_cache_depth_hits);
 
-        alpha_beta_cache_depth_hit = TRUE;
-  
         if (alpha_beta_cache_slot->ABCS_flags & LE_ALPHA_BIT)
         {
           ++(with->total_alpha_beta_cache_le_alpha_hits);
@@ -899,16 +889,18 @@ local int my_alpha_beta(board_t *with,
     goto label_return;
   }
 
-  int nfull_min = options.reduction_nfull_min;
+  int nfull_min = 1;
 
-  if (alpha_beta_cache_depth_hit) nfull_min = options.reduction_ncache_min;
-
-  if (FALSE and (with->board_thread_id != INVALID) and
-      (with->board_thread_id != thread_alpha_beta_master_id))
+/*
+  if (FALSE and (with->board_thread != NULL) and
+      (with->board_thread != thread_alpha_beta_master))
   {
-    int imove = randull_thread(0, with->board_thread_id) % moves_list.nmoves;
+    int imove = return_my_random(with->board_thread.thread_random) %
+                moves_list.nmoves;
+
     if (imove > nfull_min) nfull_min = imove;
   }
+*/
 
   if (IS_MINIMAL_WINDOW(node_type))
   {
@@ -919,6 +911,20 @@ local int my_alpha_beta(board_t *with,
       (your_depth >= options.reduction_depth_leaf) and
       (reduction_depth_root == 0) and
       (my_alpha >= (SCORE_LOST + NODE_MAX));
+
+    float factor = 1.0;
+
+    if (allow_reductions and (options.reduction_mean > 0))
+    {
+      int delta = BIT_COUNT(with->my_man_bb | with->your_man_bb |
+                            with->my_king_bb | with->your_king_bb) -
+                  options.reduction_mean;
+
+      float gamma = options.reduction_sigma;
+
+      factor = (gamma * gamma) / (delta * delta + gamma * gamma);
+//PRINTF("factor=%.6f\n", factor);
+    }
 
     {
       int nfull = 0;
@@ -956,14 +962,13 @@ local int my_alpha_beta(board_t *with,
             (moves_list.moves_tactical[jmove] == 0) and
             (nfull >= nfull_min))
         {
-          ++(with->total_reductions_delta_strong);
+          ++(with->total_reductions_delta);
 
-          int reduced_alpha = my_alpha - options.reduction_parameter_delta;
+          int reduced_alpha = my_alpha - options.reduction_delta;
           int reduced_beta = reduced_alpha + 1;
 
           int reduced_depth = 
-            roundf((100 - options.reduction_parameter_strong) /
-                   100.0f * your_depth);
+            roundf((100 - options.reduction_max) / 100.0f * your_depth);
 
           HARDBUG(reduced_depth == your_depth)
 
@@ -985,42 +990,36 @@ local int my_alpha_beta(board_t *with,
   
           if (temp_score < (SCORE_LOST + NODE_MAX))
           {
-            ++(with->total_reductions_delta_strong_lost);
+            ++(with->total_reductions_delta_lost);
           }
           else
           {
             with->total_reductions++;
 
-            int parameter = INVALID;
+            int percentage = INVALID;
 
             if (temp_score <= reduced_alpha)
             {
-              ++(with->total_reductions_delta_strong_le_alpha);
+              ++(with->total_reductions_delta_le_alpha);
 
-              parameter = options.reduction_parameter_strong;
+              percentage = roundf(options.reduction_strong * factor);
             }
             else
             { 
               SOFTBUG(!(temp_score >= reduced_beta))
 
-              ++(with->total_reductions_delta_strong_ge_beta);
+              ++(with->total_reductions_delta_ge_beta);
 
-              parameter = options.reduction_parameter_weak;
+              percentage = roundf(options.reduction_weak * factor);
             }
 
-            temp_depth = roundf((100 - parameter) / 100.0f * your_depth);
+            if (percentage < options.reduction_min)
+              percentage = options.reduction_min;
 
-            HARDBUG(temp_depth < reduced_depth)
+            reduced_depth = roundf((100 - percentage) / 100.0f * your_depth);
 
-            if ((temp_depth == reduced_depth) and
-                (options.reduction_parameter_delta == 0))
+            if (reduced_depth < your_depth)
             {
-              with->total_reductions_simple++;
-            }
-            else
-            {
-              reduced_depth = temp_depth;
-
               temp_score = -your_alpha_beta(with,
                 -my_beta, -my_alpha, reduced_depth,
                 node_type,
@@ -1036,18 +1035,22 @@ local int my_alpha_beta(board_t *with,
                   
                 goto label_return;
               }
-            }
 
-            if (temp_score <= my_alpha)
-            {
-              with->total_reductions_le_alpha++;
+              if (temp_score <= my_alpha)
+              {
+                with->total_reductions_le_alpha++;
+              }
+              else
+              {
+                SOFTBUG(!(temp_score >= my_beta))
+  
+                with->total_reductions_ge_beta++;
+  
+                temp_score = SCORE_MINUS_INFINITY;
+              }
             }
             else
             {
-              SOFTBUG(!(temp_score >= my_beta))
-
-              with->total_reductions_ge_beta++;
-
               temp_score = SCORE_MINUS_INFINITY;
             }
           }//if (temp_score < (SCORE_LOST + NODE+MAX))
@@ -1514,8 +1517,9 @@ local void print_my_pv(board_t *with, int my_depth,
 
       for (int ithread = 0; ithread < options.nthreads; ithread++)
       {
-        thread_t *with_thread = return_with_thread(threads[ithread]);
-        board_t *with_board = return_with_board(with_thread->thread_board_id);
+        thread_t *object = threads + ithread;
+
+        board_t *with_board = return_with_board(object->thread_board_id);
 
         global_nodes += with_board->total_nodes;
       }
@@ -1557,20 +1561,19 @@ local void print_my_pv(board_t *with, int my_depth,
 
   //flush
 
-  if (with->board_thread_id == INVALID)
-    my_printf(with->board_my_printf, "");
+  if (with->board_thread == NULL) my_printf(with->board_my_printf, "");
 
   if (options.mode == GAME_MODE)
   {
-    if ((with->board_thread_id != INVALID) and 
-        (with->board_thread_id == thread_alpha_beta_master_id))
+    if ((with->board_thread != NULL) and
+        (with->board_thread == thread_alpha_beta_master))
       enqueue(&main_queue, MESSAGE_INFO, pv_string);
   }
 }
 
 void my_search(board_t *with, moves_list_t *moves_list,
   int depth_min, int depth_max, int root_score,
-  int shuffle)
+  my_random_t *shuffle)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -1583,10 +1586,9 @@ void my_search(board_t *with, moves_list_t *moves_list,
     my_printf(with->board_my_printf, "itrouble=%d time_trouble=%.2f\n",
             itrouble, options.time_trouble[itrouble]);
 
-  if ((with->board_thread_id == INVALID) or
-      (with->board_thread_id == thread_alpha_beta_master_id))
+  if (with->board_thread == thread_alpha_beta_master)
   {
-    bucket_depth->clear_bucket(bucket_depth);
+    clear_bucket(&bucket_depth);
   }
 
   int my_depth = INVALID;
@@ -1609,11 +1611,11 @@ void my_search(board_t *with, moves_list_t *moves_list,
   for (int imove = 0; imove < moves_list->nmoves; imove++)
     sort[imove] = imove;
 
-  if (shuffle)
+  if (shuffle != NULL)
   { 
     for (int imove = moves_list->nmoves - 1; imove >= 1; --imove)
     {
-      int jmove = randull(0) % (imove + 1);
+      int jmove = return_my_random(shuffle) % (imove + 1);
       if (jmove != imove)
       {
         int temp = sort[imove];
@@ -1747,8 +1749,8 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
     if (options.mode == GAME_MODE)
     {
-      if ((with->board_thread_id != INVALID) and
-          (with->board_thread_id == thread_alpha_beta_master_id))
+      if ((with->board_thread != NULL) and
+          (with->board_thread == thread_alpha_beta_master))
         enqueue(&main_queue, MESSAGE_INFO, pv_string); 
     }
 
@@ -1763,7 +1765,8 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
   return_neural_score_scaled(&(with->board_neural0), FALSE, FALSE);
 
-  return_neural_score_scaled(&(with->board_neural1), FALSE, FALSE);
+  if (with->board_neural1_not_null)
+    return_neural_score_scaled(&(with->board_neural1), FALSE, FALSE);
 
   with->board_search_root_simple_score = return_my_score(with);
 
@@ -1808,8 +1811,8 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
   //publish work
 
-  if ((with->board_thread_id != INVALID) and
-      (with->board_thread_id == thread_alpha_beta_master_id))
+  if ((with->board_thread != NULL) and
+      (with->board_thread == thread_alpha_beta_master))
   {
     char message[MY_LINE_MAX];
 
@@ -1825,7 +1828,7 @@ void my_search(board_t *with, moves_list_t *moves_list,
           move_string, depth_min, depth_max, 
           with->board_search_best_score, FALSE);
         
-        enqueue(return_thread_queue(threads[ithread]),
+        enqueue(return_thread_queue(threads + ithread),
                    MESSAGE_SEARCH_FIRST, message);
       }
     }
@@ -1839,7 +1842,7 @@ void my_search(board_t *with, moves_list_t *moves_list,
             move_string, depth_min, depth_max, 
             with->board_search_best_score, FALSE);
       
-          enqueue(return_thread_queue(threads[ithread]),
+          enqueue(return_thread_queue(threads + ithread),
                      MESSAGE_SEARCH_FIRST, message);
         }
         else if ((ithread % 3) == 2)
@@ -1848,7 +1851,7 @@ void my_search(board_t *with, moves_list_t *moves_list,
             move_string, depth_min, depth_max, 
             with->board_search_best_score, FALSE);
 
-          enqueue(return_thread_queue(threads[ithread]),
+          enqueue(return_thread_queue(threads + ithread),
                      MESSAGE_SEARCH_AHEAD, message);
         }
         else
@@ -1857,7 +1860,7 @@ void my_search(board_t *with, moves_list_t *moves_list,
             move_string, depth_min, depth_max, 
             with->board_search_best_score, FALSE);
       
-          enqueue(return_thread_queue(threads[ithread]),
+          enqueue(return_thread_queue(threads + ithread),
                      MESSAGE_SEARCH_SECOND, message);
         }
       }
@@ -2024,8 +2027,8 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
         sort[0] = jmove;
 
-        if ((with->board_thread_id != INVALID) and
-            (with->board_thread_id == thread_alpha_beta_master_id) and
+        if ((with->board_thread != NULL) and
+            (with->board_thread == thread_alpha_beta_master) and
             (options.lazy_smp_policy > 0))
         {
           char message[MY_LINE_MAX];
@@ -2043,7 +2046,7 @@ void my_search(board_t *with, moves_list_t *moves_list,
                 move_string, depth_min, depth_max, 
                 with->board_search_best_score, FALSE);
     
-              enqueue(return_thread_queue(threads[ithread]),
+              enqueue(return_thread_queue(threads + ithread),
                          MESSAGE_SEARCH_AHEAD, message);
             }
             else if ((ithread % 3) == 0)
@@ -2052,7 +2055,7 @@ void my_search(board_t *with, moves_list_t *moves_list,
                 move_string, depth_min, depth_max, 
                 with->board_search_best_score, FALSE);
           
-              enqueue(return_thread_queue(threads[ithread]),
+              enqueue(return_thread_queue(threads + ithread),
                          MESSAGE_SEARCH_SECOND, message);
             }
           }
@@ -2127,8 +2130,7 @@ void my_search(board_t *with, moves_list_t *moves_list,
   }
   label_limit:
 
-  if ((with->board_thread_id == INVALID) or
-      (with->board_thread_id == thread_alpha_beta_master_id))
+  if (with->board_thread == thread_alpha_beta_master)
   {
     if (FALSE and (with->board_search_best_score < -(SCORE_MAN / 4)))
     {
@@ -2177,15 +2179,16 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
   if (options.verbose > 0) print_totals(with);
 
-  if ((with->board_thread_id != INVALID) and
-      (with->board_thread_id == thread_alpha_beta_master_id))
+  if ((with->board_thread != NULL) and
+      (with->board_thread == thread_alpha_beta_master))
   {
     global_nodes = 0;
 
     for (int ithread = 0; ithread < options.nthreads; ithread++)
     {
-      thread_t *with_thread = return_with_thread(threads[ithread]);
-      board_t *with_board = return_with_board(with_thread->thread_board_id);
+      thread_t *object = threads + ithread;
+
+      board_t *with_board = return_with_board(object->thread_board_id);
 
       global_nodes += with_board->total_nodes;
     }
@@ -2197,10 +2200,9 @@ void my_search(board_t *with, moves_list_t *moves_list,
       global_nodes / return_my_timer(&(with->board_timer), FALSE));
   }
 
-  if ((with->board_thread_id == INVALID) or
-      (with->board_thread_id == thread_alpha_beta_master_id))
+  if (with->board_thread == thread_alpha_beta_master)
   {
-    bucket_depth->printf_bucket(bucket_depth);
+    printf_bucket(&bucket_depth);
   }
 
   END_BLOCK

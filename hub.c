@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -109,7 +109,7 @@ local void write_to_hub(char *line)
 
   HARDBUG(line[nline - 1] != '\n')
 
-  HARDBUG(my_write(1, line, nline) != nline)
+  HARDBUG(compat_write(1, line, nline) != nline)
 }
 
 local char *pgets(char *s, int size, pipe_t pfd)
@@ -127,11 +127,11 @@ local char *pgets(char *s, int size, pipe_t pfd)
 
     if (pfd == 0)
     {
-      if ((n = my_read(0, &c, 1)) == INVALID) return(NULL);
+      if ((n = compat_read(0, &c, 1)) == INVALID) return(NULL);
     }
     else
     {
-      if ((n = my_pipe_read(pfd, &c, 1)) == INVALID) return(NULL);
+      if ((n = compat_pipe_read(pfd, &c, 1)) == INVALID) return(NULL);
     }
 
     //eof
@@ -161,16 +161,18 @@ local int read_from_hub(char line[MY_LINE_MAX])
 
 local int hub_input(void)
 {
-  return(my_poll());
+  return(compat_poll());
 }
 
 void hub(void)
 {
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
 
   string2board(STARTING_POSITION, iboard);
 
-  state_t *game = state_class->objects_ctor();
+  state_t game_state;
+  
+  construct_state(&game_state);
 
   while(TRUE)
   {
@@ -184,11 +186,11 @@ void hub(void)
 
     if (command.command == NULL) continue;
 
-    if (my_strcasecmp(command.command, "quit") == 0)
+    if (compat_strcasecmp(command.command, "quit") == 0)
     { 
       break;
     } 
-    else if (my_strcasecmp(command.command, "pos") == 0)
+    else if (compat_strcasecmp(command.command, "pos") == 0)
     {
       HARDBUG(command.command_nargs < 1)
 
@@ -198,7 +200,7 @@ void hub(void)
 
       HARDBUG(start_board == NULL)
 
-      HARDBUG(my_strcasecmp(name, "pos") != 0)
+      HARDBUG(compat_strcasecmp(name, "pos") != 0)
 
       string2board(start_board, iboard);
 
@@ -208,9 +210,9 @@ void hub(void)
 
       board2fen(iboard, fen, FALSE);
 
-      game->set_starting_position(game, fen);
+      game_state.set_starting_position(&game_state, fen);
 
-      while(game->pop_move(game) > 0);
+      while(game_state.pop_move(&game_state) > 0);
 
       if (command.command_nargs == 2)
       {
@@ -218,7 +220,7 @@ void hub(void)
 
         char *moves = command.command_args[1].arg_value;
 
-        HARDBUG(my_strcasecmp(name, "moves") != 0)
+        HARDBUG(compat_strcasecmp(name, "moves") != 0)
 
         int nmoves = 0;
 
@@ -236,7 +238,7 @@ void hub(void)
 
           PRINTF("got move %s\n", move_string);
 
-          game->push_move(game, move_string, NULL);
+          game_state.push_move(&game_state, move_string, NULL);
 
           nmoves++;
         }
@@ -244,7 +246,7 @@ void hub(void)
       }
       continue;
     }
-    else if (my_strcasecmp(command.command, "level") == 0)
+    else if (compat_strcasecmp(command.command, "level") == 0)
     {
       HARDBUG(command.command_nargs < 1)
 
@@ -252,7 +254,7 @@ void hub(void)
 
       char *value = command.command_args[0].arg_value;
 
-      if (my_strcasecmp(name, "depth") == 0)
+      if (compat_strcasecmp(name, "depth") == 0)
       {
         HARDBUG(value == NULL)
 
@@ -267,7 +269,7 @@ void hub(void)
 
         options.depth_limit = d;
       }
-      else if (my_strcasecmp(name, "move-time") == 0)
+      else if (compat_strcasecmp(name, "move-time") == 0)
       {
         HARDBUG(value == NULL)
 
@@ -285,7 +287,7 @@ void hub(void)
         options.time_trouble[1] = options.time_limit / 4.0;
         options.time_ntrouble = 2;
       }
-      else if (my_strcasecmp(name, "moves") == 0)
+      else if (compat_strcasecmp(name, "moves") == 0)
       {
         HARDBUG(value == NULL)
 
@@ -299,7 +301,7 @@ void hub(void)
 
         value = command.command_args[1].arg_value;
    
-        HARDBUG(my_strcasecmp(name, "time") != 0)
+        HARDBUG(compat_strcasecmp(name, "time") != 0)
   
         HARDBUG(value == NULL)
 
@@ -326,7 +328,7 @@ void hub(void)
 
         options.time_ntrouble = 2;
       }
-      else if (my_strcasecmp(name, "time") == 0)
+      else if (compat_strcasecmp(name, "time") == 0)
       {
         HARDBUG(value == NULL)
 
@@ -354,7 +356,7 @@ void hub(void)
 
         options.time_ntrouble = 2;
       }
-      else if (my_strcasecmp(name, "infinite") == 0)
+      else if (compat_strcasecmp(name, "infinite") == 0)
       {
         PRINTF("found infinite\n");
 
@@ -364,7 +366,7 @@ void hub(void)
       else
         PRINTF("ignoring %s\n", name);
     }
-    else if (my_strcasecmp(command.command, "go") == 0)
+    else if (compat_strcasecmp(command.command, "go") == 0)
     {
       options.depth_limit = 64;
 
@@ -374,12 +376,12 @@ void hub(void)
 
       HARDBUG(name == NULL)
 
-      if (my_strcasecmp(name, "ponder") == 0)
+      if (compat_strcasecmp(name, "ponder") == 0)
       {
         options.time_limit = 10000.0;
         options.time_ntrouble = 0;
       }
-      else if (my_strcasecmp(name, "analyze") == 0)
+      else if (compat_strcasecmp(name, "analyze") == 0)
       {
         if (options.ponder)
           options.time_limit = 10000.0;
@@ -410,21 +412,21 @@ void hub(void)
 
       strcpy(move_string, "NULL");
 
-      if ((my_strcasecmp(name, "think") == 0) and (moves_list.nmoves == 1))
+      if ((compat_strcasecmp(name, "think") == 0) and (moves_list.nmoves == 1))
       {
         strcpy(move_string, moves_list.move2string(&moves_list, 0));
       }
       else
       {
-        if ((my_strcasecmp(name, "think") == 0) and options.use_book)
+        if ((compat_strcasecmp(name, "think") == 0) and options.use_book)
           return_book_move(with_board, &moves_list, move_string);
 
-        if (my_strcasecmp(move_string, "NULL") == 0)
+        if (compat_strcasecmp(move_string, "NULL") == 0)
         {
-          enqueue(return_thread_queue(thread_alpha_beta_master_id),
-            MESSAGE_STATE, game->get_state(game));
+          enqueue(return_thread_queue(thread_alpha_beta_master),
+            MESSAGE_STATE, game_state.get_state(&game_state));
 
-          enqueue(return_thread_queue(thread_alpha_beta_master_id),
+          enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_GO, "hub/hub");
 
           int abort = FALSE;
@@ -436,7 +438,7 @@ void hub(void)
             {
               PRINTF("got input!\n");
   
-              enqueue(return_thread_queue(thread_alpha_beta_master_id),
+              enqueue(return_thread_queue(thread_alpha_beta_master),
                 MESSAGE_ABORT_SEARCH, "hub/hub");
   
               abort = TRUE;
@@ -444,7 +446,7 @@ void hub(void)
   
             if (dequeue(&main_queue, &message) == INVALID)
             {
-              my_sleep(CENTI_SECOND);
+              compat_sleep(CENTI_SECOND);
        
               continue;
             }
@@ -474,13 +476,13 @@ void hub(void)
         }
       }
 
-      HARDBUG(my_strcasecmp(move_string, "NULL") == 0)
+      HARDBUG(compat_strcasecmp(move_string, "NULL") == 0)
 
       snprintf(line, MY_LINE_MAX, "done move=%s\n", move_string);
   
       write_to_hub(line);
     }
-    else if (my_strcasecmp(command.command, "ping") == 0)
+    else if (compat_strcasecmp(command.command, "ping") == 0)
     {
       snprintf(line, MY_LINE_MAX, "pong\n");
 
@@ -491,7 +493,7 @@ void hub(void)
       PRINTF("ignoring command %s\n", command.command);
     }
   }
-  state_class->objects_dtor(game);
+  destroy_state(&game_state);
 }
 
 void init_hub(void)
@@ -508,7 +510,7 @@ void init_hub(void)
 
   HARDBUG(command.command == NULL)
 
-  HARDBUG(my_strcasecmp(command.command, "hub") != 0)
+  HARDBUG(compat_strcasecmp(command.command, "hub") != 0)
 
   snprintf(line, MY_LINE_MAX, 
     "id name=Gwd version=%s author=\"GW KB\" country=NL\n",
@@ -534,7 +536,7 @@ void init_hub(void)
 
     char *ui = cJSON_GetStringValue(cjson_ui);
 
-    if (my_strcasecmp(ui, "false") == 0) continue;
+    if (compat_strcasecmp(ui, "false") == 0) continue;
 
     cJSON *cjson_name = cJSON_GetObjectItem(parameter, "name");
 
@@ -548,7 +550,7 @@ void init_hub(void)
     
     HARDBUG(parameter_type == NULL)
 
-    if (my_strcasecmp(parameter_type, "int") == 0)
+    if (compat_strcasecmp(parameter_type, "int") == 0)
     {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -559,7 +561,7 @@ void init_hub(void)
       snprintf(line, MY_LINE_MAX, "param name=%s type=int value=%d\n",
         ui, value);
     }
-    else if (my_strcasecmp(parameter_type, "double") == 0)
+    else if (compat_strcasecmp(parameter_type, "double") == 0)
     {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -570,7 +572,7 @@ void init_hub(void)
       snprintf(line, MY_LINE_MAX, "param name=%s type=real value=%.2f\n",
         ui, value);
     }
-    else if (my_strcasecmp(parameter_type, "string") == 0)
+    else if (compat_strcasecmp(parameter_type, "string") == 0)
     {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -581,7 +583,7 @@ void init_hub(void)
       snprintf(line, MY_LINE_MAX, "param name=%s type=string value=\"%s\"\n",
         ui, string);
     }
-    else if (my_strcasecmp(parameter_type, "bool") == 0)
+    else if (compat_strcasecmp(parameter_type, "bool") == 0)
     {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -613,21 +615,21 @@ void init_hub(void)
 
     if (command.command == NULL) continue;
 
-    if (my_strcasecmp(command.command, "init") == 0)
+    if (compat_strcasecmp(command.command, "init") == 0)
     {
       write_to_hub("ready\n");
       break;
     }
 
-    HARDBUG(my_strcasecmp(command.command, "set-param") != 0)
+    HARDBUG(compat_strcasecmp(command.command, "set-param") != 0)
     
     HARDBUG(command.command_nargs < 2)
 
-    HARDBUG(my_strcasecmp(command.command_args[0].arg_name, "name") != 0)
+    HARDBUG(compat_strcasecmp(command.command_args[0].arg_name, "name") != 0)
 
     char *name = command.command_args[0].arg_value;
 
-    HARDBUG(my_strcasecmp(command.command_args[1].arg_name, "value") != 0)
+    HARDBUG(compat_strcasecmp(command.command_args[1].arg_name, "value") != 0)
 
     char *value = command.command_args[1].arg_value;
 
@@ -643,7 +645,7 @@ void init_hub(void)
 
       char *ui = cJSON_GetStringValue(cjson_ui);
 
-      if (my_strcasecmp(ui, name) != 0) continue;
+      if (compat_strcasecmp(ui, name) != 0) continue;
 
       cJSON *cjson_name = cJSON_GetObjectItem(parameter, "name");
   
@@ -659,7 +661,7 @@ void init_hub(void)
       
       HARDBUG(parameter_type == NULL)
   
-      if (my_strcasecmp(parameter_type, "int") == 0)
+      if (compat_strcasecmp(parameter_type, "int") == 0)
       {
         int ivalue;
 
@@ -675,7 +677,7 @@ void init_hub(void)
 
         cJSON_AddBoolToObject(parameter, "cli", TRUE);
       }
-      else if (my_strcasecmp(parameter_type, "double") == 0)
+      else if (compat_strcasecmp(parameter_type, "double") == 0)
       {
         double dvalue;
 
@@ -691,7 +693,7 @@ void init_hub(void)
 
         cJSON_AddBoolToObject(parameter, "cli", TRUE);
       }
-      else if (my_strcasecmp(parameter_type, "string") == 0)
+      else if (compat_strcasecmp(parameter_type, "string") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -701,13 +703,13 @@ void init_hub(void)
 
         cJSON_AddBoolToObject(parameter, "cli", TRUE);
       }
-      else if (my_strcasecmp(parameter_type, "bool") == 0)
+      else if (compat_strcasecmp(parameter_type, "bool") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
         HARDBUG(!cJSON_IsBool(cjson_value))
 
-        if (my_strcasecmp(value, "false") == 0)
+        if (compat_strcasecmp(value, "false") == 0)
           cJSON_SetBoolValue(cjson_value, 0);
         else
           cJSON_SetBoolValue(cjson_value, 1);
@@ -728,7 +730,7 @@ local void write_to_hub_client(char *line, pipe_t pfd)
 
   HARDBUG(line[nline - 1] != '\n')
 
-  HARDBUG(my_pipe_write(pfd, line, nline) != nline)
+  HARDBUG(compat_pipe_write(pfd, line, nline) != nline)
 }
 
 
@@ -757,26 +759,28 @@ local int play_game(board_t *with, int my_colour,
 {
   int result = INVALID;
 
-  state_t *game = state_class->objects_ctor();
+  state_t game_state;
 
-  game->set_event(game, event);
+  construct_state(&game_state);
+
+  game_state.set_event(&game_state, event);
 
   if (IS_WHITE(my_colour))
   {
-    game->set_white(game, my_name);
-    game->set_black(game, your_name);
+    game_state.set_white(&game_state, my_name);
+    game_state.set_black(&game_state, your_name);
   }
   else
   {
-    game->set_white(game, your_name);
-    game->set_black(game, my_name);
+    game_state.set_white(&game_state, your_name);
+    game_state.set_black(&game_state, my_name);
   }
 
   char fen[MY_LINE_MAX];
 
   board2fen(with->board_id, fen, FALSE);
 
-  game->set_starting_position(game, fen);
+  game_state.set_starting_position(&game_state, fen);
 
   char pos[MY_LINE_MAX];
 
@@ -838,10 +842,10 @@ local int play_game(board_t *with, int my_colour,
 
         PRINTF("\nPondering..\n");
   
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
-          MESSAGE_STATE, game->get_state(game));
+        enqueue(return_thread_queue(thread_alpha_beta_master),
+          MESSAGE_STATE, game_state.get_state(&game_state));
 
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
+        enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_GO, "hub/play_game");
       }
 
@@ -853,14 +857,14 @@ local int play_game(board_t *with, int my_colour,
 
       cJSON *game_move;
 
-      cJSON_ArrayForEach(game_move, game->get_moves(game))
+      cJSON_ArrayForEach(game_move, game_state.get_moves(&game_state))
       {
         cJSON *move_string =
           cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
 
         HARDBUG(!cJSON_IsString(move_string))
     
-        if (my_strcasecmp(moves_string, "") == 0)
+        if (compat_strcasecmp(moves_string, "") == 0)
           strcpy(moves_string, cJSON_GetStringValue(move_string));
         else
         {
@@ -893,7 +897,7 @@ local int play_game(board_t *with, int my_colour,
 
       PRINTF("waiting for 'info' or 'done'..\n");
 
-      double t1 = my_time();
+      double t1 = compat_time();
 
       command_t command;
 
@@ -905,10 +909,10 @@ local int play_game(board_t *with, int my_colour,
       
         HARDBUG(command.command == NULL)
 
-        if (my_strcasecmp(command.command, "done") == 0) break;
+        if (compat_strcasecmp(command.command, "done") == 0) break;
       }
 
-      double t2 = my_time();
+      double t2 = compat_time();
 
       double move_time_used = t2 - t1;
 
@@ -923,7 +927,7 @@ local int play_game(board_t *with, int my_colour,
       {
         //cancel pondering and dequeue messages
 
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
+        enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_ABORT_SEARCH, "main/play_game");
   
         message_t message;
@@ -944,13 +948,13 @@ local int play_game(board_t *with, int my_colour,
             else
               FATAL("message.message_id error", EXIT_FAILURE)
           }
-          my_sleep(CENTI_SECOND);
+          compat_sleep(CENTI_SECOND);
         }
       }
 
       HARDBUG(command.command_nargs < 1)
 
-      HARDBUG(my_strcasecmp(command.command_args[0].arg_name, "move") != 0)
+      HARDBUG(compat_strcasecmp(command.command_args[0].arg_name, "move") != 0)
 
       char *move_string = command.command_args[0].arg_value;
 
@@ -958,7 +962,7 @@ local int play_game(board_t *with, int my_colour,
 
       HARDBUG((imove = search_move(&moves_list, move_string)) == INVALID)
 
-      game->push_move(game, move_string, NULL);
+      game_state.push_move(&game_state, move_string, NULL);
 
       do_move(with, imove, &moves_list);
     }
@@ -1019,19 +1023,19 @@ local int play_game(board_t *with, int my_colour,
 
       strcpy(best_move, "NULL");
 
-      message_t message;
+      char best_string[MY_LINE_MAX];
 
-      strcpy(bdata(message.message_text), "NULL");
+      strcpy(best_string, "NULL");
 
       PRINTF("\nthinking..\n");
 
-      double t1 = my_time();
+      double t1 = compat_time();
 
       if (moves_list.nmoves == 1)
       {
         strcpy(best_move, moves_list.move2string(&moves_list, 0));
 
-        strcpy(bdata(message.message_text), "only move");
+        strcpy(best_string, "only move");
 
         best_score = 0;
  
@@ -1042,9 +1046,9 @@ local int play_game(board_t *with, int my_colour,
         if (options.use_book)
           return_book_move(with, &moves_list, best_move);
       
-        if (my_strcasecmp(best_move, "NULL") != 0)
+        if (compat_strcasecmp(best_move, "NULL") != 0)
         {
-          strcpy(bdata(message.message_text), "book move");
+          strcpy(best_string, "book move");
 
           best_score = 0;
  
@@ -1056,14 +1060,16 @@ local int play_game(board_t *with, int my_colour,
 
           set_time_limit(nmy_game_moves_done, &time_control);
 
-          enqueue(return_thread_queue(thread_alpha_beta_master_id),
-            MESSAGE_STATE, game->get_state(game));
+          enqueue(return_thread_queue(thread_alpha_beta_master),
+            MESSAGE_STATE, game_state.get_state(&game_state));
   
-          enqueue(return_thread_queue(thread_alpha_beta_master_id),
+          enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_GO, "hub/play_game");
     
           while(TRUE)
           {
+            message_t message;
+
             if (dequeue(&main_queue, &message) != INVALID)
             {
               if (message.message_id == MESSAGE_INFO)
@@ -1072,9 +1078,12 @@ local int play_game(board_t *with, int my_colour,
               }
               else if (message.message_id == MESSAGE_RESULT)
               {
-                PRINTF("got result %s\n", bdata(message.message_text));
+                strcpy(best_string, bdata(message.message_text));
+
+                PRINTF("got result %s\n", best_string);
     
-                HARDBUG(sscanf(bdata(message.message_text), "%s%d%d",
+                
+                HARDBUG(sscanf(best_string, "%s%d%d",
                                best_move, &best_score, &best_depth) != 3)
   
                 break;
@@ -1082,12 +1091,12 @@ local int play_game(board_t *with, int my_colour,
               else
                 FATAL("message.message_id error", EXIT_FAILURE)
             } 
-            my_sleep(CENTI_SECOND);
+            compat_sleep(CENTI_SECOND);
           }
         }
       }
 
-      double t2 = my_time();
+      double t2 = compat_time();
 
       double move_time_used = t2 - t1;
 
@@ -1105,9 +1114,9 @@ local int play_game(board_t *with, int my_colour,
         best_move, best_score, best_depth);
 
       if (options.hub_annotate_level == 0)
-        game->push_move(game, best_move, NULL);
+        game_state.push_move(&game_state, best_move, NULL);
       else
-        game->push_move(game, best_move, bdata(message.message_text));
+        game_state.push_move(&game_state, best_move, best_string);
 
       int imove;
 
@@ -1125,11 +1134,13 @@ local int play_game(board_t *with, int my_colour,
         options.time_limit = options.neural_evaluation_time;
         options.time_ntrouble = 0;
 
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
+        enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_GO, "hub/evaluate");
   
         while(TRUE)
         {
+          message_t message;
+
           if (dequeue(&main_queue, &message) != INVALID)
           {
             if (message.message_id == MESSAGE_INFO)
@@ -1148,13 +1159,13 @@ local int play_game(board_t *with, int my_colour,
             else
               FATAL("message.message_id error", EXIT_FAILURE)
           } 
-          my_sleep(CENTI_SECOND);
+          compat_sleep(CENTI_SECOND);
         }
 
         PRINTF("evaluate best_move=%s best_score=%d best_depth=%d\n",
                best_move, best_score, best_depth);
 
-        int fd = my_lock_file("hub.fen");
+        int fd = compat_lock_file("hub.fen");
 
         HARDBUG(fd == -1)
       
@@ -1162,10 +1173,10 @@ local int play_game(board_t *with, int my_colour,
 
         if (IS_BLACK(with->board_colour2move)) best_score = -best_score;
 
-        my_fdprintf(fd, "%s {%.5f}\n", fen,
+        compat_fdprintf(fd, "%s {%.5f}\n", fen,
                         return_sigmoid(best_score / 100.0));
 
-        my_unlock_file(fd);
+        compat_unlock_file(fd);
       }
 
       do_move(with, imove, &moves_list);
@@ -1191,21 +1202,21 @@ local int play_game(board_t *with, int my_colour,
 
   PRINTF("game_result=%s\n", game_result);
 
-  game->set_result(game, game_result);
+  game_state.set_result(&game_state, game_result);
 
-  game->save2pdn(game, "hub.pdn");
+  game_state.save2pdn(&game_state, "hub.pdn");
 
-  state_class->objects_dtor(game);
+  destroy_state(&game_state);
 
   return(result);
 }
 
 local void hub_server_game_initiator(pipe_t parent2child, pipe_t child2parent)
 {
-  snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.neural_name0);
+  snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.neural0_name);
   snprintf(your_name, MY_LINE_MAX, "%s", options.hub_server_client);
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   int nwon = 0;
@@ -1389,7 +1400,7 @@ void hub_server(pipe_t parent2child, pipe_t child2parent)
   
     HARDBUG(command.command == NULL)
   
-    if (my_strcasecmp(command.command, "wait") == 0) break;
+    if (compat_strcasecmp(command.command, "wait") == 0) break;
   }
 
   write_to_hub_client("init\n", parent2child);
@@ -1408,7 +1419,7 @@ void hub_server(pipe_t parent2child, pipe_t child2parent)
   
     HARDBUG(command.command == NULL)
   
-    if (my_strcasecmp(command.command, "ready") == 0) break;
+    if (compat_strcasecmp(command.command, "ready") == 0) break;
   }
 
   hub_server_game_initiator(parent2child, child2parent);

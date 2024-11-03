@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #undef ALIGN8
@@ -13,34 +13,34 @@ local void printf_cache(void *self)
 
   PRINTF("cache_name=%s\n", bdata(object->cache_name));
 
-  PRINTF("%s_entry_key_type=%d\n", object->cache_name,
+  PRINTF("%s_entry_key_type=%d\n", bdata(object->cache_name),
     object->cache_entry_key_type);
 
-  PRINTF("%s_entry_key_size=%d\n", object->cache_name,
+  PRINTF("%s_entry_key_size=%d\n", bdata(object->cache_name),
     (int) object->cache_entry_key_size);
 
-  PRINTF("%s_entry_key_nalign=%d\n", object->cache_name,
+  PRINTF("%s_entry_key_nalign=%d\n", bdata(object->cache_name),
     object->cache_entry_key_nalign);
 
-  PRINTF("%s_entry_value_size=%d\n", object->cache_name,
+  PRINTF("%s_entry_value_size=%d\n", bdata(object->cache_name),
     (int) object->cache_entry_value_size);
 
-  PRINTF("%s_entry_value_nalign=%d\n", object->cache_name,
+  PRINTF("%s_entry_value_nalign=%d\n", bdata(object->cache_name),
     object->cache_entry_value_nalign);
 
-  PRINTF("%s_nentries=%lld\n", object->cache_name,
+  PRINTF("%s_nentries=%lld\n", bdata(object->cache_name),
     object->cache_nentries);
 
-  PRINTF("%s_nhits=%lld\n", object->cache_name,
+  PRINTF("%s_nhits=%lld\n", bdata(object->cache_name),
     object->cache_nhits);
 
-  PRINTF("%s_nstored=%lld\n", object->cache_name,
+  PRINTF("%s_nstored=%lld\n", bdata(object->cache_name),
     object->cache_nstored);
 
-  PRINTF("%s_nupdates=%lld\n", object->cache_name,
+  PRINTF("%s_nupdates=%lld\n", bdata(object->cache_name),
     object->cache_nupdates);
 
-  PRINTF("%s_noverwrites=%lld\n", object->cache_name,
+  PRINTF("%s_noverwrites=%lld\n", bdata(object->cache_name),
     object->cache_noverwrites);
 
   i64_t nunused = 0;
@@ -57,7 +57,7 @@ local void printf_cache(void *self)
       nunused++;
   }
 
-  PRINTF("%s_nunused=%lld or %.2f percent\n", object->cache_name,
+  PRINTF("%s_nunused=%lld or %.2f percent\n", bdata(object->cache_name),
     nunused, nunused * 100.0 / object->cache_nentries);
 }
 
@@ -243,7 +243,8 @@ void construct_cache(void *self, char *arg_cache_name, i64_t arg_cache_size,
 
   //copy the default key value
 
-  MALLOC(object->cache_entry_key_default, i8_t, object->cache_entry_key_size)
+  MY_MALLOC(object->cache_entry_key_default, i8_t,
+    object->cache_entry_key_size)
 
   memcpy(object->cache_entry_key_default, arg_entry_key_default,
     object->cache_entry_key_size);
@@ -264,7 +265,7 @@ void construct_cache(void *self, char *arg_cache_name, i64_t arg_cache_size,
 
   HARDBUG(object->cache_nentries < 3)
 
-  MALLOC(object->cache_entry_values, i8_t,
+  MY_MALLOC(object->cache_entry_values, i8_t,
     CACHE_ENTRY_SIZE(object) * object->cache_nentries)
 
   memcpy(object->cache_entry_values, object->cache_entry_key_default,
@@ -299,6 +300,10 @@ void construct_cache(void *self, char *arg_cache_name, i64_t arg_cache_size,
 
 void test_caches(void)
 {
+  my_random_t test_random;
+
+  construct_my_random(&test_random, 0);
+
   i64_t d = -1;
 
   cache_t a;
@@ -332,7 +337,7 @@ void test_caches(void)
 
   for (i64_t i = 0; i < 100000; i++)
   {
-    i64_t j = randull(0) % 100000000;
+    i64_t j = return_my_random(&test_random) % 100000000;
 
     i64_t v = 2 * j;
 
@@ -382,7 +387,7 @@ void test_caches(void)
 
   for (i64_t i = 0; i < 100000; i++)
   {
-    ui64_t j = randull(0) % 100000000;
+    ui64_t j = return_my_random(&test_random) % 100000000;
 
     ui64_t v = 2 * j;
 

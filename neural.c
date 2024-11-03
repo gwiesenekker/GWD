@@ -1,7 +1,37 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #define NETWORKS_JSON "networks.json"
+
+#define CLIP_VALUE 6
+
+local scaled_double_t add2(i64_t a, i64_t b, int scale)
+{
+  i64_t s;
+
+  if (scale == INVALID)
+    s = a + b;
+  else
+    s = (a + b * scale) / scale;
+
+  if (s > SCALED_DOUBLE_MAX)
+  {
+    PRINTF("WARNING: POSITIVE OVERFLOW ADD2"
+           " a=%lld b=%lld scale=%d\n", a, b, scale);
+
+    s = SCALED_DOUBLE_MAX;
+  }
+
+  if (s < SCALED_DOUBLE_MIN)
+  {
+    PRINTF("WARNING: NEGATIVE OVERFLOW ADD2"
+           " a=%lld b=%lld scale=%d\n", a, b, scale);
+
+    s = SCALED_DOUBLE_MIN;
+  }
+
+  return(s);
+}
 
 local cJSON *open_cjson_file(cJSON *directory, char *arg_name)
 {
@@ -64,8 +94,8 @@ local void read_1d_csv(cJSON *csv, int *arg_nrows,
   scaled_double_t *cells;
   double *cells_double;
 
-  MALLOC(cells, scaled_double_t, nrows)
-  MALLOC(cells_double, double, nrows)
+  MY_MALLOC(cells, scaled_double_t, nrows)
+  MY_MALLOC(cells_double, double, nrows)
 
   int irow = 0;
 
@@ -80,8 +110,6 @@ local void read_1d_csv(cJSON *csv, int *arg_nrows,
     double f;
 
     HARDBUG(sscanf(string, "%lf", &f) != 1)
-
-    cells[irow] = DOUBLE2SCALED(f);
 
     cells_double[irow] = f;
 
@@ -162,51 +190,51 @@ local void read_2d_csv(cJSON *csv, const int by_row,
 
   if (by_row)
   {
-    MALLOC(cells, scaled_double_t *, nrows)
+    MY_MALLOC(cells, scaled_double_t *, nrows)
 
     for (int irow = 0; irow < nrows; irow++)
-      MALLOC(cells[irow], scaled_double_t, ncols)
+      MY_MALLOC(cells[irow], scaled_double_t, ncols)
 
-    MALLOC(cells_transposed, scaled_double_t *, ncols)
+    MY_MALLOC(cells_transposed, scaled_double_t *, ncols)
 
     for (int icol = 0; icol < ncols; icol++)
-      MALLOC(cells_transposed[icol], scaled_double_t, nrows)
+      MY_MALLOC(cells_transposed[icol], scaled_double_t, nrows)
 
     //
 
-    MALLOC(cells_double, double *, nrows)
+    MY_MALLOC(cells_double, double *, nrows)
 
     for (int irow = 0; irow < nrows; irow++)
-      MALLOC(cells_double[irow], double, ncols)
+      MY_MALLOC(cells_double[irow], double, ncols)
 
-    MALLOC(cells_transposed_double, double *, ncols)
+    MY_MALLOC(cells_transposed_double, double *, ncols)
 
     for (int icol = 0; icol < ncols; icol++)
-      MALLOC(cells_transposed_double[icol], double, nrows)
+      MY_MALLOC(cells_transposed_double[icol], double, nrows)
   }
   else
   {
-    MALLOC(cells, scaled_double_t *, ncols)
+    MY_MALLOC(cells, scaled_double_t *, ncols)
 
     for (int icol = 0; icol < ncols; icol++)
-      MALLOC(cells[icol], scaled_double_t, nrows)
+      MY_MALLOC(cells[icol], scaled_double_t, nrows)
 
-    MALLOC(cells_transposed, scaled_double_t *, nrows)
+    MY_MALLOC(cells_transposed, scaled_double_t *, nrows)
 
     for (int irow = 0; irow < nrows; irow++)
-      MALLOC(cells_transposed[irow], scaled_double_t, ncols)
+      MY_MALLOC(cells_transposed[irow], scaled_double_t, ncols)
 
     //
 
-    MALLOC(cells_double, double *, ncols)
+    MY_MALLOC(cells_double, double *, ncols)
 
     for (int icol = 0; icol < ncols; icol++)
-      MALLOC(cells_double[icol], double, nrows)
+      MY_MALLOC(cells_double[icol], double, nrows)
 
-    MALLOC(cells_transposed_double, double *, nrows)
+    MY_MALLOC(cells_transposed_double, double *, nrows)
 
     for (int irow = 0; irow < nrows; irow++)
-      MALLOC(cells_transposed_double[irow], double, ncols)
+      MY_MALLOC(cells_transposed_double[irow], double, ncols)
   }
 
   //now read csv
@@ -237,14 +265,10 @@ local void read_2d_csv(cJSON *csv, const int by_row,
 
       if (by_row)
       {
-        cells_transposed[icol][irow]= cells[irow][icol] = DOUBLE2SCALED(f);
-
         cells_transposed_double[icol][irow]= cells_double[irow][icol] = f;
       }
       else
       {
-        cells_transposed[irow][icol] = cells[icol][irow] = DOUBLE2SCALED(f);
-
         cells_transposed_double[irow][icol] = cells_double[icol][irow] = f;
       }
        
@@ -363,23 +387,23 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
 
   char *svalue = cJSON_GetStringValue(value_cjson);
 
-  if (my_strcasecmp(svalue, "v2") == 0)
-    neural->neural_input_map = NEURAL_INPUT_MAP_V2;
-  else if (my_strcasecmp(svalue, "v5") == 0)
+  if (compat_strcasecmp(svalue, "v5") == 0)
     neural->neural_input_map = NEURAL_INPUT_MAP_V5;
-  else if (my_strcasecmp(svalue, "v6") == 0)
+  else if (compat_strcasecmp(svalue, "v6") == 0)
     neural->neural_input_map = NEURAL_INPUT_MAP_V6;
+  else if (compat_strcasecmp(svalue, "v7") == 0)
+    neural->neural_input_map = NEURAL_INPUT_MAP_V7;
   else
     FATAL("unknown input_map option", EXIT_FAILURE)
 
   if (verbose)
   {
-    if (neural->neural_input_map == NEURAL_INPUT_MAP_V2)
-      PRINTF("input_map=V2\n");
-    else if (neural->neural_input_map == NEURAL_INPUT_MAP_V5)
+    if (neural->neural_input_map == NEURAL_INPUT_MAP_V5)
       PRINTF("input_map=V5\n");
     else if (neural->neural_input_map == NEURAL_INPUT_MAP_V6)
       PRINTF("input_map=V6\n");
+    else if (neural->neural_input_map == NEURAL_INPUT_MAP_V7)
+      PRINTF("input_map=V7\n");
     else
       FATAL("unknown input_map option", EXIT_FAILURE)
   }
@@ -393,9 +417,9 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
 
   svalue = cJSON_GetStringValue(value_cjson);
 
-  if (my_strcasecmp(svalue, "relu") == 0)
+  if (compat_strcasecmp(svalue, "relu") == 0)
     neural->neural_activation = NEURAL_ACTIVATION_RELU;
-  else if (my_strcasecmp(svalue, "clipped-relu") == 0)
+  else if (compat_strcasecmp(svalue, "clipped-relu") == 0)
     neural->neural_activation = NEURAL_ACTIVATION_CLIPPED_RELU;
   else
     FATAL("unknown activation option", EXIT_FAILURE)
@@ -419,9 +443,9 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
 
   svalue = cJSON_GetStringValue(value_cjson);
 
-  if (my_strcasecmp(svalue, "linear") == 0)
+  if (compat_strcasecmp(svalue, "linear") == 0)
     neural->neural_activation_last = NEURAL_ACTIVATION_LINEAR;
-  else if (my_strcasecmp(svalue, "sigmoid") == 0)
+  else if (compat_strcasecmp(svalue, "sigmoid") == 0)
     neural->neural_activation_last = NEURAL_ACTIVATION_SIGMOID;
   else
     FATAL("unknown activation_last option", EXIT_FAILURE)
@@ -445,9 +469,9 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
 
   svalue = cJSON_GetStringValue(value_cjson);
 
-  if (my_strcasecmp(svalue, "c2m") == 0)
+  if (compat_strcasecmp(svalue, "c2m") == 0)
     neural->neural_label = NEURAL_LABEL_C2M;
-  else if (my_strcasecmp(svalue, "w2m") == 0)
+  else if (compat_strcasecmp(svalue, "w2m") == 0)
     neural->neural_label = NEURAL_LABEL_W2M;
   else
     FATAL("unknown label option", EXIT_FAILURE)
@@ -471,7 +495,7 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
 
   svalue = cJSON_GetStringValue(value_cjson);
 
-  if (my_strcasecmp(svalue, "0") == 0)
+  if (compat_strcasecmp(svalue, "0") == 0)
     neural->neural_colour_bits = NEURAL_COLOUR_BITS_0;
   else
     FATAL("unknown colour_bits option", EXIT_FAILURE)
@@ -493,9 +517,9 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
 
   svalue = cJSON_GetStringValue(value_cjson);
 
-  if (my_strcasecmp(svalue, "w2m") == 0)
+  if (compat_strcasecmp(svalue, "w2m") == 0)
     neural->neural_output = NEURAL_OUTPUT_W2M;
-  else if (my_strcasecmp(svalue, "c2m") == 0)
+  else if (compat_strcasecmp(svalue, "c2m") == 0)
     neural->neural_output = NEURAL_OUTPUT_C2M;
   else
     FATAL("unknown output option", EXIT_FAILURE)
@@ -510,6 +534,24 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
       FATAL("unknown output option", EXIT_FAILURE)
   }
 
+  //king weight
+
+  value_cjson =
+    cJSON_GetObjectItem(directory, CJSON_KING_WEIGHT_ID);
+
+  HARDBUG(!cJSON_IsNumber(value_cjson));
+
+  int ivalue = round(cJSON_GetNumberValue(value_cjson));
+
+  HARDBUG(ivalue < 0)
+
+  neural->neural_king_weight = ivalue;
+
+  if (verbose)
+  {
+    PRINTF("king_weight=%d\n", neural->neural_king_weight);
+  }
+
   //npieces_min
 
   value_cjson =
@@ -517,7 +559,7 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
 
   HARDBUG(!cJSON_IsNumber(value_cjson));
 
-  int ivalue = round(cJSON_GetNumberValue(value_cjson));
+  ivalue = round(cJSON_GetNumberValue(value_cjson));
 
   HARDBUG(ivalue < 0)
 
@@ -551,68 +593,48 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
   for (int i = 0; i < BOARD_MAX; i++)
     neural->white_man_input_map[i] = INVALID;
   for (int i = 0; i < BOARD_MAX; i++)
-    neural->white_crown_input_map[i] = INVALID;
+    neural->white_king_input_map[i] = INVALID;
   for (int i = 0; i < BOARD_MAX; i++)
     neural->black_man_input_map[i] = INVALID;
   for (int i = 0; i < BOARD_MAX; i++)
-    neural->black_crown_input_map[i] = INVALID;
+    neural->black_king_input_map[i] = INVALID;
   for (int i = 0; i < BOARD_MAX; i++)
     neural->empty_input_map[i] = INVALID;
 
   neural->c2m_input_map = INVALID;
+  neural->nwc_input_map = INVALID;
+  neural->nbc_input_map = INVALID;
 
   int ninputs = 0;
 
-  if (neural->neural_input_map == NEURAL_INPUT_MAP_V2)
+  for (int i = 1; i <= 50; ++i)
+    neural->white_man_input_map[map[i]] = ninputs++;
+  
+  for (int i = 1; i <= 50; ++i)
+    neural->black_man_input_map[map[i]] = ninputs++;
+
+  if (neural->neural_input_map == NEURAL_INPUT_MAP_V5)
   {
-    for (int i = 6; i <= 50; ++i)
-      neural->white_man_input_map[map[i]] = ninputs++;
-  
-    for (int i = 1; i <= 45; ++i)
-      neural->black_man_input_map[map[i]] = ninputs++;
-
     for (int i = 1; i <= 50; ++i)
-      neural->white_crown_input_map[map[i]] = ninputs++;
+      neural->white_king_input_map[map[i]] = ninputs++;
   
     for (int i = 1; i <= 50; ++i)
-      neural->black_crown_input_map[map[i]] = ninputs++;
-
-    neural->c2m_input_map = ninputs++;
+      neural->black_king_input_map[map[i]] = ninputs++;
   } 
-  else if (neural->neural_input_map == NEURAL_INPUT_MAP_V5)
+
+  if (neural->neural_input_map != NEURAL_INPUT_MAP_V7)
   {
-    for (int i = 1; i <= 50; ++i)
-      neural->white_man_input_map[map[i]] = ninputs++;
-  
-    for (int i = 1; i <= 50; ++i)
-      neural->black_man_input_map[map[i]] = ninputs++;
-
-    for (int i = 1; i <= 50; ++i)
-      neural->white_crown_input_map[map[i]] = ninputs++;
-  
-    for (int i = 1; i <= 50; ++i)
-      neural->black_crown_input_map[map[i]] = ninputs++;
-
     for (int i = 1; i <= 50; ++i)
       neural->empty_input_map[map[i]] = ninputs++;
+  }
 
-    neural->c2m_input_map = ninputs++;
-  } 
-  else if (neural->neural_input_map == NEURAL_INPUT_MAP_V6)
+  neural->c2m_input_map = ninputs++;
+
+  if (neural->neural_input_map == NEURAL_INPUT_MAP_V7)
   {
-    for (int i = 1; i <= 50; ++i)
-      neural->white_man_input_map[map[i]] = ninputs++;
-  
-    for (int i = 1; i <= 50; ++i)
-      neural->black_man_input_map[map[i]] = ninputs++;
-
-    for (int i = 1; i <= 50; ++i)
-      neural->empty_input_map[map[i]] = ninputs++;
-
-    neural->c2m_input_map = ninputs++;
-  } 
-  else
-    FATAL("unknown input_map option", EXIT_FAILURE)
+    neural->nwc_input_map = ninputs++;
+    neural->nbc_input_map = ninputs++;
+  }
 
   HARDBUG(ninputs >= NINPUTS_MAX)
 
@@ -627,19 +649,21 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
   PRINTF("white_man_input_map\n");
   print_input_map(BOARD_MAX, neural->white_man_input_map, TRUE);
 
-  PRINTF("white_crown_input_map\n");
-  print_input_map(BOARD_MAX, neural->white_crown_input_map, TRUE);
+  PRINTF("white_king_input_map\n");
+  print_input_map(BOARD_MAX, neural->white_king_input_map, TRUE);
 
   PRINTF("black_man_input_map\n");
   print_input_map(BOARD_MAX, neural->black_man_input_map, TRUE);
 
-  PRINTF("black_crown_input_map\n");
-  print_input_map(BOARD_MAX, neural->black_crown_input_map, TRUE);
+  PRINTF("black_king_input_map\n");
+  print_input_map(BOARD_MAX, neural->black_king_input_map, TRUE);
 
   PRINTF("empty_input_map\n");
   print_input_map(BOARD_MAX, neural->empty_input_map, TRUE);
 
   PRINTF("c2m_input_map=%d\n", neural->c2m_input_map);
+  PRINTF("nwc_input_map=%d\n", neural->nwc_input_map);
+  PRINTF("nbc_input_map=%d\n", neural->nbc_input_map);
 
   neural->neural_nlayers = 0;
 
@@ -675,6 +699,20 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
     read_1d_csv(file, &(with->layer_noutputs), &(with->layer_bias),
       &(with->layer_bias_double));
 
+    //scale the weights and transposed weights
+
+    for (int ioutput = 0; ioutput < with->layer_noutputs; ioutput++)
+    {
+      for (int input = 0; input < with->layer_ninputs; input++)
+      {
+        with->layer_weights_transposed[input][ioutput] =
+          with->layer_weights[ioutput][input] =
+            DOUBLE2SCALED(with->layer_weights_double[ioutput][input]);
+      }
+      with->layer_bias[ioutput] =
+       DOUBLE2SCALED(with->layer_bias_double[ioutput]);
+    }
+
     neural->neural_nlayers++;
   }
 
@@ -682,15 +720,20 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
 
   HARDBUG(neural->neural_nlayers < 3)
 
-  neural->nlayer0_sum = 0;
+  neural->nlayer0 = 0;
 
-  MALLOC(neural->layer0_sum, scaled_double_t *, NODE_MAX)
+  MY_MALLOC(neural->layer0_inputs, scaled_double_t *, NODE_MAX)
+
+  MY_MALLOC(neural->layer0_sum, scaled_double_t *, NODE_MAX)
 
   for (int inode = 0; inode < NODE_MAX; inode++)
   {
     layer_t *with = neural->neural_layers;
 
-    MALLOC(neural->layer0_sum[inode], scaled_double_t,
+    MY_MALLOC(neural->layer0_inputs[inode], scaled_double_t,
+           with->layer_ninputs)
+
+    MY_MALLOC(neural->layer0_sum[inode], scaled_double_t,
            with->layer_noutputs)
   }
 
@@ -707,13 +750,17 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
     }
 
     if (ilayer == 0)
-      with->layer_sum = neural->layer0_sum[0];
-    else
-      MALLOC(with->layer_sum, scaled_double_t, with->layer_noutputs);
+    {
+      neural->neural_inputs = neural->layer0_inputs[0];
 
-    MALLOC(with->layer_outputs, scaled_double_t, with->layer_noutputs);
-    MALLOC(with->layer_sum_double, double, with->layer_noutputs);
-    MALLOC(with->layer_outputs_double, double, with->layer_noutputs);
+      with->layer_sum = neural->layer0_sum[0];
+    }
+    else
+      MY_MALLOC(with->layer_sum, scaled_double_t, with->layer_noutputs);
+
+    MY_MALLOC(with->layer_outputs, scaled_double_t, with->layer_noutputs);
+    MY_MALLOC(with->layer_sum_double, double, with->layer_noutputs);
+    MY_MALLOC(with->layer_outputs_double, double, with->layer_noutputs);
   }
  
   //check topology
@@ -727,76 +774,48 @@ void load_neural(char *neural_name, neural_t *neural, int verbose)
   }
 }
 
-local scaled_double_t dot_scaled(int n, scaled_double_t *restrict a,
-  scaled_double_t *restrict b, int scale)
+local i64_t dot_scaled(int n, scaled_double_t *restrict a,
+  scaled_double_t *restrict b)
 {
   BEGIN_BLOCK(__FUNC__)
 
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_I64_T
   i64_t s = 0;
-#else
-  i32_t s = 0;
-#endif
 
 #ifdef USE_AVX2_INTRINSICS
 
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_I16_T
-  if (n == 8)
-  {
-    const __m128i ta = _mm_load_si128((__m128i*)a);
-    const __m128i tb = _mm_load_si128((__m128i*)b);
-    __m128i ts = _mm_madd_epi16(ta, tb);
-
-    i32_t result[4];
-
-    _mm_store_si128((__m128i*)result, ts);
-
-     s = result[0] + result[1] + result[2] + result[3];
-  }
-  else
-  {
-    SOFTBUG((n % 16) != 0)
-
-    __m256i ts = _mm256_setzero_si256();
-  
-    for (const i16_t *z = a + n ; a < z; a += 16, b += 16)
-    {
-      const __m256i ta = _mm256_load_si256((__m256i*)a);
-      const __m256i tb = _mm256_load_si256((__m256i*)b);
-      ts = _mm256_add_epi32(ts, _mm256_madd_epi16(ta, tb));
-    }
-
-    i32_t result[8];
-
-    _mm256_store_si256((__m256i*)result, ts);
-
-    s = result[0] + result[1] + result[2] + result[3] +
-        result[4] + result[5] + result[6] + result[7];
-  }
-#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
   SOFTBUG((n % 8) != 0)
 
-  __m256i ts = _mm256_setzero_si256();
+  __m256i s_lo = _mm256_setzero_si256();
+  __m256i s_hi = _mm256_setzero_si256();
 
   for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
   {
-    const __m256i ta = _mm256_load_si256((__m256i*)a);
-    const __m256i tb = _mm256_load_si256((__m256i*)b);
-    ts = _mm256_add_epi32(ts, _mm256_mullo_epi32(ta, tb));
+    __m256i ta = _mm256_load_si256((__m256i*)a);
+    __m256i tb = _mm256_load_si256((__m256i*)b);
+
+    __m256i ta_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(ta));
+    __m256i ta_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(ta, 1));
+
+    __m256i tb_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(tb));
+    __m256i tb_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(tb, 1));
+
+    s_lo = _mm256_add_epi64(s_lo, _mm256_mul_epi32(ta_lo, tb_lo));
+    s_hi = _mm256_add_epi64(s_hi, _mm256_mul_epi32(ta_hi, tb_hi));
   }
 
-  i32_t result[8];
+  i64_t result_lo[4], result_hi[4];
 
-  _mm256_store_si256((__m256i*)result, ts);
+  _mm256_storeu_si256((__m256i*)result_lo, s_lo);
+  _mm256_storeu_si256((__m256i*)result_hi, s_hi);
 
-  s = result[0] + result[1] + result[2] + result[3] +
-      result[4] + result[5] + result[6] + result[7];
+  s = result_lo[0] + result_lo[1] + result_lo[2] + result_lo[3] +
+      result_hi[0] + result_hi[1] + result_hi[2] + result_hi[3];
 
 #elif SCALED_DOUBLE_T == SCALED_DOUBLE_I64_T
   SOFTBUG((n % 4) != 0)
 
-  for (int i = 0; i < n; i++)
-    s += a[i] * b[i];
+  for (int i = 0; i < n; i++) s += a[i] * b[i];
 #else
 #error unknown SCALED_DOUBLE_T
 #endif
@@ -806,10 +825,6 @@ local scaled_double_t dot_scaled(int n, scaled_double_t *restrict a,
 #endif
 
   END_BLOCK
-
-  //if (scale) s = round(SCALED2DOUBLE(s));
-  //if (scale) s = (s + (SCALED_DOUBLE_FACTOR / 2)) / SCALED_DOUBLE_FACTOR;
-  if (scale) s /= SCALED_DOUBLE_FACTOR;
 
   return(s);
 }
@@ -829,28 +844,13 @@ local void vcopy_ab(int n, scaled_double_t *restrict a,
 {
 #ifdef USE_AVX2_INTRINSICS
 
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_I16_T
-  if (n == 8)
-  {
-    __m128i ta = _mm_load_si128((__m128i*)a);
-    _mm_store_si128((__m128i*)b, ta);
-  }
-  else
-  {
-    SOFTBUG((n % 16) != 0)
-
-    for (const i16_t *z = a + n ; a < z; a += 16, b += 16)
-    {
-      __m256i ta = _mm256_load_si256((__m256i*)a);
-      _mm256_store_si256((__m256i*)b, ta);
-    }
-  }
-#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
   SOFTBUG((n % 8) != 0)
 
   for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
   {
     __m256i ta = _mm256_load_si256((__m256i*)a);
+
     _mm256_store_si256((__m256i*)b, ta);
   }
 #elif SCALED_DOUBLE_T == SCALED_DOUBLE_I64_T
@@ -873,38 +873,21 @@ local void vadd_aba(int n, scaled_double_t *restrict a,
 
 #ifdef USE_AVX2_INTRINSICS
 
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_I16_T
-  if (n == 8)
-  {
-    const __m128i ta = _mm_load_si128((__m128i*)a);
-    const __m128i tb = _mm_load_si128((__m128i*)b);
-    __m128i ts = _mm_madd_epi16(ta, tb);
-    _mm_store_si128((__m128i*)a, ts);
-  }
-  else
-  {
-    SOFTBUG((n % 16) != 0)
-
-    for (const i16_t *z = a + n ; a < z; a += 16, b += 16)
-    {
-      const __m256i ta = _mm256_load_si256((__m256i*)a);
-      const __m256i tb = _mm256_load_si256((__m256i*)b);
-      const __m256i ts = _mm256_add_epi16(ta, tb);
-      _mm256_store_si256((__m256i*)a, ts);
-    }
-  }
-#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
   SOFTBUG((n % 8) != 0)
 
   for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
   {
     const __m256i ta = _mm256_load_si256((__m256i*)a);
     const __m256i tb = _mm256_load_si256((__m256i*)b);
+
     const __m256i ts = _mm256_add_epi32(ta, tb);
+
     _mm256_store_si256((__m256i*)a, ts);
   }
 #elif SCALED_DOUBLE_T == SCALED_DOUBLE_I64_T
-  SOFTBUG((n % 4) != 0)
+
+  SOFTBUG((n % 4) == 0)
 
   for (int i = 0; i < n; i++) a[i] += b[i];
 #else
@@ -924,34 +907,16 @@ local void vsub_aba(int n, scaled_double_t *restrict a,
 
 #ifdef USE_AVX2_INTRINSICS
 
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_I16_T
-  if (n == 8)
-  {
-    const __m128i ta = _mm_load_si128((__m128i*)a);
-    const __m128i tb = _mm_load_si128((__m128i*)b);
-    __m128i ts = _mm_sub_epi16(ta, tb);
-    _mm_store_si128((__m128i*)a, ts);
-  }
-  else
-  {
-    SOFTBUG((n % 16) != 0)
-
-    for (const i16_t *z = a + n ; a < z; a += 16, b += 16)
-    {
-      const __m256i ta = _mm256_load_si256((__m256i*)a);
-      const __m256i tb = _mm256_load_si256((__m256i*)b);
-      const __m256i ts = _mm256_sub_epi16(ta, tb);
-      _mm256_store_si256((__m256i*)a, ts);
-    }
-  }
-#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
   SOFTBUG((n % 8) != 0)
 
   for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
   {
     const __m256i ta = _mm256_load_si256((__m256i*)a);
     const __m256i tb = _mm256_load_si256((__m256i*)b);
+
     const __m256i ts = _mm256_sub_epi32(ta, tb);
+
     _mm256_store_si256((__m256i*)a, ts);
   }
 #elif SCALED_DOUBLE_T == SCALED_DOUBLE_I64_T
@@ -976,35 +941,7 @@ local void vadd_acba(int n, scaled_double_t *restrict a,
 
 #ifdef USE_AVX2_INTRINSICS
 
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_I16_T
-  if (n == 8)
-  {
-    __m128i tc = _mm_set1_epi16(c);
-
-    const __m128i ta = _mm_load_si128((__m128i*)a);
-    const __m128i tb = _mm_load_si128((__m128i*)b);
-
-    __m128i tm = _mm_mullo_epi16(tb, tc);
-    __m128i ts = _mm_madd_epi16(ta, tm);
-    _mm_store_si128((__m128i*)a, ts);
-  }
-  else
-  {
-    SOFTBUG((n % 16) != 0)
-
-    __m256i tc = _mm256_set1_epi16(c);
-
-    for (const i16_t *z = a + n ; a < z; a += 16, b += 16)
-    {
-      const __m256i ta = _mm256_load_si256((__m256i*)a);
-      const __m256i tb = _mm256_load_si256((__m256i*)b);
-
-      const __m256i tm = _mm256_mullo_epi16(tb, tc);
-      const __m256i ts = _mm256_add_epi16(ta, tm);
-      _mm256_store_si256((__m256i*)a, ts);
-    }
-  }
-#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
   SOFTBUG((n % 8) != 0)
 
   __m256i tc = _mm256_set1_epi32(c);
@@ -1015,7 +952,9 @@ local void vadd_acba(int n, scaled_double_t *restrict a,
     const __m256i tb = _mm256_load_si256((__m256i*)b);
 
     const __m256i tm = _mm256_mullo_epi32(tb, tc);
+
     const __m256i ts = _mm256_add_epi32(ta, tm);
+
     _mm256_store_si256((__m256i*)a, ts);
   }
 #elif SCALED_DOUBLE_T == SCALED_DOUBLE_I64_T
@@ -1036,63 +975,6 @@ local void vadd_acba(int n, scaled_double_t *restrict a,
 local void activation_relu_scaled(int n,
   scaled_double_t *restrict a, scaled_double_t *restrict b)
 {
-#ifdef USE_AVX2_INTRINSICS
-
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_I16_T
-  if (n == 8)
-  {
-    __m128i zero = _mm_setzero_si128();
-    __m128i ta = _mm_load_si128((__m128i*)a);
-    ta = _mm_max_epi16(ta, zero);
-    _mm_store_si128((__m128i*)b, ta);
-  } 
-  else
-  {
-    SOFTBUG((n % 16) != 0)
-
-    __m256i zero = _mm256_setzero_si256();
-  
-    for (const i16_t *z = a + n ; a < z; a += 16, b += 16)
-    {
-      __m256i ta = _mm256_load_si256((__m256i*)a);
-      ta = _mm256_max_epi16(ta, zero);
-      _mm256_store_si256((__m256i*)b, ta);
-    }
-  }
-#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
-  SOFTBUG((n % 8) != 0)
-
-  __m256i zero = _mm256_setzero_si256();
-
-  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
-  {
-    __m256i ta = _mm256_load_si256((__m256i*)a);
-    ta = _mm256_max_epi32(ta, zero);
-    _mm256_store_si256((__m256i*)b, ta);
-  }
-#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I64_T
-  SOFTBUG((n % 4) != 0)
-
-  for (int i = 0; i < n; i++)
-  {
-    if (a[i] <= 0)
-      b[i] = 0;
-    else
-      b[i] = a[i];
-  }
-#else
-#error unknown SCALED_DOUBLE_T
-#endif
-
-#else
-  for (int i = 0; i < n; i++)
-  {
-    if (a[i] <= 0)
-      b[i] = 0;
-    else
-      b[i] = a[i];
-  }
-#endif
 }
 
 local void activation_clipped_relu_scaled(int n,
@@ -1100,43 +982,13 @@ local void activation_clipped_relu_scaled(int n,
 {
 #ifdef USE_AVX2_INTRINSICS
 
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_I16_T
-  if (n == 8)
-  {
-    __m128i zero = _mm_setzero_si128();
-    __m128i clip = _mm_set1_epi16(SCALED_DOUBLE_FACTOR);
-
-    __m128i ta = _mm_load_si128((__m128i*)a);
-
-    ta = _mm_max_epi16(ta, zero);
-    ta = _mm_min_epi16(ta, clip);
-
-    _mm_store_si128((__m128i*)b, ta);
-  } 
-  else
-  {
-    SOFTBUG((n % 16) != 0)
-
-    __m256i zero = _mm256_setzero_si256();
-    __m256i clip = _mm256_set1_epi16(SCALED_DOUBLE_FACTOR);
-  
-    for (const i16_t *z = a + n ; a < z; a += 16, b += 16)
-    {
-      __m256i ta = _mm256_load_si256((__m256i*)a);
-
-      ta = _mm256_max_epi16(ta, zero);
-      ta = _mm256_min_epi16(ta, clip);
-
-      _mm256_store_si256((__m256i*)b, ta);
-    }
-  }
-#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_I32_T
   SOFTBUG((n % 8) != 0)
 
   __m256i zero = _mm256_setzero_si256();
-  __m256i clip = _mm256_set1_epi32(SCALED_DOUBLE_FACTOR);
+  __m256i clip = _mm256_set1_epi32(SCALED_DOUBLE_FACTOR * CLIP_VALUE);
 
-  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+  for (const int32_t *z = a + n; a < z; a += 8, b += 8)
   {
     __m256i ta = _mm256_load_si256((__m256i*)a);
 
@@ -1152,8 +1004,8 @@ local void activation_clipped_relu_scaled(int n,
   {
     if (a[i] <= 0)
       b[i] = 0;
-    else if (a[i] >= SCALED_DOUBLE_FACTOR)
-      b[i] = SCALED_DOUBLE_FACTOR;
+    else if (a[i] >= scale * CLIP_VALUE)
+      b[i] = scale * CLIP_VALUE;
     else
       b[i] = a[i];
   }
@@ -1166,8 +1018,8 @@ local void activation_clipped_relu_scaled(int n,
   {
     if (a[i] <= 0)
       b[i] = 0;
-    else if (a[i] >= SCALED_DOUBLE_FACTOR)
-      b[i] = SCALED_DOUBLE_FACTOR;
+    else if (a[i] >= scale * CLIP_VALUE)
+      b[i] = scale * CLIP_VALUE;
     else
       b[i] = a[i];
   }
@@ -1193,8 +1045,8 @@ local void activation_clipped_relu_double(int n,
   {
     if (a[i] <= 0.0)
       b[i] = 0.0;
-    else if (a[i] >= 1.0)
-      b[i] = 1.0;
+    else if (a[i] >= CLIP_VALUE)
+      b[i] = CLIP_VALUE;
     else
       b[i] = a[i];
   }
@@ -1202,7 +1054,6 @@ local void activation_clipped_relu_double(int n,
 
 local double return_sigmoid(double x)
 {
-  return(x);
   return(2.0 / (1.0 + exp(-x)) - 1.0);
 }
 
@@ -1224,10 +1075,10 @@ double return_neural_score_scaled(neural_t *neural, int with_sigmoid,
     for (int i = 0; i < with_current->layer_noutputs; i++)
     {
       with_current->layer_sum[i] = 
-        dot_scaled(with_current->layer_ninputs,
-                   neural->neural_inputs,
-                   with_current->layer_weights[i], FALSE) +
-        with_current->layer_bias[i];
+        add2(dot_scaled(with_current->layer_ninputs,
+                        neural->neural_inputs,
+                        with_current->layer_weights[i]),
+             with_current->layer_bias[i], INVALID);
     }
 
     double inputs_double[NINPUTS_MAX];
@@ -1278,10 +1129,10 @@ double return_neural_score_scaled(neural_t *neural, int with_sigmoid,
     for (int i = 0; i < with_current->layer_noutputs; i++)
     {
       with_current->layer_sum[i] = 
-        dot_scaled(with_current->layer_ninputs,
-                   with_previous->layer_outputs,
-                   with_current->layer_weights[i], TRUE) +
-        with_current->layer_bias[i];
+        add2(dot_scaled(with_current->layer_ninputs,
+                        with_previous->layer_outputs,
+                        with_current->layer_weights[i]),
+             with_current->layer_bias[i], SCALED_DOUBLE_FACTOR);
     }
 
     if (ilayer < (neural->neural_nlayers - 1))
@@ -1333,10 +1184,7 @@ double return_neural_score_scaled(neural_t *neural, int with_sigmoid,
 
   layer_t *with = neural->neural_layers + neural->neural_nlayers - 1;
 
-  if (with_sigmoid)
-    return(with->layer_outputs_double[0]);
-  else
-    return(SCALED2DOUBLE(with->layer_sum[0]));
+  return(with->layer_outputs_double[0]);
 }
 
 double return_neural_score_double(neural_t *neural, int with_sigmoid)
@@ -1351,11 +1199,15 @@ double return_neural_score_double(neural_t *neural, int with_sigmoid)
 
   for (int i = 0; i < with_current->layer_noutputs; i++)
   {
-    with_current->layer_sum_double[i] = 
-      dot_double(with_current->layer_ninputs,
-                 inputs_double,
-                 with_current->layer_weights_double[i]) +
-      with_current->layer_bias_double[i];
+    double dot = dot_double(with_current->layer_ninputs,
+                              inputs_double,
+                              with_current->layer_weights_double[i]);
+
+    double bias = with_current->layer_bias_double[i];
+  
+    double sum = dot + bias;
+
+    with_current->layer_sum_double[i] = sum;
   }
 
   if (neural->neural_activation == NEURAL_ACTIVATION_RELU)
@@ -1379,11 +1231,15 @@ double return_neural_score_double(neural_t *neural, int with_sigmoid)
 
     for (int i = 0; i < with_current->layer_noutputs; i++)
     {
-      with_current->layer_sum_double[i] = 
-        dot_double(with_current->layer_ninputs,
-                   with_previous->layer_outputs_double,
-                   with_current->layer_weights_double[i]) +
-        with_current->layer_bias_double[i];
+      double dot = dot_double(with_current->layer_ninputs,
+                              with_previous->layer_outputs_double,
+                              with_current->layer_weights_double[i]);
+  
+      double bias = with_current->layer_bias_double[i];
+    
+      double sum = dot + bias;
+  
+      with_current->layer_sum_double[i] = sum;
     }
 
     if (ilayer < (neural->neural_nlayers - 1))
@@ -1429,44 +1285,51 @@ double return_neural_score_double(neural_t *neural, int with_sigmoid)
     return(with->layer_sum_double[0]);
 }
 
-void copy_first_layer_sum(neural_t *neural)
+void copy_layer0(neural_t *neural)
 {
   layer_t *with = neural->neural_layers;
 
-  HARDBUG(with->layer_sum != neural->layer0_sum[neural->nlayer0_sum])
+  HARDBUG(with->layer_sum != neural->layer0_sum[neural->nlayer0])
 
-  neural->nlayer0_sum++;
+  neural->nlayer0++;
 
-  HARDBUG(neural->nlayer0_sum >= NODE_MAX)
+  HARDBUG(neural->nlayer0 >= NODE_MAX)
+
+  vcopy_ab(with->layer_ninputs, neural->neural_inputs,
+           neural->layer0_inputs[neural->nlayer0]);
 
   vcopy_ab(with->layer_noutputs, with->layer_sum,
-           neural->layer0_sum[neural->nlayer0_sum]);
+           neural->layer0_sum[neural->nlayer0]);
 
-  with->layer_sum = neural->layer0_sum[neural->nlayer0_sum];
+  neural->neural_inputs = neural->layer0_inputs[neural->nlayer0];
+
+  with->layer_sum = neural->layer0_sum[neural->nlayer0];
 }
 
-void restore_first_layer_sum(neural_t *neural)
+void restore_layer0(neural_t *neural)
 {
-  neural->nlayer0_sum--;
+  neural->nlayer0--;
 
-  HARDBUG(neural->nlayer0_sum < 0)
+  HARDBUG(neural->nlayer0 < 0)
 
   layer_t *with = neural->neural_layers;
 
-  with->layer_sum = neural->layer0_sum[neural->nlayer0_sum];
+  neural->neural_inputs = neural->layer0_inputs[neural->nlayer0];
+
+  with->layer_sum = neural->layer0_sum[neural->nlayer0];
 }
 
-void check_first_layer_sum(neural_t *neural)
+void check_layer0(neural_t *neural)
 {
   layer_t *with_current = neural->neural_layers;
 
   for (int i = 0; i < with_current->layer_noutputs; i++)
   {
     scaled_double_t layer_sum = 
-      dot_scaled(with_current->layer_ninputs,
-                 neural->neural_inputs,
-                 with_current->layer_weights[i], FALSE) +
-      with_current->layer_bias[i];
+      add2(dot_scaled(with_current->layer_ninputs,
+                      neural->neural_inputs,
+                      with_current->layer_weights[i]),
+           with_current->layer_bias[i], INVALID);
 
     if (llabs(layer_sum - with_current->layer_sum[i]) > 10)
     {
@@ -1478,7 +1341,7 @@ void check_first_layer_sum(neural_t *neural)
   }
 }
 
-void update_first_layer(neural_t *neural, int j, scaled_double_t v)
+void update_layer0(neural_t *neural, int j, scaled_double_t v)
 {
   if (options.material_only) return;
 
@@ -1520,46 +1383,82 @@ void board2neural(board_t *with, neural_t *neural, int debug)
       inputs[input] = neural->neural_inputs[input];
   }
 
+  neural->nlayer0 = 0;
+
+  neural->neural_inputs = neural->layer0_inputs[0];
+
+  neural->neural_layers[0].layer_sum = neural->layer0_sum[0];
+
   for (int input = 0; input < ninputs; input++)
     neural->neural_inputs[input] = 0;
 
-  ui64_t white_bb = with->board_white_man_bb | with->board_white_crown_bb;
-  ui64_t black_bb = with->board_black_man_bb | with->board_black_crown_bb;
+  ui64_t white_bb = with->board_white_man_bb | with->board_white_king_bb;
+  ui64_t black_bb = with->board_black_man_bb | with->board_black_king_bb;
 
   ui64_t empty_bb = with->board_empty_bb & ~(white_bb | black_bb);
+
+  int nwm_before = BIT_COUNT(with->board_white_man_bb);
+  int nbm_before = BIT_COUNT(with->board_black_man_bb);
+
+  int king_weight = 1;
+
+  if (neural->neural_king_weight > 0)
+  {
+    king_weight = (40 - nwm_before - nbm_before) / 
+                   neural->neural_king_weight;
+
+    if (king_weight < 1) king_weight = 1;
+  }
 
   for (int i = 1; i <= 50; ++i)
   {
     int isquare = map[i];
              
+    //always add men
+
     if (with->board_white_man_bb & BITULL(isquare))
       neural->neural_inputs[neural->white_man_input_map[isquare]] = 1;
 
     if (with->board_black_man_bb & BITULL(isquare))
       neural->neural_inputs[neural->black_man_input_map[isquare]] = 1;
 
-    if ((neural->neural_input_map == NEURAL_INPUT_MAP_V2) or
-        (neural->neural_input_map == NEURAL_INPUT_MAP_V5))
-    {
-      if (with->board_white_crown_bb & BITULL(isquare))
-        neural->neural_inputs[neural->white_crown_input_map[isquare]] = 1;
+    //sometimes add kings
 
-      if (with->board_black_crown_bb & BITULL(isquare))
-        neural->neural_inputs[neural->black_crown_input_map[isquare]] = 1;
+    if (neural->neural_input_map == NEURAL_INPUT_MAP_V5)
+    {
+      if (with->board_white_king_bb & BITULL(isquare))
+      {
+        neural->neural_inputs[neural->white_king_input_map[isquare]] = 
+          king_weight;
+      }
+
+      if (with->board_black_king_bb & BITULL(isquare))
+      {
+        neural->neural_inputs[neural->black_king_input_map[isquare]] =
+          king_weight;
+      }
     }
-    if ((neural->neural_input_map == NEURAL_INPUT_MAP_V5) or
-        (neural->neural_input_map == NEURAL_INPUT_MAP_V6))
+    
+    //sometimes add empty squares
+
+    if (neural->neural_input_map != NEURAL_INPUT_MAP_V7)
     {
       if (empty_bb & BITULL(isquare))
         neural->neural_inputs[neural->empty_input_map[isquare]] = 1;
     }
   }
 
+  //sometimes add nwc and nbc
+
   HARDBUG(neural->neural_colour_bits != NEURAL_COLOUR_BITS_0)
 
-  neural->nlayer0_sum = 0;
-
-  neural->neural_layers[0].layer_sum = neural->layer0_sum[0];
+  if (neural->neural_input_map == NEURAL_INPUT_MAP_V7)
+  {
+    neural->neural_inputs[neural->nwc_input_map] =
+      BIT_COUNT(with->board_white_king_bb);
+    neural->neural_inputs[neural->nbc_input_map] =
+      BIT_COUNT(with->board_black_king_bb);
+  }
 
   if (debug)
   {
@@ -1581,12 +1480,14 @@ void board2neural(board_t *with, neural_t *neural, int debug)
   }
 }
 
-local void heap_sort_double(i64_t n, double *a)
+local void heap_sort_double(i64_t n, i64_t *p, double *a)
 {
-  i64_t i, j, k;
-  double t;
+  i64_t i, j, k, t;
 
   if (n < 2) return;
+
+  for (i = 0; i < n; i++) p[i] = i;
+
   k = n / 2;
   --n;
 
@@ -1594,15 +1495,15 @@ local void heap_sort_double(i64_t n, double *a)
   {
     if (k > 0)
     {
-      t = a[--k];
+      t = p[--k];
     }
     else
     {
-      t = a[n];
-      a[n] = a[0];
+      t = p[n];
+      p[n] = p[0];
       if (--n == 0)
       {
-        a[0] = t;
+        p[0] = t;
         break;
       }
     }
@@ -1610,10 +1511,10 @@ local void heap_sort_double(i64_t n, double *a)
     j = 2 * k + 1;
     while(j <= n)
     {
-      if ((j < n) and (a[j] < a[j + 1])) j++;
-      if (t < a[j])
+      if ((j < n) and (a[p[j]] < a[p[j + 1]])) j++;
+      if (a[t] < a[p[j]])
       {  
-        a[i] = a[j];
+        p[i] = p[j];
         i = j;
         j = 2 * j + 1;
       }
@@ -1622,8 +1523,10 @@ local void heap_sort_double(i64_t n, double *a)
         j = n + 1;
       }
     }  
-    a[i] = t;
+    p[i] = t;
   }
+
+  for (i = 0; i < n; i++) HARDBUG(a[p[i]] > a[p[i + 1]])
 }
 
 local void update_mean_sigma(long long n, double x,
@@ -1644,7 +1547,7 @@ void fen2neural(char *arg_name)
 #ifdef USE_OPENMPI
   HARDBUG(my_mpi_globals.MY_MPIG_nslaves < 1)
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   char line[MY_LINE_MAX];
@@ -1683,36 +1586,39 @@ void fen2neural(char *arg_name)
   i64_t nb2m_result_pos = 0;
   i64_t nb2m_result_neg = 0;
 
-  i64_t nw2m_neural_score_scaled_pos = 0;
-  i64_t nw2m_neural_score_scaled_neg = 0;
-  i64_t nb2m_neural_score_scaled_pos = 0;
-  i64_t nb2m_neural_score_scaled_neg = 0;
+  i64_t nw2m_score_scaled_pos = 0;
+  i64_t nw2m_score_scaled_neg = 0;
+  i64_t nb2m_score_scaled_pos = 0;
+  i64_t nb2m_score_scaled_neg = 0;
 
-  i64_t nw2m_sigmoid_score_scaled_pos = 0;
-  i64_t nw2m_sigmoid_score_scaled_neg = 0;
-  i64_t nb2m_sigmoid_score_scaled_pos = 0;
-  i64_t nb2m_sigmoid_score_scaled_neg = 0;
+  i64_t nw2m_result_pos_score_scaled_neg = 0;
+  i64_t nw2m_result_neg_score_scaled_pos = 0;
 
-  i64_t nw2m_result_pos_sigmoid_score_scaled_neg = 0;
-  i64_t nw2m_result_neg_sigmoid_score_scaled_pos = 0;
-
-  i64_t nb2m_result_pos_sigmoid_score_scaled_neg = 0;
-  i64_t nb2m_result_neg_sigmoid_score_scaled_pos = 0;
+  i64_t nb2m_result_pos_score_scaled_neg = 0;
+  i64_t nb2m_result_neg_score_scaled_pos = 0;
 
   i64_t *npieces_fen;
 
-  MALLOC(npieces_fen, i64_t, nfen)
+  MY_MALLOC(npieces_fen, i64_t, nfen)
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
     npieces_fen[ifen] = 0;
 
-  double *delta_scaled_fen, *delta_double_fen;
+  double *score_scaled, *score_double;
 
-  MALLOC(delta_scaled_fen, double, nfen)
-  MALLOC(delta_double_fen, double, nfen)
+  MY_MALLOC(score_scaled, double, nfen)
+  MY_MALLOC(score_double, double, nfen)
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
-    delta_scaled_fen[ifen] = delta_double_fen[ifen] = 0.0;
+    score_scaled[ifen] = score_double[ifen] = 0.0;
+
+  double *delta_scaled, *delta_double;
+
+  MY_MALLOC(delta_scaled, double, nfen)
+  MY_MALLOC(delta_double, double, nfen)
+
+  for (i64_t ifen = 0; ifen < nfen; ifen++)
+    delta_scaled[ifen] = delta_double[ifen] = 0.0;
 
   double mse_vs_draw_scaled = 0.0;
   double mse_vs_draw_double = 0.0;
@@ -1759,10 +1665,10 @@ void fen2neural(char *arg_name)
 
     int nwhite_man = BIT_COUNT(with->board_white_man_bb);
     int nblack_man = BIT_COUNT(with->board_black_man_bb);
-    int nwhite_crown = BIT_COUNT(with->board_white_crown_bb);
-    int nblack_crown = BIT_COUNT(with->board_black_crown_bb);
+    int nwhite_king = BIT_COUNT(with->board_white_king_bb);
+    int nblack_king = BIT_COUNT(with->board_black_king_bb);
 
-    int npieces = nwhite_man + nblack_man + nwhite_crown + nblack_crown;
+    int npieces = nwhite_man + nblack_man + nwhite_king + nblack_king;
 
     if (((npieces > with->board_neural0.neural_npieces_max) or
          (npieces < with->board_neural0.neural_npieces_min)))
@@ -1791,7 +1697,7 @@ void fen2neural(char *arg_name)
     //check_moves(with, &moves_list);
 
     int mat_score = (nwhite_man - nblack_man) * SCORE_MAN +
-                    (nwhite_crown - nblack_crown) * SCORE_CROWN;
+                    (nwhite_king - nblack_king) * SCORE_CROWN;
 
     if (result >= 0.9)
     {
@@ -1824,17 +1730,11 @@ void fen2neural(char *arg_name)
       }
     }
 
-    double neural_score_scaled =
+    score_scaled[ifen] =
       return_neural_score_scaled(&(with->board_neural0), FALSE, FALSE);
 
-    double neural_score_double =
+    score_double[ifen] =
       return_neural_score_double(&(with->board_neural0), FALSE);
-
-    double sigmoid_score_scaled =
-      return_neural_score_scaled(&(with->board_neural0), TRUE, FALSE);
-
-    double sigmoid_score_double =
-      return_neural_score_double(&(with->board_neural0), TRUE);
 
     if (IS_BLACK(with->board_colour2move))
     {
@@ -1845,18 +1745,15 @@ void fen2neural(char *arg_name)
 
       if (with->board_neural0.neural_output == NEURAL_OUTPUT_W2M)
       {
-        neural_score_scaled = -neural_score_scaled;
-        neural_score_double = -neural_score_double;
-        sigmoid_score_scaled = -sigmoid_score_scaled;
-        sigmoid_score_double = -sigmoid_score_double;
+        score_scaled[ifen] = -score_scaled[ifen];
+        score_double[ifen] = -score_double[ifen];
       }
     }
 
     if (ifen <= 100)
-      PRINTF("%s {%.6f} ms=%d nss=%.6f nsd=%.6f sss=%.6f ssd=%.6f r=%.6f\n",
+      PRINTF("%s {%.6f} ms=%d ss=%.6f sd=%.6f r=%.6f\n",
         fen, result, mat_score,
-        neural_score_scaled, neural_score_double,
-        sigmoid_score_scaled, sigmoid_score_double, result);
+        score_scaled[ifen], score_double[ifen], result);
 
     if (IS_WHITE(with->board_colour2move))
     {
@@ -1865,20 +1762,15 @@ void fen2neural(char *arg_name)
       if (result < 0.0)
         nw2m_result_neg++;
 
-      if (neural_score_scaled > 0.0) 
-        nw2m_neural_score_scaled_pos++;
-      if (neural_score_scaled < 0.0)
-        nw2m_neural_score_scaled_neg++;
+      if (score_scaled[ifen] > 0.0) 
+        nw2m_score_scaled_pos++;
+      if (score_scaled[ifen] < 0.0)
+        nw2m_score_scaled_neg++;
 
-      if (sigmoid_score_scaled > 0.0) 
-        nw2m_sigmoid_score_scaled_pos++;
-      if (sigmoid_score_scaled < 0.0)
-        nw2m_sigmoid_score_scaled_neg++;
-
-      if ((result > 0.0) and (sigmoid_score_scaled < 0.0))
-        nw2m_result_pos_sigmoid_score_scaled_neg++;
-      if ((result < 0.0) and (sigmoid_score_scaled > 0.0))
-        nw2m_result_neg_sigmoid_score_scaled_pos++;
+      if ((result > 0.0) and (score_scaled[ifen] < 0.0))
+        nw2m_result_pos_score_scaled_neg++;
+      if ((result < 0.0) and (score_scaled[ifen] > 0.0))
+        nw2m_result_neg_score_scaled_pos++;
     } 
     else
     {
@@ -1887,55 +1779,53 @@ void fen2neural(char *arg_name)
       else if (result < 0.0)
         nb2m_result_neg++;
 
-      if (neural_score_scaled > 0.0) 
-        nb2m_neural_score_scaled_pos++;
-      if (neural_score_scaled < 0.0)
-        nb2m_neural_score_scaled_neg++;
+      if (score_scaled[ifen] > 0.0) 
+        nb2m_score_scaled_pos++;
+      if (score_scaled[ifen] < 0.0)
+        nb2m_score_scaled_neg++;
 
-      if (sigmoid_score_scaled > 0.0) 
-        nb2m_sigmoid_score_scaled_pos++;
-      if (sigmoid_score_scaled < 0.0)
-        nb2m_sigmoid_score_scaled_neg++;
-
-      if ((result > 0.0) and (sigmoid_score_scaled < 0.0))
-        nb2m_result_pos_sigmoid_score_scaled_neg++;
-      if ((result < 0.0) and (sigmoid_score_scaled > 0.0))
-        nb2m_result_neg_sigmoid_score_scaled_pos++;
+      if ((result > 0.0) and (score_scaled[ifen] < 0.0))
+        nb2m_result_pos_score_scaled_neg++;
+      if ((result < 0.0) and (score_scaled[ifen] > 0.0))
+        nb2m_result_neg_score_scaled_pos++;
     }
 
-    delta_scaled_fen[ifen] = fabs(sigmoid_score_scaled - result);
-    delta_double_fen[ifen] = fabs(sigmoid_score_double - result);
+    delta_scaled[ifen] = fabs(score_scaled[ifen] - result);
+    delta_double[ifen] = fabs(score_double[ifen] - result);
 
-    mse_vs_draw_scaled += sigmoid_score_scaled * sigmoid_score_scaled;
-    mse_vs_draw_double += sigmoid_score_double * sigmoid_score_double;
+    mse_vs_draw_scaled +=
+      score_scaled[ifen] * score_scaled[ifen];
 
-    mse_scaled += delta_scaled_fen[ifen] * delta_scaled_fen[ifen];
-    mse_double += delta_double_fen[ifen] * delta_double_fen[ifen];
+    mse_vs_draw_double +=
+      score_double[ifen] * score_double[ifen];
 
-    double error = fabs(neural_score_scaled - neural_score_double);
+    mse_scaled += delta_scaled[ifen] * delta_scaled[ifen];
+
+    mse_double += delta_double[ifen] * delta_double[ifen];
+
+    double error = fabs(score_scaled[ifen] - score_double[ifen]);
 
     if (error > error_max_scaled_vs_double)
     {
       error_max_scaled_vs_double = error;
 
-      PRINTF("%s {%.6f} ms=%d nss=%.6f nsd=%.6f sss=%.6f ssd=%.6f r=%.6f\n",
+      PRINTF("%s {%.6f} ms=%d nss=%.6f nsd=%.6f r=%.6f\n",
         fen, result, mat_score,
-        neural_score_scaled, neural_score_double,
-        sigmoid_score_scaled, sigmoid_score_double, result);
+        score_scaled[ifen], score_double[ifen], result);
 
       PRINTF("error_max_scaled_vs_double=%.6f\n", error_max_scaled_vs_double);
     }
 
     if ((moves_list.ncaptx == 0) and
-        (with->board_white_crown_bb == 0) and
-        (with->board_black_crown_bb == 0) and
+        (with->board_white_king_bb == 0) and
+        (with->board_black_king_bb == 0) and
         (result > 0.0) and
-        (sigmoid_score_scaled >= result) and
+        (score_scaled[ifen] >= result) and
         ((mat_score >= SCORE_MAN) and (mat_score <= (3 * SCORE_MAN))))
     {    
       ++nfactor;
 
-      factor += mat_score / neural_score_scaled;
+      factor += mat_score / score_scaled[ifen];
 
       if (nfactor <= 100)
         PRINTF("nfactor=%lld factor=%.6f\n", nfactor, factor / nfactor);
@@ -1943,7 +1833,8 @@ void fen2neural(char *arg_name)
 
     if (nfactor > 10)
     {
-      int neural2mat_score = round(neural_score_scaled * factor / nfactor);
+      int neural2mat_score =
+        round(score_scaled[ifen] * factor / nfactor);
 
       if (abs(neural2mat_score - mat_score) > SCORE_MAN)
       {  
@@ -1997,40 +1888,37 @@ void fen2neural(char *arg_name)
   MPI_Allreduce(MPI_IN_PLACE, &nb2m_result_neg, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
-  MPI_Allreduce(MPI_IN_PLACE, &nw2m_neural_score_scaled_pos, 1,
+  MPI_Allreduce(MPI_IN_PLACE, &nw2m_score_scaled_pos, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nw2m_neural_score_scaled_neg, 1,
+  MPI_Allreduce(MPI_IN_PLACE, &nw2m_score_scaled_neg, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nb2m_neural_score_scaled_pos, 1,
+  MPI_Allreduce(MPI_IN_PLACE, &nb2m_score_scaled_pos, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nb2m_neural_score_scaled_neg, 1,
-    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-
-  MPI_Allreduce(MPI_IN_PLACE, &nw2m_sigmoid_score_scaled_pos, 1,
-    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nw2m_sigmoid_score_scaled_neg, 1,
-    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nb2m_sigmoid_score_scaled_pos, 1,
-    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nb2m_sigmoid_score_scaled_neg, 1,
+  MPI_Allreduce(MPI_IN_PLACE, &nb2m_score_scaled_neg, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
-  MPI_Allreduce(MPI_IN_PLACE, &nw2m_result_pos_sigmoid_score_scaled_neg, 1,
+  MPI_Allreduce(MPI_IN_PLACE, &nw2m_result_pos_score_scaled_neg, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nw2m_result_neg_sigmoid_score_scaled_pos, 1,
+  MPI_Allreduce(MPI_IN_PLACE, &nw2m_result_neg_score_scaled_pos, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nb2m_result_pos_sigmoid_score_scaled_neg, 1,
+  MPI_Allreduce(MPI_IN_PLACE, &nb2m_result_pos_score_scaled_neg, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nb2m_result_neg_sigmoid_score_scaled_pos, 1,
+  MPI_Allreduce(MPI_IN_PLACE, &nb2m_result_neg_score_scaled_pos, 1,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
   MPI_Allreduce(MPI_IN_PLACE, npieces_fen, nfen,
     MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
-  MPI_Allreduce(MPI_IN_PLACE, delta_scaled_fen, nfen,
+  MPI_Allreduce(MPI_IN_PLACE, score_scaled, nfen,
     MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
-  MPI_Allreduce(MPI_IN_PLACE, delta_double_fen, nfen,
+  MPI_Allreduce(MPI_IN_PLACE, score_double, nfen,
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+
+  MPI_Allreduce(MPI_IN_PLACE, delta_scaled, nfen,
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+
+  MPI_Allreduce(MPI_IN_PLACE, delta_double, nfen,
     MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
   MPI_Allreduce(MPI_IN_PLACE, &mse_vs_draw_scaled, 1,
@@ -2085,36 +1973,27 @@ void fen2neural(char *arg_name)
          nb2m_result_pos,
          nb2m_result_neg);
 
-  PRINTF("nw2m_neural_score_scaled_pos=%lld\n"
-         "nw2m_neural_score_scaled_neg=%lld\n"
-         "nb2m_neural_score_scaled_pos=%lld\n"
-         "nb2m_neural_score_scaled_neg=%lld\n",
-         nw2m_neural_score_scaled_pos,
-         nw2m_neural_score_scaled_neg,
-         nb2m_neural_score_scaled_pos,
-         nb2m_neural_score_scaled_neg);
+  PRINTF("nw2m_score_scaled_pos=%lld\n"
+         "nw2m_score_scaled_neg=%lld\n"
+         "nb2m_score_scaled_pos=%lld\n"
+         "nb2m_score_scaled_neg=%lld\n",
+         nw2m_score_scaled_pos,
+         nw2m_score_scaled_neg,
+         nb2m_score_scaled_pos,
+         nb2m_score_scaled_neg);
 
-  PRINTF("nw2m_sigmoid_score_scaled_pos=%lld\n"
-         "nw2m_sigmoid_score_scaled_neg=%lld\n"
-         "nb2m_sigmoid_score_scaled_pos=%lld\n"
-         "nb2m_sigmoid_score_scaled_neg=%lld\n",
-         nw2m_sigmoid_score_scaled_pos,
-         nw2m_sigmoid_score_scaled_neg,
-         nb2m_sigmoid_score_scaled_pos,
-         nb2m_sigmoid_score_scaled_neg);
-
-  PRINTF("nw2m_result_pos_sigmoid_score_scaled_neg=%lld (%.6f %%)\n"
-         "nw2m_result_neg_sigmoid_score_scaled_pos=%lld (%.6f %%)\n" 
-         "nb2m_result_pos_sigmoid_score_scaled_neg=%lld (%.6f %%)\n"
-         "nb2m_result_neg_sigmoid_score_scaled_pos=%lld (%.6f %%)\n", 
-         nw2m_result_pos_sigmoid_score_scaled_neg,
-         nw2m_result_pos_sigmoid_score_scaled_neg * 100.0 / nw2m_result_pos,
-         nw2m_result_neg_sigmoid_score_scaled_pos,
-         nw2m_result_neg_sigmoid_score_scaled_pos * 100.0 / nw2m_result_neg,
-         nb2m_result_pos_sigmoid_score_scaled_neg,
-         nb2m_result_pos_sigmoid_score_scaled_neg * 100.0 / nb2m_result_pos,
-         nb2m_result_neg_sigmoid_score_scaled_pos,
-         nb2m_result_neg_sigmoid_score_scaled_pos * 100.0 / nb2m_result_neg);
+  PRINTF("nw2m_result_pos_score_scaled_neg=%lld (%.6f %%)\n"
+         "nw2m_result_neg_score_scaled_pos=%lld (%.6f %%)\n" 
+         "nb2m_result_pos_score_scaled_neg=%lld (%.6f %%)\n"
+         "nb2m_result_neg_score_scaled_pos=%lld (%.6f %%)\n", 
+         nw2m_result_pos_score_scaled_neg,
+         nw2m_result_pos_score_scaled_neg * 100.0 / nw2m_result_pos,
+         nw2m_result_neg_score_scaled_pos,
+         nw2m_result_neg_score_scaled_pos * 100.0 / nw2m_result_neg,
+         nb2m_result_pos_score_scaled_neg,
+         nb2m_result_pos_score_scaled_neg * 100.0 / nb2m_result_pos,
+         nb2m_result_neg_score_scaled_pos,
+         nb2m_result_neg_score_scaled_pos * 100.0 / nb2m_result_neg);
 
   PRINTF("delta npieces\n");
 
@@ -2134,10 +2013,10 @@ void fen2neural(char *arg_name)
 
       ndelta++;
 
-      update_mean_sigma(ndelta, delta_scaled_fen[ifen],
+      update_mean_sigma(ndelta, delta_scaled[ifen],
         &delta_scaled_max, &delta_scaled_mean, &delta_scaled_sigma);
 
-      update_mean_sigma(ndelta, delta_double_fen[ifen],
+      update_mean_sigma(ndelta, delta_double[ifen],
         &delta_double_max, &delta_double_mean, &delta_double_sigma);
     }
     PRINTF("ipiece=%d nd=%lld ds_max=%.6f ds_mean=%.6f ds_sigma=%.6f"
@@ -2147,12 +2026,17 @@ void fen2neural(char *arg_name)
      delta_double_max, delta_double_mean, sqrt(delta_double_sigma / ndelta));
   }
 
-  heap_sort_double(nfen, delta_scaled_fen);
+  i64_t *pdelta_scaled;
 
-  heap_sort_double(nfen, delta_double_fen);
+  MY_MALLOC(pdelta_scaled, i64_t, nfen)
 
-  PRINTF("ds_max=%.6f dd_max=%.6f\n",
-    delta_scaled_fen[nfen - 1], delta_double_fen[nfen - 1]);
+  heap_sort_double(nfen, pdelta_scaled, delta_scaled);
+
+  PRINTF("ds_max=%.6f ss_max=%.6f dd_max=%.6f ds_max=%.6f\n",
+    delta_scaled[pdelta_scaled[nfen - 1]],
+    score_scaled[pdelta_scaled[nfen - 1]],
+    delta_double[pdelta_scaled[nfen - 1]],
+    score_double[pdelta_scaled[nfen - 1]]);
 
   PRINTF("delta percentiles\n");
 
@@ -2162,8 +2046,12 @@ void fen2neural(char *arg_name)
 
     HARDBUG(ifen >= nfen)
 
-    PRINTF("ipercentile=%d delta_scaled=%.6f delta_double=%.6f\n",
-      ipercentile, delta_scaled_fen[ifen], delta_double_fen[ifen]);
+    PRINTF("ipercentile=%d delta_scaled=%.6f score_scaled=%.6f"
+           " delta_double=%.6f score_double=%.6f\n",
+      ipercentile, delta_scaled[pdelta_scaled[ifen]],
+                   score_scaled[pdelta_scaled[ifen]],
+                   delta_double[pdelta_scaled[ifen]],
+                   score_double[pdelta_scaled[ifen]]);
   }
 
   PRINTF("mse_vs_draw_scaled=%.6f\n"
@@ -2192,7 +2080,7 @@ void fen2neural(char *arg_name)
          nneural2mat_score_gt_score_man);
 
   i64_t ipercentile = round(90 / 100.0 * nfen);
-  double percentile = delta_scaled_fen[ipercentile];
+  double percentile = delta_scaled[pdelta_scaled[ipercentile]];
 
   PRINTF("percentile=%.6f\n", percentile);
 
@@ -2247,10 +2135,10 @@ void fen2neural(char *arg_name)
 
     //check_moves(with, &moves_list);
 
-    int nwhite_crown = BIT_COUNT(with->board_white_crown_bb);
-    int nblack_crown = BIT_COUNT(with->board_black_crown_bb);
+    int nwhite_king = BIT_COUNT(with->board_white_king_bb);
+    int nblack_king = BIT_COUNT(with->board_black_king_bb);
 
-    if ((nwhite_crown > 0) or (nblack_crown > 0))
+    if ((nwhite_king > 0) or (nblack_king > 0))
     {
       nfen_skipped_mpi++;
 
@@ -2273,10 +2161,10 @@ void fen2neural(char *arg_name)
       continue;
     }
 
-    double sigmoid_score_scaled =
-      return_neural_score_scaled(&(with->board_neural0), TRUE, FALSE);
+    double neural_score_scaled =
+      return_neural_score_scaled(&(with->board_neural0), FALSE, FALSE);
 
-    if (fabs(sigmoid_score_scaled - result) > percentile)
+    if (fabs(neural_score_scaled - result) > percentile)
     {
       nfen_skipped_mpi++;
 
@@ -2285,9 +2173,6 @@ void fen2neural(char *arg_name)
       continue;
     }
  
-    double neural_score_scaled =
-      return_neural_score_scaled(&(with->board_neural0), FALSE, FALSE);
-
     nfactor++;
     factor += fabs(neural_score_scaled);
 
@@ -2333,7 +2218,7 @@ void fen2search(char *arg_name)
 #ifdef USE_OPENMPI
   HARDBUG(my_mpi_globals.MY_MPIG_nslaves < 1)
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   char line[MY_LINE_MAX];
@@ -2370,10 +2255,6 @@ void fen2search(char *arg_name)
       my_mpi_globals.MY_MPIG_id_slave, my_mpi_globals.MY_MPIG_nslaves);
 
     HARDBUG((ffen = fopen(fen, "w")) == NULL)
-
-    ui64_t s = randull(INVALID);
-
-    PRINTF("seed=%llu\n", s);
   }
 
   i64_t nfen_mpi = 0;
@@ -2460,8 +2341,8 @@ local void return_pack(board_t *with, int colour_bit, int kind_bit,
   for (int ipack = 0; ipack < NPACK; ipack++)
     pack[ipack] = 0;
 
-  ui64_t white_bb = with->board_white_man_bb | with->board_white_crown_bb;
-  ui64_t black_bb = with->board_black_man_bb | with->board_black_crown_bb;
+  ui64_t white_bb = with->board_white_man_bb | with->board_white_king_bb;
+  ui64_t black_bb = with->board_black_man_bb | with->board_black_king_bb;
   ui64_t empty_bb = with->board_empty_bb & ~(white_bb | black_bb);
 
   ui64_t colour_bb;
@@ -2476,7 +2357,7 @@ local void return_pack(board_t *with, int colour_bit, int kind_bit,
   if (IS_MAN(kind_bit))
     kind_bb = with->board_white_man_bb | with->board_black_man_bb;
   else
-    kind_bb = with->board_white_crown_bb | with->board_black_crown_bb;
+    kind_bb = with->board_white_king_bb | with->board_black_king_bb;
 
   int input = 0;
 
@@ -2504,42 +2385,28 @@ local void return_pack(board_t *with, int colour_bit, int kind_bit,
 
 #define NBUFFER_MAX 1000000
 
-local void flush_buffer(bstring *bfeatures_name, bstring *bfeatures_buffer,
-  bstring *blabels_name, bstring *blabels_buffer)
+local void flush_buffer(bstring *bname, bstring *bbuffer)
 {
-  int fd = my_lock_file(bdata(*bfeatures_name));
+  int fd = compat_lock_file(bdata(*bname));
 
   HARDBUG(fd == -1)
 
-  HARDBUG(my_write(fd, bdata(*bfeatures_buffer), blength(*bfeatures_buffer)) !=
-                   blength(*bfeatures_buffer))
+  HARDBUG(compat_write(fd, bdata(*bbuffer), blength(*bbuffer)) !=
+                   blength(*bbuffer))
 
-  my_unlock_file(fd);
+  compat_unlock_file(fd);
 
-  HARDBUG(bassigncstr(*bfeatures_buffer, "") == BSTR_ERR)
-
-  fd = my_lock_file(bdata(*blabels_name));
-
-  HARDBUG(fd == -1)
-
-  HARDBUG(my_write(fd, bdata(*blabels_buffer), blength(*blabels_buffer)) !=
-                   blength(*blabels_buffer))
-
-  my_unlock_file(fd);
-
-  HARDBUG(bassigncstr(*blabels_buffer, "") == BSTR_ERR)
+  HARDBUG(bassigncstr(*bbuffer, "") != BSTR_OK)
 }
 
 local void append_pack(board_t *with, int *nbuffer,
-  bstring *bfeatures_name, bstring *bfeatures_buffer,
-  bstring *blabels_name, bstring *blabels_buffer,
-  int nwhite_man, int nwhite_crown, int nblack_man, int nblack_crown,
+  bstring *bname, bstring *bbuffer,
+  int nwhite_man, int nwhite_king, int nblack_man, int nblack_king,
   i64_t nfen, double result)
 {
   if (*nbuffer >= NBUFFER_MAX)
   {
-    flush_buffer(bfeatures_name, bfeatures_buffer,
-                 blabels_name, blabels_buffer);
+    flush_buffer(bname, bbuffer);
 
     *nbuffer = 0;
   }
@@ -2549,126 +2416,82 @@ local void append_pack(board_t *with, int *nbuffer,
   return_pack(with, WHITE_BIT, MAN_BIT, pack);
  
   for (int ipack = 0; ipack < NPACK; ipack++)
-    bformata(*bfeatures_buffer, "%3u,", pack[ipack]);
+    bformata(*bbuffer, "%3u,", pack[ipack]);
 
   return_pack(with, BLACK_BIT, MAN_BIT, pack);
 
   for (int ipack = 0; ipack < NPACK; ipack++)
-    bformata(*bfeatures_buffer, "%3u,", pack[ipack]);
+    bformata(*bbuffer, "%3u,", pack[ipack]);
 
   return_pack(with, WHITE_BIT, CROWN_BIT, pack);
 
   for (int ipack = 0; ipack < NPACK; ipack++)
-    bformata(*bfeatures_buffer, "%3u,", pack[ipack]);
+    bformata(*bbuffer, "%3u,", pack[ipack]);
 
   return_pack(with, BLACK_BIT, CROWN_BIT, pack);
 
   for (int ipack = 0; ipack < NPACK; ipack++)
-    bformata(*bfeatures_buffer, "%3u,", pack[ipack]);
+    bformata(*bbuffer, "%3u,", pack[ipack]);
 
   return_pack(with, 0, 0, pack);
 
   for (int ipack = 0; ipack < NPACK; ipack++)
-    bformata(*bfeatures_buffer, "%3u,", pack[ipack]);
+    bformata(*bbuffer, "%3u,", pack[ipack]);
 
   if (IS_WHITE(with->board_colour2move))
-    bformata(*bfeatures_buffer, "%3u,", 1);
+    bformata(*bbuffer, "%3u,", 1);
   else
-    bformata(*bfeatures_buffer, "%3u,", 0);
+    bformata(*bbuffer, "%3u,", 0);
 
-  bformata(*bfeatures_buffer, "%3u,%3u,%3u,%3u,%lld\n",
-    nwhite_man, nblack_man, nwhite_crown, nblack_crown, nfen);
-
-  bformata(*blabels_buffer, "%.6f\n", result);
+  bformata(*bbuffer, "%3u,%3u,%3u,%3u,%lld,%.6f\n",
+    nwhite_man, nblack_man, nwhite_king, nblack_king, nfen,result);
 
   (*nbuffer)++;
 }
 
-typedef struct
-{
-  int stage_min;
-  int stage_max;
-
-  bstring stage_training_features_name;
-  bstring stage_training_labels_name;
-
-  int stage_training_nbuffer;
-  bstring stage_training_features_buffer;
-  bstring stage_training_labels_buffer;
-
-  bstring stage_validation_features_name;
-  bstring stage_validation_labels_name;
-
-  int stage_validation_nbuffer;
-  bstring stage_validation_features_buffer;
-  bstring stage_validation_labels_buffer;
-} stage_t;
-
-#define NSTAGES 2
-
-local stage_t stages[NSTAGES] =
-{
-  {17, 32, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL},
-  {7, 22, NULL, NULL, 0, NULL, NULL, NULL, NULL, 0, NULL, NULL}
-};
-
 void fen2csv(char *arg_name)
 {
 #ifdef USE_OPENMPI
- 
+  my_random_t fen2csv_random;
+
+  construct_my_random(&fen2csv_random, 0);
+
   FILE *fname;
 
   HARDBUG((fname = fopen(arg_name, "r")) == NULL)
 
-  for (int istage = 0; istage < NSTAGES; istage++)
-  {
-    stage_t *stage = stages + istage;
+  bstring training_name;
 
-    stage->stage_training_features_name =
-      bformat("%s-%s-%d-%d-training-features.csv", arg_name, TAG,
-              stage->stage_min, stage->stage_max);
-    HARDBUG(stage->stage_training_features_name == NULL)
+  int training_nbuffer;
+  bstring training_buffer;
 
-    stage->stage_training_labels_name =
-      bformat("%s-%s-%d-%d-training-labels.csv", arg_name, TAG,
-              stage->stage_min, stage->stage_max);
-    HARDBUG(stage->stage_training_labels_name == NULL)
+  bstring validation_name;
 
-    stage->stage_training_nbuffer = 0;
-    HARDBUG((stage->stage_training_features_buffer = bfromcstr("")) == NULL)
-    HARDBUG((stage->stage_training_labels_buffer = bfromcstr("")) == NULL)
+  int validation_nbuffer;
+  bstring validation_buffer;
 
-    stage->stage_validation_features_name =
-      bformat("%s-%s-%d-%d-validation-features.csv", arg_name, TAG,
-              stage->stage_min, stage->stage_max);
-    HARDBUG(stage->stage_validation_features_name == NULL)
+  training_name = bformat("%s-%s-training.csv", arg_name, TAG);
 
-    stage->stage_validation_labels_name =
-      bformat("%s-%s-%d-%d-validation-labels.csv", arg_name, TAG,
-              stage->stage_min, stage->stage_max);
-    HARDBUG(stage->stage_validation_labels_name == NULL)
+  HARDBUG(training_name == NULL)
 
-    stage->stage_validation_nbuffer = 0;
+  training_nbuffer = 0;
+  HARDBUG((training_buffer = bfromcstr("")) == NULL)
 
-    HARDBUG((stage->stage_validation_features_buffer = bfromcstr("")) == NULL)
-    HARDBUG((stage->stage_validation_labels_buffer = bfromcstr("")) == NULL)
+  validation_name = bformat("%s-%s-validation.csv", arg_name, TAG);
 
-    PRINTF("istage=%d stage_training_features_name=%s\n",
-      istage, bdata(stage->stage_training_features_name));
-    PRINTF("istage=%d stage_training_labels_name=%s\n",
-      istage, bdata(stage->stage_training_labels_name));
-    PRINTF("istage=%d stage_validation_features_name=%s\n",
-      istage, bdata(stage->stage_validation_features_name));
-    PRINTF("istage=%d stage_validation_labels_name=%s\n",
-      istage, bdata(stage->stage_validation_labels_name));
+  HARDBUG(validation_name == NULL)
 
-    remove(bdata(stage->stage_training_features_name));
-    remove(bdata(stage->stage_training_labels_name));
-    remove(bdata(stage->stage_validation_features_name));
-    remove(bdata(stage->stage_validation_labels_name));
-  }
+  validation_nbuffer = 0;
 
-  int iboard = create_board(STDOUT, INVALID);
+  HARDBUG((validation_buffer = bfromcstr("")) == NULL)
+
+  PRINTF("training_name=%s\n", bdata(training_name));
+  PRINTF("validation_name=%s\n", bdata(validation_name));
+
+  remove(bdata(training_name));
+  remove(bdata(validation_name));
+
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   char line[MY_LINE_MAX];
@@ -2721,63 +2544,28 @@ void fen2csv(char *arg_name)
 
     int nwhite_man = BIT_COUNT(with->board_white_man_bb);
     int nblack_man = BIT_COUNT(with->board_black_man_bb);
-    int nwhite_crown = BIT_COUNT(with->board_white_crown_bb);
-    int nblack_crown = BIT_COUNT(with->board_black_crown_bb);
-
-    int npieces = nwhite_man + nblack_man + nwhite_crown + nblack_crown;
-
-    int istage;
-
-    for (istage = 0; istage < NSTAGES; istage++)
-    {
-      stage_t *stage = stages + istage;
-
-      if ((stage->stage_min == 41) and (npieces <= stage->stage_max) and
-          (nwhite_crown == 0) and (nblack_crown == 0)) break;
-
-      if ((stage->stage_min == 42) and (npieces <= stage->stage_max) and
-          ((nwhite_crown > 0) or (nblack_crown > 0))) break;
-
-      if ((npieces >= stage->stage_min) and (npieces <= stage->stage_max))
-        break;
-    }
-
-    if (istage >= NSTAGES)
-    { 
-      nfen_skipped_mpi++;
-
-      continue;
-    }
-
-    HARDBUG(istage >= NSTAGES)
-
-    stage_t *stage = stages + istage;
+    int nwhite_king = BIT_COUNT(with->board_white_king_bb);
+    int nblack_king = BIT_COUNT(with->board_black_king_bb);
 
     //HARDBUG(fabs(result) >= 0.999999)
 
     //scale the result
     //result = (result * iply) / nply;
 
-    int prob = randull(0) % 100;
+    int prob = return_my_random(&fen2csv_random) % 100;
 
     if (prob <= 79) 
     {
-      append_pack(with, &(stage->stage_training_nbuffer),
-        &(stage->stage_training_features_name),
-        &(stage->stage_training_features_buffer),
-        &(stage->stage_training_labels_name),
-        &(stage->stage_training_labels_buffer),
-        nwhite_man, nwhite_crown, nblack_man, nblack_crown,
+      append_pack(with, &(training_nbuffer),
+        &(training_name), &(training_buffer),
+        nwhite_man, nwhite_king, nblack_man, nblack_king,
         nfen, result);
     }
     else
     {
-      append_pack(with, &(stage->stage_validation_nbuffer),
-        &(stage->stage_validation_features_name),
-        &(stage->stage_validation_features_buffer),
-        &(stage->stage_validation_labels_name),
-        &(stage->stage_validation_labels_buffer),
-        nwhite_man, nwhite_crown, nblack_man, nblack_crown,
+      append_pack(with, &(validation_nbuffer),
+        &(validation_name), &(validation_buffer),
+        nwhite_man, nwhite_king, nblack_man, nblack_king,
         nfen, result);
     }
   }
@@ -2798,25 +2586,11 @@ void fen2csv(char *arg_name)
 
   //write remaining
 
-  for (int istage = 0; istage < NSTAGES; istage++)
-  {
-    stage_t *stage = stages + istage;
+  if (training_nbuffer > 0)
+    flush_buffer(&(training_name), &(training_buffer));
 
-    if (stage->stage_training_nbuffer > 0)
-    {
-      flush_buffer(&(stage->stage_training_features_name),
-                   &(stage->stage_training_features_buffer),
-                   &(stage->stage_training_labels_name),
-                   &(stage->stage_training_labels_buffer));
-    } 
-    if (stage->stage_validation_nbuffer > 0)
-    {
-      flush_buffer(&(stage->stage_validation_features_name),
-                   &(stage->stage_validation_features_buffer),
-                   &(stage->stage_validation_labels_name),
-                   &(stage->stage_validation_labels_buffer));
-    }
-  }
+  if (validation_nbuffer > 0)
+    flush_buffer(&(validation_name), &(validation_buffer));
 #endif
 }
 
@@ -2829,14 +2603,18 @@ void test_neural(void)
 
 void egtb2neural(void)
 {
-  int iboard = create_board(STDOUT, INVALID);
+  my_random_t egtb2neural_random;
+
+  construct_my_random(&egtb2neural_random, 0);
+
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   double *delta_white;
   double *delta_black;
 
-  MALLOC(delta_white, double, NPOS)
-  MALLOC(delta_black, double, NPOS)
+  MY_MALLOC(delta_white, double, NPOS)
+  MY_MALLOC(delta_black, double, NPOS)
 
   for (i64_t ipos = 0; ipos < NPOS; ipos++)
     delta_white[ipos] = delta_black[ipos] = 0.0;
@@ -2852,7 +2630,7 @@ void egtb2neural(void)
   {
     if ((ipos % 10000) == 0) PRINTF("ipos=%lld\n", ipos);
 
-    int nwhite = randull(0) % (NEGTB - 1) + 1;
+    int nwhite = return_my_random(&egtb2neural_random) % (NEGTB - 1) + 1;
 
     HARDBUG(nwhite >= NEGTB)
 
@@ -2864,7 +2642,7 @@ void egtb2neural(void)
 
     char s[MY_LINE_MAX];
 
-    if ((randull(0) % 2) == 0)
+    if ((return_my_random(&egtb2neural_random) % 2) == 0)
       s[0] = 'w';
     else
       s[0] = 'b';
@@ -2874,12 +2652,12 @@ void egtb2neural(void)
       for (int i = 1; i <= 50; ++i) s[i] = *nn;
       for (int i = 1; i <= nwhite; ++i)
       {
-        if ((randull(0) % 2) == 0)
+        if ((return_my_random(&egtb2neural_random) % 2) == 0)
         {
           int j;
           while(TRUE)
           {
-            j = randull(0) % 50 + 1;
+            j = return_my_random(&egtb2neural_random) % 50 + 1;
             if (s[j] == *nn) break;
           }
           s[j] = *wX;
@@ -2889,7 +2667,7 @@ void egtb2neural(void)
           int j;
           while(TRUE)
           {
-            j = randull(0) % 45 + 6;
+            j = return_my_random(&egtb2neural_random) % 45 + 6;
             if (s[j] == *nn) break;
           }
           s[j] = *wO;
@@ -2898,12 +2676,12 @@ void egtb2neural(void)
   
       for (int i = 1; i <= nblack; ++i)
       {
-        if ((randull(0) % 2) == 0)
+        if ((return_my_random(&egtb2neural_random) % 2) == 0)
         {
           int j;
           while(TRUE)
           {
-            j = randull(0) % 50 + 1;
+            j = return_my_random(&egtb2neural_random) % 50 + 1;
             if (s[j] == *nn) break;
           }
           s[j] = *bX;
@@ -2913,7 +2691,7 @@ void egtb2neural(void)
           int j;
           while(TRUE)
           {
-            j = randull(0) % 45 + 1;
+            j = return_my_random(&egtb2neural_random) % 45 + 1;
             if (s[j] == *nn) break;
           }
           s[j] = *bO;
@@ -2971,8 +2749,16 @@ void egtb2neural(void)
     }
   }
 
-  heap_sort_double(NPOS, delta_white);
-  heap_sort_double(NPOS, delta_black);
+  i64_t *pdelta_white;
+
+  i64_t *pdelta_black;
+
+  MY_MALLOC(pdelta_white, i64_t, NPOS)
+
+  MY_MALLOC(pdelta_black, i64_t, NPOS)
+
+  heap_sort_double(NPOS, pdelta_white, delta_white);
+  heap_sort_double(NPOS, pdelta_black, delta_black);
 
   PRINTF("delta percentiles\n");
 
@@ -2981,7 +2767,8 @@ void egtb2neural(void)
     i64_t ipos = round(ipercentile / 100.0 * NPOS);
 
     PRINTF("ipercentile=%d delta_white=%.6f delta_black=%.6f\n",
-      ipercentile, delta_white[ipos], delta_black[ipos]);
+      ipercentile, delta_white[pdelta_white[ipos]],
+                   delta_black[pdelta_black[ipos]]);
   }
 
   PRINTF("nw2m_won_draw=%lld\n", nw2m_won_draw);

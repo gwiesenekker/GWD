@@ -1,18 +1,12 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef BucketsH
 #define BucketsH
 
 #define BUCKET_LINEAR 1
 #define BUCKET_LOG    2
 
-typedef struct bucket
+typedef struct 
 {
-  //generic properties and methods
-
-  int object_id;
-
-  //specific properties
-
   double bucket_size;
   double bucket_min;
   double bucket_max;
@@ -26,14 +20,12 @@ typedef struct bucket
 
   pter_t printf_bucket;
 
-  void (*define_bucket)(struct bucket *, double, double, double, int);
-  void (*update_bucket)(struct bucket *, double);
-  void (*clear_bucket)(struct bucket *);
 } bucket_t;
 
-extern class_t *bucket_class;
-
-void init_bucket_class(void);
-void test_bucket_class(void);
+void clear_bucket(void *);
+void update_bucket(void *, double);
+void printf_bucket(void *);
+void construct_bucket(void *, double, double, double, int);
+void test_buckets(void);
 
 #endif

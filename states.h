@@ -1,58 +1,44 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef StatesH
 #define StatesH
 
-typedef struct state
+typedef struct
 {
-  //generic properties and methods
-
-  int object_id;
-
-  //specific properties
-
   cJSON *cjson_object;
 
   char string[MY_LINE_MAX];
 
-  //specific methods
+  void (*printf_state)(void  *);
+  void (*set_state)(void  *, char *);
+  void (*set_event)(void  *, char *);
+  void (*set_date)(void  *, char *);
+  void (*set_white)(void  *, char *);
+  void (*set_black)(void  *, char *);
+  void (*set_result)(void  *, char *);
+  void (*set_starting_position)(void  *, char *);
+  void (*push_move)(void  *, char *, char *);
+  int (*pop_move)(void  *);
+  void (*set_depth)(void  *, int);
+  void (*set_time)(void  *, int);
+  void (*save)(void  *, char *);
+  void (*save2pdn)(void  *, char *);
 
-  pter_t printf_state;
-
-  void (*set_state)(struct state *, char *);
-  void (*set_event)(struct state *, char *);
-  void (*set_date)(struct state *, char *);
-  void (*set_white)(struct state *, char *);
-  void (*set_black)(struct state *, char *);
-  void (*set_result)(struct state *, char *);
-  void (*set_starting_position)(struct state *, char *);
-  void (*push_move)(struct state *, char *, char *);
-  int (*pop_move)(struct state *);
-  void (*set_depth)(struct state *, int);
-  void (*set_time)(struct state *, int);
-  void (*save)(struct state *, char *);
-  void (*save2pdn)(struct state *, char *);
-
-  char *(*get_state)(struct state *);
-  char *(*get_event)(struct state *);
-  char *(*get_date)(struct state *);
-  char *(*get_white)(struct state *);
-  char *(*get_black)(struct state *);
-  char *(*get_result)(struct state *);
-  char *(*get_starting_position)(struct state *);
-  cJSON *(*get_moves)(struct state *);
-  int (*get_depth)(struct state *);
-  int (*get_time)(struct state *);
-  void (*load)(struct state *, char *);
+  char *(*get_state)(void  *);
+  char *(*get_event)(void  *);
+  char *(*get_date)(void  *);
+  char *(*get_white)(void  *);
+  char *(*get_black)(void  *);
+  char *(*get_result)(void  *);
+  char *(*get_starting_position)(void  *);
+  cJSON *(*get_moves)(void  *);
+  int (*get_depth)(void  *);
+  int (*get_time)(void  *);
+  void (*load)(void  *, char *);
 } state_t;
 
-//alphabetical
-
-//states.c
-
-extern class_t *state_class;
-
-void init_state_class(void);
-void test_state_class(void);
+void construct_state(void *);
+void destroy_state(void *);
+void test_states(void);
 
 #endif
 

@@ -24,6 +24,7 @@ OBJS=main.o\
   score.o\
   search.o\
   states.o\
+  stats.o\
   threads.o\
   timers.o\
   utils.o\
@@ -137,6 +138,7 @@ HEADERS=boards.h\
   score.h\
   search.h\
   states.h\
+  stats.h\
   threads.h\
   timers.h\
   utils.h
@@ -168,6 +170,7 @@ records.o: Makefile records.c $(HEADERS)
 score.o: Makefile score.c score.d $(HEADERS)
 search.o: Makefile search.c search.d $(HEADERS)
 states.o: Makefile states.c $(HEADERS)
+stats.o: Makefile stats.c $(HEADERS)
 threads.o: Makefile threads.c $(HEADERS)
 timers.o: Makefile timers.c $(HEADERS)
 utils.o: Makefile utils.c $(HEADERS)

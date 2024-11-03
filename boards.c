@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #define NBOARDS_MAX     128
@@ -86,18 +86,15 @@ int black_row[BOARD_MAX] =
     -1, -1, -1, -1, -1
 };
 
+my_random_t boards_random;
+
 local my_mutex_t boards_mutex;
 
 hash_key_t white_man_key[BOARD_MAX];
-hash_key_t white_crown_key[BOARD_MAX];
+hash_key_t white_king_key[BOARD_MAX];
 
 hash_key_t black_man_key[BOARD_MAX];
-hash_key_t black_crown_key[BOARD_MAX];
-
-local hash_key_t white2move_key;
-local hash_key_t black2move_key;
-
-hash_key_t pv_key;
+hash_key_t black_king_key[BOARD_MAX];
 
 local board_t board_objs[NBOARDS_MAX];
 
@@ -136,12 +133,12 @@ board_t *return_with_board(int arg_board_id)
   return(with);
 }
 
-int create_board(my_printf_t *arg_my_printf, int arg_my_thread_id)
+int create_board(my_printf_t *arg_my_printf, thread_t *arg_thread)
 {
   int iboard;
   board_t *with;
 
-  HARDBUG(my_mutex_lock(&boards_mutex) != 0)
+  HARDBUG(compat_mutex_lock(&boards_mutex) != 0)
 
   //search empty slot
 
@@ -155,13 +152,21 @@ int create_board(my_printf_t *arg_my_printf, int arg_my_thread_id)
 
   with->board_my_printf = arg_my_printf;
 
-  with->board_thread_id = arg_my_thread_id;
+  with->board_thread = arg_thread;
   
   construct_my_timer(&(with->board_timer), "board",
     with->board_my_printf, FALSE);
 
-  load_neural(options.neural_name0, &(with->board_neural0), TRUE);
-  load_neural(options.neural_name1, &(with->board_neural1), TRUE);
+  load_neural(options.neural0_name, &(with->board_neural0), TRUE);
+
+  with->board_neural1_not_null = FALSE;
+
+  if (compat_strcasecmp(options.neural1_name, "null") != 0)
+  {
+    with->board_neural1_not_null = TRUE;
+
+    load_neural(options.neural1_name, &(with->board_neural1), TRUE);
+  }
 
   entry_i16_t entry_i16_default = {MATE_DRAW, MATE_DRAW};
             
@@ -181,14 +186,14 @@ int create_board(my_printf_t *arg_my_printf, int arg_my_thread_id)
 
   CLR_HASH_KEY(with->board_board2string_key)
 
-  HARDBUG(my_mutex_unlock(&boards_mutex) != 0)
+  HARDBUG(compat_mutex_unlock(&boards_mutex) != 0)
 
   return(with->board_id);
 }
 
 void destroy_board(int arg_board_id)
 {
-  HARDBUG(my_mutex_lock(&boards_mutex) != 0)
+  HARDBUG(compat_mutex_lock(&boards_mutex) != 0)
 
   board_t *with = return_with_board(arg_board_id);
 
@@ -196,11 +201,11 @@ void destroy_board(int arg_board_id)
 
   with->board_my_printf = NULL;
 
-  with->board_thread_id = INVALID;
+  with->board_thread = NULL;
 
   with->board_id = INVALID;
 
-  HARDBUG(my_mutex_unlock(&boards_mutex) != 0)
+  HARDBUG(compat_mutex_unlock(&boards_mutex) != 0)
 }
 
 hash_key_t return_key_from_bb(board_t *with)
@@ -220,13 +225,13 @@ hash_key_t return_key_from_bb(board_t *with)
     bb &= ~BITULL(iboard);
   }
 
-  bb = with->board_white_crown_bb;
+  bb = with->board_white_king_bb;
 
   while(bb != 0)
   {
     int iboard = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, white_crown_key[iboard])
+    XOR_HASH_KEY(result, white_king_key[iboard])
 
     bb &= ~BITULL(iboard);
   }
@@ -242,13 +247,13 @@ hash_key_t return_key_from_bb(board_t *with)
     bb &= ~BITULL(iboard);
   }
 
-  bb = with->board_black_crown_bb;
+  bb = with->board_black_king_bb;
 
   while(bb != 0)
   {
     int iboard = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, black_crown_key[iboard])
+    XOR_HASH_KEY(result, black_king_key[iboard])
 
     bb &= ~BITULL(iboard);
   }
@@ -266,6 +271,8 @@ hash_key_t return_key_from_inputs(neural_t *with)
   {
     int iboard = map[i];
 
+    HARDBUG(with->neural_inputs[with->white_man_input_map[iboard]] < 0)
+
     if (with->neural_inputs[with->white_man_input_map[iboard]])
       XOR_HASH_KEY(result, white_man_key[iboard])
   }
@@ -274,13 +281,17 @@ hash_key_t return_key_from_inputs(neural_t *with)
   {
     int iboard = map[i];
 
-    if (with->neural_inputs[with->white_crown_input_map[iboard]])
-      XOR_HASH_KEY(result, white_crown_key[iboard])
+    HARDBUG(with->neural_inputs[with->white_king_input_map[iboard]] < 0)
+
+    if (with->neural_inputs[with->white_king_input_map[iboard]])
+      XOR_HASH_KEY(result, white_king_key[iboard])
   }
 
   for (int i = 1; i <= 45; ++i)
   {
     int iboard = map[i];
+
+    HARDBUG(with->neural_inputs[with->black_man_input_map[iboard]] < 0)
 
     if (with->neural_inputs[with->black_man_input_map[iboard]])
       XOR_HASH_KEY(result, black_man_key[iboard])
@@ -290,23 +301,11 @@ hash_key_t return_key_from_inputs(neural_t *with)
   {
     int iboard = map[i];
 
-    if (with->neural_inputs[with->black_crown_input_map[iboard]])
-      XOR_HASH_KEY(result, black_crown_key[iboard])
+    HARDBUG(with->neural_inputs[with->black_king_input_map[iboard]] < 0)
+
+    if (with->neural_inputs[with->black_king_input_map[iboard]])
+      XOR_HASH_KEY(result, black_king_key[iboard])
   }
-
-  return(result);
-}
-
-hash_key_t return_book_key(board_t *with)
-{
-  hash_key_t result;
-
-  result = with->board_key;
-
-  if (IS_WHITE(with->board_colour2move))
-    XOR_HASH_KEY(result, white2move_key)
-  else
-    XOR_HASH_KEY(result, black2move_key)
 
   return(result);
 }
@@ -325,9 +324,9 @@ void string2board(char *arg_s, int arg_board_id)
   }
 
   with->board_white_man_bb = 0;
-  with->board_white_crown_bb = 0;
+  with->board_white_king_bb = 0;
   with->board_black_man_bb = 0;
-  with->board_black_crown_bb = 0;
+  with->board_black_king_bb = 0;
 
   char wO_local = *wO;
   char wX_local = *wX;
@@ -363,7 +362,7 @@ void string2board(char *arg_s, int arg_board_id)
     }
     else if (arg_s[i] == wX_local)
     {
-      with->board_white_crown_bb |= BITULL(iboard);
+      with->board_white_king_bb |= BITULL(iboard);
     }
     else if (arg_s[i] == bO_local)
     {
@@ -373,7 +372,7 @@ void string2board(char *arg_s, int arg_board_id)
     }
     else if (arg_s[i] == bX_local)
     {
-      with->board_black_crown_bb |= BITULL(iboard);
+      with->board_black_king_bb |= BITULL(iboard);
     }
     else if (arg_s[i] == nn_local)
     {
@@ -402,10 +401,13 @@ void string2board(char *arg_s, int arg_board_id)
     FATAL("colour2move error", EXIT_FAILURE)
 
   board2neural(with, &(with->board_neural0), FALSE);
-  board2neural(with, &(with->board_neural1), FALSE);
-  
   return_neural_score_scaled(&(with->board_neural0), FALSE, FALSE);
-  return_neural_score_scaled(&(with->board_neural1), FALSE, FALSE);
+
+  if (with->board_neural1_not_null)
+  {
+    board2neural(with, &(with->board_neural1), FALSE);
+    return_neural_score_scaled(&(with->board_neural1), FALSE, FALSE);
+  }
 }
 
 void fen2board(char *arg_fen, int arg_board_id)
@@ -548,8 +550,8 @@ void board2fen(int arg_board_id, char arg_fen[MY_LINE_MAX], int brackets)
   else
     STRNCAT(arg_fen, "B");
 
-  ui64_t white_bb = with->board_white_man_bb | with->board_white_crown_bb;
-  ui64_t black_bb = with->board_black_man_bb | with->board_black_crown_bb;
+  ui64_t white_bb = with->board_white_man_bb | with->board_white_king_bb;
+  ui64_t black_bb = with->board_black_man_bb | with->board_black_king_bb;
 
   for (int i = 1; i <= 50; ++i)
   {
@@ -559,7 +561,7 @@ void board2fen(int arg_board_id, char arg_fen[MY_LINE_MAX], int brackets)
     {
       if (wcomma) STRNCAT(wfen, ",");
 
-      if (with->board_white_crown_bb & BITULL(iboard))
+      if (with->board_white_king_bb & BITULL(iboard))
         STRNCAT(wfen, "K");
 
       STRNCAT(wfen, nota[iboard]);
@@ -570,7 +572,7 @@ void board2fen(int arg_board_id, char arg_fen[MY_LINE_MAX], int brackets)
     {
       if (bcomma) STRNCAT(bfen, ",");
 
-      if (with->board_black_crown_bb & BITULL(iboard))
+      if (with->board_black_king_bb & BITULL(iboard))
         STRNCAT(bfen, "K");
 
       STRNCAT(bfen, nota[iboard]);
@@ -599,11 +601,11 @@ void print_board(int arg_board_id)
 
       if (with->board_white_man_bb & BITULL(iboard))
         my_printf(with->board_my_printf, "  wO");
-      else if (with->board_white_crown_bb & BITULL(iboard))
+      else if (with->board_white_king_bb & BITULL(iboard))
         my_printf(with->board_my_printf, "  wX");
       else if (with->board_black_man_bb & BITULL(iboard))
         my_printf(with->board_my_printf, "  bO");
-      else if (with->board_black_crown_bb & BITULL(iboard))
+      else if (with->board_black_king_bb & BITULL(iboard))
         my_printf(with->board_my_printf, "  bX");
       else
         my_printf(with->board_my_printf, "  ..");
@@ -612,12 +614,12 @@ void print_board(int arg_board_id)
   }
   my_printf(with->board_my_printf, 
     "(%d) (%dx%d) (%dx%d)",
-    BIT_COUNT(with->board_white_man_bb | with->board_white_crown_bb | 
-              with->board_black_man_bb | with->board_black_crown_bb),
+    BIT_COUNT(with->board_white_man_bb | with->board_white_king_bb | 
+              with->board_black_man_bb | with->board_black_king_bb),
     BIT_COUNT(with->board_white_man_bb),
     BIT_COUNT(with->board_black_man_bb),
-    BIT_COUNT(with->board_white_crown_bb),
-    BIT_COUNT(with->board_black_crown_bb));
+    BIT_COUNT(with->board_white_king_bb),
+    BIT_COUNT(with->board_black_king_bb));
 
   if (IS_WHITE(with->board_colour2move))
     my_printf(with->board_my_printf, " WHITE to move\n");
@@ -637,7 +639,8 @@ void print_board(int arg_board_id)
 
 local void init_key(hash_key_t *k)
 {
-  for (int i = 0; i < BOARD_MAX; i++) RANDULL_HASH_KEY(k[i])
+  for (int i = 0; i < BOARD_MAX; i++) 
+    k[i] = return_my_random(&boards_random);
 }
 
 local char *self_board2string(board_t *self, int hub)
@@ -676,7 +679,7 @@ local char *self_board2string(board_t *self, int hub)
       else
         self->board_string[i] = *wO_hub;
     }
-    else if (self->board_white_crown_bb & BITULL(iboard))
+    else if (self->board_white_king_bb & BITULL(iboard))
     {
       if (!hub)
         self->board_string[i] = *wX;
@@ -690,7 +693,7 @@ local char *self_board2string(board_t *self, int hub)
       else
         self->board_string[i] = *bO_hub;
     }
-    else if (self->board_black_crown_bb & BITULL(iboard))
+    else if (self->board_black_king_bb & BITULL(iboard))
     {
       if (!hub)
         self->board_string[i] = *bX;
@@ -714,13 +717,15 @@ local char *self_board2string(board_t *self, int hub)
 
 void init_boards(void)
 {
-  MARK_ARRAY_READONLY(map)
+  construct_my_random(&boards_random, 0);
 
-  MARK_ARRAY_READONLY(inverse_map)
+  MARK_BLOCK_READ_ONLY(map, sizeof(map))
 
-  MARK_ARRAY_READONLY(white_row)
+  MARK_BLOCK_READ_ONLY(inverse_map, sizeof(inverse_map))
 
-  MARK_ARRAY_READONLY(black_row)
+  MARK_BLOCK_READ_ONLY(white_row, sizeof(inverse_map))
+
+  MARK_BLOCK_READ_ONLY(black_row, sizeof(inverse_map))
 
   for (int iboard = 0; iboard < NBOARDS_MAX; iboard++)
   {
@@ -731,25 +736,18 @@ void init_boards(void)
   }
 
   init_key(white_man_key);
-  init_key(white_crown_key);
+  init_key(white_king_key);
 
-  MARK_ARRAY_READONLY(white_man_key)
-  MARK_ARRAY_READONLY(white_crown_key)
+  MARK_BLOCK_READ_ONLY(white_man_key, sizeof(inverse_map))
+  MARK_BLOCK_READ_ONLY(white_king_key, sizeof(inverse_map))
 
   init_key(black_man_key);
-  init_key(black_crown_key);
+  init_key(black_king_key);
 
-  MARK_ARRAY_READONLY(black_man_key)
-  MARK_ARRAY_READONLY(black_crown_key)
+  MARK_BLOCK_READ_ONLY(black_man_key, sizeof(inverse_map))
+  MARK_BLOCK_READ_ONLY(black_king_key, sizeof(inverse_map))
 
-  //book backward compatability
-
-  RANDULL_HASH_KEY(white2move_key)
-  RANDULL_HASH_KEY(black2move_key)
-
-  pv_key = randull(0);
-
-  HARDBUG(my_mutex_init(&boards_mutex) != 0)
+  HARDBUG(compat_mutex_init(&boards_mutex) != 0)
 } 
 
 void state2board(board_t *with, state_t *game)
@@ -763,8 +761,6 @@ void state2board(board_t *with, state_t *game)
 
   cJSON *game_move;
 
-  int ndone = 0;
-
   cJSON_ArrayForEach(game_move, game->get_moves(game))
   {
     cJSON *move_string = cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
@@ -773,8 +769,6 @@ void state2board(board_t *with, state_t *game)
 
     my_printf(with->board_my_printf, "move_string=%s\n",
       cJSON_GetStringValue(move_string));
-
-    ++ndone;
 
     gen_moves(with, &moves_list, FALSE);
 

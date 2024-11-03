@@ -1,13 +1,15 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #define NRETRIES 5
 
+local my_random_t book_random;
 
 local sqlite3 *book;
 
 void init_book(void)
 {
+  construct_my_random(&book_random, INVALID);
 }
 
 local int help_walk_book_alpha_beta(sqlite3 *db, board_t *with,
@@ -239,20 +241,13 @@ void open_book(void)
 
   if (TRUE)
   {
-    int iboard = create_board(STDOUT, INVALID);
+    int iboard = create_board(STDOUT, NULL);
 
     board_t *with = return_with_board(iboard);
   
     string2board(STARTING_POSITION, iboard);
   
     help_walk_book(book, with, 0, 30, "");
-  }
-
-  if (options.book_randomness > 0)
-  {
-    ui64_t seed = randull(INVALID);
-
-    PRINTF("seed=%llX\n", seed);
   }
 }
 
@@ -293,7 +288,7 @@ void return_book_move(board_t *with, moves_list_t *moves_list,
   {
     for (int imove = moves_list->nmoves - 1; imove >= 1; --imove)
     {
-      int jmove = randull(0) % (imove + 1);
+      int jmove = return_my_random(&book_random) % (imove + 1);
 
       if (jmove != imove)
       {
@@ -556,7 +551,7 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
 
 void gen_book(int eval_time, int depth_limit)
 {
-  ui64_t seed = randull(INVALID);
+  ui64_t seed = return_my_random(&book_random);
 
   PRINTF("seed=%llX\n", seed);
 
@@ -585,7 +580,7 @@ void gen_book(int eval_time, int depth_limit)
 
   //we start with the starting position
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   string2board(STARTING_POSITION, iboard);
@@ -619,7 +614,7 @@ void walk_book(int eval_time)
 
   //we start with the starting position
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
 
   board_t *with = return_with_board(iboard);
 
@@ -695,7 +690,7 @@ void count_book(int depth_limit)
 
   //we start with the starting position
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   string2board(STARTING_POSITION, iboard);

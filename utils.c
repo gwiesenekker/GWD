@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #ifdef USE_HARDWARE_CRC32
@@ -12,8 +12,6 @@ local my_mutex_t mpi_abort_mutex;
 #ifdef USE_OPENMPI
 local int mpi_abort = FALSE;
 #endif
-
-local my_mutex_t randull_mutex;
 
 int zzzzzz_invocation = 0;
 
@@ -59,7 +57,7 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
     }
     else
     {
-      HARDBUG(my_mutex_lock(&mpi_abort_mutex) != 0)
+      HARDBUG(compat_mutex_lock(&mpi_abort_mutex) != 0)
 
       if (mpi_abort == FALSE)
       {
@@ -67,7 +65,7 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
         MPI_Abort(my_mpi_globals.MY_MPIG_comm_global, code);
       }
 
-      HARDBUG(my_mutex_unlock(&mpi_abort_mutex) != 0)
+      HARDBUG(compat_mutex_unlock(&mpi_abort_mutex) != 0)
     }
   }
 #endif
@@ -76,135 +74,10 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
 
 int fexists(char *name)
 {
-  if (my_access(name, F_OK) == 0)
+  if (compat_access(name, F_OK) == 0)
     return(TRUE);
   else
     return(FALSE);
-}
-
-local char *x[55] = {
-  "7695486691539278197",
-  "17668290884826504057",
-  "8217136619161190694",
-  "9798145789352023136",
-  "13533164559007451430",
-  "11991545949957946907",
-  "8108979246051854641",
-  "4469134220914525539",
-  "9803057183791134933",
-  "11878025097534696099",
-  "12705436919975675895",
-  "3788215626329693944",
-  "2788229817969439085",
-  "896809635154914246",
-  "7642979227627401218",
-  "16415566446300674176",
-  "17693797731780643904",
-  "740343703055963834",
-  "13163760304165995515",
-  "13583424190793939054",
-  "18157047174260536439",
-  "10426639141240110889",
-  "12577394375014380344",
-  "1287267897397807597",
-  "1238188445866482434",
-  "6593406311695770544",
-  "4360257755853189649",
-  "9935866181755336076",
-  "10763453978995970524",
-  "17660290453874763156",
-  "5474650546656110815",
-  "855045942413422633",
-  "14795454850486999302",
-  "15005637393194842865",
-  "6604271681962598632",
-  "10901888371365892400",
-  "16618911050944948120",
-  "14108827758039928618",
-  "8184664491189973222",
-  "12933065998774769839",
-  "12760171374446467927",
-  "8756798036556576879",
-  "8855962242306141418",
-  "8573013844835606592",
-  "13049868273895483103",
-  "7553530932171241797",
-  "14725311941001312690",
-  "16509117984292574803",
-  "16423365846456388573",
-  "960124620475471253",
-  "10365054185148123041",
-  "15796623839392014534",
-  "14883283904315193857",
-  "10969950277165035521",
-  "9502089656919400129"
-};
-
-ui64_t randull(int init)
-{
-  static ui64_t y[55];
-  static int j, k;
-
-  if (init == 1)
-  {
-    for (int i = 0; i < 55; i++)
-    {
-      (void) sscanf(x[i], "%llu", y + i);
-
-      char z[64 + 1];
-
-      (void) snprintf(z, 64, "%llu", y[i]);
-
-      HARDBUG(strcmp(z, x[i]) != 0)
-    }
-    j = 24 - 1;
-    k = 55 - 1;
-
-    return(0);
-  }
-  else if (init == INVALID)
-  {
-    for (int i = 0; i < 55; i++)
-    {
-//ui64_t unsigned long??
-      unsigned long long r;
-
-#ifdef USE_HARDWARE_RAND
-      HARDBUG(!_rdrand64_step(&r))
-#else
-      r = i;
-#endif
-
-      y[i] = r;
-
-      HARDBUG(y[i] != r)
-    }
-    //PRINTF("local char *x[55] = {\n");
-    //for (int i = 0; i < 54; i++)
-      //PRINTF("  \"%llu\",\n", y[i]);
-    //PRINTF("  \"%llu\"\n};\n", y[54]);
-  }
-
-//  HARDBUG(my_mutex_lock(&randull_mutex) != 0)
-
-  ui64_t ul = (y[k] += y[j]);
-  if (--j < 0) j = 55 - 1;
-  if (--k < 0) k = 55 - 1;
-
-//  HARDBUG(my_mutex_unlock(&randull_mutex) != 0)
-
-  return(ul);
-}
-
-double randdouble(int n)
-{
-  HARDBUG(n < 1)
-
-  i64_t m = 1;
-  for (int i = 1; i <= n; ++i)
-    m *= 10;
-  
-  return((randull(0) % m) / (m - 1.0));
 }
 
 local int is_prime(i64_t n)
@@ -321,10 +194,7 @@ void init_utils(void)
     crc_table64[i] = part;
   }
 
-  (void) randull(1);
-
-  HARDBUG(my_mutex_init(&mpi_abort_mutex) != 0)
-  HARDBUG(my_mutex_init(&randull_mutex) != 0)
+  HARDBUG(compat_mutex_init(&mpi_abort_mutex) != 0)
 }
 
 void test_utils(void)
@@ -398,7 +268,7 @@ cJSON *cJSON_FindItemInObject(cJSON *object, char *name)
 
   cJSON_ArrayForEach(entry, object)
   {
-    if (my_strcasecmp(entry->string, name) == 0)
+    if (compat_strcasecmp(entry->string, name) == 0)
     {
       result = entry;
       break;

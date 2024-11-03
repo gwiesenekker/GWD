@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef SearchH
 #define SearchH
 
@@ -31,7 +31,7 @@ void print_totals(board_t *with);
 void clear_caches(void);
 void init_search(void);
 void fin_search(void);
-void search(board_t *with, moves_list_t *, int, int, int, int);
+void search(board_t *with, moves_list_t *, int, int, int, my_random_t *);
 
 #endif
 

@@ -1,10 +1,10 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef MyPrintfH
 #define MyPrintfH
 
-typedef struct my_printf_s
+typedef struct 
 {
-  int object_id;
+  int my_printf2stdout;
 
   char my_printf_fname[MY_LINE_MAX];
 
@@ -21,14 +21,10 @@ typedef struct my_printf_s
 
 //my_printf.c
 
-extern char log_infix[MY_LINE_MAX];
-extern class_t *my_printf_class;
-
-my_printf_t *construct_my_printf(int);
-void my_printf(my_printf_t *, char *, ...);
-void init_my_printf_class(void);
-void fin_my_printf_class(void);
-void test_my_printf_class(void);
+void construct_my_printf(void *, char *, int);
+void my_printf(void *, char *, ...);
+void init_my_printf(void);
+void test_my_printf(void);
 
 #endif
 

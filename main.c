@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 
@@ -29,7 +29,7 @@ local void solve_problems(char *arg_name)
   int nproblems = 0;
   int nsolved = 0;
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   char line[MY_LINE_MAX];
@@ -94,7 +94,7 @@ local void solve_problems(char *arg_name)
 
 local void solve_problems_multi_threaded(char *arg_name)
 {
-  enqueue(return_thread_queue(thread_alpha_beta_master_id),
+  enqueue(return_thread_queue(thread_alpha_beta_master),
     MESSAGE_SOLVE, arg_name);
 
   while(TRUE)
@@ -114,7 +114,7 @@ local void solve_problems_multi_threaded(char *arg_name)
       else
         FATAL("message.message_id error", EXIT_FAILURE)
     }
-    my_sleep(CENTI_SECOND);
+    compat_sleep(CENTI_SECOND);
   }
 }
 
@@ -139,23 +139,29 @@ local char *secs2string(int t)
 void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
   int game_minutes, int used_minutes)
 {
-  state_t *game = state_class->objects_ctor();
+  my_random_t play_random;
+
+  construct_my_random(&play_random, 0);
+
+  state_t game_state;
+
+  construct_state(&game_state);
 
   if (fexists(name))
   {
-    game->load(game, name);
+    game_state.load(&game_state, name);
   }
   else
   {
     if (*colour == 'w')
     {
-      game->set_white(game, "Human");
-      game->set_black(game, "GWD");
+      game_state.set_white(&game_state, "Human");
+      game_state.set_black(&game_state, "GWD");
     }
     else
     {
-      game->set_white(game, "GWD");
-      game->set_black(game, "Human");
+      game_state.set_white(&game_state, "GWD");
+      game_state.set_black(&game_state, "Human");
     }
   }
 
@@ -169,7 +175,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
   double game_time = game_minutes * 60.0;
   double game_time_used = used_minutes * 60.0;
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   int automatic = FALSE;
@@ -178,10 +184,10 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
   while(TRUE)
   {
-    enqueue(return_thread_queue(thread_alpha_beta_master_id),
-      MESSAGE_STATE, game->get_state(game));
+    enqueue(return_thread_queue(thread_alpha_beta_master),
+      MESSAGE_STATE, game_state.get_state(&game_state));
 
-    state2board(with, game);
+    state2board(with, &game_state);
 
     print_board(with->board_id);
 
@@ -209,7 +215,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
         PRINTF("\nPondering..\n");
 
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
+        enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_GO, "main/play_game");
       }
 
@@ -236,7 +242,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
       char best_move[MY_LINE_MAX];
 
-      double t1 = my_time();
+      double t1 = compat_time();
 
       while(TRUE)
       {
@@ -288,14 +294,14 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
         if (*answer == 'u')
         {
-          game->pop_move(game);
+          game_state.pop_move(&game_state);
 
           goto label_undo;
         }
 
         if (*answer == 'q')
         {
-          enqueue(return_thread_queue(thread_alpha_beta_master_id),
+          enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_ABORT_SEARCH, "main/play_game");
 
           goto label_return;
@@ -303,7 +309,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
         if (*answer == '.')
         {
-          int imove = randull(0) % moves_list.nmoves;
+          int imove = return_my_random(&play_random) % moves_list.nmoves;
 
           strcpy(best_move, moves_list.move2string(&moves_list, imove));
 
@@ -334,7 +340,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
         break;
       }
       
-      double t2 = my_time();
+      double t2 = compat_time();
 
       double wait_time = t2 - t1;
 
@@ -344,7 +350,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
       snprintf(comment, MY_LINE_MAX, "%d", 0);
 
-      game->push_move(game, best_move, comment);
+      game_state.push_move(&game_state, best_move, comment);
 
       ++ndone;
 
@@ -354,7 +360,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
    
       if (options.ponder)
       {
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
+        enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_ABORT_SEARCH, "main/play_game");
 
         while(TRUE)
@@ -369,7 +375,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
               break;
             }
           }
-          my_sleep(CENTI_SECOND);
+          compat_sleep(CENTI_SECOND);
         }
       }
     }
@@ -378,7 +384,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
       char best_move[MY_LINE_MAX];
       int best_score;
 
-      double t1 = my_time();
+      double t1 = compat_time();
 
       if (moves_list.nmoves == 1)
       {
@@ -395,7 +401,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
  
       if (options.use_book) return_book_move(with, &moves_list, best_move);
 
-      if (my_strcasecmp(best_move, "NULL") != 0)
+      if (compat_strcasecmp(best_move, "NULL") != 0)
       {
         PRINTF("book move=%s\n", best_move);
 
@@ -424,7 +430,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
       options.time_ntrouble = 2;
 
-      enqueue(return_thread_queue(thread_alpha_beta_master_id),
+      enqueue(return_thread_queue(thread_alpha_beta_master),
         MESSAGE_GO, "main/play_game");
 
       while(TRUE)
@@ -449,14 +455,14 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
           else
             FATAL("message.message_id error", EXIT_FAILURE)
         } 
-        my_sleep(CENTI_SECOND);
+        compat_sleep(CENTI_SECOND);
       }
 
       double t2;
 
       label_break:
 
-      t2 = my_time();
+      t2 = compat_time();
 
       double move_time = t2 - t1;
 
@@ -475,25 +481,29 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
       snprintf(comment, MY_LINE_MAX, "%d", best_score);
 
-      game->push_move(game, best_move, comment);
+      game_state.push_move(&game_state, best_move, comment);
     }
   }
   label_return:
 
-  game->save(game, name);
+  game_state.save(&game_state, name);
 
-  game->save2pdn(game, "play.pdn");
+  game_state.save2pdn(&game_state, "play.pdn");
 
-  state_class->objects_dtor(game);
+  destroy_state(&game_state);
 }
 
 local void gen_random(char *name, int nwhite, int nblack)
 {
+  my_random_t temp_random;
+
+  construct_my_random(&temp_random, 0);
+
   FILE *frandom;
 
   HARDBUG((frandom = fopen(name, "w")) == NULL)
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   for (int iwhite = 1; iwhite <= nwhite; ++iwhite)
@@ -503,7 +513,7 @@ local void gen_random(char *name, int nwhite, int nblack)
       char s[MY_LINE_MAX];
       PRINTF("random %d %d\n", iwhite, iblack);
 
-      if ((randull(0) % 2) == 0)
+      if ((return_my_random(&temp_random) % 2) == 0)
         s[0] = 'w';
       else
         s[0] = 'b';
@@ -511,12 +521,12 @@ local void gen_random(char *name, int nwhite, int nblack)
       for (int i = 1; i <= 50; ++i) s[i] = *nn;
       for (int i = 1; i <= iwhite; ++i)
       {
-        if ((randull(0) % 4) == 0)
+        if ((return_my_random(&temp_random) % 4) == 0)
         {
           int j;
           while(TRUE)
           {
-            j = randull(0) % 50 + 1;
+            j = return_my_random(&temp_random) % 50 + 1;
             if (s[j] == *nn) break;
           }
           s[j] = *wX;
@@ -526,7 +536,7 @@ local void gen_random(char *name, int nwhite, int nblack)
           int j;
           while(TRUE)
           {
-            j = randull(0) % 45 + 6;
+            j = return_my_random(&temp_random) % 45 + 6;
             if (s[j] == *nn) break;
           }
           s[j] = *wO;
@@ -535,12 +545,12 @@ local void gen_random(char *name, int nwhite, int nblack)
 
       for (int i = 1; i <= iblack; ++i)
       {
-        if ((randull(0) % 4) == 0)
+        if ((return_my_random(&temp_random) % 4) == 0)
         {
           int j;
           while(TRUE)
           {
-            j = randull(0) % 50 + 1;
+            j = return_my_random(&temp_random) % 50 + 1;
             if (s[j] == *nn) break;
           }
           s[j] = *bX;
@@ -550,7 +560,7 @@ local void gen_random(char *name, int nwhite, int nblack)
           int j;
           while(TRUE)
           {
-            j = randull(0) % 45 + 1;
+            j = return_my_random(&temp_random) % 45 + 1;
             if (s[j] == *nn) break;
           }
           s[j] = *bO;
@@ -562,7 +572,7 @@ local void gen_random(char *name, int nwhite, int nblack)
 
       print_board(iboard);
 
-      HARDBUG(my_strcasecmp(s, with->board2string(with, FALSE)) != 0)
+      HARDBUG(compat_strcasecmp(s, with->board2string(with, FALSE)) != 0)
 
       moves_list_t moves_list;
 
@@ -648,8 +658,8 @@ local void load_gwd_json(void)
 
   options.verbose = 1;
 
-  strcpy(options.neural_name0, "NULL");
-  strcpy(options.neural_name1, "NULL");
+  strcpy(options.neural0_name, "NULL");
+  strcpy(options.neural1_name, "NULL");
 
   options.neural_evaluation_min = -100;
   options.neural_evaluation_max = -25;
@@ -679,7 +689,6 @@ local void load_gwd_json(void)
   options.egtb_level = 7;
 
   options.material_only = FALSE;
-  options.material_blend_parameter = 0;
 
   options.captures_are_transparent = TRUE;
   options.returned_depth_includes_captures = FALSE;
@@ -689,11 +698,13 @@ local void load_gwd_json(void)
   options.reduction_depth_root = 2;
   options.reduction_depth_leaf = 2;
 
-  options.reduction_nfull_min = 2;
-  options.reduction_ncache_min = 1;
-  options.reduction_parameter_delta = 25;
-  options.reduction_parameter_strong = 70;
-  options.reduction_parameter_weak = 20;
+  options.reduction_mean = 20;
+  options.reduction_sigma = 10;
+
+  options.reduction_delta = 25;
+  options.reduction_max = 80;
+  options.reduction_max = 50;
+  options.reduction_min = 20;
 
   options.row9_captures_are_tactical = TRUE;
   options.promotions_are_tactical = TRUE;
@@ -767,7 +778,7 @@ local void parse_parameters(void)
 
     HARDBUG(parameter_type == NULL)
 
-    if (my_strcasecmp(parameter_type, "int") == 0)
+    if (compat_strcasecmp(parameter_type, "int") == 0)
     {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -775,40 +786,40 @@ local void parse_parameters(void)
 
       int ivalue = round(cJSON_GetNumberValue(cjson_value));
  
-      if (my_strcasecmp(parameter_name, "verbose") == 0)  
+      if (compat_strcasecmp(parameter_name, "verbose") == 0)  
         options.verbose = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "neural_evaluation_min") == 0)  
+      else if (compat_strcasecmp(parameter_name, "neural_evaluation_min") == 0)  
         options.neural_evaluation_min = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "neural_evaluation_max") == 0)  
+      else if (compat_strcasecmp(parameter_name, "neural_evaluation_max") == 0)  
         options.neural_evaluation_max = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "neural_evaluation_time") == 0)  
+      else if (compat_strcasecmp(parameter_name, "neural_evaluation_time") == 0)  
         options.neural_evaluation_time = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "time_control_ntrouble") == 0)  
+      else if (compat_strcasecmp(parameter_name, "time_control_ntrouble") == 0)  
         options.time_control_ntrouble = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "time_control_mean") == 0)  
+      else if (compat_strcasecmp(parameter_name, "time_control_mean") == 0)  
         options.time_control_mean = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "time_control_sigma") == 0)  
+      else if (compat_strcasecmp(parameter_name, "time_control_sigma") == 0)  
         options.time_control_sigma = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "time_control_method") == 0)  
+      else if (compat_strcasecmp(parameter_name, "time_control_method") == 0)  
         options.time_control_method = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "wall_time_threshold") == 0)  
+      else if (compat_strcasecmp(parameter_name, "wall_time_threshold") == 0)  
         options.wall_time_threshold = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "depth_limit") == 0)  
+      else if (compat_strcasecmp(parameter_name, "depth_limit") == 0)  
         options.depth_limit = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "book_randomness") == 0)  
+      else if (compat_strcasecmp(parameter_name, "book_randomness") == 0)  
         options.book_randomness = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "egtb_level") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_level") == 0)  
       {
         if (ivalue < NENDGAME_MAX)
         {
@@ -827,81 +838,84 @@ local void parse_parameters(void)
         }
       }
 
-      else if (my_strcasecmp(parameter_name, "material_blend_parameter") == 0)  
-        options.material_blend_parameter = ivalue;
-
-      else if (my_strcasecmp(parameter_name, "reduction_depth_root") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_depth_root") == 0)  
         options.reduction_depth_root = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "reduction_depth_leaf") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_depth_leaf") == 0)  
         options.reduction_depth_leaf = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "reduction_nfull_min") == 0)  
-        options.reduction_nfull_min = ivalue;
+      else if (compat_strcasecmp(parameter_name,
+                             "reduction_mean") == 0)  
+        options.reduction_mean = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "reduction_ncache_min") == 0)  
-        options.reduction_ncache_min = ivalue;
+      else if (compat_strcasecmp(parameter_name,
+                             "reduction_sigma") == 0)  
+        options.reduction_sigma = ivalue;
 
-      else if (my_strcasecmp(parameter_name,
-                             "reduction_parameter_delta") == 0)  
-        options.reduction_parameter_delta = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_delta") == 0)  
+        options.reduction_delta = ivalue;
 
-      else if (my_strcasecmp(parameter_name,
-                             "reduction_parameter_strong") == 0)  
-        options.reduction_parameter_strong = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_max") == 0)  
+        options.reduction_max = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "reduction_parameter_weak") == 0)  
-        options.reduction_parameter_weak = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_strong") == 0)  
+        options.reduction_strong = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_weak") == 0)  
+        options.reduction_weak = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "reduction_min") == 0)  
+        options.reduction_min = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)  
         options.alpha_beta_cache_size = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "pv_cache_fraction") == 0)  
+      else if (compat_strcasecmp(parameter_name, "pv_cache_fraction") == 0)  
         options.pv_cache_fraction = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "nthreads_alpha_beta") == 0)  
+      else if (compat_strcasecmp(parameter_name, "nthreads_alpha_beta") == 0)  
         options.nthreads_alpha_beta = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "lazy_smp_policy") == 0)  
+      else if (compat_strcasecmp(parameter_name, "lazy_smp_policy") == 0)  
         options.lazy_smp_policy = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "nslaves") == 0)  
+      else if (compat_strcasecmp(parameter_name, "nslaves") == 0)  
         options.nslaves = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "egtb_entry_cache_size") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_entry_cache_size") == 0)  
         options.egtb_entry_cache_size = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "dxp_port") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_port") == 0)  
         options.dxp_port = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "dxp_game_time") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_game_time") == 0)  
         options.dxp_game_time = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "dxp_game_moves") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_game_moves") == 0)  
         options.dxp_game_moves = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "dxp_games") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_games") == 0)  
         options.dxp_games = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "dxp_annotate_level") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_annotate_level") == 0)  
         options.dxp_annotate_level = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "hub_server_game_time") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_server_game_time") == 0)  
         options.hub_server_game_time = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "hub_server_game_moves") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_server_game_moves") == 0)  
         options.hub_server_game_moves = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "hub_server_games") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_server_games") == 0)  
         options.hub_server_games = ivalue;
 
-      else if (my_strcasecmp(parameter_name, "hub_annotate_level") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_annotate_level") == 0)  
         options.hub_annotate_level = ivalue;
 
       else
         PRINTF("ignoring int parameter %s\n", parameter_name);
     }
-    else if (my_strcasecmp(parameter_type, "double") == 0)
+    else if (compat_strcasecmp(parameter_type, "double") == 0)
     {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -909,14 +923,14 @@ local void parse_parameters(void)
 
       double dvalue = cJSON_GetNumberValue(cjson_value);
  
-      if (my_strcasecmp(parameter_name, "time_limit") == 0)  
+      if (compat_strcasecmp(parameter_name, "time_limit") == 0)  
         options.time_limit = dvalue;
 
       else
         PRINTF("ignoring double parameter %s with value %.2f\n",
           parameter_name, dvalue);
     }
-    else if (my_strcasecmp(parameter_type, "string") == 0)
+    else if (compat_strcasecmp(parameter_type, "string") == 0)
     {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -926,49 +940,49 @@ local void parse_parameters(void)
 
       HARDBUG(svalue == NULL)
 
-      if (my_strcasecmp(parameter_name, "hub_version") == 0)  
+      if (compat_strcasecmp(parameter_name, "hub_version") == 0)  
         strncpy(options.hub_version, svalue, MY_LINE_MAX);
 
-      else if (my_strcasecmp(parameter_name, "overrides") == 0)  
+      else if (compat_strcasecmp(parameter_name, "overrides") == 0)  
         strncpy(options.overrides, svalue, MY_LINE_MAX);
 
-      else if (my_strcasecmp(parameter_name, "neural_name0") == 0)  
-        strncpy(options.neural_name0, svalue, MY_LINE_MAX);
+      else if (compat_strcasecmp(parameter_name, "neural0_name") == 0)  
+        strncpy(options.neural0_name, svalue, MY_LINE_MAX);
 
-      else if (my_strcasecmp(parameter_name, "neural_name1") == 0)  
-        strncpy(options.neural_name1, svalue, MY_LINE_MAX);
+      else if (compat_strcasecmp(parameter_name, "neural1_name") == 0)  
+        strncpy(options.neural1_name, svalue, MY_LINE_MAX);
 
-      else if (my_strcasecmp(parameter_name, "book_name") == 0)  
+      else if (compat_strcasecmp(parameter_name, "book_name") == 0)  
         strncpy(options.book_name, svalue, MY_LINE_MAX);
 
-      else if (my_strcasecmp(parameter_name, "egtb_dir") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_dir") == 0)  
         strncpy(options.egtb_dir, svalue, MY_LINE_MAX);
 
-      else if (my_strcasecmp(parameter_name, "egtb_ram") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_ram") == 0)  
         strncpy(options.egtb_ram, svalue, MY_LINE_MAX);
 
-      else if (my_strcasecmp(parameter_name, "egtb_ram_wdl") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_ram_wdl") == 0)  
         strncpy(options.egtb_ram_wdl, svalue, MY_LINE_MAX);
 
-      else if (my_strcasecmp(parameter_name, "dxp_server_ip") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_server_ip") == 0)  
         strncpy(options.dxp_server_ip, svalue, MY_LINE_MAX);
       
-      else if (my_strcasecmp(parameter_name, "dxp_ballot") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_ballot") == 0)  
         strncpy(options.dxp_ballot, svalue, MY_LINE_MAX);
       
-      else if (my_strcasecmp(parameter_name, "dxp_tag") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_tag") == 0)  
         strncpy(options.dxp_tag, svalue, MY_LINE_MAX);
       
-      else if (my_strcasecmp(parameter_name, "hub_server_ballot") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_server_ballot") == 0)  
         strncpy(options.hub_server_ballot, svalue, MY_LINE_MAX);
       
-      else if (my_strcasecmp(parameter_name, "hub_server_client") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_server_client") == 0)  
         strncpy(options.hub_server_client, svalue, MY_LINE_MAX);
       
       else
         PRINTF("ignoring string parameter %s\n", parameter_name);
     }
-    else if (my_strcasecmp(parameter_type, "bool") == 0)
+    else if (compat_strcasecmp(parameter_type, "bool") == 0)
     { 
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -978,46 +992,46 @@ local void parse_parameters(void)
       if (cJSON_IsTrue(cjson_value))
         bvalue = 1;
 
-      if (my_strcasecmp(parameter_name, "use_book") == 0)  
+      if (compat_strcasecmp(parameter_name, "use_book") == 0)  
         options.use_book = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "ponder") == 0)  
+      else if (compat_strcasecmp(parameter_name, "ponder") == 0)  
         options.ponder = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "material_only") == 0)  
+      else if (compat_strcasecmp(parameter_name, "material_only") == 0)  
         options.material_only = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "captures_are_transparent") == 0)  
+      else if (compat_strcasecmp(parameter_name, "captures_are_transparent") == 0)  
         options.captures_are_transparent = bvalue;
 
-      else if (my_strcasecmp(parameter_name,
+      else if (compat_strcasecmp(parameter_name,
                              "returned_depth_includes_captures") == 0)  
         options.returned_depth_includes_captures = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "use_reductions") == 0)  
+      else if (compat_strcasecmp(parameter_name, "use_reductions") == 0)  
         options.use_reductions = bvalue;
 
-      else if (my_strcasecmp(parameter_name,
+      else if (compat_strcasecmp(parameter_name,
                              "row9_captures_are_tactical") == 0)  
         options.row9_captures_are_tactical = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "promotions_are_tactical") == 0)  
+      else if (compat_strcasecmp(parameter_name, "promotions_are_tactical") == 0)  
         options.promotions_are_tactical = bvalue;
 
-      else if (my_strcasecmp(parameter_name,
+      else if (compat_strcasecmp(parameter_name,
                              "use_single_reply_extensions") == 0)  
         options.use_single_reply_extensions = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "sync_clock") == 0)  
+      else if (compat_strcasecmp(parameter_name, "sync_clock") == 0)  
         options.sync_clock = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "dxp_initiator") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_initiator") == 0)  
         options.dxp_initiator = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "dxp_book") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_book") == 0)  
         options.dxp_book = bvalue;
 
-      else if (my_strcasecmp(parameter_name, "dxp_strict_gameend") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_strict_gameend") == 0)  
         options.dxp_strict_gameend = bvalue;
 
       else
@@ -1069,7 +1083,7 @@ local void load_overrides(void)
 
       HARDBUG(parameter_name == NULL)
 
-      if (my_strcasecmp(parameter_name, override_name) != 0) continue;
+      if (compat_strcasecmp(parameter_name, override_name) != 0) continue;
   
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "cli");
 
@@ -1086,7 +1100,7 @@ local void load_overrides(void)
       
       HARDBUG(parameter_type == NULL)
   
-      if (my_strcasecmp(parameter_type, "int") == 0)
+      if (compat_strcasecmp(parameter_type, "int") == 0)
       {
         cjson_value = cJSON_GetObjectItem(override, "value");
   
@@ -1102,7 +1116,7 @@ local void load_overrides(void)
 
         nfound++;
       }
-      else if (my_strcasecmp(parameter_type, "double") == 0)
+      else if (compat_strcasecmp(parameter_type, "double") == 0)
       {
         cjson_value = cJSON_GetObjectItem(override, "value");
   
@@ -1118,7 +1132,7 @@ local void load_overrides(void)
 
         nfound++;
       }
-      else if (my_strcasecmp(parameter_type, "string") == 0)
+      else if (compat_strcasecmp(parameter_type, "string") == 0)
       {
         cjson_value = cJSON_GetObjectItem(override, "value");
   
@@ -1134,7 +1148,7 @@ local void load_overrides(void)
 
         nfound++;
       }
-      else if (my_strcasecmp(parameter_type, "bool") == 0)
+      else if (compat_strcasecmp(parameter_type, "bool") == 0)
       {
         cjson_value = cJSON_GetObjectItem(override, "value");
   
@@ -1214,7 +1228,7 @@ local void load_overrides(void)
 
       HARDBUG(parameter_name == NULL)
 
-      if (my_strcasecmp(parameter_name, column_name) != 0) continue;
+      if (compat_strcasecmp(parameter_name, column_name) != 0) continue;
   
       nfound++;
     }
@@ -1354,7 +1368,7 @@ void results2csv(int nwon, int ndraw, int nlost, int nunknown)
 
       HARDBUG(parameter_name == NULL)
 
-      if (my_strcasecmp(parameter_name, column_name) != 0) continue;
+      if (compat_strcasecmp(parameter_name, column_name) != 0) continue;
   
       cJSON *cjson_type = cJSON_GetObjectItem(parameter, "type");
     
@@ -1362,7 +1376,7 @@ void results2csv(int nwon, int ndraw, int nlost, int nunknown)
       
       HARDBUG(parameter_type == NULL)
   
-      if (my_strcasecmp(parameter_type, "int") == 0)
+      if (compat_strcasecmp(parameter_type, "int") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -1374,7 +1388,7 @@ void results2csv(int nwon, int ndraw, int nlost, int nunknown)
 
         nfound++;
       }
-      else if (my_strcasecmp(parameter_type, "double") == 0)
+      else if (compat_strcasecmp(parameter_type, "double") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -1386,7 +1400,7 @@ void results2csv(int nwon, int ndraw, int nlost, int nunknown)
 
         nfound++;
       }
-      else if (my_strcasecmp(parameter_type, "string") == 0)
+      else if (compat_strcasecmp(parameter_type, "string") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -1398,7 +1412,7 @@ void results2csv(int nwon, int ndraw, int nlost, int nunknown)
 
         nfound++;
       }
-      else if (my_strcasecmp(parameter_type, "bool") == 0)
+      else if (compat_strcasecmp(parameter_type, "bool") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -1477,43 +1491,29 @@ int main(int argc, char **argv)
 
   //special argument
 
-  if ((argc > 1) and (my_strcasecmp(argv[1], "--revision") == 0))
+  if ((argc > 1) and (compat_strcasecmp(argv[1], "--revision") == 0))
   {
     fprintf(stdout, "%s\n", REVISION);
     exit(EXIT_SUCCESS);
   }
 
-  //special argument
-
-  int iarg = 1;
-
-  strcpy(log_infix, "");
-
-  if ((argc > 1) and (sscanf(argv[1], "--infix=%s", log_infix) == 1))
-    iarg++;
-
   load_gwd_json();
 
   parse_parameters();
 
-  if (my_strcasecmp(options.hub_version, "NULL") == 0)
+  if (compat_strcasecmp(options.hub_version, "NULL") == 0)
   {
     PRINTF("required parameter hub_version not found in gwd.json!"); 
     exit(EXIT_FAILURE);
   }
-  if (my_strcasecmp(options.overrides, "NULL") == 0)
+  if (compat_strcasecmp(options.overrides, "NULL") == 0)
   {
     PRINTF("required parameter overrides not found in gwd.json!"); 
     exit(EXIT_FAILURE);
   }
-  if (my_strcasecmp(options.neural_name0, "NULL") == 0)
+  if (compat_strcasecmp(options.neural0_name, "NULL") == 0)
   {
-    PRINTF("required parameter neural_name0 not found in gwd.json!"); 
-    exit(EXIT_FAILURE);
-  }
-  if (my_strcasecmp(options.neural_name1, "NULL") == 0)
-  {
-    PRINTF("required parameter neural_name1 not found in gwd.json!"); 
+    PRINTF("required parameter neural0_name not found in gwd.json!"); 
     exit(EXIT_FAILURE);
   }
 
@@ -1521,8 +1521,12 @@ int main(int argc, char **argv)
 
   //parse command line arguments 
 
+  int iarg = 1;
+
   int narg = 1;
+
   while(argv[narg] != NULL) ++narg;
+
   HARDBUG(narg != argc)
   
   while (argv[iarg] != NULL)
@@ -1562,7 +1566,7 @@ int main(int argc, char **argv)
   
         HARDBUG(arg == NULL)
 
-        if (my_strcasecmp(parameter_type, "int") == 0)
+        if (compat_strcasecmp(parameter_type, "int") == 0)
         {
           char format[MY_LINE_MAX];
   
@@ -1582,7 +1586,7 @@ int main(int argc, char **argv)
 
           nfound++;
         }
-        else if (my_strcasecmp(parameter_type, "double") == 0)
+        else if (compat_strcasecmp(parameter_type, "double") == 0)
         {
           char format[MY_LINE_MAX];
   
@@ -1602,7 +1606,7 @@ int main(int argc, char **argv)
 
           nfound++;
         }
-        else if (my_strcasecmp(parameter_type, "string") == 0)
+        else if (compat_strcasecmp(parameter_type, "string") == 0)
         {
           char format[MY_LINE_MAX];
   
@@ -1622,7 +1626,7 @@ int main(int argc, char **argv)
   
           nfound++;
         }
-        else if (my_strcasecmp(parameter_type, "bool") == 0)
+        else if (compat_strcasecmp(parameter_type, "bool") == 0)
         {
           char format[MY_LINE_MAX];
   
@@ -1636,9 +1640,9 @@ int main(int argc, char **argv)
   
           HARDBUG(!cJSON_IsBool(cjson_value))
   
-          if ((my_strcasecmp(svalue, "false") == 0) or
-              (my_strcasecmp(svalue, "off") == 0) or
-              (my_strcasecmp(svalue, "0") == 0))
+          if ((compat_strcasecmp(svalue, "false") == 0) or
+              (compat_strcasecmp(svalue, "off") == 0) or
+              (compat_strcasecmp(svalue, "0") == 0))
             cJSON_SetBoolValue(cjson_value, 0);
           else
             cJSON_SetBoolValue(cjson_value, 1);
@@ -1674,7 +1678,7 @@ int main(int argc, char **argv)
 
   //MPI
 
-  if ((iarg == narg) or (my_strcasecmp(argv[iarg], "hub") == 0))
+  if ((iarg == narg) or (compat_strcasecmp(argv[iarg], "hub") == 0))
   {
     //do not initialize OpenMPI
  
@@ -1824,13 +1828,17 @@ int main(int argc, char **argv)
 
   //now that we have the MPI context we can initialize 
 
-  init_my_printf_class();
+  init_my_printf();
 
-  STDOUT = construct_my_printf(INVALID);
+  static my_printf_t my_stdout;
+
+  construct_my_printf(&my_stdout, "stdout", TRUE);
+
+  STDOUT = &my_stdout;
 
   options.hub = FALSE;
 
-  if ((iarg == narg) or (my_strcasecmp(argv[iarg], "hub") == 0))
+  if ((iarg == narg) or (compat_strcasecmp(argv[iarg], "hub") == 0))
   {
     options.hub = TRUE;
    
@@ -1882,8 +1890,8 @@ int main(int argc, char **argv)
 
   PRINTF_CFG_I(verbose);
 
-  PRINTF_CFG_S(neural_name0);
-  PRINTF_CFG_S(neural_name1);
+  PRINTF_CFG_S(neural0_name);
+  PRINTF_CFG_S(neural1_name);
   PRINTF_CFG_I(neural_evaluation_min);
   PRINTF_CFG_I(neural_evaluation_max);
   PRINTF_CFG_I(neural_evaluation_time);
@@ -1908,7 +1916,6 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(egtb_level);
 
   PRINTF_CFG_B(material_only);
-  PRINTF_CFG_I(material_blend_parameter);
 
   PRINTF_CFG_B(captures_are_transparent);
   PRINTF_CFG_B(returned_depth_includes_captures);
@@ -1918,12 +1925,14 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(reduction_depth_root);
   PRINTF_CFG_I(reduction_depth_leaf);
 
-  PRINTF_CFG_I(reduction_nfull_min);
-  PRINTF_CFG_I(reduction_ncache_min);
+  PRINTF_CFG_I(reduction_mean);
+  PRINTF_CFG_I(reduction_sigma);
 
-  PRINTF_CFG_I(reduction_parameter_delta);
-  PRINTF_CFG_I(reduction_parameter_strong);
-  PRINTF_CFG_I(reduction_parameter_weak);
+  PRINTF_CFG_I(reduction_delta);
+  PRINTF_CFG_I(reduction_max);
+  PRINTF_CFG_I(reduction_strong);
+  PRINTF_CFG_I(reduction_weak);
+  PRINTF_CFG_I(reduction_min);
 
   PRINTF_CFG_B(row9_captures_are_tactical);
   PRINTF_CFG_B(promotions_are_tactical);
@@ -2005,12 +2014,11 @@ int main(int argc, char **argv)
   HARDBUG(options.reduction_depth_root < 0)
   HARDBUG(options.reduction_depth_leaf < 0)
 
-  HARDBUG(options.reduction_nfull_min < 0)
-  HARDBUG(options.reduction_ncache_min < 0)
-
-  HARDBUG(options.reduction_parameter_delta < 0)
-  HARDBUG(options.reduction_parameter_strong < 0)
-  HARDBUG(options.reduction_parameter_weak < 0)
+  HARDBUG(options.reduction_delta < 0)
+  HARDBUG(options.reduction_max < 0)
+  HARDBUG(options.reduction_strong < 0)
+  HARDBUG(options.reduction_weak < 0)
+  HARDBUG(options.reduction_min < 0)
 
   INIT_PROFILE
   
@@ -2021,8 +2029,6 @@ int main(int argc, char **argv)
     init_my_malloc();
 
     construct_my_random(&main_random, 0);
-
-    init_bucket_class();
 
     init_utils(); 
 
@@ -2041,13 +2047,7 @@ int main(int argc, char **argv)
 
     init_search();
 
-    init_state_class();
-
-    init_threads();
-
   //END_BLOCK
-
-  check_readonly_objects();
 
   //BEGIN_BLOCK("main-tests")
 
@@ -2055,9 +2055,9 @@ int main(int argc, char **argv)
 
     //test_my_printf();
 
-    test_bucket_class();
+    test_buckets();
 
-    //test_my_random();
+    test_my_random();
     //FATAL("test_my_random", EXIT_FAILURE)
 
     test_cJSON();
@@ -2082,7 +2082,10 @@ int main(int argc, char **argv)
     //test_queues();
     //FATAL("test_queues", 1)
 
-    test_state_class();
+    test_states();
+
+    test_stats();
+    //FATAL("test_stats", EXIT_FAILURE)
 
     //test_threads();
 
@@ -2099,11 +2102,11 @@ int main(int argc, char **argv)
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads[ithread]),
+        enqueue(return_thread_queue(threads + ithread),
           MESSAGE_EXIT_THREAD, "main/hub");
     }
 
-    enqueue(return_thread_queue(thread_alpha_beta_master_id),
+    enqueue(return_thread_queue(thread_alpha_beta_master),
       MESSAGE_EXIT_THREAD, "main/hub");
 
     PRINTF("before join\n");
@@ -2118,37 +2121,37 @@ int main(int argc, char **argv)
 
   //main loop
 
-  if (my_strcasecmp(argv[iarg], "solve_problems") == 0)
+  if (compat_strcasecmp(argv[iarg], "solve_problems") == 0)
   { 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
     solve_problems(argv[iarg]);
   }
-  else if (my_strcasecmp(argv[iarg], "solve_problems_multi_threaded") == 0)
+  else if (compat_strcasecmp(argv[iarg], "solve_problems_multi_threaded") == 0)
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
   
     start_threads();
 
-    HARDBUG(thread_alpha_beta_master_id == INVALID)
+    HARDBUG(thread_alpha_beta_master == INVALID)
   
     solve_problems_multi_threaded(argv[iarg]);
   
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads[ithread]),
+        enqueue(return_thread_queue(threads + ithread),
           MESSAGE_EXIT_THREAD, "main/solve");  
     }
 
-    enqueue(return_thread_queue(thread_alpha_beta_master_id),
+    enqueue(return_thread_queue(thread_alpha_beta_master),
       MESSAGE_EXIT_THREAD, "main/solve");
 
     join_threads();
   }
-  else if (my_strcasecmp(argv[iarg], "hub_server") == 0)
+  else if (compat_strcasecmp(argv[iarg], "hub_server") == 0)
   {
     i64_t memory_slaves = memory * options.nslaves;
 
@@ -2198,28 +2201,28 @@ int main(int argc, char **argv)
       pipe_t parent2child[2];
       pipe_t child2parent[2];
 
-      HARDBUG(my_pipe(parent2child) == -1)
+      HARDBUG(compat_pipe(parent2child) == -1)
   
-      HARDBUG(my_pipe(child2parent) == -1)
+      HARDBUG(compat_pipe(child2parent) == -1)
   
       pid_t pid;
   
-      HARDBUG((pid = my_fork()) == -1)
+      HARDBUG((pid = compat_fork()) == -1)
     
       if (pid == 0)
       {
-        HARDBUG(my_pipe_close(parent2child[1]) == -1)
+        HARDBUG(compat_pipe_close(parent2child[1]) == -1)
     
-        HARDBUG(my_pipe_close(child2parent[0]) == -1)
+        HARDBUG(compat_pipe_close(child2parent[0]) == -1)
     
-        HARDBUG(my_dup2(parent2child[0], 0) == -1)
+        HARDBUG(compat_dup2(parent2child[0], 0) == -1)
   
-        HARDBUG(my_dup2(child2parent[1], 1) == -1)
+        HARDBUG(compat_dup2(child2parent[1], 1) == -1)
   
-        HARDBUG(my_chdir(dir) == -1)
+        HARDBUG(compat_chdir(dir) == -1)
 
 
-        if (my_strcasecmp(arg, "NULL") == 0)
+        if (compat_strcasecmp(arg, "NULL") == 0)
         {
           HARDBUG(execlp(exe, exe, NULL) == -1)
         }
@@ -2231,9 +2234,9 @@ int main(int argc, char **argv)
         FATAL("should not get here!", EXIT_FAILURE)
       }
 
-      HARDBUG(my_pipe_close(parent2child[0]) == -1)
+      HARDBUG(compat_pipe_close(parent2child[0]) == -1)
   
-      HARDBUG(my_pipe_close(child2parent[1]) == -1)
+      HARDBUG(compat_pipe_close(child2parent[1]) == -1)
 
       start_threads();
 
@@ -2243,7 +2246,7 @@ int main(int argc, char **argv)
 
       //pipe for stdin
 
-      HARDBUG(my_pipe(parent2child) == -1)
+      HARDBUG(compat_pipe(parent2child) == -1)
 
       HARDBUG(!SetHandleInformation(parent2child[1], HANDLE_FLAG_INHERIT, 0))
 
@@ -2251,7 +2254,7 @@ int main(int argc, char **argv)
 
       pipe_t child2parent[2];
 
-      HARDBUG(my_pipe(child2parent) == -1)
+      HARDBUG(compat_pipe(child2parent) == -1)
 
       HARDBUG(!SetHandleInformation(child2parent[0], HANDLE_FLAG_INHERIT, 0))
 
@@ -2287,33 +2290,33 @@ int main(int argc, char **argv)
       if (options.nthreads > 1)
       {
         for (int ithread = 1; ithread < options.nthreads; ithread++)
-          enqueue(return_thread_queue(threads[ithread]),
+          enqueue(return_thread_queue(threads + ithread),
             MESSAGE_EXIT_THREAD, "main/hub_server");
       }
   
-      enqueue(return_thread_queue(thread_alpha_beta_master_id),
+      enqueue(return_thread_queue(thread_alpha_beta_master),
         MESSAGE_EXIT_THREAD, "main/hub_server");
 
       PRINTF("before join\n");
       join_threads();
     }
   }
-  else if (my_strcasecmp(argv[iarg], "gen_random") == 0)
+  else if (compat_strcasecmp(argv[iarg], "gen_random") == 0)
   {
     gen_random("random.fen", 20, 20);
   }
-  else if (my_strcasecmp(argv[iarg], "endgame") == 0)
+  else if (compat_strcasecmp(argv[iarg], "endgame") == 0)
   {
     gen_random("endgame.fen", 2, 2);
   }
-  else if (my_strcasecmp(argv[iarg], "read_games") == 0)
+  else if (compat_strcasecmp(argv[iarg], "read_games") == 0)
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
   
     read_games(argv[iarg]);
   }
-  else if (my_strcasecmp(argv[iarg], "gen_book") == 0)
+  else if (compat_strcasecmp(argv[iarg], "gen_book") == 0)
   {
     iarg++;
 
@@ -2345,7 +2348,7 @@ int main(int argc, char **argv)
     if (my_mpi_globals.MY_MPIG_id_slave != INVALID)
       gen_book(eval_time, depth_limit);
   }
-  else if (my_strcasecmp(argv[iarg], "walk_book") == 0)
+  else if (compat_strcasecmp(argv[iarg], "walk_book") == 0)
   {
     iarg++;
 
@@ -2359,7 +2362,7 @@ int main(int argc, char **argv)
 
     walk_book(eval_time);
   }
-  else if (my_strcasecmp(argv[iarg], "count_book") == 0)
+  else if (compat_strcasecmp(argv[iarg], "count_book") == 0)
   {
     iarg++;
 
@@ -2371,7 +2374,7 @@ int main(int argc, char **argv)
 
     count_book(depth_limit);
   }
-  else if (my_strcasecmp(argv[iarg], "gen_pos") == 0)
+  else if (compat_strcasecmp(argv[iarg], "gen_pos") == 0)
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -2404,7 +2407,7 @@ int main(int argc, char **argv)
     if (my_mpi_globals.MY_MPIG_id_slave != INVALID)
       gen_pos(npositions_max, npieces);
   }
-  else if (my_strcasecmp(argv[iarg], "play_game") == 0)
+  else if (compat_strcasecmp(argv[iarg], "play_game") == 0)
   {
     //name
 
@@ -2506,17 +2509,17 @@ int main(int argc, char **argv)
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads[ithread]),
+        enqueue(return_thread_queue(threads + ithread),
           MESSAGE_EXIT_THREAD, "main/play_game");
     }
 
-    enqueue(return_thread_queue(thread_alpha_beta_master_id),
+    enqueue(return_thread_queue(thread_alpha_beta_master),
       MESSAGE_EXIT_THREAD, "main/play_game");
 
     PRINTF("before join\n");
     join_threads();
   }
-  else if (my_strcasecmp(argv[iarg], "fen2neural") == 0)
+  else if (compat_strcasecmp(argv[iarg], "fen2neural") == 0)
   { 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -2537,7 +2540,7 @@ int main(int argc, char **argv)
 
     if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2neural(argv[iarg]);
   }
-  else if (my_strcasecmp(argv[iarg], "fen2search") == 0)
+  else if (compat_strcasecmp(argv[iarg], "fen2search") == 0)
   { 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -2558,7 +2561,7 @@ int main(int argc, char **argv)
 
     if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2search(argv[iarg]);
   }
-  else if (my_strcasecmp(argv[iarg], "fen2csv") == 0)
+  else if (compat_strcasecmp(argv[iarg], "fen2csv") == 0)
   { 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -2579,11 +2582,11 @@ int main(int argc, char **argv)
 
     if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2csv(argv[iarg]);
   }
-  else if (my_strcasecmp(argv[iarg], "egtb2neural") == 0)
+  else if (compat_strcasecmp(argv[iarg], "egtb2neural") == 0)
   { 
     egtb2neural();
   }
-  else if (my_strcasecmp(argv[iarg], "dxp_server") == 0)
+  else if (compat_strcasecmp(argv[iarg], "dxp_server") == 0)
   {
     HARDBUG(memory >= (physical_memory / 2))
     
@@ -2599,17 +2602,17 @@ int main(int argc, char **argv)
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads[ithread]),
+        enqueue(return_thread_queue(threads + ithread),
           MESSAGE_EXIT_THREAD, "main/dxp_server");
     }
 
-    enqueue(return_thread_queue(thread_alpha_beta_master_id),
+    enqueue(return_thread_queue(thread_alpha_beta_master),
       MESSAGE_EXIT_THREAD, "main/dxp_server");
 
     PRINTF("before join\n");
     join_threads();
   }
-  else if (my_strcasecmp(argv[iarg], "dxp_client") == 0)
+  else if (compat_strcasecmp(argv[iarg], "dxp_client") == 0)
   {
     HARDBUG(memory >= (physical_memory / 2))
     
@@ -2625,17 +2628,17 @@ int main(int argc, char **argv)
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads[ithread]),
+        enqueue(return_thread_queue(threads + ithread),
           MESSAGE_EXIT_THREAD, "main/dxp_client");
     }
 
-    enqueue(return_thread_queue(thread_alpha_beta_master_id),
+    enqueue(return_thread_queue(thread_alpha_beta_master),
       MESSAGE_EXIT_THREAD, "main/dxp_client");
 
     PRINTF("before join\n");
     join_threads();
   }
-  else if (my_strcasecmp(argv[iarg], "recompress_endgame") == 0)
+  else if (compat_strcasecmp(argv[iarg], "recompress_endgame") == 0)
   { 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -2679,16 +2682,14 @@ int main(int argc, char **argv)
 
     //finalization
 
-    check_readonly_objects();
-
     fin_endgame();
  
     fin_search();
+
+    fin_my_malloc(FALSE);
   
     PRINTF("", NULL);
   
-    fin_my_printf_class();
-
   //END_BLOCK
 
   DUMP_PROFILE(1)

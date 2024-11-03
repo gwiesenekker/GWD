@@ -1,6 +1,6 @@
 #include "globals.h"
 
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 
 my_mpi_globals_t my_mpi_globals =
 {
@@ -48,7 +48,7 @@ void my_mpi_barrier(char *info, MPI_Comm comm, int verbose)
     wall[icomm] = 0.0;
   }
 
-  double t0 = my_time();
+  double t0 = compat_time();
 
   for (int icomm = 0; icomm < ncomm; icomm++)
   {
@@ -92,7 +92,7 @@ void my_mpi_barrier(char *info, MPI_Comm comm, int verbose)
 
     if (!flag)
     {
-      my_sleep(BARRIER_POLL);
+      compat_sleep(BARRIER_POLL);
       continue;
     }
 
@@ -117,7 +117,7 @@ void my_mpi_barrier(char *info, MPI_Comm comm, int verbose)
     if (verbose)
       PRINTF("my_mpi_barrier receiving from %d\n", source);
 
-    double t1 = my_time();
+    double t1 = compat_time();
 
     done[source] = TRUE;
     wall[source] = t1 - t0;
@@ -157,7 +157,7 @@ void my_mpi_probe(MPI_Comm comm)
 
     if (flag) break;
 
-     my_sleep(PROBE_POLL);
+     compat_sleep(PROBE_POLL);
   }
 }
 
@@ -183,7 +183,7 @@ void my_mpi_acquire_semaphore(MPI_Win win)
 
     MPI_Win_unlock(0, win);
 
-    my_sleep(0.1);
+    compat_sleep(0.1);
   }
 }
 
@@ -202,7 +202,11 @@ void my_mpi_release_semaphore(MPI_Win win)
 
 void test_mpi(void)
 {
-  ui64_t seed = randull(INVALID);
+  my_random_t test_random;
+
+  construct_my_random(&test_random, INVALID);
+
+  ui64_t seed = return_my_random(&test_random);
 
   PRINTF("seed=%llX\n", seed);
 
@@ -253,13 +257,15 @@ void test_mpi(void)
   PRINTF("Process %d is testing semaphores\n",
          my_mpi_globals.MY_MPIG_id_global);
 
-  my_sleep(0.1 + 0.1 * (randull(0) % my_mpi_globals.MY_MPIG_nglobal));
+  compat_sleep(0.1 + 0.1 * (return_my_random(&test_random) %
+                        my_mpi_globals.MY_MPIG_nglobal));
 
   my_mpi_acquire_semaphore(win);
 
   PRINTF("Process %d acquired semaphore\n", my_mpi_globals.MY_MPIG_id_global);
 
-  my_sleep(0.1 + 0.1 * (randull(0) % my_mpi_globals.MY_MPIG_nglobal));
+  compat_sleep(0.1 + 0.1 * (return_my_random(&test_random) %
+                        my_mpi_globals.MY_MPIG_nglobal));
 
   my_mpi_release_semaphore(win);
 

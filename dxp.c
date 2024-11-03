@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #define SA struct sockaddr
@@ -99,7 +99,7 @@ local void encode(char type, board_t *with,
         strcpy(buffer + i, "w");
         i++;
       }
-      else if (with->board_white_crown_bb & BITULL(jboard))
+      else if (with->board_white_king_bb & BITULL(jboard))
       {
         strcpy(buffer + i, "W");
         i++;
@@ -109,7 +109,7 @@ local void encode(char type, board_t *with,
         strcpy(buffer + i, "z");
         i++;
       }
-      else if (with->board_black_crown_bb & BITULL(jboard))
+      else if (with->board_black_king_bb & BITULL(jboard))
       {
         strcpy(buffer + i, "Z");
         i++;
@@ -538,7 +538,7 @@ int reads(int sockfd, char buffer[MY_LINE_MAX], int *nbuffer)
       int n;
       char c;
   
-      if ((n = my_socket_read(sockfd, &c, 1)) == INVALID)
+      if ((n = compat_socket_read(sockfd, &c, 1)) == INVALID)
         return(INVALID);
   
       HARDBUG(n != 1)
@@ -597,28 +597,31 @@ local int play_game(board_t *with, int sockfd)
 {
   int result = INVALID;
 
-  state_t *game = state_class->objects_ctor();
+  state_t game_state;
 
-  game->set_event(game, event);
+  construct_state(&game_state);
+
+  game_state.set_event(&game_state, event);
 
   if (IS_WHITE(with->board_dxp_game_colour))
   {
-    game->set_white(game, rtrim(my_name));
-    game->set_black(game, rtrim(your_name));
+    game_state.set_white(&game_state, rtrim(my_name));
+    game_state.set_black(&game_state, rtrim(your_name));
   }
   else
   {
-    game->set_white(game, rtrim(your_name));
-    game->set_black(game, rtrim(my_name));
+    game_state.set_white(&game_state, rtrim(your_name));
+    game_state.set_black(&game_state, rtrim(my_name));
   }
 
   char fen[MY_LINE_MAX];
 
   board2fen(with->board_id, fen, FALSE);
 
-  game->set_starting_position(game, fen);
+  game_state.set_starting_position(&game_state, fen);
 
-  if (IS_BLACK(with->board_colour2move)) game->push_move(game, "...", NULL);
+  if (IS_BLACK(with->board_colour2move))
+    game_state.push_move(&game_state, "...", NULL);
 
   int nbuffer;
   char buffer[MY_LINE_MAX];
@@ -661,7 +664,7 @@ local int play_game(board_t *with, int sockfd)
   
           int nwrite;
 
-          if ((nwrite = my_socket_write(sockfd, buffer, nbuffer)) ==
+          if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
               INVALID) break;
         }
 
@@ -686,10 +689,10 @@ local int play_game(board_t *with, int sockfd)
   
         PRINTF("\nPondering..\n");
   
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
-          MESSAGE_STATE, game->get_state(game));
+        enqueue(return_thread_queue(thread_alpha_beta_master),
+          MESSAGE_STATE, game_state.get_state(&game_state));
 
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
+        enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_GO, "dxp/play_game");
       }
 
@@ -701,7 +704,7 @@ local int play_game(board_t *with, int sockfd)
       {
         //cancel pondering and dequeue messages
 
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
+        enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_ABORT_SEARCH, "main/play_game");
   
         message_t message;
@@ -722,7 +725,7 @@ local int play_game(board_t *with, int sockfd)
             else
               FATAL("message.message_id error", EXIT_FAILURE)
           }
-          my_sleep(CENTI_SECOND);
+          compat_sleep(CENTI_SECOND);
         }
         if (options.dxp_annotate_level > 1)
           sprintf(comment, "%s", bdata(message.message_text));
@@ -742,7 +745,7 @@ local int play_game(board_t *with, int sockfd)
 
           int nwrite;
 
-          if ((nwrite = my_socket_write(sockfd, buffer, nbuffer)) ==
+          if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
               INVALID) break;
         }
         if (with->board_dxp_game_code == DXP_IGIVEUP)
@@ -778,10 +781,10 @@ local int play_game(board_t *with, int sockfd)
       HARDBUG((imove = search_move(&moves_list,
                                with->board_dxp_move_string)) == INVALID)
 
-      if (my_strcasecmp(comment, "NULL") == 0)
-        game->push_move(game, with->board_dxp_move_string, NULL);
+      if (compat_strcasecmp(comment, "NULL") == 0)
+        game_state.push_move(&game_state, with->board_dxp_move_string, NULL);
       else
-        game->push_move(game, with->board_dxp_move_string, comment);
+        game_state.push_move(&game_state, with->board_dxp_move_string, comment);
 
       do_move(with, imove, &moves_list);
     }
@@ -800,7 +803,7 @@ local int play_game(board_t *with, int sockfd)
 
         int nwrite;
 
-        if ((nwrite = my_socket_write(sockfd, buffer, nbuffer)) ==
+        if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
             INVALID) break;
   
         HARDBUG(nwrite != nbuffer)
@@ -869,7 +872,7 @@ local int play_game(board_t *with, int sockfd)
   
         int nwrite;
 
-        if ((nwrite = my_socket_write(sockfd, buffer, nbuffer)) ==
+        if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
             INVALID) break;
   
         HARDBUG(nwrite != nbuffer)
@@ -901,7 +904,7 @@ local int play_game(board_t *with, int sockfd)
   
         int nwrite;
 
-        if ((nwrite = my_socket_write(sockfd, buffer, nbuffer)) ==
+        if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
             INVALID) break;
   
         HARDBUG(nwrite != nbuffer)
@@ -926,7 +929,7 @@ local int play_game(board_t *with, int sockfd)
       if (options.dxp_book)
         return_book_move(with, &moves_list, best_move);
   
-      if (my_strcasecmp(best_move, "NULL") != 0)
+      if (compat_strcasecmp(best_move, "NULL") != 0)
       {
         strcpy(bdata(message.message_text), "book");
 
@@ -941,7 +944,7 @@ local int play_game(board_t *with, int sockfd)
 
       PRINTF("\nthinking..\n");
 
-      double t1 = my_time();
+      double t1 = compat_time();
 
       if (moves_list.nmoves == 1)
       {
@@ -959,10 +962,10 @@ local int play_game(board_t *with, int sockfd)
 
         set_time_limit(with->board_dxp_move_number, &time_control);
 
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
-          MESSAGE_STATE, game->get_state(game));
+        enqueue(return_thread_queue(thread_alpha_beta_master),
+          MESSAGE_STATE, game_state.get_state(&game_state));
 
-        enqueue(return_thread_queue(thread_alpha_beta_master_id),
+        enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_GO, "dxp/play_game");
   
         while(TRUE)
@@ -985,11 +988,11 @@ local int play_game(board_t *with, int sockfd)
             else
               FATAL("message.message_id error", EXIT_FAILURE)
           } 
-          my_sleep(CENTI_SECOND);
+          compat_sleep(CENTI_SECOND);
         }
       }
 
-      double t2 = my_time();
+      double t2 = compat_time();
 
       double move_time = t2 - t1;
 
@@ -1015,10 +1018,10 @@ local int play_game(board_t *with, int sockfd)
       strcpy(with->board_dxp_move_string, best_move);
 
       if (options.dxp_annotate_level == 0)
-        game->push_move(game, with->board_dxp_move_string, NULL);
+        game_state.push_move(&game_state, with->board_dxp_move_string, NULL);
       else
-        game->push_move(game, with->board_dxp_move_string,
-                        bdata(message.message_text));
+        game_state.push_move(&game_state, with->board_dxp_move_string,
+                             bdata(message.message_text));
 
       encode(DXP_MOVE, with, buffer, &nbuffer);
 
@@ -1026,7 +1029,7 @@ local int play_game(board_t *with, int sockfd)
 
       int nwrite;
 
-      if ((nwrite = my_socket_write(sockfd, buffer, nbuffer)) ==
+      if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
           INVALID) break;
 
       HARDBUG(nwrite != nbuffer)
@@ -1058,22 +1061,22 @@ local int play_game(board_t *with, int sockfd)
 
   PRINTF("game_result=%s\n", game_result);
 
-  game->set_result(game, game_result);
+  game_state.set_result(&game_state, game_result);
  
-  game->save2pdn(game, "dxp.pdn");
+  game_state.save2pdn(&game_state, "dxp.pdn");
 
-  state_class->objects_dtor(game);
+  destroy_state(&game_state);
 
   return(result);
 }
 
 local void set_my_name(void)
 {
-  if (my_strcasecmp(options.dxp_tag, "NULL") == 0)
-    snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.neural_name0);
+  if (compat_strcasecmp(options.dxp_tag, "NULL") == 0)
+    snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.neural0_name);
   else
     snprintf(my_name, MY_LINE_MAX, "GWD %s %s %s", REVISION, options.dxp_tag,
-             options.neural_name0);
+             options.neural0_name);
 
   for (int j = strlen(my_name); j < 32; j++) my_name[j] = ' ';
 
@@ -1086,7 +1089,7 @@ local void dxp_game_initiator(int arg_fd)
 {
   set_my_name();
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
 
   int nwon = 0;
@@ -1180,7 +1183,7 @@ local void dxp_game_initiator(int arg_fd)
 
       int nwrite;
 
-      if ((nwrite = my_socket_write(arg_fd, buffer, nbuffer)) ==
+      if ((nwrite = compat_socket_write(arg_fd, buffer, nbuffer)) ==
           INVALID) break;
 
       HARDBUG(nwrite != nbuffer)
@@ -1244,7 +1247,7 @@ local void dxp_game_follower(int arg_fd)
 {
   set_my_name();
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
 
   board_t *with = return_with_board(iboard);
 
@@ -1276,7 +1279,7 @@ local void dxp_game_follower(int arg_fd)
 
     int nwrite;
 
-    if ((nwrite = my_socket_write(arg_fd, buffer, nbuffer)) == INVALID) break;
+    if ((nwrite = compat_socket_write(arg_fd, buffer, nbuffer)) == INVALID) break;
 
     HARDBUG(nwrite != nbuffer)
 
@@ -1321,7 +1324,7 @@ void dxp_server(void)
 {
   int sockfd;
 
-  HARDBUG(my_socket_startup() != 0)
+  HARDBUG(compat_socket_startup() != 0)
 
   HARDBUG((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID)
 
@@ -1357,16 +1360,16 @@ void dxp_server(void)
   else
     dxp_game_follower(connfd);
 
-  HARDBUG(my_socket_close(sockfd) == INVALID)
+  HARDBUG(compat_socket_close(sockfd) == INVALID)
 
-  HARDBUG(my_socket_cleanup() != 0)
+  HARDBUG(compat_socket_cleanup() != 0)
 }
 
 void dxp_client(void)
 {
   int sockfd;
 
-  HARDBUG(my_socket_startup() != 0)
+  HARDBUG(compat_socket_startup() != 0)
 
   HARDBUG((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID)
 
@@ -1386,8 +1389,8 @@ void dxp_client(void)
   else
     dxp_game_follower(sockfd);
 
-  HARDBUG(my_socket_close(sockfd) == INVALID)
+  HARDBUG(compat_socket_close(sockfd) == INVALID)
 
-  HARDBUG(my_socket_cleanup() != 0)
+  HARDBUG(compat_socket_cleanup() != 0)
 }
 

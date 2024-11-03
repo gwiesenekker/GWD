@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0
@@ -34,7 +34,7 @@ void reset_my_timer(void *self)
 
   object->MT_start_cpu_clock = return_my_clock();
 
-  object->MT_start_wall_clock = my_time();
+  object->MT_start_wall_clock = compat_time();
 
   object->MT_status = MY_TIMER_STARTED;
 }
@@ -48,7 +48,7 @@ local void return_time_used(my_timer_t *object,
 
   HARDBUG(*arg_cpu_time_used < 0.0)
 
-  double current_wall_clock = my_time();
+  double current_wall_clock = compat_time();
 
   *arg_wall_time_used =
     current_wall_clock - object->MT_start_wall_clock;
@@ -142,7 +142,7 @@ void start_my_timer(void *self)
 
   object->MT_start_cpu_clock = return_my_clock();
 
-  object->MT_start_wall_clock = my_time();
+  object->MT_start_wall_clock = compat_time();
 
   object->MT_status = MY_TIMER_STARTED;
 }
@@ -311,7 +311,7 @@ void test_my_timers(void)
 
     HARDBUG(bname == NULL)
 
-    HARDBUG(bformata(bname, "%d", itest) == BSTR_ERR)
+    HARDBUG(bformata(bname, "%d", itest) != BSTR_OK)
 
     construct_my_timer(test + itest, bdata(bname),  STDOUT, FALSE);
   }
@@ -325,7 +325,7 @@ void test_my_timers(void)
   {
     PRINTF("sleeping for %d seconds..\n", isecond);
 
-    my_sleep(isecond);
+    compat_sleep(isecond);
 
     for (int itest = 0; itest < NTEST; itest++)
     {

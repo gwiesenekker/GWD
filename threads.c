@@ -1,26 +1,17 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
-int threads[NTHREADS_MAX];
+#define THREAD_ALPHA_BETA_MASTER 0
+#define THREAD_ALPHA_BETA_SLAVE  1
 
-int thread_alpha_beta_master_id = INVALID;
+thread_t threads[NTHREADS_MAX];
 
-local thread_t thread_objs[NTHREADS_MAX];
+thread_t *thread_alpha_beta_master = NULL;
 
-thread_t *return_with_thread(int arg_id)
-{
-  int ithread = arg_id - THREAD_ID_OFFSET;
-  HARDBUG(ithread < 0)
-  HARDBUG(ithread >= NTHREADS_MAX)
-
-  thread_t *with = thread_objs + ithread;
-  HARDBUG(with->thread_id != arg_id)
-
-  return(with);
-}
-
-local void solve_problems(thread_t *with, char *arg_name)
+local void solve_problems(void *self, char *arg_name)
 { 
+  thread_t *object = self;
+
   FILE *fname, *ftmp;
   
   HARDBUG((fname = fopen(arg_name, "r")) == NULL)
@@ -53,20 +44,20 @@ local void solve_problems(thread_t *with, char *arg_name)
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads[ithread]), MESSAGE_FEN, fen);
+        enqueue(return_thread_queue(threads + ithread), MESSAGE_FEN, fen);
 
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads[ithread]), MESSAGE_GO,
+        enqueue(return_thread_queue(threads + ithread), MESSAGE_GO,
           "threads/solve_problems");
     }
 
-    my_printf(with->thread_my_printf, "problem #%d\n", nproblems);
+    my_printf(&(object->thread_my_printf), "problem #%d\n", nproblems);
 
-    fen2board(fen, with->thread_board_id);
+    fen2board(fen, object->thread_board_id);
 
-    board_t *with_board = return_with_board(with->thread_board_id);
+    board_t *with_board = return_with_board(object->thread_board_id);
 
-    print_board(with->thread_board_id);
+    print_board(object->thread_board_id);
 
     moves_list_t moves_list;
 
@@ -85,12 +76,12 @@ local void solve_problems(thread_t *with, char *arg_name)
            with_board->board_search_root_simple_score) > (SCORE_MAN / 2))
       {
         ++nsolved;
-        my_printf(with->thread_my_printf,
+        my_printf(&(object->thread_my_printf),
           "solved problem #%d\n", nproblems);
       }
       else
       {
-        my_printf(with->thread_my_printf,
+        my_printf(&(object->thread_my_printf),
           "did not solve problem #%d\n", nproblems);
         HARDBUG(fprintf(ftmp, "%s\n", fen) < 0)
       }
@@ -99,7 +90,7 @@ local void solve_problems(thread_t *with, char *arg_name)
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads[ithread]),
+        enqueue(return_thread_queue(threads + ithread),
                    MESSAGE_ABORT_SEARCH, "threads/solve_problems");
     }
   }
@@ -114,54 +105,56 @@ local void solve_problems(thread_t *with, char *arg_name)
   enqueue(&main_queue, MESSAGE_INFO, text);
 }
 
-local void thread_alpha_beta_master(thread_t *with)
+local void thread_func_alpha_beta_master(void *self)
 {
+  thread_t *object = self;
+
   //wait for message
     
-  my_printf(with->thread_my_printf, "alpha_beta master thread\n");
-  my_printf(with->thread_my_printf, "");
+  my_printf(&(object->thread_my_printf), "alpha_beta master thread\n");
+  my_printf(&(object->thread_my_printf), "");
   while(TRUE)
   { 
     message_t message;
     
-    if (dequeue(&(with->thread_queue), &message) != INVALID)
+    if (dequeue(&(object->thread_queue), &message) != INVALID)
     {
       if (message.message_id == MESSAGE_SOLVE)
       {
-        my_printf(with->thread_my_printf, "got SOLVE message %s\n",
+        my_printf(&(object->thread_my_printf), "got SOLVE message %s\n",
           bdata(message.message_text));
 
-        stop_my_timer(&(with->thread_idle_timer));
-        start_my_timer(&(with->thread_busy_timer));
+        stop_my_timer(&(object->thread_idle_timer));
+        start_my_timer(&(object->thread_busy_timer));
 
-        solve_problems(with, bdata(message.message_text));
+        solve_problems(object, bdata(message.message_text));
 
-        stop_my_timer(&(with->thread_busy_timer));
-        start_my_timer(&(with->thread_idle_timer));
+        stop_my_timer(&(object->thread_busy_timer));
+        start_my_timer(&(object->thread_idle_timer));
 
         enqueue(&main_queue, MESSAGE_READY,
-          "threads/thread_alpha_beta_master");
+          "threads/thread_func_alpha_beta_master");
       }
       else if (message.message_id == MESSAGE_EXIT_THREAD)
       {
-        my_printf(with->thread_my_printf, "got EXIT THREAD message %s\n",
+        my_printf(&(object->thread_my_printf), "got EXIT THREAD message %s\n",
           bdata(message.message_text));
 
-        stop_my_timer(&(with->thread_idle_timer));
+        stop_my_timer(&(object->thread_idle_timer));
 
-        my_printf(with->thread_my_printf,
+        my_printf(&(object->thread_my_printf),
           "%.2f seconds idle\n%.2f seconds busy\n",
-          return_my_timer(&(with->thread_idle_timer), FALSE),
-          return_my_timer(&(with->thread_busy_timer), FALSE));
+          return_my_timer(&(object->thread_idle_timer), FALSE),
+          return_my_timer(&(object->thread_busy_timer), FALSE));
 
-        with->thread_idle =
-          return_my_timer(&(with->thread_idle_timer), FALSE);
+        object->thread_idle =
+          return_my_timer(&(object->thread_idle_timer), FALSE);
 
         break;
       }
       else if (message.message_id == MESSAGE_ABORT_SEARCH)
       {
-        my_printf(with->thread_my_printf, "got ABORT SEARCH message %s\n",
+        my_printf(&(object->thread_my_printf), "got ABORT SEARCH message %s\n",
           bdata(message.message_text));
 
         //send abort also to other threads
@@ -169,31 +162,13 @@ local void thread_alpha_beta_master(thread_t *with)
         if (options.nthreads > 1)
         {
           for (int ithread = 1; ithread < options.nthreads; ithread++)
-            enqueue(return_thread_queue(threads[ithread]),
+            enqueue(return_thread_queue(threads + ithread),
               MESSAGE_ABORT_SEARCH, bdata(message.message_text));
         }
       }
-      else if (message.message_id == MESSAGE_BOARD)
-      {
-        FATAL("MESSAGE_BOARD SHOULD NOT BE SENT ANY MORE", EXIT_FAILURE)
-        my_printf(with->thread_my_printf, "got BOARD message %s\n",
-          bdata(message.message_text));
-
-        //send board also to other threads
-
-        if (options.nthreads > 1)
-        {
-          for (int ithread = 1; ithread < options.nthreads; ithread++)
-            enqueue(return_thread_queue(threads[ithread]),
-              MESSAGE_BOARD, bdata(message.message_text));
-        }
-
-        string2board(bdata(message.message_text), with->thread_board_id);
-        print_board(with->thread_board_id);
-      }
       else if (message.message_id == MESSAGE_STATE)
       {
-        my_printf(with->thread_my_printf, "got STATE message %s\n",
+        my_printf(&(object->thread_my_printf), "got STATE message %s\n",
           bdata(message.message_text));
 
         //send board also to other threads
@@ -201,73 +176,25 @@ local void thread_alpha_beta_master(thread_t *with)
         if (options.nthreads > 1)
         {
           for (int ithread = 1; ithread < options.nthreads; ithread++)
-            enqueue(return_thread_queue(threads[ithread]),
+            enqueue(return_thread_queue(threads + ithread),
               MESSAGE_STATE, bdata(message.message_text));
         }
 
-        state_t *game = state_class->objects_ctor();
+        state_t game_state;
 
-        game->set_state(game, bdata(message.message_text));
+        construct_state(&game_state);
 
-        board_t *with_board = return_with_board(with->thread_board_id);
+        game_state.set_state(&game_state, bdata(message.message_text));
 
-        state2board(with_board, game);
+        board_t *with_board = return_with_board(object->thread_board_id);
 
-        state_class->objects_dtor(game);
-      }
-      else if (message.message_id == MESSAGE_MOVE)
-      {
-        FATAL("MESSAGE_MOVE SHOULD NOT BE SENT ANY MORE", EXIT_FAILURE)
+        state2board(with_board, &game_state);
 
-        my_printf(with->thread_my_printf, "got MOVE message %s\n",
-          bdata(message.message_text));
-
-        //send move also to other threads
-
-        if (options.nthreads > 1)
-        {
-          for (int ithread = 1; ithread < options.nthreads; ithread++)
-            enqueue(return_thread_queue(threads[ithread]),
-              MESSAGE_MOVE, bdata(message.message_text));
-        }
-
-
-        moves_list_t moves_list;
-
-        create_moves_list(&moves_list);
-    
-        board_t *with_board = return_with_board(with->thread_board_id);
-      
-        gen_moves(with_board, &moves_list, FALSE);
-
-        HARDBUG(moves_list.nmoves == 0)
-
-        check_moves(with_board, &moves_list);
-
-        char move_string[MY_LINE_MAX];
-
-        strncpy(move_string, bdata(message.message_text), MY_LINE_MAX);
-
-        int imove;
-
-        if ((imove = search_move(&moves_list, move_string)) == INVALID)
-        {  
-          print_board(with->thread_board_id);
-
-          my_printf(with->thread_my_printf, "move=%s\n",
-            bdata(message.message_text));
-
-          moves_list.fprintf_moves(with->thread_my_printf,
-            &moves_list, TRUE);
-
-          FATAL("move not found", EXIT_FAILURE)
-        }
-
-        do_move(with_board, imove, &moves_list);
+        destroy_state(&game_state);
       }
       else if (message.message_id == MESSAGE_GO)
       {
-        my_printf(with->thread_my_printf, "got GO message %s\n",
+        my_printf(&(object->thread_my_printf), "got GO message %s\n",
           bdata(message.message_text));
 
         //send GO also to other threads
@@ -275,13 +202,13 @@ local void thread_alpha_beta_master(thread_t *with)
         if (options.nthreads > 1)
         {
           for (int ithread = 1; ithread < options.nthreads; ithread++)
-            enqueue(return_thread_queue(threads[ithread]),
+            enqueue(return_thread_queue(threads + ithread),
               MESSAGE_GO, "threads/thread_alha_beta_master");
         }
 
-        board_t *with_board = return_with_board(with->thread_board_id);
+        board_t *with_board = return_with_board(object->thread_board_id);
 
-        print_board(with->thread_board_id);
+        print_board(object->thread_board_id);
 
         moves_list_t moves_list;
 
@@ -293,8 +220,14 @@ local void thread_alpha_beta_master(thread_t *with)
 
         check_moves(with_board, &moves_list);
 
+        stop_my_timer(&(object->thread_idle_timer));
+        start_my_timer(&(object->thread_busy_timer));
+
         search(with_board, &moves_list,
                INVALID, INVALID, SCORE_MINUS_INFINITY, FALSE);
+
+        stop_my_timer(&(object->thread_busy_timer));
+        start_my_timer(&(object->thread_idle_timer));
 
         //message_t *sent[NTHREADS_MAX];
 
@@ -317,141 +250,88 @@ local void thread_alpha_beta_master(thread_t *with)
         if (options.nthreads > 1)
         {
           for (int ithread = 1; ithread < options.nthreads; ithread++)
-            enqueue(return_thread_queue(threads[ithread]),
+            enqueue(return_thread_queue(threads + ithread),
               MESSAGE_ABORT_SEARCH, bdata(message.message_text));
         }
       }
       else
         FATAL("message.message_id error", EXIT_FAILURE)
     }
-    my_sleep(CENTI_SECOND);
+    compat_sleep(CENTI_SECOND);
   }
 }
 
-local void thread_alpha_beta_slave(thread_t *with)
+local void thread_func_alpha_beta_slave(thread_t *object)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  my_printf(with->thread_my_printf, "alpha_beta slave thread\n");
-  my_printf(with->thread_my_printf, "");
+  my_printf(&(object->thread_my_printf), "alpha_beta slave thread\n");
+  my_printf(&(object->thread_my_printf), "");
 
   while(TRUE)
   { 
     message_t message;
     
-    if (dequeue(&(with->thread_queue), &message) != INVALID)
+    if (dequeue(&(object->thread_queue), &message) != INVALID)
     {
       if (message.message_id == MESSAGE_FEN)
       {
-        my_printf(with->thread_my_printf, "got FEN message %s\n",
+        my_printf(&(object->thread_my_printf), "got FEN message %s\n",
           bdata(message.message_text));
 
-        fen2board(bdata(message.message_text), with->thread_board_id);
+        fen2board(bdata(message.message_text), object->thread_board_id);
 
-        print_board(with->thread_board_id);
+        print_board(object->thread_board_id);
       }
       else if (message.message_id == MESSAGE_EXIT_THREAD)
       {
-        my_printf(with->thread_my_printf, "got EXIT THREAD message %s\n",
+        my_printf(&(object->thread_my_printf), "got EXIT THREAD message %s\n",
           bdata(message.message_text));
 
-        stop_my_timer(&(with->thread_idle_timer));
+        stop_my_timer(&(object->thread_idle_timer));
 
-        my_printf(with->thread_my_printf,
+        my_printf(&(object->thread_my_printf),
           "%.2f seconds idle\n%.2f seconds busy\n",
-          return_my_timer(&(with->thread_idle_timer), FALSE),
-          return_my_timer(&(with->thread_busy_timer), FALSE));
+          return_my_timer(&(object->thread_idle_timer), FALSE),
+          return_my_timer(&(object->thread_busy_timer), FALSE));
 
-        with->thread_idle =
-          return_my_timer(&(with->thread_idle_timer), FALSE);
+        object->thread_idle =
+          return_my_timer(&(object->thread_idle_timer), FALSE);
 
         break;
       }
       else if (message.message_id == MESSAGE_ABORT_SEARCH)
       {
-        my_printf(with->thread_my_printf, "got ABORT SEARCH message %s\n",
+        my_printf(&(object->thread_my_printf), "got ABORT SEARCH message %s\n",
           bdata(message.message_text));
-      }
-      else if (message.message_id == MESSAGE_BOARD)
-      {
-        FATAL("MESSAGE_BOARD SHOULD NOT BE SENT ANY MORE", EXIT_FAILURE)
-
-        my_printf(with->thread_my_printf, "got BOARD message %s\n",
-          bdata(message.message_text));
-
-        string2board(bdata(message.message_text), with->thread_board_id);
-
-        print_board(with->thread_board_id);
-      }
-      else if (message.message_id == MESSAGE_MOVE)
-      {
-        FATAL("MESSAGE_MOVE SHOULD NOT BE SENT ANY MORE", EXIT_FAILURE)
-
-        my_printf(with->thread_my_printf, "got MOVE message %s\n",
-          bdata(message.message_text));
-
-        //this message should have only been sent to other threads
-
-        HARDBUG(with->thread_id == thread_alpha_beta_master_id)
-     
-        moves_list_t moves_list;
-
-        create_moves_list(&moves_list);
-
-        board_t *with_board = return_with_board(with->thread_board_id);
-     
-        gen_moves(with_board, &moves_list, FALSE);
-
-        HARDBUG(moves_list.nmoves == 0)
-  
-        check_moves(with_board, &moves_list);
-  
-        char move_string[MY_LINE_MAX];
-     
-        strncpy(move_string, bdata(message.message_text), MY_LINE_MAX);
-  
-        int imove;
-
-        if ((imove = search_move(&moves_list, move_string)) == INVALID)
-        {  
-          print_board(with->thread_board_id);
-
-          my_printf(with->thread_my_printf, "move=%s\n",
-            bdata(message.message_text));
-
-          moves_list.fprintf_moves(with->thread_my_printf,
-            &moves_list, TRUE);
-
-          FATAL("move not found", EXIT_FAILURE)
-        }
-  
-        do_move(with_board, imove, &moves_list);
       }
       else if (message.message_id == MESSAGE_STATE)
       {
-        my_printf(with->thread_my_printf, "got STATE message %s\n",
+        my_printf(&(object->thread_my_printf), "got STATE message %s\n",
           bdata(message.message_text));
 
-        state_t *game = state_class->objects_ctor();
+        state_t game_state;
 
-        game->set_state(game, bdata(message.message_text));
+        construct_state(&game_state);
 
-        board_t *with_board = return_with_board(with->thread_board_id);
+        game_state.set_state(&game_state, bdata(message.message_text));
 
-        state2board(with_board, game);
+        board_t *with_board = return_with_board(object->thread_board_id);
 
-        state_class->objects_dtor(game);
+        state2board(with_board, &game_state);
+
+        destroy_state(&game_state);
       }
       else if (message.message_id == MESSAGE_GO)
       {
-        my_printf(with->thread_my_printf, "got GO message %s\n",
+        my_printf(&(object->thread_my_printf), "got GO message %s\n",
           bdata(message.message_text));
 
         while(TRUE)
         {
-          if (dequeue(&(with->thread_queue), &message) == INVALID)
+          if (dequeue(&(object->thread_queue), &message) == INVALID)
           {
-            my_sleep(CENTI_SECOND);
+            compat_sleep(CENTI_SECOND);
             continue;
           }
 
@@ -468,7 +348,7 @@ local void thread_alpha_beta_slave(thread_t *with)
                      &depth_min, &depth_max,
                      &root_score, &minimal_window) != 5)
             
-          board_t *with_board = return_with_board(with->thread_board_id);
+          board_t *with_board = return_with_board(object->thread_board_id);
 
           moves_list_t moves_list;
 
@@ -485,12 +365,12 @@ local void thread_alpha_beta_slave(thread_t *with)
           if ((imove = search_move(&moves_list, move_string)) ==
               INVALID)
           {  
-            print_board(with->thread_board_id);
+            print_board(object->thread_board_id);
   
-            my_printf(with->thread_my_printf, "move=%s\n",
+            my_printf(&(object->thread_my_printf), "move=%s\n",
               move_string);
     
-            moves_list.fprintf_moves(with->thread_my_printf,
+            moves_list.fprintf_moves(&(object->thread_my_printf),
               &moves_list, TRUE);
     
             FATAL("move not found", EXIT_FAILURE)
@@ -498,26 +378,32 @@ local void thread_alpha_beta_slave(thread_t *with)
     
           if (message.message_id == MESSAGE_SEARCH_FIRST)
           {
-            my_printf(with->thread_my_printf,
+            my_printf(&(object->thread_my_printf),
               "got SEARCH FIRST message %s\n", bdata(message.message_text));
 
-            my_printf(with->thread_my_printf, "%s %d %d %d %d\n",
+            my_printf(&(object->thread_my_printf), "%s %d %d %d %d\n",
               move_string, depth_min, depth_max,
               root_score, minimal_window);
 
             clear_totals(with_board);
 
+            stop_my_timer(&(object->thread_idle_timer));
+            start_my_timer(&(object->thread_busy_timer));
+
             search(with_board, &moves_list,
                    depth_min, depth_max, root_score, FALSE);
+
+            stop_my_timer(&(object->thread_busy_timer));
+            start_my_timer(&(object->thread_idle_timer));
   
             print_totals(with_board);
           }
           else if (message.message_id == MESSAGE_SEARCH_AHEAD)
           {
-            my_printf(with->thread_my_printf,
+            my_printf(&(object->thread_my_printf),
               "got SEARCH AHEAD message %s\n", bdata(message.message_text));
 
-            my_printf(with->thread_my_printf, "%s %d %d %d %d\n",
+            my_printf(&(object->thread_my_printf), "%s %d %d %d %d\n",
               move_string, depth_min, depth_max,
               root_score, minimal_window);
 
@@ -533,8 +419,15 @@ local void thread_alpha_beta_slave(thread_t *with)
             {
               clear_totals(with_board);
 
+
+              stop_my_timer(&(object->thread_idle_timer));
+              start_my_timer(&(object->thread_busy_timer));
+
               search(with_board, &your_moves_list,
                      depth_min, depth_max, -root_score, FALSE);
+
+              stop_my_timer(&(object->thread_busy_timer));
+              start_my_timer(&(object->thread_idle_timer));
    
               print_totals(with_board);
             }
@@ -543,10 +436,10 @@ local void thread_alpha_beta_slave(thread_t *with)
           }
           else if (message.message_id == MESSAGE_SEARCH_SECOND)
           {
-            my_printf(with->thread_my_printf,
+            my_printf(&(object->thread_my_printf),
               "got SEARCH SECOND message %s\n", bdata(message.message_text));
 
-            my_printf(with->thread_my_printf, "%s %d %d %d %d\n",
+            my_printf(&(object->thread_my_printf), "%s %d %d %d %d\n",
               move_string, depth_min, depth_max,
               root_score, minimal_window);
 
@@ -562,9 +455,16 @@ local void thread_alpha_beta_slave(thread_t *with)
 
             clear_totals(with_board);
 
+
+            stop_my_timer(&(object->thread_idle_timer));
+            start_my_timer(&(object->thread_busy_timer));
+
             search(with_board, &moves_list,
                    depth_min, depth_max, root_score, FALSE);
     
+            stop_my_timer(&(object->thread_busy_timer));
+            start_my_timer(&(object->thread_idle_timer));
+
             print_totals(with_board);
           }
           else
@@ -575,15 +475,15 @@ local void thread_alpha_beta_slave(thread_t *with)
         FATAL("message.message_id error", EXIT_FAILURE)
     }
 
-    my_sleep(CENTI_SECOND);
+    compat_sleep(CENTI_SECOND);
   }
 
   END_BLOCK
 }
 
-local void *thread_func(void *arg_with)
+local void *thread_func(void *self)
 {
-  thread_t *with = arg_with;
+  thread_t *object = self;
 
 #if COMPAT_CSTD == COMPAT_CSTD_C11
   i64_t tid = thrd_current();
@@ -591,8 +491,8 @@ local void *thread_func(void *arg_with)
   i64_t tid = INVALID;
 #endif
 
-  my_printf(with->thread_my_printf, "thread id=%d tid=%lld\n",
-    with->thread_id, tid);
+  my_printf(&(object->thread_my_printf), "thread=%p tid=%lld\n",
+    object, tid);
 
   BEGIN_BLOCK("main-thread")
 
@@ -600,34 +500,34 @@ local void *thread_func(void *arg_with)
 
   HARDBUG(bname == NULL)
 
-  HARDBUG(bformata(bname, "%d", with->thread_id) == BSTR_ERR)
+  HARDBUG(bformata(bname, "-%p", object) != BSTR_OK)
 
-  construct_my_timer(&(with->thread_idle_timer), bdata(bname),
-    with->thread_my_printf, FALSE);
+  construct_my_timer(&(object->thread_idle_timer), bdata(bname),
+    &(object->thread_my_printf), FALSE);
 
-  construct_my_timer(&(with->thread_busy_timer), bdata(bname),
-    with->thread_my_printf, FALSE);
+  construct_my_timer(&(object->thread_busy_timer), bdata(bname),
+    &(object->thread_my_printf), FALSE);
 
-  with->thread_idle = 0.0;
+  object->thread_idle = 0.0;
 
-  reset_my_timer(&(with->thread_idle_timer));
+  reset_my_timer(&(object->thread_idle_timer));
 
-  reset_my_timer(&(with->thread_busy_timer));
+  reset_my_timer(&(object->thread_busy_timer));
 
-  stop_my_timer(&(with->thread_busy_timer));
+  stop_my_timer(&(object->thread_busy_timer));
 
-  if (with->thread_role == THREAD_ALPHA_BETA_MASTER)
+  if (object->thread_role == THREAD_ALPHA_BETA_MASTER)
   {
-    thread_alpha_beta_master(with);
+    thread_func_alpha_beta_master(object);
   }
-  else if (with->thread_role == THREAD_ALPHA_BETA_SLAVE)
+  else if (object->thread_role == THREAD_ALPHA_BETA_SLAVE)
   {
-    thread_alpha_beta_slave(with);
+    thread_func_alpha_beta_slave(object);
   }
   else
     FATAL("unknown thread_role", EXIT_FAILURE);
 
-  //solve_random(with);
+  //solve_random(object);
 
   END_BLOCK
 
@@ -636,121 +536,52 @@ local void *thread_func(void *arg_with)
   return(NULL);
 }
 
-local int create_thread(int arg_role)
+local void create_thread(void *self, int arg_role)
 {
-  int ithread;
-  thread_t *with;
+  thread_t *object = self;
 
-  //search empty slot
+  object->thread_role = arg_role;
 
-  for (ithread = 0; ithread < NTHREADS_MAX; ithread++)
-  {
-    with = thread_objs + ithread;
+  construct_my_printf(&(object->thread_my_printf), "log", FALSE);
 
-    if (with->thread_id == INVALID) break;
-  }
+  construct_my_random(&(object->thread_random), INVALID);
 
-  HARDBUG(ithread >= NTHREADS_MAX)
-  with->thread_id = THREAD_ID_OFFSET + ithread;
+  bstring queue_name = bformat("thread-%p", self);
 
-  with->thread_role = arg_role;
+  construct_queue(&(object->thread_queue), bdata(queue_name),
+                  &(object->thread_my_printf));
 
-  with->thread_my_printf = construct_my_printf(ithread);
+  bdestroy(queue_name);
 
-  char queue_name[MY_LINE_MAX];
+  object->thread_board_id =
+    create_board(&(object->thread_my_printf), object);
 
-  snprintf(queue_name, MY_LINE_MAX, "thread%d", ithread);
+  compat_thread_create(&(object->thread), thread_func, object);
 
-  construct_queue(&(with->thread_queue), queue_name, with->thread_my_printf);
-
-  with->thread_board_id =
-    create_board(with->thread_my_printf, with->thread_id);
-
-  my_thread_create(&(with->thread), thread_func, with);
-
-  randull_thread(1, with->thread_id);
-
-  return(with->thread_id);
 }
 
-ui64_t randull_thread(int init, int arg_id)
+queue_t *return_thread_queue(void *self)
 {
-  thread_t *with = return_with_thread(arg_id);
+  thread_t *object = self;
 
-  if (init == 1)
-  {
-    with->thread_j = 24 - 1;
-    with->thread_k = 55 - 1;
+  if (object == NULL) return(NULL);
 
-    for (int i = 0; i < 55; i++)
-    {
-//ui64_t unsigned long??
-      unsigned long long r;
-
-#ifdef USE_HARDWARE_RAND
-      HARDBUG(!_rdrand64_step(&r))
-#else
-#error NOT IMPLEMENTED YET
-      r = i;
-#endif
-
-      with->thread_y[i] = r;
-
-      HARDBUG(with->thread_y[i] != r)
-    }
-  }
-
-  ui64_t ul =
-    (with->thread_y[with->thread_k] += with->thread_y[with->thread_j]);
-
-  if (--(with->thread_j) < 0) with->thread_j = 55 - 1;
-  if (--(with->thread_k) < 0) with->thread_k = 55 - 1;
-
-  return(ul);
-}
-
-queue_t *return_thread_queue(int arg_thread_id)
-{
-  thread_t *with = return_with_thread(arg_thread_id);
-
-  return(&(with->thread_queue));
-}
-
-void init_threads(void)
-{
-  for (int ithread = 0; ithread < NTHREADS_MAX; ithread++)
-  {
-    thread_t *with = thread_objs + ithread;
-
-    with->thread_id = INVALID;
-  }
+  return(&(object->thread_queue));
 }
 
 void start_threads(void)
 {
-  int ithread = 0;
-
   if (options.nthreads_alpha_beta > 0)
   {
-    HARDBUG(ithread >= NTHREADS_MAX)
+    create_thread(threads, THREAD_ALPHA_BETA_MASTER);
+    
+    thread_alpha_beta_master = threads;
 
-    thread_alpha_beta_master_id = threads[ithread] =
-      create_thread(THREAD_ALPHA_BETA_MASTER);
+    PRINTF("thread_alpha_beta_master=%p\n", thread_alpha_beta_master);
 
-    ithread++;
-
-    for (int jthread = 1; jthread < options.nthreads_alpha_beta; jthread++)
-    {
-      HARDBUG(ithread >= NTHREADS_MAX)
-
-      threads[ithread] = create_thread(THREAD_ALPHA_BETA_SLAVE);
-
-      ithread++;
-    }
-    PRINTF("thread_alpha_beta_master_id=%d\n", thread_alpha_beta_master_id);
+    for (int ithread = 1; ithread < options.nthreads_alpha_beta; ithread++)
+      create_thread(threads + ithread, THREAD_ALPHA_BETA_SLAVE);
   }
-
-  HARDBUG(ithread != options.nthreads)
 }
 
 void join_threads(void)
@@ -759,11 +590,11 @@ void join_threads(void)
 
   for (int ithread = 0; ithread < options.nthreads; ithread++)
   {
-    thread_t *with = return_with_thread(threads[ithread]);
+    thread_t *object = threads + ithread;
 
-    my_thread_join(with->thread);
+    compat_thread_join(object->thread);
     
-    idle += with->thread_idle;
+    idle += object->thread_idle;
   }
   PRINTF("total idle time=%.2f seconds\n", idle);
 }
@@ -772,16 +603,16 @@ void join_threads(void)
 
 void test_threads(void)
 {
-  int test [NTEST];
+  thread_t test[NTEST];
 
   for (int itest = 0; itest < NTEST; itest++)
-    test[itest] = create_thread(INVALID);
+    create_thread(test + itest, INVALID);
 
   for (int itest = 0; itest < NTEST; itest++)
   {
-    thread_t *with = return_with_thread(test[itest]);
+    thread_t *object = test + itest;
 
-    my_thread_join(with->thread);
+    compat_thread_join(object->thread);
   }
 }
 

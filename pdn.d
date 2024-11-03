@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 void my_pv(int npieces, board_t *with, pv_t *pv, double pv_score, FILE *ffen,
   i64_t *iposition)
 {
@@ -12,9 +12,9 @@ void my_pv(int npieces, board_t *with, pv_t *pv, double pv_score, FILE *ffen,
 
   int ncount = 
     BIT_COUNT(with->board_white_man_bb |
-              with->board_white_crown_bb |
+              with->board_white_king_bb |
               with->board_black_man_bb |
-              with->board_black_crown_bb);
+              with->board_black_king_bb);
 
   if ((moves_list.nmoves > 1) and
       (moves_list.ncaptx == 0) and

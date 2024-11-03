@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 void construct_queue(void *self,
@@ -18,14 +18,14 @@ void construct_queue(void *self,
   object->Q_nwrite = -1;
   object->Q_length_max = 0;
 
-  HARDBUG(my_mutex_init(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_init(&(object->Q_mutex)) != 0)
 }
 
 void enqueue(void *self, int arg_message_id, char *arg_message_text)
 {
   queue_t *object = self;
   
-  HARDBUG(my_mutex_lock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
 
   //nread, nwrite
   //0      -1     : 0 messages in queue
@@ -47,7 +47,7 @@ void enqueue(void *self, int arg_message_id, char *arg_message_text)
 
   message->message_id = arg_message_id;
 
-  HARDBUG(bassigncstr(message->message_text, arg_message_text) == BSTR_ERR)
+  HARDBUG(bassigncstr(message->message_text, arg_message_text) != BSTR_OK)
 
   message->message_read = FALSE;
 
@@ -63,7 +63,7 @@ void enqueue(void *self, int arg_message_id, char *arg_message_text)
     object->Q_length_max = length;
   }
 
-  HARDBUG(my_mutex_unlock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(object->Q_mutex)) != 0)
 }
 
 int poll_queue(void *self)
@@ -72,12 +72,14 @@ int poll_queue(void *self)
 
   int result = INVALID;
 
-  HARDBUG(my_mutex_lock(&(object->Q_mutex)) != 0)
+  if (object == NULL) return(result);
+
+  HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
 
   if (object->Q_nread <= object->Q_nwrite)
     result = object->Q_messages[object->Q_nread % NMESSAGES_MAX].message_id;
 
-  HARDBUG(my_mutex_unlock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(object->Q_mutex)) != 0)
 
   return(result);
 }
@@ -88,7 +90,7 @@ int dequeue(void *self, message_t *arg_message)
 
   int result = INVALID;
   
-  HARDBUG(my_mutex_lock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
 
   if (object->Q_nread <= object->Q_nwrite)
   {
@@ -104,7 +106,7 @@ int dequeue(void *self, message_t *arg_message)
     if (arg_message != NULL) *arg_message = *message;
   }
 
-  HARDBUG(my_mutex_unlock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(object->Q_mutex)) != 0)
 
   return(result);
 }

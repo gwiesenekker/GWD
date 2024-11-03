@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef BoardsH
 #define BoardsH
 
@@ -42,9 +42,9 @@
 #define my_man_bb     the_man_bb(my_colour)
 #define your_man_bb   the_man_bb(your_colour)
 
-#define the_crown_bb(X) cat3(board_, X, _crown_bb)
-#define my_crown_bb     the_crown_bb(my_colour)
-#define your_crown_bb   the_crown_bb(your_colour)
+#define the_king_bb(X) cat3(board_, X, _king_bb)
+#define my_king_bb     the_king_bb(my_colour)
+#define your_king_bb   the_king_bb(your_colour)
 
 #define the_row(X) cat2(X, _row)
 #define my_row     the_row(my_colour)
@@ -54,9 +54,9 @@
 #define my_man_key     the_man_key(my_colour)
 #define your_man_key   the_man_key(your_colour)
 
-#define the_crown_key(X) cat2(X, _crown_key)
-#define my_crown_key     the_crown_key(my_colour)
-#define your_crown_key   the_crown_key(your_colour)
+#define the_king_key(X) cat2(X, _king_key)
+#define my_king_key     the_king_key(my_colour)
+#define your_king_key   the_king_key(your_colour)
 
 #define PV_MAX 256
 
@@ -68,9 +68,9 @@ typedef struct
   hash_key_t node_key;
   hash_key_t node_move_key;
   ui64_t node_white_man_bb;
-  ui64_t node_white_crown_bb;
+  ui64_t node_white_king_bb;
   ui64_t node_black_man_bb;
-  ui64_t node_black_crown_bb;
+  ui64_t node_black_king_bb;
   int node_move_tactical;
 } node_t;
 
@@ -78,13 +78,13 @@ typedef struct board
 {
   int board_id;
   my_printf_t *board_my_printf;
-  int board_thread_id;
+  thread_t *board_thread;
 
   ui64_t board_empty_bb;
   ui64_t board_white_man_bb;
-  ui64_t board_white_crown_bb;
+  ui64_t board_white_king_bb;
   ui64_t board_black_man_bb;
-  ui64_t board_black_crown_bb;
+  ui64_t board_black_king_bb;
 
   int board_colour2move;
   hash_key_t board_key;
@@ -97,6 +97,7 @@ typedef struct board
   my_timer_t board_timer;
 
   neural_t board_neural0;
+  int board_neural1_not_null;
   neural_t board_neural1;
 
   //endgame
@@ -137,13 +138,12 @@ typedef struct board
   i64_t total_minimal_window_nodes;
   i64_t total_pv_nodes;
 
-  i64_t total_reductions_delta_strong;
-  i64_t total_reductions_delta_strong_lost;
-  i64_t total_reductions_delta_strong_le_alpha;
-  i64_t total_reductions_delta_strong_ge_beta;
+  i64_t total_reductions_delta;
+  i64_t total_reductions_delta_lost;
+  i64_t total_reductions_delta_le_alpha;
+  i64_t total_reductions_delta_ge_beta;
 
   i64_t total_reductions;
-  i64_t total_reductions_simple;
   i64_t total_reductions_le_alpha;
   i64_t total_reductions_ge_beta;
 
@@ -182,19 +182,16 @@ extern int white_row[BOARD_MAX];
 extern int black_row[BOARD_MAX];
 
 extern hash_key_t white_man_key[BOARD_MAX];
-extern hash_key_t white_crown_key[BOARD_MAX];
+extern hash_key_t white_king_key[BOARD_MAX];
 
 extern hash_key_t black_man_key[BOARD_MAX];
-extern hash_key_t black_crown_key[BOARD_MAX];
-
-extern hash_key_t pv_key;
+extern hash_key_t black_king_key[BOARD_MAX];
 
 board_t *return_with_board(int);
-int create_board(my_printf_t *, int);
+int create_board(my_printf_t *, thread_t *);
 void destroy_board(int);
 hash_key_t return_key_from_bb(board_t *);
 hash_key_t return_key_from_inputs(neural_t *);
-hash_key_t return_book_key(board_t *);
 void string2board(char *, int);
 void fen2board(char *, int);
 //TODO make board2fen member of board_t

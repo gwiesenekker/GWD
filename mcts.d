@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta, 
   int node_type, moves_list_t *moves_list, int *best_pv)
 {
@@ -113,12 +113,12 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
   {
 /*
     int nmy_man = BIT_COUNT(with->my_man_bb);
-    int nmy_crown = BIT_COUNT(with->my_crown_bb);
+    int nmy_king = BIT_COUNT(with->my_king_bb);
     int nyour_man = BIT_COUNT(with->your_man_bb);
-    int nyour_crown = BIT_COUNT(with->your_crown_bb);
+    int nyour_king = BIT_COUNT(with->your_king_bb);
             
     best_score = (nmy_man - nyour_man) * SCORE_MAN +
-                 (nmy_crown - nyour_crown) * SCORE_CROWN;
+                 (nmy_king - nyour_king) * SCORE_CROWN;
 
     best_score = return_scaled_float_score(best_score, with->board_key);
 */

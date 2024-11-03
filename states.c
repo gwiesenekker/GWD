@@ -1,18 +1,11 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 //the game state is maintained in a cJSON object
-//with the following fields
-
-class_t *state_class;
-
-//the object printer
 
 local void printf_state(void *self)
 {
   state_t *object = self;
-
-  PRINTF("object_id=%d\n", object->object_id);
 
   PRINTF("state=%s\n", object->get_state(object));
   PRINTF("event=%s\n", object->get_event(object));
@@ -25,10 +18,10 @@ local void printf_state(void *self)
   PRINTF("time=%d\n", object->get_time(object));
 }
 
-//object methods
-
-local void set_state(state_t *object, char *string)
+local void set_state(void *self, char *string)
 {
+  state_t *object = self;
+
   object->cjson_object = cJSON_Parse(string);
 
   if (object->cjson_object == NULL)
@@ -42,8 +35,10 @@ local void set_state(state_t *object, char *string)
   }
 }
 
-local void set_event(state_t *object, char *event)
+local void set_event(void *self, char *event)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_EVENT_ID);
 
@@ -52,8 +47,10 @@ local void set_event(state_t *object, char *event)
   cJSON_SetStringValue(cjson_item, event);
 }
 
-local void set_date(state_t *object, char *date)
+local void set_date(void *self, char *date)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_DATE_ID);
 
@@ -62,8 +59,10 @@ local void set_date(state_t *object, char *date)
   cJSON_SetStringValue(cjson_item, date);
 }
 
-local void set_white(state_t *object, char *white)
+local void set_white(void *self, char *white)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_WHITE_ID);
 
@@ -72,8 +71,10 @@ local void set_white(state_t *object, char *white)
   cJSON_SetStringValue(cjson_item, white);
 }
 
-local void set_black(state_t *object, char *black)
+local void set_black(void *self, char *black)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_BLACK_ID);
 
@@ -82,8 +83,10 @@ local void set_black(state_t *object, char *black)
   cJSON_SetStringValue(cjson_item, black);
 }
 
-local void set_result(state_t *object, char *result)
+local void set_result(void *self, char *result)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_RESULT_ID);
 
@@ -92,8 +95,10 @@ local void set_result(state_t *object, char *result)
   cJSON_SetStringValue(cjson_item, result);
 }
 
-local void set_starting_position(state_t *object, char *position)
+local void set_starting_position(void *self, char *position)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_STARTING_POSITION_ID);
 
@@ -102,8 +107,10 @@ local void set_starting_position(state_t *object, char *position)
   cJSON_SetStringValue(cjson_item, position);
 }
 
-local void push_move(state_t *object, char *move, char *comment)
+local void push_move(void *self, char *move, char *comment)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_MOVES_ID);
 
@@ -113,7 +120,8 @@ local void push_move(state_t *object, char *move, char *comment)
  
   HARDBUG(cjson_move == NULL)
 
-  HARDBUG(cJSON_AddStringToObject(cjson_move, CJSON_MOVE_STRING_ID, move) == NULL)
+  HARDBUG(cJSON_AddStringToObject(cjson_move, CJSON_MOVE_STRING_ID,
+                                  move) == NULL)
 
   if (comment != NULL)
     HARDBUG(cJSON_AddStringToObject(cjson_move, CJSON_COMMENT_STRING_ID,
@@ -122,8 +130,10 @@ local void push_move(state_t *object, char *move, char *comment)
   cJSON_AddItemToArray(cjson_item, cjson_move);
 }
 
-local int pop_move(state_t *object)
+local int pop_move(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_MOVES_ID);
 
@@ -136,8 +146,10 @@ local int pop_move(state_t *object)
   return(n);
 }
 
-local void set_depth(state_t *object, int depth)
+local void set_depth(void *self, int depth)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_DEPTH_ID);
 
@@ -146,8 +158,10 @@ local void set_depth(state_t *object, int depth)
   cJSON_SetNumberValue(cjson_item, depth);
 }
 
-local void set_time(state_t *object, int time)
+local void set_time(void *self, int time)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_TIME_ID);
 
@@ -156,8 +170,10 @@ local void set_time(state_t *object, int time)
   cJSON_SetNumberValue(cjson_item, time);
 }
 
-local void save(state_t *object, char *name)
+local void save(void *self, char *name)
 {
+  state_t *object = self;
+
   FILE *fsave;
 
   HARDBUG((fsave = fopen(name, "w")) == NULL)
@@ -167,18 +183,20 @@ local void save(state_t *object, char *name)
   FCLOSE(fsave);
 }
 
-local void save2pdn(state_t *object, char *pdn)
+local void save2pdn(void *self, char *pdn)
 {
-  int fd = my_lock_file(pdn);
+  state_t *object = self;
+
+  int fd = compat_lock_file(pdn);
 
   HARDBUG(fd == -1)
 
-  my_fdprintf(fd, "[Event \"%s\"]\n", object->get_event(object));
-  my_fdprintf(fd, "[Date \"%s\"]\n", object->get_date(object));
-  my_fdprintf(fd, "[White \"%s\"]\n", object->get_white(object));
-  my_fdprintf(fd, "[Black \"%s\"]\n", object->get_black(object));
-  my_fdprintf(fd, "[Result \"%s\"]\n", object->get_result(object));
-  my_fdprintf(fd, "[FEN \"%s\"]\n\n", object->get_starting_position(object));
+  compat_fdprintf(fd, "[Event \"%s\"]\n", object->get_event(object));
+  compat_fdprintf(fd, "[Date \"%s\"]\n", object->get_date(object));
+  compat_fdprintf(fd, "[White \"%s\"]\n", object->get_white(object));
+  compat_fdprintf(fd, "[Black \"%s\"]\n", object->get_black(object));
+  compat_fdprintf(fd, "[Result \"%s\"]\n", object->get_result(object));
+  compat_fdprintf(fd, "[FEN \"%s\"]\n\n", object->get_starting_position(object));
 
   int iply = 0;
 
@@ -193,37 +211,41 @@ local void save2pdn(state_t *object, char *pdn)
     cJSON *comment_string = cJSON_GetObjectItem(game_move,
                                                 CJSON_COMMENT_STRING_ID);
 
-    if ((iply % 2) == 0) my_fdprintf(fd, " %d.", iply / 2 + 1);
+    if ((iply % 2) == 0) compat_fdprintf(fd, " %d.", iply / 2 + 1);
 
     if (comment_string == NULL)
     {
-      my_fdprintf(fd, " %s", cJSON_GetStringValue(move_string));
+      compat_fdprintf(fd, " %s", cJSON_GetStringValue(move_string));
     }
     else
     {
-      my_fdprintf(fd, " %s {%s}", cJSON_GetStringValue(move_string),
+      compat_fdprintf(fd, " %s {%s}", cJSON_GetStringValue(move_string),
                                   cJSON_GetStringValue(comment_string));
     } 
 
     iply++;
 
-    if ((iply > 0) and ((iply % 10) == 0)) my_fdprintf(fd, "\n");
+    if ((iply > 0) and ((iply % 10) == 0)) compat_fdprintf(fd, "\n");
   }
-  my_fdprintf(fd, " %s\n\n", object->get_result(object));
+  compat_fdprintf(fd, " %s\n\n", object->get_result(object));
 
-  my_unlock_file(fd);
+  compat_unlock_file(fd);
 }
 
-local char *get_state(state_t *object)
+local char *get_state(void *self)
 {
-  HARDBUG(cJSON_PrintPreallocated(object->cjson_object, object->string, MY_LINE_MAX,
-                              FALSE) == 0)
+  state_t *object = self;
+
+  HARDBUG(cJSON_PrintPreallocated(object->cjson_object, object->string,
+                                  MY_LINE_MAX, FALSE) == 0)
 
   return(object->string);
 }
 
-local char *get_event(state_t *object)
+local char *get_event(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_EVENT_ID);
 
@@ -232,8 +254,10 @@ local char *get_event(state_t *object)
   return(cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_date(state_t *object)
+local char *get_date(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_DATE_ID);
 
@@ -242,8 +266,10 @@ local char *get_date(state_t *object)
   return(cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_white(state_t *object)
+local char *get_white(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_WHITE_ID);
 
@@ -252,8 +278,10 @@ local char *get_white(state_t *object)
   return(cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_black(state_t *object)
+local char *get_black(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_BLACK_ID);
 
@@ -262,8 +290,10 @@ local char *get_black(state_t *object)
   return(cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_result(state_t *object)
+local char *get_result(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_RESULT_ID);
 
@@ -272,8 +302,10 @@ local char *get_result(state_t *object)
   return(cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_starting_position(state_t *object)
+local char *get_starting_position(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_STARTING_POSITION_ID);
 
@@ -282,8 +314,10 @@ local char *get_starting_position(state_t *object)
   return(cJSON_GetStringValue(cjson_item));
 }
 
-local cJSON *get_moves(state_t *object)
+local cJSON *get_moves(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_MOVES_ID);
 
@@ -292,8 +326,10 @@ local cJSON *get_moves(state_t *object)
   return(cjson_item);
 }
 
-local int get_depth(state_t *object)
+local int get_depth(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_DEPTH_ID);
 
@@ -302,8 +338,10 @@ local int get_depth(state_t *object)
   return(round(cJSON_GetNumberValue(cjson_item)));
 }
 
-local int get_time(state_t *object)
+local int get_time(void *self)
 {
+  state_t *object = self;
+
   cJSON *cjson_item =
     cJSON_GetObjectItem(object->cjson_object, CJSON_TIME_ID);
 
@@ -312,8 +350,10 @@ local int get_time(state_t *object)
   return(round(cJSON_GetNumberValue(cjson_item)));
 }
 
-local void load(state_t *object, char *name)
+local void load(void *self, char *name)
 {
+  state_t *object = self;
+
   FILE *fload;
 
   HARDBUG((fload = fopen(name, "r")) == NULL)
@@ -342,48 +382,49 @@ local void load(state_t *object, char *name)
   object->set_state(object, string);
 }
 
-local void *construct_state(void)
+void construct_state(void *self)
 {
-  state_t *object;
-  
-  MALLOC(object, state_t, 1)
-
-  object->object_id = state_class->register_object(state_class, object);
+  state_t *object = self;
 
   object->cjson_object = cJSON_CreateObject();
-
+  
   char event[MY_LINE_MAX];
 
   time_t t = time(NULL);
 
   (void) strftime(event, MY_LINE_MAX, "%Y.%m.%d %H:%M:%S", localtime(&t));
 
-  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_EVENT_ID, event) ==
-      NULL)
+  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_EVENT_ID,
+                                  event) == NULL)
 
   char date[MY_LINE_MAX];
 
   (void) strftime(date, MY_LINE_MAX, "%Y.%m.%d", localtime(&t));
 
-  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_DATE_ID, date) == NULL)
+  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_DATE_ID,
+                                  date) == NULL)
 
-  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_WHITE_ID, "White") ==
-      NULL)
+  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_WHITE_ID,
+                                  "White") == NULL)
 
-  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_BLACK_ID, "Black") ==
-      NULL)
+  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_BLACK_ID,
+                                  "Black") == NULL)
 
-  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_RESULT_ID, "*") ==
-      NULL)
+  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_RESULT_ID,
+                                  "*") == NULL)
 
-  HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_STARTING_POSITION_ID,
-                              STARTING_POSITION2FEN) == NULL)
+  HARDBUG(cJSON_AddStringToObject(object->cjson_object,
+                                  CJSON_STARTING_POSITION_ID,
+                                  STARTING_POSITION2FEN) == NULL)
 
-  HARDBUG(cJSON_AddArrayToObject(object->cjson_object, CJSON_MOVES_ID) == NULL)
+  HARDBUG(cJSON_AddArrayToObject(object->cjson_object,
+                                 CJSON_MOVES_ID) == NULL)
 
-  HARDBUG(cJSON_AddNumberToObject(object->cjson_object, CJSON_DEPTH_ID, 64) == NULL)
+  HARDBUG(cJSON_AddNumberToObject(object->cjson_object,
+                                  CJSON_DEPTH_ID, 64) == NULL)
 
-  HARDBUG(cJSON_AddNumberToObject(object->cjson_object, CJSON_TIME_ID, 30) == NULL)
+  HARDBUG(cJSON_AddNumberToObject(object->cjson_object, CJSON_TIME_ID,
+                                  30) == NULL)
 
   object->printf_state = printf_state;
 
@@ -412,63 +453,39 @@ local void *construct_state(void)
   object->get_depth = get_depth;
   object->get_time = get_time;
   object->load = load;
-
-  return(object);
 }
 
-local void destroy_state(void *self)
+void destroy_state(void *self)
 {
   state_t *object = self;
 
   cJSON_Delete(object->cjson_object);
-
-  state_class->deregister_object(state_class, object);
 }
 
-
-//the object iterator
-
-local int iterate_state(void *self)
+void test_states(void)
 {
-  state_t *object = self;
+  state_t a;
 
-  PRINTF("iterate object_id=%d\n", object->object_id);
+  construct_state(&a);
 
-  object->printf_state(object);
+  a.set_starting_position(&a, "[FEN \"W:W28,31,32,35,36,37,38,39,40,42,43,45,47:B3,7,8,11,12,13,15,19,20,21,23,26,29.\"]");
 
-  return(0);
-}
+  a.push_move(&a, "31-26", NULL);
 
-void init_state_class(void)
-{
-  state_class = init_class(128, construct_state, destroy_state,
-                           iterate_state);
-}
+  a.push_move(&a, "17-22", "{only move}");
 
-void test_state_class(void)
-{
-  state_t *a = state_class->objects_ctor();
+  a.set_depth(&a, 32);
 
-  a->set_starting_position(a, "[FEN \"W:W28,31,32,35,36,37,38,39,40,42,43,45,47:B3,7,8,11,12,13,15,19,20,21,23,26,29.\"]");
+  a.set_time(&a, 10);
 
-  a->push_move(a, "31-26", NULL);
+  a.printf_state(&a);
 
-  a->push_move(a, "17-22", "{only move}");
+  a.pop_move(&a);
 
-  a->set_depth(a, 32);
+  state_t b;
 
-  a->set_time(a, 10);
-
-  a->printf_state(a);
-
-  a->pop_move(a);
-
-  state_t *b = state_class->objects_ctor();
+  construct_state(&b);
   
-  b->printf_state(b);
-
-  PRINTF("iterate\n");
-
-  iterate_class(state_class);
+  b.printf_state(&b);
 }
 

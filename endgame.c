@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 
@@ -102,7 +102,7 @@ void init_endgame(void)
 
   char path[MY_LINE_MAX];
 
-  if (my_strcasecmp(options.egtb_dir, "NULL") != 0)
+  if (compat_strcasecmp(options.egtb_dir, "NULL") != 0)
   {
     snprintf(path, MY_LINE_MAX, "%s/1wX-0wO-1bX-0bO", options.egtb_dir);
 
@@ -189,7 +189,7 @@ void init_endgame(void)
 
           HARDBUG((with_endgame->fendgame = fopen(path, "r+b")) == NULL)
 
-          HARDBUG(my_mutex_init(&(with_endgame->endgame_fmutex)) != 0)
+          HARDBUG(compat_mutex_init(&(with_endgame->endgame_fmutex)) != 0)
 
           i8_t version;
           i16_t nblock_entries;
@@ -232,7 +232,7 @@ void init_endgame(void)
 
           cJSON *egtbs = NULL;
 
-          if (my_strcasecmp(options.egtb_ram_wdl, "NULL") == 0)
+          if (compat_strcasecmp(options.egtb_ram_wdl, "NULL") == 0)
           {
             egtbs = cJSON_CreateArray();
           }
@@ -250,7 +250,7 @@ void init_endgame(void)
           {
             HARDBUG(!cJSON_IsString(egtb))
 
-            if (my_strcasecmp(with_endgame->endgame_name,
+            if (compat_strcasecmp(with_endgame->endgame_name,
                               cJSON_GetStringValue(egtb)) != 0) continue;
 
             //egtb should be WDL encoded
@@ -269,7 +269,7 @@ void init_endgame(void)
 
             if (my_mpi_globals.MY_MPIG_nglobal <= 1)
             {
-              MALLOC(with_endgame->pendgame, wdl_t, nwdl)
+              MY_MALLOC(with_endgame->pendgame, wdl_t, nwdl)
             }
             else
             {
@@ -366,7 +366,7 @@ void init_endgame(void)
                   sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) + 
                   ipage * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
                 
-                HARDBUG(my_fseeko(with_endgame->fendgame, seek, SEEK_SET) != 0)
+                HARDBUG(compat_fseeko(with_endgame->fendgame, seek, SEEK_SET) != 0)
                     
                 i64_t offset;
                 i16_t length;
@@ -396,7 +396,7 @@ void init_endgame(void)
                 i8_t source[2 * ARRAY_PAGE_SIZE];
                 size_t sourceLen = length;
                
-                HARDBUG(my_fseeko(with_endgame->fendgame, offset, SEEK_SET) !=
+                HARDBUG(compat_fseeko(with_endgame->fendgame, offset, SEEK_SET) !=
                         0)
                 
                 HARDBUG(fread(source, sizeof(i8_t), sourceLen,
@@ -611,7 +611,7 @@ void init_endgame(void)
           {
             egtbs = NULL;
 
-            if (my_strcasecmp(options.egtb_ram, "NULL") == 0)
+            if (compat_strcasecmp(options.egtb_ram, "NULL") == 0)
             {
               egtbs = cJSON_CreateArray();
             }
@@ -626,14 +626,14 @@ void init_endgame(void)
             {
               HARDBUG(!cJSON_IsString(egtb))
 
-              if (my_strcasecmp(with_endgame->endgame_name,
+              if (compat_strcasecmp(with_endgame->endgame_name,
                                 cJSON_GetStringValue(egtb)) != 0) continue;
 
-              MALLOC(with_endgame->pendgame, i8_t, st.st_size)
+              MY_MALLOC(with_endgame->pendgame, i8_t, st.st_size)
 
               PRINTF("loading compressed EGTB %s into RAM..\n", path);
                 
-              HARDBUG(my_fseeko(with_endgame->fendgame, 0, SEEK_SET) != 0)
+              HARDBUG(compat_fseeko(with_endgame->fendgame, 0, SEEK_SET) != 0)
   
               HARDBUG(fread(with_endgame->pendgame, 1, st.st_size,
                         with_endgame->fendgame) != st.st_size)
@@ -650,7 +650,7 @@ void init_endgame(void)
 
           if (with_endgame->endgame_status == INVALID)
           {
-            HARDBUG(my_fseeko(with_endgame->fendgame, 0, SEEK_SET) != 0)
+            HARDBUG(compat_fseeko(with_endgame->fendgame, 0, SEEK_SET) != 0)
 
             with_endgame->endgame_status = ENDGAME_ROOT_ONLY;
           }
@@ -916,10 +916,10 @@ int read_endgame(board_t *with, int colour2move, int root_only)
 
   int result = ENDGAME_UNKNOWN;
 
-  int nwc = BIT_COUNT(with->board_white_crown_bb);
+  int nwc = BIT_COUNT(with->board_white_king_bb);
   int nwm = BIT_COUNT(with->board_white_man_bb);
 
-  int nbc = BIT_COUNT(with->board_black_crown_bb);
+  int nbc = BIT_COUNT(with->board_black_king_bb);
   int nbm = BIT_COUNT(with->board_black_man_bb);
 
   int npieces = nwc + nwm + nbc + nbm;
@@ -1031,10 +1031,10 @@ int read_endgame(board_t *with, int colour2move, int root_only)
   
   i64_t endgame_index = 0;
 
-  int white_crown_sort[NENDGAME_MAX];
+  int white_king_sort[NENDGAME_MAX];
   int white_man_sort[NENDGAME_MAX];
 
-  int black_crown_sort[NENDGAME_MAX];
+  int black_king_sort[NENDGAME_MAX];
   int black_man_sort[NENDGAME_MAX];
 
   if (mirror)
@@ -1042,13 +1042,13 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     ui64_t bb;
     int nbb;
 
-    bb = with->board_white_crown_bb; 
+    bb = with->board_white_king_bb; 
     nbb = 0;
 
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      white_crown_sort[nwc - 1 - nbb++] = 49 - inverse_map[lsb];
+      white_king_sort[nwc - 1 - nbb++] = 49 - inverse_map[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nwc)
@@ -1064,13 +1064,13 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nwm)
 
-    bb = with->board_black_crown_bb; 
+    bb = with->board_black_king_bb; 
     nbb = 0;
 
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      black_crown_sort[nbc - 1 - nbb++] = 49 - inverse_map[lsb];
+      black_king_sort[nbc - 1 - nbb++] = 49 - inverse_map[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nbc)
@@ -1091,13 +1091,13 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     ui64_t bb;
     int nbb;
 
-    bb = with->board_white_crown_bb; 
+    bb = with->board_white_king_bb; 
     nbb = 0;
 
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      white_crown_sort[nbb++] = inverse_map[lsb];
+      white_king_sort[nbb++] = inverse_map[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nwc)
@@ -1113,13 +1113,13 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nwm)
 
-    bb = with->board_black_crown_bb; 
+    bb = with->board_black_king_bb; 
     nbb = 0;
 
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      black_crown_sort[nbb++] = inverse_map[lsb];
+      black_king_sort[nbb++] = inverse_map[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nbc)
@@ -1138,21 +1138,21 @@ int read_endgame(board_t *with, int colour2move, int root_only)
 
   if (mirror)
   {
-    update_endgame_index(nbc, black_crown_sort, &endgame_index);
+    update_endgame_index(nbc, black_king_sort, &endgame_index);
 
     update_endgame_index(nbm, black_man_sort, &endgame_index);
 
-    update_endgame_index(nwc, white_crown_sort, &endgame_index);
+    update_endgame_index(nwc, white_king_sort, &endgame_index);
 
     update_endgame_index(nwm, white_man_sort, &endgame_index);
   } 
   else
   {
-    update_endgame_index(nwc, white_crown_sort, &endgame_index);
+    update_endgame_index(nwc, white_king_sort, &endgame_index);
 
     update_endgame_index(nwm, white_man_sort, &endgame_index);
 
-    update_endgame_index(nbc, black_crown_sort, &endgame_index);
+    update_endgame_index(nbc, black_king_sort, &endgame_index);
 
     update_endgame_index(nbm, black_man_sort, &endgame_index);
   }
@@ -1301,9 +1301,9 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     else
     {
-      HARDBUG(my_mutex_lock(&(with_endgame->endgame_fmutex)) != 0)
+      HARDBUG(compat_mutex_lock(&(with_endgame->endgame_fmutex)) != 0)
 
-      HARDBUG(my_fseeko(with_endgame->fendgame, seek, SEEK_SET) != 0)
+      HARDBUG(compat_fseeko(with_endgame->fendgame, seek, SEEK_SET) != 0)
       
       HARDBUG(fread(&offset, sizeof(i64_t), 1, with_endgame->fendgame) != 1)
   
@@ -1325,7 +1325,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
 
       sourceLen = length;
 
-      HARDBUG(my_fseeko(with_endgame->fendgame, offset, SEEK_SET) != 0)
+      HARDBUG(compat_fseeko(with_endgame->fendgame, offset, SEEK_SET) != 0)
 
 #ifndef ZSTD
       HARDBUG(fread(source, sizeof(COMPRESS_BYTE_T), sourceLen, 
@@ -1335,7 +1335,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
                 with_endgame->fendgame) != sourceLen)
 #endif
   
-      HARDBUG(my_mutex_unlock(&(with_endgame->endgame_fmutex)) != 0)
+      HARDBUG(compat_mutex_unlock(&(with_endgame->endgame_fmutex)) != 0)
     }
 
 #ifndef ZSTD
@@ -1641,7 +1641,7 @@ void recompress_endgame(char *name, int level, int nblock)
     i64_t seek_old = sizeof(i64_t) +
       ipage_old * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui64_t));
 
-    HARDBUG(my_fseeko(fold, seek_old, SEEK_SET) != 0)
+    HARDBUG(compat_fseeko(fold, seek_old, SEEK_SET) != 0)
     
     i64_t offset_old;
     i16_t length_old;
@@ -1671,7 +1671,7 @@ void recompress_endgame(char *name, int level, int nblock)
         i64_t seek_new = sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) + 
           ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
 
-        HARDBUG(my_fseeko(fnew, seek_new, SEEK_SET) != 0)
+        HARDBUG(compat_fseeko(fnew, seek_new, SEEK_SET) != 0)
   
         HARDBUG(fwrite(&offset_new, sizeof(i64_t), 1, fnew) != 1)
         HARDBUG(fwrite(&length_new, sizeof(i16_t), 1, fnew) != 1)
@@ -1688,7 +1688,7 @@ void recompress_endgame(char *name, int level, int nblock)
 
     sourceLen_old = length_old;
 
-    HARDBUG(my_fseeko(fold, offset_old, SEEK_SET) != 0)
+    HARDBUG(compat_fseeko(fold, offset_old, SEEK_SET) != 0)
 
     HARDBUG(fread(source_old, sizeof(COMPRESS_BYTE_T), sourceLen_old, 
               fold) != sourceLen_old)
@@ -1913,7 +1913,7 @@ void recompress_endgame(char *name, int level, int nblock)
       i64_t seek_new = sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) +
         ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
 
-      HARDBUG(my_fseeko(fnew, seek_new, SEEK_SET) != 0)
+      HARDBUG(compat_fseeko(fnew, seek_new, SEEK_SET) != 0)
 
       i16_t destLen_i16 = destLen_new;
 
@@ -1921,7 +1921,7 @@ void recompress_endgame(char *name, int level, int nblock)
       HARDBUG(fwrite(&destLen_i16, sizeof(i16_t), 1, fnew) != 1)
       HARDBUG(fwrite(&crc32,  sizeof(ui32_t), 1, fnew) != 1)
 
-      HARDBUG(my_fseeko(fnew, size_new, SEEK_SET) != 0)
+      HARDBUG(compat_fseeko(fnew, size_new, SEEK_SET) != 0)
   
       HARDBUG(fwrite(dest_new, sizeof(i8_t), destLen_new, fnew) != destLen_new)
 
@@ -2005,7 +2005,7 @@ void recompress_endgame(char *name, int level, int nblock)
     i64_t seek_new = sizeof(i8_t) + sizeof(i64_t) + sizeof(i16_t) + 
       ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
 
-    HARDBUG(my_fseeko(fnew, seek_new, SEEK_SET) != 0)
+    HARDBUG(compat_fseeko(fnew, seek_new, SEEK_SET) != 0)
     
     i64_t offset_new;
     i16_t length_new;
@@ -2032,7 +2032,7 @@ void recompress_endgame(char *name, int level, int nblock)
     i8_t source_new[2 * ARRAY_PAGE_SIZE];
     size_t sourceLen_new = length_new;
 
-    HARDBUG(my_fseeko(fnew, offset_new, SEEK_SET) != 0)
+    HARDBUG(compat_fseeko(fnew, offset_new, SEEK_SET) != 0)
 
     HARDBUG(fread(source_new, sizeof(i8_t), sourceLen_new, 
               fnew) != sourceLen_new)

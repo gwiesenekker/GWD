@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 int execute_sql(sqlite3 *db, const void *sql, int step, int nretries)
@@ -20,12 +20,24 @@ int execute_sql(sqlite3 *db, const void *sql, int step, int nretries)
   {
     for (iretry = 0; iretry < nretries; iretry++)
     {
+      static my_random_t retry_random;
+      static int retry_random_init = FALSE;
+
+      if (!retry_random_init)
+      {
+        construct_my_random(&retry_random, 0);
+
+        retry_random_init = TRUE;
+      }
+
+
       if (step)
         rc = sqlite3_step((sqlite3_stmt *) sql);
       else
         rc = sqlite3_exec(db, (const char *) sql, 0, 0, &err_msg);
 
-      double sleep = 0.1 + 0.1 * (randull(0) % nretries / nretries);
+      double sleep =
+        0.1 + 0.1 * (return_my_random(&retry_random) % nretries / nretries);
 
       if ((rc == SQLITE_BUSY) or (rc == SQLITE_LOCKED))
       {
@@ -46,7 +58,7 @@ int execute_sql(sqlite3 *db, const void *sql, int step, int nretries)
                  (const char *) sql, iretry, sleep);
         }
 
-        my_sleep(sleep);
+        compat_sleep(sleep);
 
         continue;
       }

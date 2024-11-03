@@ -1,9 +1,9 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM  gwd7
-#define REVISION "7.661"
+#define REVISION "7.700"
 
 //generic includes
 
@@ -49,6 +49,8 @@ typedef long long  i64_t;
 #define MBYTE   1048576
 #define GBYTE   1073741824LL
 //#define TBYTE   1099511627776LL
+#define S_MAX   32767
+#define S_MIN   (-S_MAX)
 #define L_MAX   2147483647L
 #define L_MIN   (-L_MAX)
 #define LL_MAX  9223372036854775807LL
@@ -77,6 +79,7 @@ typedef long long  i64_t;
 #define CJSON_LABEL_ID             "label"
 #define CJSON_COLOUR_BITS_ID       "colour_bits"
 #define CJSON_OUTPUT_ID            "output"
+#define CJSON_KING_WEIGHT_ID       "king_weight"
 #define CJSON_NPIECES_MIN_ID       "npieces_min"
 #define CJSON_NPIECES_MAX_ID       "npieces_max"
 #define CJSON_EVENT_ID             "event"
@@ -155,9 +158,9 @@ typedef long long  i64_t;
 
 #define FREAD(F, P, T, N) HARDBUG(fread(P, sizeof(T), N, F) != N)
 #define FWRITE(F, P, T, N) HARDBUG(fwrite(P, sizeof(T), N, F) != N)
-#define FSEEKO(F, N) HARDBUG(my_fseeko(F, N, SEEK_SET) != 0)
-#define FBOFO(F) HARDBUG(my_fseeko(F, 0, SEEK_SET) != 0)
-#define FEOFO(F) HARDBUG(my_fseeko(F, 0, SEEK_END) != 0)
+#define FSEEKO(F, N) HARDBUG(compat_fseeko(F, N, SEEK_SET) != 0)
+#define FBOFO(F) HARDBUG(compat_fseeko(F, 0, SEEK_SET) != 0)
+#define FEOFO(F) HARDBUG(compat_fseeko(F, 0, SEEK_END) != 0)
 #define FTELLO(F, X) HARDBUG(((X) = ftello(F)) < 0)
 #define FCLOSE(F) {HARDBUG(fclose(F) == EOF) (F) = NULL;}
 
@@ -174,8 +177,6 @@ typedef long long  i64_t;
 #define XOR_HASH_KEY(A, B) {A ^= B;}
 
 #define MOD_HASH_KEY(A, B) ((A) % (B))
-
-#define RANDULL_HASH_KEY(A) {A = randull(0);}
 
 #define HASH_KEY_GT(A, B) (A > B)
 
@@ -219,9 +220,11 @@ extern void *STDOUT;
 #include "records.h"
 #include "queues.h"
 #include "states.h"
+#include "stats.h"
 #include "timers.h"
 #include "utils.h"
 
+#include "threads.h"
 #include "neural.h"
 #include "boards.h"
 #include "moves.h"
@@ -235,7 +238,6 @@ extern void *STDOUT;
 #include "pdn.h"
 #include "score.h"
 #include "search.h"
-#include "threads.h"
 
 #endif
 

@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef MainH
 #define MainH
 
@@ -16,8 +16,8 @@ typedef struct
 
   int verbose;
 
-  char neural_name0[MY_LINE_MAX];
-  char neural_name1[MY_LINE_MAX];
+  char neural0_name[MY_LINE_MAX];
+  char neural1_name[MY_LINE_MAX];
 
   int neural_evaluation_min;
   int neural_evaluation_max;
@@ -47,7 +47,6 @@ typedef struct
   int egtb_level;
 
   int material_only;
-  int material_blend_parameter;
 
   int captures_are_transparent;
   int returned_depth_includes_captures;
@@ -57,12 +56,14 @@ typedef struct
   int reduction_depth_root;
   int reduction_depth_leaf;
 
-  int reduction_nfull_min;
-  int reduction_ncache_min;
+  int reduction_mean;
+  int reduction_sigma;
 
-  int reduction_parameter_delta;
-  int reduction_parameter_strong;
-  int reduction_parameter_weak;
+  int reduction_delta;
+  int reduction_max;
+  int reduction_strong;
+  int reduction_weak;
+  int reduction_min;
 
   int row9_captures_are_tactical;
   int promotions_are_tactical;

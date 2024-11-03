@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 
@@ -291,7 +291,7 @@ void read_games(char *name)
 
   HARDBUG((fstring = fopen("pos.str", "w")) == NULL)
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
 
   board_t *with = return_with_board(iboard);
 
@@ -329,7 +329,7 @@ void read_games(char *name)
           PRINTF("%ld:%s\n", iline, line);
           FATAL("WORD expected after '[' in PDN", EXIT_FAILURE)
         }
-        if (my_strcasecmp(token, "Event") == 0)
+        if (compat_strcasecmp(token, "Event") == 0)
         {
           game = TRUE;
           iply = 0;
@@ -343,7 +343,7 @@ void read_games(char *name)
             FATAL("STRING expected after '[WORD' in PDN", EXIT_FAILURE)
           }
         }
-        else if (my_strcasecmp(token, "Result") == 0)
+        else if (compat_strcasecmp(token, "Result") == 0)
         {
           HARDBUG(!game)
           get_next_token();
@@ -352,18 +352,18 @@ void read_games(char *name)
             PRINTF("%ld:%s\n", iline, line);
             FATAL("STRING expected after '[Result' in PDN", EXIT_FAILURE)
           } 
-          if ((my_strcasecmp(token, RESULT_WON) == 0) or
-              (my_strcasecmp(token, RESULT_WON_ALT) == 0))
+          if ((compat_strcasecmp(token, RESULT_WON) == 0) or
+              (compat_strcasecmp(token, RESULT_WON_ALT) == 0))
           {
             result = 2;
           }
-          else if ((my_strcasecmp(token, RESULT_DRAW) == 0) or
-                   (my_strcasecmp(token, RESULT_DRAW_ALT) == 0))
+          else if ((compat_strcasecmp(token, RESULT_DRAW) == 0) or
+                   (compat_strcasecmp(token, RESULT_DRAW_ALT) == 0))
           {
             result = 1;
           }
-          else if ((my_strcasecmp(token, RESULT_LOST) == 0) or
-                   (my_strcasecmp(token, RESULT_LOST_ALT) == 0))
+          else if ((compat_strcasecmp(token, RESULT_LOST) == 0) or
+                   (compat_strcasecmp(token, RESULT_LOST_ALT) == 0))
           {
             result = 0;
           }
@@ -372,7 +372,7 @@ void read_games(char *name)
             result = INVALID;
           }
         }
-        else if (my_strcasecmp(token, "PlyCount") == 0)
+        else if (compat_strcasecmp(token, "PlyCount") == 0)
         {
           HARDBUG(!game)
           get_next_token();
@@ -565,8 +565,8 @@ void read_games(char *name)
               IS_WHITE(with->board_colour2move) and
               (moves_list.nmoves > 1) and
               (moves_list.ncaptx == 0) and
-              (with->board_white_crown_bb == 0) and
-              (with->board_black_crown_bb == 0) and
+              (with->board_white_king_bb == 0) and
+              (with->board_black_king_bb == 0) and
               (BIT_COUNT(with->board_white_man_bb |
                          with->board_black_man_bb) > 8) and
               !can_capture)
@@ -694,6 +694,8 @@ void gen_pos(i64_t npositions_max, int npieces)
 
   reset_my_timer(&timer);
 
+  my_random_t gen_pos_random;
+
   if (my_mpi_globals.MY_MPIG_nslaves == 1)
   {
     char fen[MY_LINE_MAX];
@@ -701,6 +703,8 @@ void gen_pos(i64_t npositions_max, int npieces)
     snprintf(fen, MY_LINE_MAX, "gen-%d.fen", npieces);
 
     HARDBUG((ffen = fopen(fen, "w")) == NULL)
+
+    construct_my_random(&gen_pos_random, 0);
   }
   else
   {
@@ -711,12 +715,10 @@ void gen_pos(i64_t npositions_max, int npieces)
 
     HARDBUG((ffen = fopen(fen, "w")) == NULL)
 
-    ui64_t seed = randull(INVALID);
-
-    PRINTF("seed=%llX\n", seed);
+    construct_my_random(&gen_pos_random, INVALID);
   }
 
-  int iboard = create_board(STDOUT, INVALID);
+  int iboard = create_board(STDOUT, NULL);
   board_t *with = return_with_board(iboard);
   
   i64_t npositions = npositions_max / my_mpi_globals.MY_MPIG_nslaves;
@@ -776,7 +778,7 @@ void gen_pos(i64_t npositions_max, int npieces)
       if (moves_list.nmoves == 0) break;
 
       search(with, &moves_list, 1, DEPTH_GEN,
-        SCORE_MINUS_INFINITY, TRUE);
+        SCORE_MINUS_INFINITY, &gen_pos_random);
 
       int best_score = with->board_search_best_score;
 
@@ -792,9 +794,9 @@ void gen_pos(i64_t npositions_max, int npieces)
 
       ncount = 
         BIT_COUNT(with->board_white_man_bb |
-                  with->board_white_crown_bb |
+                  with->board_white_king_bb |
                   with->board_black_man_bb |
-                  with->board_black_crown_bb);
+                  with->board_black_king_bb);
 
       //if (best_score > (SCORE_WON - NODE_MAX)) break;
 
@@ -882,9 +884,9 @@ void gen_pos(i64_t npositions_max, int npieces)
 
       ncount = 
         BIT_COUNT(with->board_white_man_bb |
-                  with->board_white_crown_bb |
+                  with->board_white_king_bb |
                   with->board_black_man_bb |
-                  with->board_black_crown_bb);
+                  with->board_black_king_bb);
 
       if ((moves_list.nmoves > 1) and
           (moves_list.ncaptx == 0) and
@@ -893,7 +895,7 @@ void gen_pos(i64_t npositions_max, int npieces)
         print_board(iboard);
     
         search(with, &moves_list, 1, DEPTH_SEARCH,
-               SCORE_MINUS_INFINITY, TRUE);
+               SCORE_MINUS_INFINITY, &gen_pos_random);
 
         int search_best_score = with->board_search_best_score;
         int search_best_depth = with->board_search_best_depth;

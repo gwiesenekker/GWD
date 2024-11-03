@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 
@@ -74,7 +74,7 @@ local alpha_beta_cache_entry_t *black_alpha_beta_cache;
 
 local i64_t global_nodes;
 
-local bucket_t *bucket_depth;
+local bucket_t bucket_depth;
 
 local void white_endgame_pv(board_t *, int, char *);
 local void black_endgame_pv(board_t *, int, char *);
@@ -134,11 +134,11 @@ local int move_repetition(board_t *with)
 
   if (IS_WHITE(with->board_colour2move))
   {
-    npieces = BIT_COUNT(with->board_white_man_bb | with->board_white_crown_bb);
+    npieces = BIT_COUNT(with->board_white_man_bb | with->board_white_king_bb);
   }
   else
   {
-    npieces = BIT_COUNT(with->board_black_man_bb | with->board_black_crown_bb);
+    npieces = BIT_COUNT(with->board_black_man_bb | with->board_black_king_bb);
   }
 
   if (npieces > 1) return(FALSE);
@@ -200,13 +200,12 @@ void clear_totals(board_t *with)
   with->total_minimal_window_nodes = 0;
   with->total_pv_nodes = 0;
 
-  with->total_reductions_delta_strong = 0;
-  with->total_reductions_delta_strong_lost = 0;
-  with->total_reductions_delta_strong_le_alpha = 0;
-  with->total_reductions_delta_strong_ge_beta = 0;
+  with->total_reductions_delta = 0;
+  with->total_reductions_delta_lost = 0;
+  with->total_reductions_delta_le_alpha = 0;
+  with->total_reductions_delta_ge_beta = 0;
 
   with->total_reductions = 0;
-  with->total_reductions_simple = 0;
   with->total_reductions_le_alpha = 0;
   with->total_reductions_ge_beta = 0;
 
@@ -246,13 +245,12 @@ void print_totals(board_t *with)
   PRINTF_TOTAL(total_minimal_window_nodes)
   PRINTF_TOTAL(total_pv_nodes)
 
-  PRINTF_TOTAL(total_reductions_delta_strong)
-  PRINTF_TOTAL(total_reductions_delta_strong_lost)
-  PRINTF_TOTAL(total_reductions_delta_strong_le_alpha)
-  PRINTF_TOTAL(total_reductions_delta_strong_ge_beta)
+  PRINTF_TOTAL(total_reductions_delta)
+  PRINTF_TOTAL(total_reductions_delta_lost)
+  PRINTF_TOTAL(total_reductions_delta_le_alpha)
+  PRINTF_TOTAL(total_reductions_delta_ge_beta)
 
   PRINTF_TOTAL(total_reductions)
-  PRINTF_TOTAL(total_reductions_simple)
   PRINTF_TOTAL(total_reductions_le_alpha)
   PRINTF_TOTAL(total_reductions_ge_beta)
 
@@ -534,18 +532,15 @@ void init_search(void)
     alpha_beta_cache_entry_default.ABCE_slots[islot] = 
       alpha_beta_cache_slot_default;
 
-  MALLOC(white_alpha_beta_cache, alpha_beta_cache_entry_t,
-         nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
+  MY_MALLOC(white_alpha_beta_cache, alpha_beta_cache_entry_t,
+            nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
 
-  MALLOC(black_alpha_beta_cache, alpha_beta_cache_entry_t,
-         nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
+  MY_MALLOC(black_alpha_beta_cache, alpha_beta_cache_entry_t,
+            nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
 
   clear_caches();
 
-  bucket_depth = bucket_class->objects_ctor();
-
-  bucket_depth->define_bucket(bucket_depth, 1, 0, DEPTH_MAX,
-    BUCKET_LINEAR);
+  construct_bucket(&bucket_depth, 1, 0, DEPTH_MAX, BUCKET_LINEAR);
 }
 
 void fin_search(void)
@@ -554,7 +549,7 @@ void fin_search(void)
 
 void search(board_t *with, moves_list_t *moves_list,
   int depth_min, int depth_max, int root_score,
-  int shuffle)
+  my_random_t *shuffle)
 {
   if (IS_WHITE(with->board_colour2move))
     white_search(with, moves_list, depth_min, depth_max, root_score,

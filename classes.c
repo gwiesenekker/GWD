@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 //objects are derived from a class
@@ -16,7 +16,7 @@
 
 local int register_object(class_t *self, void *object)
 {
-  HARDBUG(my_mutex_lock(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(self->objects_mutex)) != 0)
 
   HARDBUG(self->nobjects >= self->nobjects_max)
 
@@ -24,7 +24,7 @@ local int register_object(class_t *self, void *object)
 
   int object_id = self->object_id++;
 
-  HARDBUG(my_mutex_unlock(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(self->objects_mutex)) != 0)
 
   return(object_id);
 }
@@ -34,7 +34,7 @@ local int register_object(class_t *self, void *object)
 
 local void deregister_object(class_t *self, void *object)
 {
-  HARDBUG(my_mutex_lock(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(self->objects_mutex)) != 0)
 
   HARDBUG(self->nobjects < 1)
 
@@ -52,7 +52,7 @@ local void deregister_object(class_t *self, void *object)
 
   self->nobjects--;
 
-  HARDBUG(my_mutex_unlock(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(self->objects_mutex)) != 0)
 }
 
 //you initialize a class by calling init_class
@@ -66,7 +66,7 @@ class_t *init_class(int nobjects_max, ctor_t ctor, dtor_t dtor, iter_t iter)
 {
   class_t *self;
  
-  MALLOC(self, class_t, 1)
+  MY_MALLOC(self, class_t, 1)
 
   //the class keeps track of the (number of) created objects
 
@@ -76,7 +76,7 @@ class_t *init_class(int nobjects_max, ctor_t ctor, dtor_t dtor, iter_t iter)
 
   self->object_id = 0;
 
-  MALLOC(self->objects, void *, nobjects_max)
+  MY_MALLOC(self->objects, void *, nobjects_max)
 
   for (int iobject = 0; iobject < nobjects_max; iobject++)
    self->objects[iobject] = NULL;
@@ -101,7 +101,7 @@ class_t *init_class(int nobjects_max, ctor_t ctor, dtor_t dtor, iter_t iter)
 
   //make the class constructor thread safe
 
-  HARDBUG(my_mutex_init(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_init(&(self->objects_mutex)) != 0)
 
   return(self);
 }
@@ -163,7 +163,7 @@ local void *construct_my_object(void)
 {
   my_object_t *object;
   
-  MALLOC(object, my_object_t, 1)
+  MY_MALLOC(object, my_object_t, 1)
 
   //call the class 'constructor'
 

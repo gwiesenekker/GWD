@@ -1,20 +1,26 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
+#define LOG_PREFIX_ID "LOG_prefix_id"
+#define LOG_OBJECT_ID "LOG_object_id"
 
-#define MY_PRINTF_MAX       64
+#define NLOGS 2
 
 #define NROTATE 9
-#define MAX_SIZE (4 * MBYTE)
 
-char log_infix[MY_LINE_MAX];
+#define MAX_SIZE (4 * MBYTE)
 
 #define LOGS_DIR "logs"
 
-class_t *my_printf_class;
+local int nlogs = INVALID;
+record_t logs[NLOGS];
 
-void my_printf(my_printf_t *object, char *arg_format, ...)
+local my_mutex_t my_printf_mutex;
+
+void my_printf(void *self, char *arg_format, ...)
 {
+  my_printf_t *object = self;
+
   va_list ap;
 
   va_start(ap, arg_format);
@@ -23,12 +29,14 @@ void my_printf(my_printf_t *object, char *arg_format, ...)
   {
     vprintf(arg_format, ap);
 
+    va_end(ap);
+
     return;
   }
 
-  if (my_strcasecmp(arg_format, "") == 0)
+  if (compat_strcasecmp(arg_format, "") == 0)
   {
-    HARDBUG(my_mutex_lock(&(object->my_printf_mutex)) != 0)
+    HARDBUG(compat_mutex_lock(&(object->my_printf_mutex)) != 0)
 
     if (fflush(object->my_printf_flog) != 0)
     {
@@ -36,12 +44,12 @@ void my_printf(my_printf_t *object, char *arg_format, ...)
       exit(EXIT_FAILURE);
     }
 
-    HARDBUG(my_mutex_unlock(&(object->my_printf_mutex)) != 0)
+    HARDBUG(compat_mutex_unlock(&(object->my_printf_mutex)) != 0)
 
     return;
   }
 
-  HARDBUG(my_mutex_lock(&(object->my_printf_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(object->my_printf_mutex)) != 0)
 
   char line[MY_LINE_MAX];
 
@@ -111,6 +119,7 @@ void my_printf(my_printf_t *object, char *arg_format, ...)
       {
         fprintf(stderr, "could not fopen %s in mode 'w'\n",
           object->my_printf_fname);
+
         exit(EXIT_FAILURE);
       }
 
@@ -122,6 +131,7 @@ void my_printf(my_printf_t *object, char *arg_format, ...)
       if (nchar < 0)
       {
         fprintf(stderr, "could not fprintf %s\n", object->my_printf_fname);
+
         exit(EXIT_FAILURE);
       }
   
@@ -130,6 +140,7 @@ void my_printf(my_printf_t *object, char *arg_format, ...)
 
     int nchar = fprintf(object->my_printf_flog, "%s@ %s",
       stamp, object->my_printf_buffer);
+
     if (nchar < 0)
     {
       fprintf(stderr, "could not fprintf %s\n", object->my_printf_fname);
@@ -155,166 +166,137 @@ void my_printf(my_printf_t *object, char *arg_format, ...)
 #endif
     object->my_printf_fsize += nchar;
   
-    if (!options.hub and (object->object_id == 0) and
+    if (!options.hub and object->my_printf2stdout and
         ((my_mpi_globals.MY_MPIG_id_global == 0) or
          (my_mpi_globals.MY_MPIG_id_global == INVALID)))
     {
       nchar = fprintf(stdout, "%s", object->my_printf_buffer);
+
       if (nchar < 0)
       {
         fprintf(stderr, "could not fprintf stdout\n");
+
         exit(EXIT_FAILURE);
       }
+
       if (fflush(stdout) != 0)
       {
         fprintf(stderr, "could not fflush stdout\n");
+
         exit(EXIT_FAILURE);
       }
     }
   
     strcpy(object->my_printf_buffer, "");
+
     object->my_printf_ibuffer = 0;
   }
 
-  HARDBUG(my_mutex_unlock(&(object->my_printf_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(object->my_printf_mutex)) != 0)
 }
 
-my_printf_t *construct_my_printf(int arg_id)
+void construct_my_printf(void *self, char *arg_prefix, int arg2stdout)
 {
-  my_printf_t *object;
+  my_printf_t *object = self;
 
-  MALLOC(object, my_printf_t, 1)
+  object->my_printf2stdout = arg2stdout;
 
-  object->object_id =
-    my_printf_class->register_object(my_printf_class, object);
+  record_t *with_record = NULL;
 
-  if (arg_id == INVALID)
+  int ilog;
+
+  for (ilog = 0; ilog < nlogs; ilog++)
   {
-    if (my_mpi_globals.MY_MPIG_nglobal <= 1)
-      HARDBUG(snprintf(object->my_printf_fname, MY_LINE_MAX, 
-              LOGS_DIR "/stdout%s.txt", log_infix) < 0)
-    else
-      HARDBUG(snprintf(object->my_printf_fname, MY_LINE_MAX,
-              LOGS_DIR "/stdout%s;%d;%d.txt", log_infix,
-              my_mpi_globals.MY_MPIG_id_global,
-              my_mpi_globals.MY_MPIG_nglobal) < 0)
+    with_record = logs + ilog;
+
+    bstring prefix = bfromcstr("");
+
+    get_field(with_record, LOG_PREFIX_ID, prefix);
+ 
+    if (compat_strcasecmp(bdata(prefix), arg_prefix) == 0) break;
   }
+
+  if (ilog == nlogs)
+  {
+    with_record = logs + nlogs++;
+
+    construct_record(with_record);
+
+    add_field(with_record, LOG_PREFIX_ID, FIELD_TYPE_STRING, arg_prefix);
+
+    int object_id = 0;
+
+    add_field(with_record, LOG_OBJECT_ID, FIELD_TYPE_INT, &object_id);
+  }
+
+  int object_id;
+
+  get_field(with_record, LOG_OBJECT_ID, &object_id);
+
+  if (my_mpi_globals.MY_MPIG_nglobal <= 1)
+    HARDBUG(snprintf(object->my_printf_fname, MY_LINE_MAX,
+            LOGS_DIR "/%s%d.txt", arg_prefix, object_id) < 0)
   else
-  {
-    if (my_mpi_globals.MY_MPIG_nglobal <= 1)
-      HARDBUG(snprintf(object->my_printf_fname, MY_LINE_MAX,
-              LOGS_DIR "/log%s-%d.txt", log_infix, arg_id) < 0)
-    else
-      HARDBUG(snprintf(object->my_printf_fname, MY_LINE_MAX,
-              LOGS_DIR "/log%s-%d;%d;%d.txt", log_infix, arg_id,
-              my_mpi_globals.MY_MPIG_id_global,
-              my_mpi_globals.MY_MPIG_nglobal) < 0)
-  }
+    HARDBUG(snprintf(object->my_printf_fname, MY_LINE_MAX,
+            LOGS_DIR "/%s%d-%d-%d.txt", arg_prefix, object_id,
+            my_mpi_globals.MY_MPIG_id_global,
+            my_mpi_globals.MY_MPIG_nglobal) < 0)
 
   if ((object->my_printf_flog = fopen(object->my_printf_fname, "w")) == NULL)
   {
     fprintf(stderr, "could not fopen %s in mode 'w'\n",
             object->my_printf_fname);
+
     exit(EXIT_FAILURE);
   }
 
   time_t t = time(NULL);
+
   int nchar = fprintf(object->my_printf_flog,
     "log file opened at %s\n", ctime(&t));
 
   if (nchar < 0)
   {
     fprintf(stderr, "could not fprintf %s\n", object->my_printf_fname);
+
     exit(EXIT_FAILURE);
   }
 
   object->my_printf_fsize = nchar;
 
   strcpy(object->my_printf_buffer, "");
+
   object->my_printf_ibuffer = 0;
 
-  HARDBUG(my_mutex_init(&(object->my_printf_mutex)) != 0)
+  object_id++;
 
-  return(object);
+  set_field(with_record, LOG_OBJECT_ID, &object_id);
+
+  HARDBUG(compat_mutex_init(&(object->my_printf_mutex)) != 0)
 }
 
-local void destroy_my_printf(void *self)
-{
-  my_printf_t *object = self;
-
-  //flush my_printf_buffer
-
-  if (object->my_printf_ibuffer != 0)
-  {
-    char stamp[MY_LINE_MAX];
-  
-    HARDBUG(object->my_printf_ibuffer >= MY_LINE_MAX)
-
-    object->my_printf_buffer[object->my_printf_ibuffer] = '\0';
-
-    time_t t = time(NULL);
-    (void) strftime(stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t));
-
-    int nchar = fprintf(object->my_printf_flog, "%s@ %s\n",
-      stamp, object->my_printf_buffer);
-
-    if (nchar < 0)
-    {
-      fprintf(stderr, "could not fprintf %s\n", object->my_printf_fname);
-      exit(EXIT_FAILURE);
-    }
-    if (!options.hub and (object->object_id == 0) and
-        ((my_mpi_globals.MY_MPIG_id_global == 0) or
-         (my_mpi_globals.MY_MPIG_id_global == INVALID)))
-    {
-      nchar = fprintf(stdout, "%s\n", object->my_printf_buffer);
-      if (nchar < 0)
-      {
-        fprintf(stderr, "could not fprintf stdout\n");
-        exit(EXIT_FAILURE);
-      }
-    }
-    strcpy(object->my_printf_buffer, "");
-    object->my_printf_ibuffer = 0;
-  }
-
-  HARDBUG(object->my_printf_ibuffer != 0)
-
-  if (fclose(object->my_printf_flog) == EOF)
-  {
-    fprintf(stderr, "could not fclose %s\n", object->my_printf_fname);
-    exit(EXIT_FAILURE);
-  }
-
-  my_printf_class->deregister_object(my_printf_class, object);
-
-  FREE_AND_NULL(object)
-}
-
-void init_my_printf_class(void)
+void init_my_printf(void)
 {
   if (opendir(LOGS_DIR) == NULL)
   {
-    HARDBUG(my_mkdir(LOGS_DIR) != 0)
+    HARDBUG(compat_mkdir(LOGS_DIR) != 0)
     HARDBUG(opendir(LOGS_DIR) == NULL)
   }
 
-  my_printf_class = init_class(MY_PRINTF_MAX, NULL, destroy_my_printf, NULL);
-}
+  nlogs = 0;
 
-void fin_my_printf_class(void)
-{
+  HARDBUG(compat_mutex_init(&my_printf_mutex) != 0)
 }
 
 #define NTEST 4
 #define NLINES 1000
 
-void test_my_printf_class(void)
+void test_my_printf(void)
 {
-  my_printf_t *test[NTEST];
+  my_printf_t test[NTEST];
 
   for (int itest = 0; itest < NTEST; itest++)
-    test[itest] = construct_my_printf(itest);
+    construct_my_printf(test + itest, "test", TRUE);
 
   for (int iline = 1; iline <= NLINES; iline++)
   {
@@ -325,18 +307,18 @@ void test_my_printf_class(void)
     snprintf(line, MY_LINE_MAX, "%d:", iline);
 
     for (int itest = 0; itest < NTEST; itest++)
-      my_printf(test[itest], line);
+      my_printf(test + itest, line);
 
     for (int ichar = 1; ichar <= nchar; ichar++)
     {
       snprintf(line, MY_LINE_MAX, " %d", ichar);
 
       for (int itest = 0; itest < NTEST; itest++)
-        my_printf(test[itest], line);
+        my_printf(test + itest, line);
     }
     for (int itest = 0; itest < NTEST; itest++)
-      my_printf(test[itest], "\n");
+      my_printf(test + itest, "\n");
   }
   for (int itest = 0; itest < NTEST; itest++)
-    my_printf_class->objects_dtor(test[itest]);
+    my_printf(test + itest, "");
 }

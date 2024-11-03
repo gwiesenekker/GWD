@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #ifndef CompatH
 #define CompatH
 
@@ -35,7 +35,7 @@
 
 #define ALIGN64(X) X __attribute__((aligned(64)))
 
-#define MALLOC(P, T, N) HARDBUG(((P) = _mm_malloc(sizeof(T) * (N), 64)) == NULL)
+#define MALLOC(P, S) (P) = _mm_malloc(S, 64);
 #define FREE_AND_NULL(P) {_mm_free(P); (P) = NULL;}
 
 #define BIT_COUNT(ULL)   (int) __builtin_popcountll(ULL)
@@ -70,8 +70,7 @@ typedef int pipe_t;
 
 #define ALIGN64(X) __declspec(align(64)) X
 
-#define MALLOC(P, T, N)\
-  HARDBUG(((P) = (T *) _aligned_malloc(sizeof(T) * (N), 64)) == NULL)
+#define MALLOC(P, S) (P) = _aligned_malloc(S, 64);
 #define FREE_AND_NULL(P) {_aligned_free(P); (P) = NULL;}
 
 #define BIT_COUNT(ULL)   (int) __popcnt64(ULL)
@@ -113,43 +112,43 @@ typedef void *(*my_thread_func_t)(void *);
 #define clock      do_not_use_clock_but_return_my_clock
 #define sleep      do_not_use_sleep_but_my_sleep
 
-i64_t my_read(int, void *, i64_t);
-i64_t my_write(int, void *, i64_t);
-int my_close(int);
-int my_lock_file(char *);
-void my_unlock_file(int);
-void my_fdprintf(int, char *, ...);
+i64_t compat_read(int, void *, i64_t);
+i64_t compat_write(int, void *, i64_t);
+int compat_close(int);
+int compat_lock_file(char *);
+void compat_unlock_file(int);
+void compat_fdprintf(int, char *, ...);
 
 //socket
 
-i64_t my_socket_read(int, void *, i64_t);
-i64_t my_socket_write(int, void *, i64_t);
+i64_t compat_socket_read(int, void *, i64_t);
+i64_t compat_socket_write(int, void *, i64_t);
 
-int my_socket_startup(void);
-int my_socket_cleanup(void);
-int my_socket_close(int);
+int compat_socket_startup(void);
+int compat_socket_cleanup(void);
+int compat_socket_close(int);
 
-int my_fork(void);
+int compat_fork(void);
 
-int my_pipe(pipe_t [2]);
+int compat_pipe(pipe_t [2]);
 
-i64_t my_pipe_read(pipe_t, void *, i64_t);
-i64_t my_pipe_write(pipe_t, void *, i64_t);
-int my_pipe_close(pipe_t);
+i64_t compat_pipe_read(pipe_t, void *, i64_t);
+i64_t compat_pipe_write(pipe_t, void *, i64_t);
+int compat_pipe_close(pipe_t);
 
-int my_fseeko(FILE *, i64_t, int);
+int compat_fseeko(FILE *, i64_t, int);
 
-int my_strcasecmp(char *, char *);
+int compat_strcasecmp(char *, char *);
 
-int my_poll(void);
+int compat_poll(void);
 
-int my_access(char *, int);
+int compat_access(char *, int);
 
-int my_dup2(int, int);
+int compat_dup2(int, int);
 
-int my_chdir(char *);
+int compat_chdir(char *);
 
-int my_mkdir(char *);
+int compat_mkdir(char *);
 
 double return_my_clock(void);
 
@@ -159,20 +158,20 @@ int return_physical_cpus(void);
 
 void return_cpu_flags(char [MY_LINE_MAX]);
 
-void my_sleep(double);
+void compat_sleep(double);
 
-double my_time(void);
+double compat_time(void);
 
 //threads
 
-int my_mutex_init(my_mutex_t *);
-int my_mutex_lock(my_mutex_t *);
-int my_mutex_trylock(my_mutex_t *);
-int my_mutex_unlock(my_mutex_t *);
-int my_mutex_destroy(my_mutex_t *);
+int compat_mutex_init(my_mutex_t *);
+int compat_mutex_lock(my_mutex_t *);
+int compat_mutex_trylock(my_mutex_t *);
+int compat_mutex_unlock(my_mutex_t *);
+int compat_mutex_destroy(my_mutex_t *);
 
-void my_thread_create(my_thread_t *, my_thread_func_t, void *);
-void my_thread_join(my_thread_t);
+void compat_thread_create(my_thread_t *, my_thread_func_t, void *);
+void compat_thread_join(my_thread_t);
 
 #endif
 

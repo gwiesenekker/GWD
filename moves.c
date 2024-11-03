@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #define the_dir(X) cat2(X, _dir)
@@ -9,9 +9,9 @@
 #define my_man_input_map     the_man_input_map(my_colour)
 #define your_man_input_map   the_man_input_map(your_colour)
 
-#define the_crown_input_map(X) cat2(X, _crown_input_map)
-#define my_crown_input_map     the_crown_input_map(my_colour)
-#define your_crown_input_map   the_crown_input_map(your_colour)
+#define the_king_input_map(X) cat2(X, _king_input_map)
+#define my_king_input_map     the_king_input_map(my_colour)
+#define your_king_input_map   the_king_input_map(your_colour)
 
 #define check_the_moves(X) cat3(check_, X, _moves)
 #define check_my_moves     check_the_moves(my_colour)

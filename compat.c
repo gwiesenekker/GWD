@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 #undef read
@@ -15,7 +15,7 @@
 #undef mkdir
 #undef clock
 
-i64_t my_read(int fd, void* buffer, i64_t nbuffer)
+i64_t compat_read(int fd, void* buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(read(fd, buffer, nbuffer));
@@ -24,7 +24,7 @@ i64_t my_read(int fd, void* buffer, i64_t nbuffer)
 #endif
 }
 
-i64_t my_write(int fd, void* buffer, i64_t nbuffer)
+i64_t compat_write(int fd, void* buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(write(fd, buffer, nbuffer));
@@ -33,7 +33,7 @@ i64_t my_write(int fd, void* buffer, i64_t nbuffer)
 #endif
 }
 
-int my_close(int fd)
+int compat_close(int fd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(close(fd));
@@ -42,7 +42,7 @@ int my_close(int fd)
 #endif
 }
 
-int my_lock_file(char *fname)
+int compat_lock_file(char *fname)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   int fd = open(fname, O_WRONLY | O_CREAT | O_APPEND, 0644);
@@ -75,7 +75,7 @@ int my_lock_file(char *fname)
   return(fd);
 }
 
-void my_unlock_file(int fd)
+void compat_unlock_file(int fd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   struct flock fl;
@@ -87,7 +87,7 @@ void my_unlock_file(int fd)
 
   HARDBUG(fcntl(fd, F_SETLK, &fl) == -1)
 
-  HARDBUG(my_close(fd) == -1)
+  HARDBUG(compat_close(fd) == -1)
 #else
   OVERLAPPED ol = {0};
 
@@ -96,7 +96,7 @@ void my_unlock_file(int fd)
 #endif
 }
 
-void my_fdprintf(int fd, char *format, ...)
+void compat_fdprintf(int fd, char *format, ...)
 {
   char buffer[MY_LINE_MAX];
 
@@ -110,10 +110,10 @@ void my_fdprintf(int fd, char *format, ...)
 
   HARDBUG(nbuffer >= sizeof(buffer))
 
-  HARDBUG(my_write(fd, buffer, nbuffer) != nbuffer)
+  HARDBUG(compat_write(fd, buffer, nbuffer) != nbuffer)
 }
 
-int my_socket_startup(void)
+int compat_socket_startup(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(0);
@@ -126,7 +126,7 @@ int my_socket_startup(void)
 #endif
 }
 
-int my_socket_cleanup(void)
+int compat_socket_cleanup(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(0);
@@ -135,7 +135,7 @@ int my_socket_cleanup(void)
 #endif
 }
 
-i64_t my_socket_read(int fd, void* buffer, i64_t nbuffer)
+i64_t compat_socket_read(int fd, void* buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(read(fd, buffer, nbuffer));
@@ -144,7 +144,7 @@ i64_t my_socket_read(int fd, void* buffer, i64_t nbuffer)
 #endif
 }
 
-i64_t my_socket_write(int fd, void* buffer, i64_t nbuffer)
+i64_t compat_socket_write(int fd, void* buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(write(fd, buffer, nbuffer));
@@ -153,7 +153,7 @@ i64_t my_socket_write(int fd, void* buffer, i64_t nbuffer)
 #endif
 }
 
-int my_socket_close(int fd)
+int compat_socket_close(int fd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(close(fd));
@@ -162,7 +162,7 @@ int my_socket_close(int fd)
 #endif
 }
 
-int my_fork(void)
+int compat_fork(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(fork());
@@ -171,7 +171,7 @@ int my_fork(void)
 #endif
 }
 
-int my_pipe(pipe_t pfd[2])
+int compat_pipe(pipe_t pfd[2])
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(pipe(pfd));
@@ -193,7 +193,7 @@ int my_pipe(pipe_t pfd[2])
 #endif
 }
 
-i64_t my_pipe_read(pipe_t fd, void* buffer, i64_t nbuffer)
+i64_t compat_pipe_read(pipe_t fd, void* buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(read(fd, buffer, nbuffer));
@@ -206,7 +206,7 @@ i64_t my_pipe_read(pipe_t fd, void* buffer, i64_t nbuffer)
 #endif
 }
 
-i64_t my_pipe_write(pipe_t fd, void* buffer, i64_t nbuffer)
+i64_t compat_pipe_write(pipe_t fd, void* buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(write(fd, buffer, nbuffer));
@@ -219,7 +219,7 @@ i64_t my_pipe_write(pipe_t fd, void* buffer, i64_t nbuffer)
 #endif
 }
 
-int my_pipe_close(pipe_t fd)
+int compat_pipe_close(pipe_t fd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(close(fd));
@@ -228,7 +228,7 @@ int my_pipe_close(pipe_t fd)
 #endif
 }
 
-int my_fseeko(FILE* stream, i64_t offset, int whence)
+int compat_fseeko(FILE* stream, i64_t offset, int whence)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(fseeko(stream, offset, whence));
@@ -237,7 +237,7 @@ int my_fseeko(FILE* stream, i64_t offset, int whence)
 #endif
 }
 
-int my_strcasecmp(char* s1, char* s2)
+int compat_strcasecmp(char* s1, char* s2)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(strcasecmp(s1, s2));
@@ -246,7 +246,7 @@ int my_strcasecmp(char* s1, char* s2)
 #endif
 }
 
-int my_poll(void)
+int compat_poll(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   struct pollfd mypoll = { STDIN_FILENO, POLLIN };
@@ -273,7 +273,7 @@ int my_poll(void)
 #endif
 }
 
-int my_access(char* pathname, int mode)
+int compat_access(char* pathname, int mode)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(access(pathname, mode));
@@ -282,7 +282,7 @@ int my_access(char* pathname, int mode)
 #endif
 }
 
-int my_dup2(int oldfd, int newfd)
+int compat_dup2(int oldfd, int newfd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(dup2(oldfd, newfd));
@@ -291,7 +291,7 @@ int my_dup2(int oldfd, int newfd)
 #endif
 }
 
-int my_chdir(char* path)
+int compat_chdir(char* path)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(chdir(path));
@@ -300,7 +300,7 @@ int my_chdir(char* path)
 #endif
 }
 
-int my_mkdir(char* path)
+int compat_mkdir(char* path)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   return(mkdir(path, 0750));
@@ -459,7 +459,7 @@ void return_cpu_flags(char flags[MY_LINE_MAX])
 #endif
 }
 
-void my_sleep(double seconds)
+void compat_sleep(double seconds)
 {
   HARDBUG(seconds <= 0.0)
 
@@ -476,7 +476,7 @@ void my_sleep(double seconds)
 #endif
 }
 
-double my_time(void)
+double compat_time(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   struct timespec tv;
@@ -500,7 +500,7 @@ double my_time(void)
 
 //threads
 
-int my_mutex_init(my_mutex_t* mutex)
+int compat_mutex_init(my_mutex_t* mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
   return(mtx_init(mutex, mtx_plain));
@@ -512,7 +512,7 @@ int my_mutex_init(my_mutex_t* mutex)
 #endif
 }
 
-int my_mutex_lock(my_mutex_t* mutex)
+int compat_mutex_lock(my_mutex_t* mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
   return(mtx_lock(mutex));
@@ -524,7 +524,7 @@ int my_mutex_lock(my_mutex_t* mutex)
 #endif
 }
 
-int my_mutex_trylock(my_mutex_t* mutex)
+int compat_mutex_trylock(my_mutex_t* mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
   return(mtx_trylock(mutex));
@@ -536,7 +536,7 @@ int my_mutex_trylock(my_mutex_t* mutex)
 #endif
 }
 
-int my_mutex_unlock(my_mutex_t* mutex)
+int compat_mutex_unlock(my_mutex_t* mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
   return(mtx_unlock(mutex));
@@ -548,7 +548,7 @@ int my_mutex_unlock(my_mutex_t* mutex)
 #endif
 }
 
-int my_mutex_destroy(my_mutex_t* mutex)
+int compat_mutex_destroy(my_mutex_t* mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
   mtx_destroy(mutex);
@@ -558,7 +558,7 @@ int my_mutex_destroy(my_mutex_t* mutex)
   return(0);
 }
 
-void my_thread_create(my_thread_t* thread, my_thread_func_t thread_func,
+void compat_thread_create(my_thread_t* thread, my_thread_func_t thread_func,
                       void* arg)
 {
   int ierr;
@@ -595,7 +595,7 @@ void my_thread_create(my_thread_t* thread, my_thread_func_t thread_func,
 #endif
 }
 
-void my_thread_join(my_thread_t thread)
+void compat_thread_join(my_thread_t thread)
 {
   int ierr;
 #if COMPAT_CSTD == COMPAT_CSTD_C11

@@ -1,4 +1,4 @@
-//SCU REVISION 7.661 vr 11 okt 2024  2:21:18 CEST
+//SCU REVISION 7.700 zo  3 nov 2024 10:44:36 CET
 #include "globals.h"
 
 /*
@@ -31,7 +31,7 @@ uint64_t rotl(const uint64_t x, int k) {
 }
 */
 
-local uint64_t rotl(uint64_t x, int k)
+local ui64_t rotl(ui64_t x, int k)
 {
   HARDBUG((k < 0) or (k > 63))
 
@@ -85,7 +85,7 @@ ui64_t return_my_random(void *self)
   ui64_t result = rotl(object->MR_state[0] + object->MR_state[3], 23) +
                   object->MR_state[0];
 
-  uint64_t t = object->MR_state[1] << 17;
+  ui64_t t = object->MR_state[1] << 17;
 
   object->MR_state[2] ^= object->MR_state[0];
   object->MR_state[3] ^= object->MR_state[1];
@@ -98,33 +98,71 @@ ui64_t return_my_random(void *self)
   return result;
 }
 
-#define NBUCKETS 100000ULL
-#define NFILL    1000
+#define NBITS    16
+#define MASK     (~(~0ULL << NBITS))
+#define NBUCKETS (MASK + 1)
+#define NFILL    100
 
 local i64_t buckets[NBUCKETS];
 
 void test_my_random(void)
-{
-  for (i64_t ibucket = 0; ibucket < NBUCKETS; ibucket++)
-    buckets[ibucket] = 0;
+{ 
+  double mean_min, mean_max;
+  double sigma_min, sigma_max;
 
-  my_random_t test_random;
-
-  construct_my_random(&test_random, 0);
-
-  for (i64_t isample = 0; isample < (NBUCKETS * NFILL); isample++)
+  for (int ishift = 0; ishift <= (64 - NBITS); ++ishift)
   {
-    buckets[return_my_random(&test_random) % NBUCKETS]++;
+    for (i64_t ibucket = 0; ibucket < NBUCKETS; ibucket++)
+      buckets[ibucket] = 0;
+  
+    my_random_t test_random;
+  
+    construct_my_random(&test_random, 0);
+  
+    stats_t stats;
+    construct_stats(&stats);
+  
+    for (i64_t isample = 0; isample < (NBUCKETS * NFILL); isample++)
+    {
+      int r = (return_my_random(&test_random) >> ishift) & MASK;
+  
+      buckets[r]++;
+  
+      update_stats(&stats, r);
+    }
+  
+    i64_t min = buckets[0];
+    i64_t max = buckets[0];
+  
+    for (i64_t ibucket = 1; ibucket < NBUCKETS; ibucket++)
+    {
+      if (buckets[ibucket] < min) min = buckets[ibucket];
+      if (buckets[ibucket] > max) max = buckets[ibucket];
+    }
+    mean_sigma(&stats);
+  
+    //PRINTF("ishift=%d\n", ishift);
+    //PRINTF("min=%lld max=%lld\n", min, max);
+    //PRINTF("mean=%.6f(%.6f)\n", stats.S_mean, stats.S_mean_sum);
+    //PRINTF("sigma=%.6f(%.6f)\n", stats.S_sigma, stats.S_sigma_sum2);
+
+    if (ishift == 0)
+    {
+      mean_min = mean_max = stats.S_mean;
+      sigma_min = sigma_max = stats.S_sigma;
+    }
+    else
+    {
+       if (stats.S_mean < mean_min) mean_min = stats.S_mean;
+       if (stats.S_mean > mean_max) mean_max = stats.S_mean;
+       if (stats.S_sigma < sigma_min) sigma_min = stats.S_sigma;
+       if (stats.S_sigma > sigma_max) sigma_max = stats.S_sigma;
+    }
   }
 
-  i64_t min = buckets[0];
-  i64_t max = buckets[0];
-
-  for (i64_t ibucket = 1; ibucket < NBUCKETS; ibucket++)
-  {
-    if (buckets[ibucket] < min) min = buckets[ibucket];
-    if (buckets[ibucket] > max) max = buckets[ibucket];
-  }
-  PRINTF("min=%lld max=%lld\n", min, max);
+  PRINTF("exact mean=%.6f mean_min=%.6f mean_max=%0.6f\n",
+         MASK / 2.0, mean_min, mean_max);
+  PRINTF("exact sigma=%.6f sigma_min=%.6f sigma_max=%0.6f\n",
+         MASK / sqrt(12.0), sigma_min, sigma_max);
 }
 
