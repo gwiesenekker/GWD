@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 /*
@@ -36,6 +36,37 @@ local ui64_t rotl(ui64_t x, int k)
   HARDBUG((k < 0) or (k > 63))
 
   return (x << k) | (x >> (64 - k));
+}
+
+void shuffle(int *s, int n, my_random_t *r)
+{
+  for (int i = 0; i < n; i++) s[i] = i;
+
+  if (r != NULL)
+  { 
+    for (int i = n - 1; i >= 1; --i)
+    {
+      int j = return_my_random(r) % (i + 1);
+
+      if (j != i)
+      {
+        int t = s[i];
+
+        s[i] = s[j];
+
+        s[j] = t;
+      }
+    }
+  }
+
+  for (int i = 0; i < n; i++)
+  {
+    int m = 0;
+
+    for (int j = 0; j < n; j++) if (s[j] == i) ++m;
+
+    HARDBUG(m != 1)
+  }
 }
 
 void construct_my_random(void *self, i64_t arg_seed)
@@ -98,21 +129,21 @@ ui64_t return_my_random(void *self)
   return result;
 }
 
-#define NBITS    16
-#define MASK     (~(~0ULL << NBITS))
-#define NBUCKETS (MASK + 1)
-#define NFILL    100
+#define TEST_NBITS    16
+#define TEST_MASK     (~(~0ULL << TEST_NBITS))
+#define TEST_NBUCKETS (TEST_MASK + 1)
+#define TEST_NFILL    100
 
-local i64_t buckets[NBUCKETS];
+local i64_t buckets[TEST_NBUCKETS];
 
 void test_my_random(void)
 { 
   double mean_min, mean_max;
   double sigma_min, sigma_max;
 
-  for (int ishift = 0; ishift <= (64 - NBITS); ++ishift)
+  for (int ishift = 0; ishift <= (64 - TEST_NBITS); ++ishift)
   {
-    for (i64_t ibucket = 0; ibucket < NBUCKETS; ibucket++)
+    for (i64_t ibucket = 0; ibucket < TEST_NBUCKETS; ibucket++)
       buckets[ibucket] = 0;
   
     my_random_t test_random;
@@ -122,9 +153,9 @@ void test_my_random(void)
     stats_t stats;
     construct_stats(&stats);
   
-    for (i64_t isample = 0; isample < (NBUCKETS * NFILL); isample++)
+    for (i64_t isample = 0; isample < (TEST_NBUCKETS * TEST_NFILL); isample++)
     {
-      int r = (return_my_random(&test_random) >> ishift) & MASK;
+      int r = (return_my_random(&test_random) >> ishift) & TEST_MASK;
   
       buckets[r]++;
   
@@ -134,7 +165,7 @@ void test_my_random(void)
     i64_t min = buckets[0];
     i64_t max = buckets[0];
   
-    for (i64_t ibucket = 1; ibucket < NBUCKETS; ibucket++)
+    for (i64_t ibucket = 1; ibucket < TEST_NBUCKETS; ibucket++)
     {
       if (buckets[ibucket] < min) min = buckets[ibucket];
       if (buckets[ibucket] > max) max = buckets[ibucket];
@@ -161,8 +192,17 @@ void test_my_random(void)
   }
 
   PRINTF("exact mean=%.6f mean_min=%.6f mean_max=%0.6f\n",
-         MASK / 2.0, mean_min, mean_max);
+         TEST_MASK / 2.0, mean_min, mean_max);
   PRINTF("exact sigma=%.6f sigma_min=%.6f sigma_max=%0.6f\n",
-         MASK / sqrt(12.0), sigma_min, sigma_max);
+         TEST_MASK / sqrt(12.0), sigma_min, sigma_max);
+
+  int s[TEST_NBUCKETS];
+
+  my_random_t test_random;
+  
+  construct_my_random(&test_random, 0);
+
+  shuffle(s, TEST_NBUCKETS, NULL);
+  shuffle(s, TEST_NBUCKETS, &test_random);
 }
 

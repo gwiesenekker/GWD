@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #ifdef USE_HARDWARE_CRC32
@@ -7,24 +7,16 @@
 #define POLYNOMIAL_CRC32 0xEDB88320UL
 #endif
 
-local my_mutex_t mpi_abort_mutex;
-
-#ifdef USE_OPENMPI
-local int mpi_abort = FALSE;
-#endif
-
 int zzzzzz_invocation = 0;
 
 #define NFRAMES_MAX 256
 
 void zzzzzz(char *file, const char *func, long line, char *error, int code)
 {
-  char error_string[MY_LINE_MAX];
- 
-  snprintf(error_string, MY_LINE_MAX, 
-    "** %s **\n"
+  fprintf(stderr, "** %s **\n"
     " my_mpi_globals.MY_MPIG_id_global=%d\n"
     " my_mpi_globals.MY_MPIG_nglobal=%d\n"
+    " pthread_self=%#lX\n"
     " file=%s\n"
     " func=%s\n"
     " line=%ld\n"
@@ -34,9 +26,8 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
    code == 0 ? "OK" : "FATAL",
    my_mpi_globals.MY_MPIG_id_global,
    my_mpi_globals.MY_MPIG_nglobal,
+   compat_pthread_self(),
    file, func, line, error, code, REVISION);
-
-  fprintf(stderr, "%s", error_string);
 
   if (zzzzzz_invocation > 1)
   {
@@ -44,8 +35,25 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
   }
   else if (code != EXIT_SUCCESS)
   { 
-    PRINTF("%s", error_string);
-    PRINTF("", NULL);
+    PRINTF("** %s **\n"
+      " my_mpi_globals.MY_MPIG_id_global=%d\n"
+      " my_mpi_globals.MY_MPIG_nglobal=%d\n"
+      " pthread_self=%#lX\n"
+      " file=%s\n"
+      " func=%s\n"
+      " line=%ld\n"
+      " error=%s\n"
+      " code=%d\n"
+      " version=%s\n",
+     code == 0 ? "OK" : "FATAL",
+     my_mpi_globals.MY_MPIG_id_global,
+     my_mpi_globals.MY_MPIG_nglobal,
+     compat_pthread_self(),
+     file, func, line, error, code, REVISION);
+
+     //flush
+
+     PRINTF("", NULL);
   }
 
 #ifdef USE_OPENMPI
@@ -57,15 +65,9 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
     }
     else
     {
-      HARDBUG(compat_mutex_lock(&mpi_abort_mutex) != 0)
+      //issue when multiple processes call MPI_Abort
 
-      if (mpi_abort == FALSE)
-      {
-        mpi_abort = TRUE;
-        MPI_Abort(my_mpi_globals.MY_MPIG_comm_global, code);
-      }
-
-      HARDBUG(compat_mutex_unlock(&mpi_abort_mutex) != 0)
+      MPI_Abort(my_mpi_globals.MY_MPIG_comm_global, code);
     }
   }
 #endif
@@ -193,8 +195,6 @@ void init_utils(void)
     }
     crc_table64[i] = part;
   }
-
-  HARDBUG(compat_mutex_init(&mpi_abort_mutex) != 0)
 }
 
 void test_utils(void)
@@ -228,19 +228,26 @@ void file2cjson(char *arg_name, cJSON **arg_json)
 
   HARDBUG((fjson = fopen(arg_name, "r")) == NULL)
 
-  struct bStream* bjson = bsopen((bNread) fread, fjson);
+  struct bStream* bjson;
 
-  bstring string = bfromcstr("");
+  HARDBUG((bjson = bsopen((bNread) fread, fjson)) == NULL)
 
-  while (bsreadlna(string, bjson, (char) '\n') == BSTR_OK);
+  BSTRING(string)
+
+  while (bsreadlna(string, bjson, (char) '\n') == BSTR_OK)
+  ;
   
-  bsclose(bjson);
+  HARDBUG(bsclose(bjson) == NULL)
 
-  FCLOSE(fjson);
+  FCLOSE(fjson)
 
-  bstring newline = bfromcstr("\n");
+  BSTRING(newline)
 
-  bstring space = bfromcstr(" ");
+  HARDBUG(bassigncstr(newline, "\n") != BSTR_OK)
+
+  BSTRING(space)
+
+  HARDBUG(bassigncstr(newline, " ") != BSTR_OK)
 
   bfindreplace(string, newline, space, 0);
   
@@ -253,11 +260,11 @@ void file2cjson(char *arg_name, cJSON **arg_json)
     FATAL("cJSON error", EXIT_FAILURE)
   }
 
-  bdestroy(space);
+  BDESTROY(space)
 
-  bdestroy(newline);
+  BDESTROY(newline)
 
-  bdestroy(string);
+  BDESTROY(string)
 }
 
 cJSON *cJSON_FindItemInObject(cJSON *object, char *name)

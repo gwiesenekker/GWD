@@ -1,6 +1,5 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
-
 
 #undef SIGMOID
 
@@ -29,50 +28,10 @@
 #define RESULT_LOST_ALT "0-2"
 #define RESULT_UNKNOWN "*"
 
-#define the_pv(X) cat2(X, _pv)
-#define my_pv     the_pv(my_colour)
-#define your_pv   the_pv(your_colour)
-
 local char *pline;
 local char token[MY_LINE_MAX];
 local int itoken;
 local char error[MY_LINE_MAX];
-
-local void white_pv(int, board_t *, pv_t *, double, FILE *, i64_t *);
-local void black_pv(int, board_t *, pv_t *, double, FILE *, i64_t *);
-
-#define MY_BIT      WHITE_BIT
-#define YOUR_BIT    BLACK_BIT
-#define my_colour   white
-#define your_colour black
-
-#include "pdn.d"
-
-#undef MY_BIT
-#undef YOUR_BIT
-#undef my_colour
-#undef your_colour
-
-#define MY_BIT      BLACK_BIT
-#define YOUR_BIT    WHITE_BIT
-#define my_colour   black
-#define your_colour white
-
-#include "pdn.d"
-
-#undef MY_BIT
-#undef YOUR_BIT
-#undef my_colour
-#undef your_colour
-
-local void do_pv(int npieces, board_t *with, pv_t *best_pv, double pv_score,
-  FILE *ffen, i64_t *iposition)
-{
-  if (IS_WHITE(with->board_colour2move))
-    white_pv(npieces, with, best_pv, pv_score, ffen, iposition);
-  else
-    black_pv(npieces, with, best_pv, pv_score, ffen, iposition);
-}
 
 local void get_next_token(void)
 {
@@ -291,9 +250,11 @@ void read_games(char *name)
 
   HARDBUG((fstring = fopen("pos.str", "w")) == NULL)
 
-  int iboard = create_board(STDOUT, NULL);
+  board_t board;
 
-  board_t *with = return_with_board(iboard);
+  construct_board(&board, STDOUT);
+
+  board_t *with = &board;
 
   i64_t ngames = 0;
   int game = FALSE;
@@ -334,7 +295,8 @@ void read_games(char *name)
           game = TRUE;
           iply = 0;
           nply = INVALID;
-          string2board(STARTING_POSITION, iboard);
+
+          string2board(with, STARTING_POSITION);
 
           get_next_token();
           if (itoken != TOKEN_STRING)
@@ -462,27 +424,33 @@ void read_games(char *name)
       }
       else if (itoken == TOKEN_INTEGER)
       {
-        char move_string[MY_LINE_MAX];
+        BSTRING(bmove_string)
 
-        strcpy(move_string, token);
+        HARDBUG(bassigncstr(bmove_string, token) != BSTR_OK)
+
         HARDBUG(!game)
 
         get_next_token();
+
         if ((itoken == TOKEN_MOVE) or (itoken == TOKEN_CAPTURE))
         {
           while(TRUE)
           {
-            strcat(move_string, token);
+            HARDBUG(bcatcstr(bmove_string, token) != BSTR_OK)
 
             get_next_token();
+
             if (itoken != TOKEN_INTEGER)
             {
               PRINTF("%ld:%s\n", iline, line);
+
               FATAL("INTEGER expected after 'INTEGER-x' in PDN", EXIT_FAILURE)
             }
-            strcat(move_string, token);
+
+            HARDBUG(bcatcstr(bmove_string, token) != BSTR_OK)
 
             get_next_token();
+
             if ((itoken != TOKEN_MOVE) and (itoken != TOKEN_CAPTURE)) break;
           }
 
@@ -490,7 +458,7 @@ void read_games(char *name)
 
           moves_list_t moves_list;
 
-          create_moves_list(&moves_list);
+          construct_moves_list(&moves_list);
 
           gen_moves(with, &moves_list, FALSE);
 
@@ -507,19 +475,21 @@ void read_games(char *name)
           if (move_error)
           {
             //PRINTF("%ld:%s\n", iline, line);
-            PRINTF("ignoring move: %s\n", move_string);
+
+            PRINTF("ignoring move: %s\n", bdata(bmove_string));
+
             goto label_move_error;
           }
 
           int imove;
 
-          if ((imove = search_move(&moves_list, move_string)) == INVALID)
+          if ((imove = search_move(&moves_list, bmove_string)) == INVALID)
           {  
-            print_board(iboard);
+            print_board(with);
 
-            PRINTF("move not found: %s\n", move_string);
+            PRINTF("move not found: %s\n", bdata(bmove_string));
 
-            moves_list.printf_moves(&moves_list, TRUE);
+            fprintf_moves_list(&moves_list, STDOUT, TRUE);
 
             PRINTF("%ld:%s\n", iline, line);
 
@@ -528,9 +498,9 @@ void read_games(char *name)
             goto label_move_error;
           }
 
-          //move_string does not contain leading 0
+          //bmove_string does not contain leading 0
 
-          strcpy(move_string, moves_list.move2string(&moves_list, imove));
+          move2bstring(&moves_list, imove, bmove_string);
    
           if (moves_list.nmoves == 1) goto label_skip;
 
@@ -540,16 +510,17 @@ void read_games(char *name)
           {
             if (IS_BLACK(with->board_colour2move)) result = 2 - result;
 
-            char *position = with->board2string(with, FALSE);
+            char *position = board2string(with, FALSE);
 
             int position_id = query_position(db, position, 0);
 
             if (position_id == INVALID)
               position_id = insert_position(db, position, 0);
 
-            int move_id = query_move(db, position_id, move_string, 0);
+            int move_id = query_move(db, position_id, bdata(bmove_string), 0);
+
             if (move_id == INVALID)
-              move_id = insert_move(db, position_id, move_string, 0);
+              move_id = insert_move(db, position_id, bdata(bmove_string), 0);
   
             if (result == 2)
               increment_nwon_ndraw_nlost(db, position_id, move_id, 1, 0, 0, 0);
@@ -572,8 +543,8 @@ void read_games(char *name)
               !can_capture)
           {
             HARDBUG(fprintf(fstring, "%s %d %d %d #result iply nply\n",
-                                 with->board2string(with, FALSE),
-                                 result, iply, nply) < 0)
+                            board2string(with, FALSE),
+                            result, iply, nply) < 0)
           }
           do_move(with, imove, &moves_list);
 
@@ -594,6 +565,8 @@ void read_games(char *name)
           PRINTF("%ld:%s\n", iline, line);
           FATAL("unexpected token in PDN", EXIT_FAILURE)
         }
+
+        BDESTROY(bmove_string)
       }
       else if (itoken == TOKEN_RESULT)
       {
@@ -658,14 +631,41 @@ void read_games(char *name)
   PRINTF("read %lld games\n", ngames);
 }
 
-local double return_sigmoid(double x)
+#define NBUFFER_MAX 1000000
+
+local void flush_buffer(bstring bname, bstring bbuffer)
 {
-  return(2.0 / (1.0 + exp(-x)) - 1.0);
+  int fd = compat_lock_file(bdata(bname));
+
+  HARDBUG(fd == -1)
+
+  HARDBUG(compat_write(fd, bdata(bbuffer), blength(bbuffer)) !=
+                       blength(bbuffer))
+
+  compat_unlock_file(fd);
+
+  HARDBUG(bassigncstr(bbuffer, "") != BSTR_OK)
+}
+
+local void append_fen(bstring fen, double result, int egtb_mate,
+  int *nbuffer, bstring bname, bstring bbuffer)
+{
+  if (*nbuffer >= NBUFFER_MAX)
+  {
+    flush_buffer(bname, bbuffer);
+
+    *nbuffer = 0;
+  }
+
+  bformata(bbuffer, "%s {%.6f} egtb_mate=%d\n",
+           bdata(fen), result, egtb_mate);
+
+  (*nbuffer)++;
 }
 
 #define DEPTH_GEN    4
-#define DEPTH_FINAL  64
-#define DEPTH_SEARCH 64
+#define DEPTH_MCTS   (INVALID)
+#define NSHOOT_OUTS  100
 
 void gen_pos(i64_t npositions_max, int npieces)
 {
@@ -684,8 +684,6 @@ void gen_pos(i64_t npositions_max, int npieces)
 #endif
   PRINTF("npositions_max=%lld\n", npositions_max);
 
-  FILE *ffen;
-
   HARDBUG(my_mpi_globals.MY_MPIG_nslaves < 1)
 
   my_timer_t timer;
@@ -694,32 +692,26 @@ void gen_pos(i64_t npositions_max, int npieces)
 
   reset_my_timer(&timer);
 
+  BSTRING(gen_bname)
+
+  bassigncstr(gen_bname, "gen.fen");
+
+  int gen_nbuffer = 0;
+
+  BSTRING(gen_bbuffer)
+
   my_random_t gen_pos_random;
 
   if (my_mpi_globals.MY_MPIG_nslaves == 1)
-  {
-    char fen[MY_LINE_MAX];
-
-    snprintf(fen, MY_LINE_MAX, "gen-%d.fen", npieces);
-
-    HARDBUG((ffen = fopen(fen, "w")) == NULL)
-
     construct_my_random(&gen_pos_random, 0);
-  }
   else
-  {
-    char fen[MY_LINE_MAX];
-
-    snprintf(fen, MY_LINE_MAX, "gen-%d.fen;%d;%d",
-      npieces, my_mpi_globals.MY_MPIG_id_slave, my_mpi_globals.MY_MPIG_nslaves);
-
-    HARDBUG((ffen = fopen(fen, "w")) == NULL)
-
     construct_my_random(&gen_pos_random, INVALID);
-  }
 
-  int iboard = create_board(STDOUT, NULL);
-  board_t *with = return_with_board(iboard);
+  search_t search;
+
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
   
   i64_t npositions = npositions_max / my_mpi_globals.MY_MPIG_nslaves;
   HARDBUG(npositions < 1)
@@ -737,6 +729,10 @@ void gen_pos(i64_t npositions_max, int npieces)
 
   ui64_t alpha_beta_cache_size = options.alpha_beta_cache_size;
 
+  BSTRING(bbest_move)
+
+  BSTRING(bfen)
+
   while(iposition < npositions)
   {
     ++ngames;
@@ -746,10 +742,11 @@ void gen_pos(i64_t npositions_max, int npieces)
     options.alpha_beta_cache_size = 0;
 
     PRINTF("options.material_only=%d\n", options.material_only);
+
     PRINTF("options.alpha_beta_cache_size=%lldd\n",
            options.alpha_beta_cache_size);
 
-    string2board(STARTING_POSITION, iboard);
+    string2board(&(with->S_board), STARTING_POSITION);
 
     //autoplay 
 
@@ -767,66 +764,55 @@ void gen_pos(i64_t npositions_max, int npieces)
 
     while(TRUE)
     {
-      HARDBUG(nply > MCTS_PLY_MAX)
+      if (nply == MCTS_PLY_MAX) break;
+ 
+      ncount = 
+        BIT_COUNT(with->S_board.board_white_man_bb |
+                  with->S_board.board_white_king_bb |
+                  with->S_board.board_black_man_bb |
+                  with->S_board.board_black_king_bb);
+
+      if (ncount < npieces) break;
 
       moves_list_t moves_list;
 
-      create_moves_list(&moves_list);
+      construct_moves_list(&moves_list);
 
-      gen_moves(with, &moves_list, FALSE);
+      gen_moves(&(with->S_board), &moves_list, FALSE);
 
       if (moves_list.nmoves == 0) break;
 
-      search(with, &moves_list, 1, DEPTH_GEN,
+      do_search(with, &moves_list, 1, DEPTH_GEN,
         SCORE_MINUS_INFINITY, &gen_pos_random);
 
-      int best_score = with->board_search_best_score;
+      int best_score = with->S_best_score;
 
-      char best_move[MY_LINE_MAX];
+      move2bstring(&moves_list, with->S_best_move, bbest_move);
 
-      strcpy(best_move,
-        moves_list.move2string(&moves_list, with->board_search_best_move));
-
-      print_board(iboard);
+      print_board(&(with->S_board));
 
       PRINTF("nply=%d best_move=%s best_score=%d\n",
-        nply, best_move, best_score);
+        nply, bdata(bbest_move), best_score);
 
-      ncount = 
-        BIT_COUNT(with->board_white_man_bb |
-                  with->board_white_king_bb |
-                  with->board_black_man_bb |
-                  with->board_black_king_bb);
-
-      //if (best_score > (SCORE_WON - NODE_MAX)) break;
-
-      //if (best_score < (SCORE_LOST + NODE_MAX)) break;
-
-      //if (with->board_search_best_score_kind == SEARCH_BEST_SCORE_EGTB) break;
-
-      //if (ncount < npieces) break;
-
-      if (nply == MCTS_PLY_MAX) break;
- 
       cJSON *game_move = cJSON_CreateObject();
 
       HARDBUG(game_move == NULL)
 
       HARDBUG(cJSON_AddStringToObject(game_move, CJSON_MOVE_STRING_ID,
-                                    best_move) == NULL)
+                                      bdata(bbest_move)) == NULL)
 
       HARDBUG(cJSON_AddNumberToObject(game_move, CJSON_MOVE_SCORE_ID,
-                                    best_score) == NULL)
+                                      best_score) == NULL)
 
       HARDBUG(cJSON_AddItemToArray(game_moves, game_move) == FALSE)
 
       ++nply;
 
-      if (with->board_search_best_score_kind == SEARCH_BEST_SCORE_EGTB) break;
+      if (with->S_best_score_kind == SEARCH_BEST_SCORE_EGTB) break;
 
-      do_move(with, with->board_search_best_move, &moves_list);
+      do_move(&(with->S_board), with->S_best_move, &moves_list);
     }
- 
+
     if (ncount > npieces)
     {
       ++ngames_failed;
@@ -840,13 +826,15 @@ void gen_pos(i64_t npositions_max, int npieces)
     //now loop over all moves
 
     if (npieces > 6) options.material_only = FALSE;
+
     options.alpha_beta_cache_size = alpha_beta_cache_size;
 
     PRINTF("options.material_only=%d\n", options.material_only);
+
     PRINTF("options.alpha_beta_cache_size=%lld\n",
            options.alpha_beta_cache_size);
 
-    string2board(STARTING_POSITION, iboard);
+    string2board(&(with->S_board), STARTING_POSITION);
 
     int iply = 0;
 
@@ -859,9 +847,8 @@ void gen_pos(i64_t npositions_max, int npieces)
 
       HARDBUG(!cJSON_IsString(cjson_move_string))
 
-      char best_move[MY_LINE_MAX];
-
-      strncpy(best_move, cJSON_GetStringValue(cjson_move_string), MY_LINE_MAX);
+      HARDBUG(bassigncstr(bbest_move,
+                          cJSON_GetStringValue(cjson_move_string)) != BSTR_OK)
 
       cJSON *cjson_move_score =
         cJSON_GetObjectItem(game_move, CJSON_MOVE_SCORE_ID);
@@ -872,115 +859,91 @@ void gen_pos(i64_t npositions_max, int npieces)
 
       moves_list_t moves_list;
   
-      create_moves_list(&moves_list);
+      construct_moves_list(&moves_list);
 
-      gen_moves(with, &moves_list, FALSE);
+      gen_moves(&(with->S_board), &moves_list, FALSE);
 
       HARDBUG(moves_list.nmoves < 1)
      
       int best_pv;
 
-      HARDBUG((best_pv = search_move(&moves_list, best_move)) == INVALID)
+      HARDBUG((best_pv = search_move(&moves_list, bbest_move)) == INVALID)
 
       ncount = 
-        BIT_COUNT(with->board_white_man_bb |
-                  with->board_white_king_bb |
-                  with->board_black_man_bb |
-                  with->board_black_king_bb);
+        BIT_COUNT(with->S_board.board_white_man_bb |
+                  with->S_board.board_white_king_bb |
+                  with->S_board.board_black_man_bb |
+                  with->S_board.board_black_king_bb);
 
       if ((moves_list.nmoves > 1) and
           (moves_list.ncaptx == 0) and
           (ncount == npieces))
       {
-        print_board(iboard);
-    
-        search(with, &moves_list, 1, DEPTH_SEARCH,
-               SCORE_MINUS_INFINITY, &gen_pos_random);
+        print_board(&(with->S_board));
 
-        int search_best_score = with->board_search_best_score;
-        int search_best_depth = with->board_search_best_depth;
+        reset_my_timer(&(with->S_timer));
 
-        char search_best_move[MY_LINE_MAX];
+        double mcts_result = mcts_shoot_outs(with, iply,
+          NSHOOT_OUTS, DEPTH_MCTS);
 
-        strcpy(search_best_move,
-          moves_list.move2string(&moves_list, with->board_search_best_move));
+        int egtb_mate =
+          read_endgame(with, with->S_board.board_colour2move, TRUE);
 
-        double search_result =
-          return_sigmoid(with->board_search_best_score / 100.0);
+        board2fen(with->S_board.board_colour2move,
+          with->S_board.board_white_man_bb,
+          with->S_board.board_black_man_bb,
+          with->S_board.board_white_king_bb,
+          with->S_board.board_black_king_bb,
+          bfen, FALSE);
 
-        PRINTF("iply=%d nply=%d ncount=%d"
-               " best_move=%s"
-               " best_score=%d"
-               " search_best_move=%s"
-               " search_best_score=%d"
-               " search_best_depth=%d"
-               " search_result=%.5f\n",
-               iply, nply, ncount,
-               best_move,
-               best_score,
-               search_best_move,
-               search_best_score,
-               search_best_depth,
-               search_result);
+        PRINTF("bfen=%s best_score=%d egtb_mate=%d mcts_result=%.6f\n",
+          bdata(bfen), best_score, egtb_mate, mcts_result);
 
-        char fen[MY_LINE_MAX];
-  
-        board2fen(with->board_id, fen, FALSE);
-
-        PRINTF("fen=%s\n", fen);
-
-        double search_label = search_result;
-
-        if (IS_BLACK(with->board_colour2move)) search_label = -search_label;
-  
-        HARDBUG(fprintf(ffen, "%s {%.5f} iply=%d nply=%d ncount=%d"
-                              " search_label=W2M"
-                              " search_best_move=%s"
-                              " search_best_score=%d"
-                              " search_best_depth=%d"
-                              " search_result=%.5f\n",
-                              fen, search_label, iply, nply, ncount,
-                              search_best_move,
-                              search_best_score,
-                              search_best_depth,
-                              search_result) < 0)
-
-        HARDBUG(fflush(ffen) != 0)
-      
-        ++iposition;
-
-        do_move(with, with->board_search_best_move, &moves_list);
-
-        do_pv(npieces, with, with->board_search_best_pv + 1, -search_result,
-          ffen, &iposition);
-
-        undo_move(with, with->board_search_best_move, &moves_list);
-
-        if ((iposition - iposition_prev) > 100)
+        if (egtb_mate != ENDGAME_UNKNOWN)
         {
-          iposition_prev = iposition;
+          if (((egtb_mate == INVALID) and (fabs(mcts_result) <= 0.20)) or
+              ((egtb_mate > 0) and (mcts_result >= 0.60)) or
+              ((egtb_mate <= 0) and (mcts_result <= -0.60)))
+          {
+            append_fen(bfen, mcts_result, egtb_mate,
+                       &gen_nbuffer, gen_bname, gen_bbuffer);
 
-          PRINTF("iposition=%lld time=%.2f (%.2f positions/second)\n",
-            iposition, return_my_timer(&timer, FALSE),
-            iposition / return_my_timer(&timer, FALSE));
+            ++iposition;
+
+            if ((iposition - iposition_prev) > 100)
+            {
+              iposition_prev = iposition;
+    
+              PRINTF("iposition=%lld time=%.2f (%.2f positions/second)\n",
+                iposition, return_my_timer(&timer, FALSE),
+                iposition / return_my_timer(&timer, FALSE));
+            }
+          }
         }
       }
 
-      do_move(with, best_pv, &moves_list);
+      do_move(&(with->S_board), best_pv, &moves_list);
 
       ++iply;
     }
-    HARDBUG(iply != nply)
 
     cJSON_Delete(game);
   }
 
-  FCLOSE(ffen)
+  BDESTROY(bfen)
+
+  BDESTROY(bbest_move)
+
+  //write remaining
+
+  if (gen_nbuffer > 0) flush_buffer(gen_bname, gen_bbuffer);
+
+  BDESTROY(gen_bbuffer)
+
+  BDESTROY(gen_bname)
 
   PRINTF("generating %lld positions took %.2f seconds\n",
     iposition, return_my_timer(&timer, FALSE));
-
-  PRINTF("");
 
   my_mpi_barrier("after gen", my_mpi_globals.MY_MPIG_comm_slaves, TRUE);
 
@@ -993,11 +956,11 @@ void gen_pos(i64_t npositions_max, int npieces)
   MPI_Allreduce(MPI_IN_PLACE, &nlost, 1, MPI_LONG_LONG_INT,
     MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
-  PRINTF("ngames=%lld nwon=%lld ndraw=%lld nlost=%lld\n",
-    ngames, nwon, ndraw, nlost);
-
   MPI_Allreduce(MPI_IN_PLACE, &iposition, 1, MPI_LONG_LONG_INT,
     MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+
+  PRINTF("ngames=%lld nwon=%lld ndraw=%lld nlost=%lld\n",
+    ngames, nwon, ndraw, nlost);
 
   PRINTF("iposition=%lld\n", iposition);
 #endif

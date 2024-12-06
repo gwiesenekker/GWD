@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #ifndef MyPrintfH
 #define MyPrintfH
 
@@ -6,15 +6,13 @@ typedef struct
 {
   int my_printf2stdout;
 
-  char my_printf_fname[MY_LINE_MAX];
+  bstring my_printf_bname;
 
   FILE *my_printf_flog;
 
   long my_printf_fsize;
 
-  char my_printf_buffer[MY_LINE_MAX];
-
-  int my_printf_ibuffer;
+  bstring my_printf_bbuffer;
 
   my_mutex_t my_printf_mutex;
 } my_printf_t;

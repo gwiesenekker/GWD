@@ -1,10 +1,11 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #ifndef TimersH
 #define TimersH
 
 typedef struct
 {
-  bstring MT_name;
+  bstring MT_bname;
+
   my_printf_t *MT_my_printf;
 
   int MT_return_wall_clock_warning_given;

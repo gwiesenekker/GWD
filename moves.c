@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #define the_dir(X) cat2(X, _dir)
@@ -44,62 +44,127 @@ local int black_dir[4] = {5, 6, -6, -5};
 #undef my_colour
 #undef your_colour
 
-local int move2int(char *move, int m[50])
+void move2bstring(void *self, int imove, bstring move_string)
 {
-  int n = 0;
-  while(TRUE)
+  moves_list_t *object = self;
+
+  HARDBUG(imove < 0)
+
+  HARDBUG(imove >= object->nmoves)
+
+  move_t *move = object->moves + imove;
+   
+  int iboard = move->move_from;
+  int kboard = move->move_to;
+
+  btrunc(move_string, 0);
+
+  ui64_t captures_bb = move->move_captures_bb;
+
+  if (captures_bb == 0)
+    HARDBUG(bformata(move_string, "%s-%s",
+                     nota[iboard], nota[kboard]) != BSTR_OK)
+  else
   {
-    while (*move and !isdigit(*move))
-      move++;
-    if (*move == '\0') break;
-    HARDBUG(n >= 50)
-    HARDBUG(sscanf(move, "%d", &(m[n])) != 1)
-    n++;
-    while (*move and isdigit(*move))
-      move++;
-    if (*move == '\0') break;
+    int jboard = BIT_CTZ(captures_bb);
+   
+    captures_bb &= ~BITULL(jboard);
+
+    HARDBUG(bformata(move_string, "%sx%sx%s",
+                     nota[iboard], nota[kboard], nota[jboard]) != BSTR_OK)
+
+    while(captures_bb != 0)
+    {
+      jboard = BIT_CTZ(captures_bb);
+
+      captures_bb &= ~BITULL(jboard);
+
+      HARDBUG(bformata(move_string, "x%s", nota[jboard]) != BSTR_OK)
+    }
   }
-  return(n);
 }
 
-int search_move(moves_list_t *moves_list, char *arg_move)
+local int move2ints(bstring bmove, int m[50])
 {
+  BSTRING(bsplit)
+
+  bassigncstr(bsplit, "-x");
+
+  struct bstrList *btokens;
+  
+  HARDBUG((btokens = bsplits(bmove, bsplit)) == NULL)
+
+  HARDBUG(btokens->qty > 50)
+
+  for (int itoken = 0; itoken < btokens->qty; itoken++)
+  {
+    HARDBUG(sscanf(bdata(btokens->entry[itoken]), "%d", m + itoken) != 1)
+  }
+
+  int result = btokens->qty;
+
+  HARDBUG(bstrListDestroy(btokens) == BSTR_ERR)
+
+  BDESTROY(bsplit)
+
+  return(result);
+}
+
+int search_move(void *self, bstring barg_move)
+{
+  moves_list_t *object = self;
+
   int ihit = INVALID;
-  int nhit = 0;
+
+  int nhits = 0;
 
   int m1[50];
 
-  int n1 = move2int(arg_move, m1);
+  int n1 = move2ints(barg_move, m1);
 
   if (n1 < 2) return(INVALID);
 
-  for (int imove = 0; imove < moves_list->nmoves; imove++)
+  BSTRING(bmove_string)
+ 
+  for (int imove = 0; imove < object->nmoves; imove++)
   {
     int m2[50];
 
-    int n2 = move2int(moves_list->move2string(moves_list, imove), m2);
+    move2bstring(object, imove, bmove_string);
+
+    int n2 = move2ints(bmove_string, m2);
 
     if (n2 < 2) return(INVALID);
 
     if ((m1[0] == m2[0]) and (m1[1] == m2[1]))
     {
       int n = 1;
+
       for (int i1 = 2; i1 < n1; i1++)
       {
+        //search m1[i1] in m2[2..n2]
+
         n = 0;
+
         for (int i2 = 2; i2 < n2; i2++)
           if (m1[i1] == m2[i2]) n++;
+
         if (n != 1) break;
       }
+
       if (n == 1)
       {
         ihit = imove;
-        nhit++;
+
+        nhits++;
       }
     }
   }
-  if (nhit == 0)
-    return (INVALID);
+
+  BDESTROY(bmove_string)
+
+  if (nhits == 0) return (INVALID);
+
   return(ihit);  
 }
 
@@ -135,71 +200,40 @@ void check_moves(board_t *with, moves_list_t *moves_list)
     check_black_moves(with, moves_list);
 }
 
-local char *moves_list_move2string(moves_list_t *self, int imove)
+void construct_moves_list(void *self)
 {
-  HARDBUG(imove < 0)
+  moves_list_t *object = self;
 
-  HARDBUG(imove >= self->nmoves)
+  object->nmoves = 0;
+}
 
-  move_t *move = self->moves + imove;
-   
-  int iboard = move->move_from;
-  int kboard = move->move_to;
+void fprintf_moves_list(void *self, my_printf_t *arg_my_printf,
+  int verbose)
+{ 
+  moves_list_t *object = self;
 
-  ui64_t captures_bb = move->move_captures_bb;
+  BSTRING(bmove_string)
 
-  if (captures_bb == 0)
-    snprintf(self->move_string, MOVE_STRING_MAX, "%s-%s",
-      nota[iboard], nota[kboard]);
+  if (verbose == 0)
+  {
+    for (int imove = 0; imove < object->nmoves; imove++) 
+    {
+      move2bstring(object, imove, bmove_string);
+
+      my_printf(arg_my_printf, "%s\n", bdata(bmove_string));
+    }
+  }
   else
   {
-    int jboard = BIT_CTZ(captures_bb);
-   
-    captures_bb &= ~BITULL(jboard);
-
-    snprintf(self->move_string, MOVE_STRING_MAX, "%sx%sx%s",
-      nota[iboard], nota[kboard], nota[jboard]);
-
-    while(captures_bb != 0)
+    for (int imove = 0; imove < object->nmoves; imove++)
     {
-      jboard = BIT_CTZ(captures_bb);
+      move2bstring(object, imove, bmove_string);
 
-      captures_bb &= ~BITULL(jboard);
-
-      strcat(self->move_string, "x");
-      strcat(self->move_string, nota[jboard]);
+      my_printf(arg_my_printf, "imove=%d move=%s\n", imove,
+                bdata(bmove_string));
     }
   }
 
-  return(self->move_string);
+  BDESTROY(bmove_string)
 }
 
-local void moves_fprintf_moves(my_printf_t *arg_my_printf, moves_list_t *self,
-  int verbose)
-{
-  if (verbose == 0)
-  {
-    for (int imove = 0; imove < self->nmoves; imove++)
-      my_printf(arg_my_printf, "%s\n", self->move2string(self, imove));
-  }
-  else
-  {
-    for (int imove = 0; imove < self->nmoves; imove++)
-      my_printf(arg_my_printf, "imove=%d move=%s\n", imove,
-        self->move2string(self, imove));
-  }
-}
-
-local void moves_printf_moves(moves_list_t *self, int verbose)
-{
-  moves_fprintf_moves(STDOUT, self, verbose);
-}
-
-void create_moves_list(moves_list_t *self)
-{
-  self->nmoves = 0;
-
-  self->move2string = moves_list_move2string;
-  self->fprintf_moves = moves_fprintf_moves;
-  self->printf_moves = moves_printf_moves;
-}

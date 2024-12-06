@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #ifndef BoardsH
 #define BoardsH
 
@@ -65,20 +65,22 @@ typedef i8_t pv_t;
 typedef struct
 {
   int node_ncaptx;
-  hash_key_t node_key;
   hash_key_t node_move_key;
-  ui64_t node_white_man_bb;
-  ui64_t node_white_king_bb;
-  ui64_t node_black_man_bb;
-  ui64_t node_black_king_bb;
-  int node_move_tactical;
 } node_t;
+
+typedef struct 
+{
+  ui64_t BS_key;
+  ui64_t BS_white_man_bb;
+  ui64_t BS_white_king_bb;
+  ui64_t BS_black_man_bb;
+  ui64_t BS_black_king_bb;
+  int BS_npieces;
+} board_state_t;
 
 typedef struct board
 {
-  int board_id;
   my_printf_t *board_my_printf;
-  thread_t *board_thread;
 
   ui64_t board_empty_bb;
   ui64_t board_white_man_bb;
@@ -94,82 +96,12 @@ typedef struct board
 
   node_t board_nodes[NODE_MAX];
 
-  my_timer_t board_timer;
-
-  neural_t board_neural0;
-  int board_neural1_not_null;
-  neural_t board_neural1;
-
-  //endgame
-
-  cache_t board_endgame_entry_cache;
-
-  //dxp
-
-  int board_dxp_game_colour;
-  int board_dxp_game_time;
-  int board_dxp_game_moves;
-  char board_dxp_move_string[MY_LINE_MAX];
-  int board_dxp_game_time_used;
-  int board_dxp_move_number;
-  char board_dxp_game_code;
- 
-  //search
-
-  int board_search_root_simple_score;
-  int board_search_root_score;
-  int board_search_best_score;
-  int board_search_best_score_kind;
-  int board_search_best_move;
-  int board_search_best_depth;
-  pv_t board_search_best_pv[PV_MAX];
-
-  int board_interrupt;
-
-  i64_t total_move_repetitions;
-
-  i64_t total_quiescence_nodes;
-  i64_t total_quiescence_all_moves_captures_only;
-  i64_t total_quiescence_all_moves_le2_moves;
-  i64_t total_quiescence_all_moves_tactical;
-
-  i64_t total_nodes;
-  i64_t total_alpha_beta_nodes;
-  i64_t total_minimal_window_nodes;
-  i64_t total_pv_nodes;
-
-  i64_t total_reductions_delta;
-  i64_t total_reductions_delta_lost;
-  i64_t total_reductions_delta_le_alpha;
-  i64_t total_reductions_delta_ge_beta;
-
-  i64_t total_reductions;
-  i64_t total_reductions_le_alpha;
-  i64_t total_reductions_ge_beta;
-
-  i64_t total_single_reply_extensions;
-
-  i64_t total_evaluations;
-  i64_t total_material_only_evaluations;
-  i64_t total_neural_evaluations;
-
-  i64_t total_alpha_beta_cache_hits;
-  i64_t total_alpha_beta_cache_depth_hits;
-  i64_t total_alpha_beta_cache_le_alpha_hits;
-  i64_t total_alpha_beta_cache_le_alpha_cutoffs;
-  i64_t total_alpha_beta_cache_ge_beta_hits;
-  i64_t total_alpha_beta_cache_ge_beta_cutoffs;
-  i64_t total_alpha_beta_cache_true_score_hits;
-  i64_t total_alpha_beta_cache_le_alpha_stored;
-  i64_t total_alpha_beta_cache_ge_beta_stored;
-  i64_t total_alpha_beta_cache_true_score_stored;
-  i64_t total_alpha_beta_cache_nmoves_errors;
-  i64_t total_alpha_beta_cache_crc32_errors;
+  network_t board_network;
 
   char board_string[MY_LINE_MAX];
 
-  char * (*board2string)(struct board *, int);
-  hash_key_t board_board2string_key;
+  int board_nstate;
+  board_state_t board_states[NODE_MAX];
 } board_t;
 
 extern int map[1 + 50];
@@ -187,18 +119,26 @@ extern hash_key_t white_king_key[BOARD_MAX];
 extern hash_key_t black_man_key[BOARD_MAX];
 extern hash_key_t black_king_key[BOARD_MAX];
 
-board_t *return_with_board(int);
-int create_board(my_printf_t *, thread_t *);
-void destroy_board(int);
-hash_key_t return_key_from_bb(board_t *);
-hash_key_t return_key_from_inputs(neural_t *);
-void string2board(char *, int);
-void fen2board(char *, int);
-//TODO make board2fen member of board_t
-void board2fen(int, char[MY_LINE_MAX], int);
-void print_board(int);
+extern ui64_t left_wing_bb;
+extern ui64_t center_bb;
+extern ui64_t right_wing_bb;
+
+extern ui64_t left_half_bb;
+extern ui64_t right_half_bb;
+
+void construct_board(void *, my_printf_t *);
+void push_board_state(void *self);
+void pop_board_state(void *self);
+
+hash_key_t return_key_from_bb(void *);
+void check_inputs_against_board(void *, network_t *);
+void string2board(board_t *, char *);
+void fen2board(void *, char *);
+void board2fen(int, ui64_t, ui64_t, ui64_t, ui64_t, bstring, int);
+void print_board(board_t *);
 void init_boards();
 void state2board(board_t *, state_t *);
+char *board2string(board_t *, int);
 
 //boards.d
 

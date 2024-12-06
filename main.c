@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 
@@ -29,8 +29,13 @@ local void solve_problems(char *arg_name)
   int nproblems = 0;
   int nsolved = 0;
 
-  int iboard = create_board(STDOUT, NULL);
-  board_t *with = return_with_board(iboard);
+  search_t search;
+
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
+
+  print_board(&(with->S_board));
 
   char line[MY_LINE_MAX];
 
@@ -45,35 +50,37 @@ local void solve_problems(char *arg_name)
 
     ++nproblems;
 
-    fen2board(fen, with->board_id);
+    fen2board(&(with->S_board), fen);
 
-    print_board(with->board_id);
+    print_board(&(with->S_board));
 
     moves_list_t moves_list;
 
-    create_moves_list(&moves_list);
+    construct_moves_list(&moves_list);
 
-    gen_moves(with, &moves_list, FALSE);
+    gen_moves(&(with->S_board), &moves_list, FALSE);
 
-    check_moves(with, &moves_list);
+    check_moves(&(with->S_board), &moves_list);
 
-    moves_list.printf_moves(&moves_list, FALSE);
+    fprintf_moves_list(&moves_list, STDOUT, FALSE);
 
-    char book_move[MY_LINE_MAX];
+    BSTRING(book_move)
 
     if (options.use_book)
-      return_book_move(with, &moves_list, book_move);
+      return_book_move(&(with->S_board), &moves_list, book_move);
     else
       PRINTF("WARNING: book is not enabled!\n");
+
+    BDESTROY(book_move)
 
     if (moves_list.nmoves > 0)
     {
       //options.hub=1;
-      search(with, &moves_list,
+      do_search(with, &moves_list,
         INVALID, INVALID, SCORE_MINUS_INFINITY, FALSE);
 
-      if ((with->board_search_best_score -
-           with->board_search_root_simple_score) > (SCORE_MAN / 2))
+      if ((with->S_best_score -
+           with->S_root_simple_score) > (SCORE_MAN / 2))
       {
         ++nsolved;
         PRINTF("solved problem #%d\n", nproblems);
@@ -175,8 +182,11 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
   double game_time = game_minutes * 60.0;
   double game_time_used = used_minutes * 60.0;
 
-  int iboard = create_board(STDOUT, NULL);
-  board_t *with = return_with_board(iboard);
+  search_t search;
+
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
 
   int automatic = FALSE;
 
@@ -187,15 +197,15 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
     enqueue(return_thread_queue(thread_alpha_beta_master),
       MESSAGE_STATE, game_state.get_state(&game_state));
 
-    state2board(with, &game_state);
+    state2board(&(with->S_board), &game_state);
 
-    print_board(with->board_id);
+    print_board(&(with->S_board));
 
     moves_list_t moves_list;
 
-    create_moves_list(&moves_list);
+    construct_moves_list(&moves_list);
 
-    gen_moves(with, &moves_list, FALSE);
+    gen_moves(&(with->S_board), &moves_list, FALSE);
 
     if (moves_list.nmoves == 0)
     {
@@ -204,7 +214,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
       goto label_return;
     }
 
-    if (with->board_colour2move == human_colour)
+    if (with->S_board.board_colour2move == human_colour)
     {
       //configure thread for pondering
 
@@ -240,17 +250,17 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
         }
       }
 
-      char best_move[MY_LINE_MAX];
+      BSTRING(bbest_move)
 
       double t1 = compat_time();
 
       while(TRUE)
       {
-        char answer[MY_LINE_MAX];
+        BSTRING(banswer)
 
         if (automatic) 
         {
-          *answer = '.';
+          HARDBUG(bassigncstr(banswer, ".") != BSTR_OK)
         }
         else
         {
@@ -266,40 +276,49 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
           if (fgets(line, MY_LINE_MAX, stdin) == NULL) goto label_return;
 
-          if (sscanf(line, "%s", answer) != 1)
+          CSTRING(canswer, strlen(line))
+
+          if (sscanf(line, "%s", canswer) != 1)
           {
             PRINTF("\neh?\n");
+
             continue;
           }
+
+          HARDBUG(bassigncstr(banswer, canswer) != BSTR_OK)
+
+          CDESTROY(canswer)
         }
 
-        if (*answer == '?')
+        if (bchar(banswer, 0) == '?')
         {
-          moves_list.printf_moves(&moves_list, FALSE);
+          fprintf_moves_list(&moves_list, STDOUT, FALSE);
 
           continue;
         }
    
-        if (*answer == 'b')
+        if (bchar(banswer, 0) == 'b')
         {
-          char book_move[MY_LINE_MAX];
+          BSTRING(book_move)
 
           if (options.use_book)
-            return_book_move(with, &moves_list, book_move);
+            return_book_move(&(with->S_board), &moves_list, book_move);
           else
             PRINTF("WARNING: book is not enabled!\n");
+
+          BDESTROY(book_move)
 
           continue;
         }
 
-        if (*answer == 'u')
+        if (bchar(banswer, 0) == 'u')
         {
           game_state.pop_move(&game_state);
 
           goto label_undo;
         }
 
-        if (*answer == 'q')
+        if (bchar(banswer, 0) == 'q')
         {
           enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_ABORT_SEARCH, "main/play_game");
@@ -307,35 +326,37 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
           goto label_return;
         }
 
-        if (*answer == '.')
+        if (bchar(banswer, 0) == '.')
         {
           int imove = return_my_random(&play_random) % moves_list.nmoves;
 
-          strcpy(best_move, moves_list.move2string(&moves_list, imove));
+          move2bstring(&moves_list, imove, bbest_move);
 
-          PRINTF("randomly selected move %s\n", best_move);
+          PRINTF("randomly selected move %s\n", bdata(bbest_move));
 
           break;
         }
 
-        if (*answer == 'a')
+        if (bchar(banswer, 0) == 'a')
         {
           automatic = TRUE;
           continue;
         }
 
-        int imove = search_move(&moves_list, answer);
+        int imove = search_move(&moves_list, banswer);
 
         if (imove == INVALID)
         {
-          moves_list.printf_moves(&moves_list, FALSE);
+          fprintf_moves_list(&moves_list, STDOUT, FALSE);
 
           PRINTF("eh?\n\n");
 
           continue;
         }
 
-        strcpy(best_move, moves_list.move2string(&moves_list, imove));
+        move2bstring(&moves_list, imove, bbest_move);
+
+        BDESTROY(banswer)
 
         break;
       }
@@ -350,7 +371,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
       snprintf(comment, MY_LINE_MAX, "%d", 0);
 
-      game_state.push_move(&game_state, best_move, comment);
+      game_state.push_move(&game_state, bdata(bbest_move), comment);
 
       ++ndone;
 
@@ -378,17 +399,19 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
           compat_sleep(CENTI_SECOND);
         }
       }
+      BDESTROY(bbest_move)
     }
     else
     {
-      char best_move[MY_LINE_MAX];
+      BSTRING(bbest_move)
+
       int best_score;
 
       double t1 = compat_time();
 
       if (moves_list.nmoves == 1)
       {
-        strcpy(best_move, moves_list.move2string(&moves_list, 0));
+        move2bstring(&moves_list, 0, bbest_move);
 
         best_score = 0;
 
@@ -397,13 +420,14 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
       //check book move
  
-      strcpy(best_move, "NULL");
+      HARDBUG(bassigncstr(bbest_move, "NULL") != BSTR_OK)
  
-      if (options.use_book) return_book_move(with, &moves_list, best_move);
+      if (options.use_book)
+        return_book_move(&(with->S_board), &moves_list, bbest_move);
 
-      if (compat_strcasecmp(best_move, "NULL") != 0)
+      if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
       {
-        PRINTF("book move=%s\n", best_move);
+        PRINTF("book move=%s\n", bdata(bbest_move));
 
         best_score = 0;
 
@@ -447,8 +471,14 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
           {
             PRINTF("\ngot result %s\n", bdata(message.message_text));
 
+            CSTRING(cbest_move, blength(message.message_text))
+
             HARDBUG(sscanf(bdata(message.message_text), "%s%d",
-                       best_move, &best_score) != 2)
+                           cbest_move, &best_score) != 2)
+
+            HARDBUG(bassigncstr(bbest_move, cbest_move) != BSTR_OK)
+
+            CDESTROY(cbest_move)
 
             goto label_break;
           }
@@ -475,13 +505,15 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
       PRINTF("remain %s\n", secs2string(round(game_time - game_time_used)));
 
       PRINTF("\n* * * * * * * * * * %s %d\n\n",
-        best_move, best_score);
+        bdata(bbest_move), best_score);
 
       char comment[MY_LINE_MAX];
 
       snprintf(comment, MY_LINE_MAX, "%d", best_score);
 
-      game_state.push_move(&game_state, best_move, comment);
+      game_state.push_move(&game_state, bdata(bbest_move), comment);
+
+      BDESTROY(bbest_move)
     }
   }
   label_return:
@@ -503,8 +535,11 @@ local void gen_random(char *name, int nwhite, int nblack)
 
   HARDBUG((frandom = fopen(name, "w")) == NULL)
 
-  int iboard = create_board(STDOUT, NULL);
-  board_t *with = return_with_board(iboard);
+  search_t search;
+
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
 
   for (int iwhite = 1; iwhite <= nwhite; ++iwhite)
   {
@@ -568,27 +603,34 @@ local void gen_random(char *name, int nwhite, int nblack)
       }
       s[51] = '\0';
 
-      string2board(s, iboard);
+      string2board(&(with->S_board), s);
 
-      print_board(iboard);
+      print_board(&(with->S_board));
 
-      HARDBUG(compat_strcasecmp(s, with->board2string(with, FALSE)) != 0)
+      HARDBUG(compat_strcasecmp(s, board2string(&(with->S_board), FALSE)) != 0)
 
       moves_list_t moves_list;
 
-      create_moves_list(&moves_list);
+      construct_moves_list(&moves_list);
 
-      gen_moves(with, &moves_list, FALSE);
+      gen_moves(&(with->S_board), &moves_list, FALSE);
 
-      check_moves(with, &moves_list);
+      check_moves(&(with->S_board), &moves_list);
 
       if (moves_list.nmoves > 0)
       {
-        char fen[MY_LINE_MAX];
+        BSTRING(bfen)
 
-        board2fen(iboard, fen, FALSE);
+        board2fen(with->S_board.board_colour2move,
+          with->S_board.board_white_man_bb,
+          with->S_board.board_black_man_bb,
+          with->S_board.board_white_king_bb,
+          with->S_board.board_black_king_bb,
+          bfen, FALSE);
 
-        HARDBUG(fprintf(frandom, "%s\n", fen) < 0)
+        HARDBUG(fprintf(frandom, "%s\n", bdata(bfen)) < 0)
+
+        BDESTROY(bfen)
       }
     }
   }
@@ -658,12 +700,12 @@ local void load_gwd_json(void)
 
   options.verbose = 1;
 
-  strcpy(options.neural0_name, "NULL");
-  strcpy(options.neural1_name, "NULL");
+  strcpy(options.networks, "NULL");
+  strcpy(options.network_name, "NULL");
 
-  options.neural_evaluation_min = -100;
-  options.neural_evaluation_max = -25;
-  options.neural_evaluation_time = 30;
+  options.network_evaluation_min = -100;
+  options.network_evaluation_max = -25;
+  options.network_evaluation_time = 30;
 
   options.time_limit = 30.0;
 
@@ -693,6 +735,9 @@ local void load_gwd_json(void)
   options.captures_are_transparent = TRUE;
   options.returned_depth_includes_captures = FALSE;
 
+  options.quiescence_extension_search_delta = 25;
+  options.pv_extension_search_delta = 25;
+
   options.use_reductions = TRUE;
 
   options.reduction_depth_root = 2;
@@ -705,9 +750,6 @@ local void load_gwd_json(void)
   options.reduction_max = 80;
   options.reduction_max = 50;
   options.reduction_min = 20;
-
-  options.row9_captures_are_tactical = TRUE;
-  options.promotions_are_tactical = TRUE;
 
   options.use_single_reply_extensions = TRUE;
 
@@ -789,14 +831,14 @@ local void parse_parameters(void)
       if (compat_strcasecmp(parameter_name, "verbose") == 0)  
         options.verbose = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "neural_evaluation_min") == 0)  
-        options.neural_evaluation_min = ivalue;
+      else if (compat_strcasecmp(parameter_name, "network_evaluation_min") == 0)  
+        options.network_evaluation_min = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "neural_evaluation_max") == 0)  
-        options.neural_evaluation_max = ivalue;
+      else if (compat_strcasecmp(parameter_name, "network_evaluation_max") == 0)  
+        options.network_evaluation_max = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "neural_evaluation_time") == 0)  
-        options.neural_evaluation_time = ivalue;
+      else if (compat_strcasecmp(parameter_name, "network_evaluation_time") == 0)  
+        options.network_evaluation_time = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "time_control_ntrouble") == 0)  
         options.time_control_ntrouble = ivalue;
@@ -837,6 +879,14 @@ local void parse_parameters(void)
           }
         }
       }
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "quiescence_extension_search_delta") == 0)  
+        options.quiescence_extension_search_delta = ivalue;
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "pv_extension_search_delta") == 0)  
+        options.pv_extension_search_delta = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_depth_root") == 0)  
         options.reduction_depth_root = ivalue;
@@ -946,11 +996,11 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "overrides") == 0)  
         strncpy(options.overrides, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "neural0_name") == 0)  
-        strncpy(options.neural0_name, svalue, MY_LINE_MAX);
+      else if (compat_strcasecmp(parameter_name, "networks") == 0)  
+        strncpy(options.networks, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "neural1_name") == 0)  
-        strncpy(options.neural1_name, svalue, MY_LINE_MAX);
+      else if (compat_strcasecmp(parameter_name, "network_name") == 0)  
+        strncpy(options.network_name, svalue, MY_LINE_MAX);
 
       else if (compat_strcasecmp(parameter_name, "book_name") == 0)  
         strncpy(options.book_name, svalue, MY_LINE_MAX);
@@ -1010,13 +1060,6 @@ local void parse_parameters(void)
 
       else if (compat_strcasecmp(parameter_name, "use_reductions") == 0)  
         options.use_reductions = bvalue;
-
-      else if (compat_strcasecmp(parameter_name,
-                             "row9_captures_are_tactical") == 0)  
-        options.row9_captures_are_tactical = bvalue;
-
-      else if (compat_strcasecmp(parameter_name, "promotions_are_tactical") == 0)  
-        options.promotions_are_tactical = bvalue;
 
       else if (compat_strcasecmp(parameter_name,
                              "use_single_reply_extensions") == 0)  
@@ -1315,7 +1358,9 @@ void results2csv(int nwon, int ndraw, int nlost, int nunknown)
       char stamp[MY_LINE_MAX];
 
       time_t t = time(NULL);
-      (void) strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t));
+
+      HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S",
+                       localtime(&t)) == 0)
 
       char newpath[MY_LINE_MAX];
 
@@ -1336,7 +1381,9 @@ void results2csv(int nwon, int ndraw, int nlost, int nunknown)
   char stamp[MY_LINE_MAX];
 
   time_t t = time(NULL);
-  (void) strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t));
+
+  HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S",
+                   localtime(&t)) == 0)
 
   HARDBUG(fprintf(fcsv, "\"%s\",\"%s\"", REVISION, stamp) < 0)
 
@@ -1497,6 +1544,8 @@ int main(int argc, char **argv)
     exit(EXIT_SUCCESS);
   }
 
+  init_my_malloc();
+
   load_gwd_json();
 
   parse_parameters();
@@ -1511,9 +1560,10 @@ int main(int argc, char **argv)
     PRINTF("required parameter overrides not found in gwd.json!"); 
     exit(EXIT_FAILURE);
   }
-  if (compat_strcasecmp(options.neural0_name, "NULL") == 0)
+  if (compat_strcasecmp(options.network_name, "NULL") == 0)
   {
-    PRINTF("required parameter neural0_name not found in gwd.json!"); 
+    PRINTF("required parameter network_name not found in gwd.json!"); 
+
     exit(EXIT_FAILURE);
   }
 
@@ -1890,11 +1940,11 @@ int main(int argc, char **argv)
 
   PRINTF_CFG_I(verbose);
 
-  PRINTF_CFG_S(neural0_name);
-  PRINTF_CFG_S(neural1_name);
-  PRINTF_CFG_I(neural_evaluation_min);
-  PRINTF_CFG_I(neural_evaluation_max);
-  PRINTF_CFG_I(neural_evaluation_time);
+  PRINTF_CFG_S(networks);
+  PRINTF_CFG_S(network_name);
+  PRINTF_CFG_I(network_evaluation_min);
+  PRINTF_CFG_I(network_evaluation_max);
+  PRINTF_CFG_I(network_evaluation_time);
 
   PRINTF_CFG_D(time_limit);
 
@@ -1920,6 +1970,9 @@ int main(int argc, char **argv)
   PRINTF_CFG_B(captures_are_transparent);
   PRINTF_CFG_B(returned_depth_includes_captures);
 
+  PRINTF_CFG_I(quiescence_extension_search_delta);
+  PRINTF_CFG_I(pv_extension_search_delta);
+
   PRINTF_CFG_B(use_reductions);
 
   PRINTF_CFG_I(reduction_depth_root);
@@ -1933,9 +1986,6 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(reduction_strong);
   PRINTF_CFG_I(reduction_weak);
   PRINTF_CFG_I(reduction_min);
-
-  PRINTF_CFG_B(row9_captures_are_tactical);
-  PRINTF_CFG_B(promotions_are_tactical);
 
   PRINTF_CFG_B(use_single_reply_extensions);
 
@@ -2011,6 +2061,9 @@ int main(int argc, char **argv)
 
   //parameter checks
 
+  HARDBUG(options.quiescence_extension_search_delta < 0)
+  HARDBUG(options.pv_extension_search_delta < 0)
+
   HARDBUG(options.reduction_depth_root < 0)
   HARDBUG(options.reduction_depth_leaf < 0)
 
@@ -2025,8 +2078,6 @@ int main(int argc, char **argv)
   //BEGIN_BLOCK("main-init")
 
     if (my_mpi_globals.MY_MPIG_nglobal > 0) test_mpi();
-
-    init_my_malloc();
 
     construct_my_random(&main_random, 0);
 
@@ -2055,6 +2106,8 @@ int main(int argc, char **argv)
 
     //test_my_printf();
 
+    test_my_cjson();
+
     test_buckets();
 
     test_my_random();
@@ -2075,7 +2128,7 @@ int main(int argc, char **argv)
 
     test_caches();
 
-    //test_neural();
+    //test_network();
 
     //test_nmsimplex();
 
@@ -2135,7 +2188,7 @@ int main(int argc, char **argv)
   
     start_threads();
 
-    HARDBUG(thread_alpha_beta_master == INVALID)
+    HARDBUG(thread_alpha_beta_master == NULL)
   
     solve_problems_multi_threaded(argv[iarg]);
   
@@ -2305,7 +2358,7 @@ int main(int argc, char **argv)
   {
     gen_random("random.fen", 20, 20);
   }
-  else if (compat_strcasecmp(argv[iarg], "endgame") == 0)
+  else if (compat_strcasecmp(argv[iarg], "gen_endgame") == 0)
   {
     gen_random("endgame.fen", 2, 2);
   }
@@ -2449,25 +2502,28 @@ int main(int argc, char **argv)
     { 
       char line[MY_LINE_MAX];
 
-      char answer[MY_LINE_MAX];
-
       if (fexists(name))
       {
         PRINTF("\nDo you want to resume the game from %s (y/n)?\n", name);
 
         if (fgets(line, MY_LINE_MAX, stdin) == NULL) break;
 
-        if (sscanf(line, "%s", answer) != 1) *answer = 'y';
+        CSTRING(canswer, strlen(line))
 
-        if (*answer == 'y')
+        if (sscanf(line, "%s", canswer) != 1) strcpy(canswer, "y");
+
+        if (*canswer == 'y')
         {
           PRINTF("Resuming game from %s\n", name);
         }
         else
         {
           PRINTF("New game %s\n", name);
+
           remove(name);
         }
+
+        CDESTROY(canswer)
       }
 
       play_game(name, colour, game_minutes, used_minutes);
@@ -2476,11 +2532,18 @@ int main(int argc, char **argv)
 
       if (fgets(line, MY_LINE_MAX, stdin) == NULL) break;
 
-      if (sscanf(line, "%s", answer) != 1)
+      CSTRING(canswer, strlen(line))
+
+      if (sscanf(line, "%s", canswer) != 1)
       {
         PRINTF("\neh?\n");
+
         continue;
       }
+
+      char *answer = canswer;
+
+      CDESTROY(canswer)
 
       if (*answer == 'n') break;
       
@@ -2519,15 +2582,15 @@ int main(int argc, char **argv)
     PRINTF("before join\n");
     join_threads();
   }
-  else if (compat_strcasecmp(argv[iarg], "fen2neural") == 0)
+  else if (compat_strcasecmp(argv[iarg], "fen2network") == 0)
   { 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
     if (options.nslaves < 1)
     {
-      PRINTF("fen2neural requires --nslaves >= 1\n");
-      FATAL("fen2neural", EXIT_FAILURE);
+      PRINTF("fen2network requires --nslaves >= 1\n");
+      FATAL("fen2network", EXIT_FAILURE);
     }
 
     i64_t memory_slaves = memory * options.nslaves;
@@ -2538,17 +2601,17 @@ int main(int argc, char **argv)
   
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2neural(argv[iarg]);
+    if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2network(argv[iarg]);
   }
-  else if (compat_strcasecmp(argv[iarg], "fen2search") == 0)
+  else if (compat_strcasecmp(argv[iarg], "fen2bar") == 0)
   { 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
     if (options.nslaves < 1)
     {
-      PRINTF("fen2search requires --nslaves >= 1\n");
-      FATAL("fen2search", EXIT_FAILURE);
+      PRINTF("fen2network requires --nslaves >= 1\n");
+      FATAL("fen2network", EXIT_FAILURE);
     }
 
     i64_t memory_slaves = memory * options.nslaves;
@@ -2559,32 +2622,7 @@ int main(int argc, char **argv)
   
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2search(argv[iarg]);
-  }
-  else if (compat_strcasecmp(argv[iarg], "fen2csv") == 0)
-  { 
-    iarg++;
-    HARDBUG(argv[iarg] == NULL)
-
-    if (options.nslaves < 1)
-    {
-      PRINTF("fen2neural requires --nslaves >= 1\n");
-      FATAL("fen2neural", EXIT_FAILURE);
-    }
-
-    i64_t memory_slaves = memory * options.nslaves;
-
-    HARDBUG(memory_slaves >= physical_memory)
-
-    int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
-  
-    //HARDBUG(nthreads_slaves > physical_cpus)
-
-    if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2csv(argv[iarg]);
-  }
-  else if (compat_strcasecmp(argv[iarg], "egtb2neural") == 0)
-  { 
-    egtb2neural();
+    if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2bar(argv[iarg]);
   }
   else if (compat_strcasecmp(argv[iarg], "dxp_server") == 0)
   {

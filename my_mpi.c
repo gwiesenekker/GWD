@@ -1,6 +1,6 @@
 #include "globals.h"
 
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 
 my_mpi_globals_t my_mpi_globals =
 {

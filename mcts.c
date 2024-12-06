@@ -1,31 +1,27 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 mcts_globals_t mcts_globals;
 
 local my_random_t mcts_random;
 
-local int return_scaled_float_score(int best_score, ui64_t key)
-{
-  int result = best_score * SCALED_FLOAT_FACTOR;
+#define the_mcts_quiescence(X) cat2(X, _mcts_quiescence)
+#define my_mcts_quiescence     the_mcts_quiescence(my_colour)
+#define your_mcts_quiescence   the_mcts_quiescence(your_colour)
 
-  if (best_score == SCORE_WON)
-  { 
-    result -= key % (SCALED_FLOAT_FACTOR / 10);
-  }
-  else if (best_score == SCORE_LOST)
-  {
-    result += key % (SCALED_FLOAT_FACTOR / 10);
-  }
-  else
-  {
-    if ((key % 2) == 0)
-      result += key % (SCALED_FLOAT_FACTOR / 10);
-    else
-      result -= key % (SCALED_FLOAT_FACTOR / 10);
-  }
-  return(result);
-}
+#define the_mcts_alpha_beta(X) cat2(X, _mcts_alpha_beta)
+#define my_mcts_alpha_beta     the_mcts_alpha_beta(my_colour)
+#define your_mcts_alpha_beta   the_mcts_alpha_beta(your_colour)
+
+local int white_mcts_quiescence(search_t *, int, int, int, int,
+  moves_list_t *, int *);
+local int black_mcts_quiescence(search_t *, int, int, int, int,
+  moves_list_t *, int *);
+
+local int white_mcts_alpha_beta(search_t *, int, int, int, int, int,
+  moves_list_t *, int *);
+local int black_mcts_alpha_beta(search_t *, int, int, int, int, int,
+  moves_list_t *, int *);
 
 #define MY_BIT      WHITE_BIT
 #define YOUR_BIT    BLACK_BIT
@@ -51,35 +47,55 @@ local int return_scaled_float_score(int best_score, ui64_t key)
 #undef my_colour
 #undef your_colour
 
-local int mcts_shoot_out(board_t *with, int nply, int alpha_beta_depth)
+local int mcts_quiescence(search_t *with, int nply, int alpha, int beta, 
+  int node_type, moves_list_t *moves_list, int *best_pv)
+{
+  if (IS_WHITE(with->S_board.board_colour2move))
+  {
+    return(white_mcts_quiescence(with, nply,
+      alpha, beta, node_type, moves_list, best_pv));
+  }
+  else
+  {
+    return(black_mcts_quiescence(with, nply,
+      alpha, beta, node_type, moves_list, best_pv));
+  }
+}
+
+local int mcts_alpha_beta(search_t *with, int nply,
+  int alpha, int beta, int depth,
+  int node_type, moves_list_t *moves_list, int *best_pv)
+{
+  if (IS_WHITE(with->S_board.board_colour2move))
+  {
+    return(white_mcts_alpha_beta(with, nply,
+      alpha, beta, depth,
+      node_type, moves_list, best_pv));
+  }
+  else
+  {
+    return(black_mcts_alpha_beta(with, nply,
+      alpha, beta, depth,
+      node_type, moves_list, best_pv));
+  }
+}
+
+local int mcts_shoot_out(search_t *with, int nply, int alpha_beta_depth)
 {
   int result = 0;
 
-  if (with->board_inode > 200)
+  if (with->S_board.board_inode > 200)
   {
-    print_board(with->board_id);
+    print_board(&(with->S_board));
+
     PRINTF("WARNING: VERY DEEP SEARCH\n");
   }
 
   moves_list_t moves_list;
 
-  create_moves_list(&moves_list);
+  construct_moves_list(&moves_list);
 
-  gen_moves(with, &moves_list, FALSE);
-
-  for (int imove = moves_list.nmoves - 1; imove >= 1; --imove)
-  {
-    int jmove = return_my_random(&mcts_random) % (imove + 1);
-
-    if (jmove != imove)
-    {
-      move_t temp = moves_list.moves[imove];
-
-      moves_list.moves[imove] = moves_list.moves[jmove];
-
-      moves_list.moves[jmove] = temp;
-    }
-  }
+  gen_moves(&(with->S_board), &moves_list, FALSE);
 
   int best_pv;
 
@@ -98,7 +114,7 @@ local int mcts_shoot_out(board_t *with, int nply, int alpha_beta_depth)
       PV_BIT, &moves_list, &best_pv);
   }
 
-  if (best_pv == INVALID)
+  if ((best_pv == INVALID) or (nply >= MCTS_PLY_MAX))
   {
     result = best_score;
 
@@ -109,18 +125,18 @@ local int mcts_shoot_out(board_t *with, int nply, int alpha_beta_depth)
 
   HARDBUG(best_pv >= moves_list.nmoves)
 
-  do_move(with, best_pv, &moves_list);
+  do_move(&(with->S_board), best_pv, &moves_list);
 
   result = -mcts_shoot_out(with, nply, alpha_beta_depth);
 
-  undo_move(with, best_pv, &moves_list);
+  undo_move(&(with->S_board), best_pv, &moves_list);
 
   label_return:
 
   return(result);
 }
 
-double mcts_shoot_outs(board_t *with, int nply,
+double mcts_shoot_outs(search_t *with, int nply,
   int nshoot_outs, int alpha_beta_depth)
 {
   HARDBUG(nshoot_outs < 1)
@@ -143,52 +159,21 @@ double mcts_shoot_outs(board_t *with, int nply,
       ndraw++;
   }
 
-  PRINTF("nwon=%d nlost=%d ndraw=%d\n", nwon, nlost, ndraw);
+  result = (double) (nwon - nlost) / nshoot_outs;
 
-  result = 1.0 * (nwon - nlost) / nshoot_outs;
+  PRINTF("nwon=%d nlost=%d ndraw=%d result=%.6f\n",
+         nwon, nlost, ndraw, result);
 
   return(result);
 }
 
-int mcts_quiescence(board_t *with, int nply, int alpha, int beta, 
-  int node_type, moves_list_t *moves_list, int *best_pv)
-{
-  if (IS_WHITE(with->board_colour2move))
-  {
-    return(white_mcts_quiescence(with, nply,
-      alpha, beta, node_type, moves_list, best_pv));
-  }
-  else
-  {
-    return(black_mcts_quiescence(with, nply,
-      alpha, beta, node_type, moves_list, best_pv));
-  }
-}
-
-int mcts_alpha_beta(board_t *with, int nply,
-  int alpha, int beta, int depth,
-  int node_type, moves_list_t *moves_list, int *best_pv)
-{
-  if (IS_WHITE(with->board_colour2move))
-  {
-    return(white_mcts_alpha_beta(with, nply,
-      alpha, beta, depth,
-      node_type, moves_list, best_pv));
-  }
-  else
-  {
-    return(black_mcts_alpha_beta(with, nply,
-      alpha, beta, depth,
-      node_type, moves_list, best_pv));
-  }
-}
-
 void init_mcts(void)
 {
-  construct_my_random(&mcts_random, 0);
+  if (my_mpi_globals.MY_MPIG_nslaves == 1)
+    construct_my_random(&mcts_random, 0);
+  else
+    construct_my_random(&mcts_random, INVALID);
 
-  construct_my_timer(&(mcts_globals.mcts_globals_timer), "mcts",
-    STDOUT, FALSE);
   mcts_globals.mcts_globals_time_limit = 2.0;
   mcts_globals.mcts_globals_nodes = 0;
 }

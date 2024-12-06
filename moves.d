@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
 {
   BEGIN_BLOCK(__FUNC__)
@@ -6,11 +6,15 @@ void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
   SOFTBUG(with->board_colour2move != MY_BIT)
 
   moves_list->nmoves = 0;
+  moves_list->nblocked = 0;
   moves_list->ncaptx = 0;
 
   ui64_t my_bb = (with->my_man_bb | with->my_king_bb);
   ui64_t your_bb = (with->your_man_bb | with->your_king_bb);
   ui64_t empty_bb = with->board_empty_bb & ~(my_bb | your_bb);
+
+  ui64_t my_bb_blocked = my_bb;
+  ui64_t empty_bb_blocked = empty_bb;
 
   while(my_bb != 0)
   {
@@ -29,9 +33,9 @@ void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
 
       if (with->my_man_bb & BITULL(iboard1))
       {
-        if (empty_bb & BITULL(jboard1))
+        if ((i < 2) and (moves_list->ncaptx == 0))
         {
-          if ((i < 2) and (moves_list->ncaptx == 0))
+          if (empty_bb & BITULL(jboard1))
           {
             SOFTBUG(moves_list->nmoves >= MOVES_MAX)
 
@@ -42,6 +46,15 @@ void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
             move->move_captures_bb = 0;
        
             moves_list->nmoves++;
+          }
+          else if (my_bb_blocked & BITULL(jboard1))
+          {   
+            moves_list->nblocked++;
+          }
+          else if ((your_bb & BITULL(jboard1)) and
+                   !(empty_bb_blocked & BITULL(jboard1 + my_dir[i])))
+          {   
+            moves_list->nblocked++;
           }
         }
       }
@@ -103,6 +116,7 @@ void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
             moves_list->ncaptx = ncapt;
 
             moves_list->nmoves = 0;
+            moves_list->nblocked = 0;
           }
           if (ncapt == moves_list->ncaptx)
           {
@@ -238,39 +252,33 @@ void gen_my_moves(board_t *with, moves_list_t *moves_list, int quiescence)
 
     int move_weight = move_score_delta;
 
-    int move_tactical = FALSE;
+    int move_flag = 0;
 
     if (with->my_man_bb & BITULL(iboard))
     {
       if (my_row[kboard] == 8)
       {
-        move_weight = move_score_delta + 1;
+        move_weight = move_score_delta + 10;
       }
       else if (my_row[kboard] == 9)
       {
-        move_weight = move_score_delta + 2;
+        move_weight = move_score_delta + 20;
 
-        if (options.row9_captures_are_tactical and (moves_list->ncaptx > 0))
-        {
-          move_tactical = ROW9_CAPTURE_BIT;
-        }
+        move_flag = MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT;
       }
       else if (my_row[kboard] == 10)
       {
         move_score_delta += SCORE_KING - SCORE_MAN;
 
-        move_weight = move_score_delta + 3;
+        move_weight = move_score_delta + 30;
 
-        if (options.promotions_are_tactical)
-        {
-          move_tactical = PROMOTION_BIT;
-        }
+        move_flag = MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT;
       }
     }
 
     moves_list->moves_weight[imove] = move_weight;
 
-    moves_list->moves_tactical[imove] = move_tactical;
+    moves_list->moves_flag[imove] = move_flag;
   }
 
   with->board_nodes[with->board_inode].node_ncaptx = moves_list->ncaptx;
@@ -386,54 +394,21 @@ void do_my_move(board_t *with, int imove, moves_list_t *moves_list)
 
   SOFTBUG(with->board_colour2move != MY_BIT)
 
+  push_board_state(with);
+
   node_t *node = with->board_nodes + with->board_inode;
 
-  node->node_key = with->board_key;
+  ui64_t move_key = 0;
 
-  node->node_white_man_bb = with->board_white_man_bb;
-  node->node_white_king_bb = with->board_white_king_bb;
-  node->node_black_man_bb = with->board_black_man_bb;
-  node->node_black_king_bb = with->board_black_king_bb;
-
-  node->node_move_tactical = moves_list->moves_tactical[imove];
-
-  int nwm_before = BIT_COUNT(with->board_white_man_bb);
-  int nbm_before = BIT_COUNT(with->board_black_man_bb);
-
-  int nwc_before = BIT_COUNT(with->board_white_king_bb);
-  int nbc_before = BIT_COUNT(with->board_black_king_bb);
-
-  int king0_weight = 1;
-  int king1_weight = 1;
-
-  if (with->board_neural0.neural_king_weight > 0)
-  {
-    king0_weight = (40 - nwm_before - nbm_before) /
-                   with->board_neural0.neural_king_weight;
-
-    if (king0_weight < 1) king0_weight = 1;
-  }
-  
-  if ((with->board_neural1_not_null) and
-      (with->board_neural1.neural_king_weight > 0))
-  {
-    king1_weight = (40 - nwm_before - nbm_before) /
-                   with->board_neural1.neural_king_weight;
-
-    if (king1_weight < 1) king1_weight = 1;
-  }
+  if (!options.material_only)
+    push_network_state(&(with->board_network));
+ 
+  if (moves_list == NULL) goto label_null;
 
   move_t *move = moves_list->moves + imove;
 
-  ui64_t move_key;
-
   int iboard = move->move_from;
   int kboard = move->move_to;
-
-  copy_layer0(&(with->board_neural0));
- 
-  if (with->board_neural1_not_null)
-    copy_layer0(&(with->board_neural1));
 
   if (iboard != kboard)
   {
@@ -443,14 +418,10 @@ void do_my_move(board_t *with, int imove, moves_list_t *moves_list)
 
       XOR_HASH_KEY(with->board_key, my_man_key[iboard])
 
-      update_layer0(&(with->board_neural0),
-                    with->board_neural0.my_man_input_map[iboard], -1); 
 
-      if (with->board_neural1_not_null)
-      {
-        update_layer0(&(with->board_neural1),
-                      with->board_neural1.my_man_input_map[iboard], -1); 
-      }
+      if (!options.material_only)
+        update_layer0(&(with->board_network),
+                      with->board_network.my_man_input_map[iboard], -1);
 
       with->my_man_bb &= ~BITULL(iboard);
 
@@ -465,29 +436,6 @@ void do_my_move(board_t *with, int imove, moves_list_t *moves_list)
 
       XOR_HASH_KEY(with->board_key, my_king_key[iboard]);
 
-      if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V5)
-      {
-        int king_weight = 
-          with->board_neural0.neural_inputs[with->board_neural0
-                                            .my_king_input_map[iboard]];
-
-        update_layer0(&(with->board_neural0),
-                      with->board_neural0
-                      .my_king_input_map[iboard], -king_weight); 
-      }
-
-      if (with->board_neural1_not_null and
-          (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V5))
-      {
-        int king_weight = 
-          with->board_neural1.neural_inputs[with->board_neural1
-                                            .my_king_input_map[iboard]];
-
-        update_layer0(&(with->board_neural1),
-                      with->board_neural1
-                      .my_king_input_map[iboard], -king_weight); 
-      }
-
       with->my_king_bb &= ~BITULL(iboard);
 
       with->my_king_bb |= BITULL(kboard);
@@ -499,54 +447,24 @@ void do_my_move(board_t *with, int imove, moves_list_t *moves_list)
 
       XOR_HASH_KEY(with->board_key, my_man_key[kboard])
 
-      update_layer0(&(with->board_neural0),
-                    with->board_neural0.my_man_input_map[kboard], 1); 
-
-      if (with->board_neural1_not_null)
-      {
-        update_layer0(&(with->board_neural1),
-                      with->board_neural1.my_man_input_map[kboard], 1); 
-      }
+      if (!options.material_only)
+        update_layer0(&(with->board_network),
+                      with->board_network.my_man_input_map[kboard], 1);
     }
     else
     {
       move_key ^= my_king_key[kboard];
 
       XOR_HASH_KEY(with->board_key, my_king_key[kboard])
-
-      if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V5)
-      {
-        update_layer0(&(with->board_neural0),
-                      with->board_neural0
-                      .my_king_input_map[kboard], king0_weight); 
-      }
-
-      if (with->board_neural1_not_null and
-          (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V5))
-      {
-        update_layer0(&(with->board_neural1),
-                      with->board_neural1
-                      .my_king_input_map[kboard], king1_weight); 
-      }
     }
 
-    if (with->board_neural0.neural_input_map != NEURAL_INPUT_MAP_V7)
+    if (!options.material_only)
     {
-      update_layer0(&(with->board_neural0),
-                    with->board_neural0.empty_input_map[iboard], 1);
+      update_layer0(&(with->board_network),
+                    with->board_network.empty_input_map[iboard], 1);
 
-      update_layer0(&(with->board_neural0),
-                    with->board_neural0.empty_input_map[kboard], -1);
-    }
-
-    if (with->board_neural1_not_null and
-        (with->board_neural1.neural_input_map != NEURAL_INPUT_MAP_V7))
-    {
-      update_layer0(&(with->board_neural1),
-                    with->board_neural1.empty_input_map[iboard], 1);
-
-      update_layer0(&(with->board_neural1),
-                    with->board_neural1.empty_input_map[kboard], -1);
+      update_layer0(&(with->board_network),
+                    with->board_network.empty_input_map[kboard], -1);
     }
   }
 
@@ -564,14 +482,9 @@ void do_my_move(board_t *with, int imove, moves_list_t *moves_list)
 
       XOR_HASH_KEY(with->board_key, your_man_key[jboard])
 
-      update_layer0(&(with->board_neural0),
-                    with->board_neural0.your_man_input_map[jboard], -1); 
-
-      if (with->board_neural1_not_null)
-      {
-        update_layer0(&(with->board_neural1),
-                      with->board_neural1.your_man_input_map[jboard], -1); 
-      }
+      if (!options.material_only)
+        update_layer0(&(with->board_network),
+                      with->board_network.your_man_input_map[jboard], -1); 
 
       with->your_man_bb &= ~BITULL(jboard);
     }
@@ -581,157 +494,15 @@ void do_my_move(board_t *with, int imove, moves_list_t *moves_list)
 
       XOR_HASH_KEY(with->board_key, your_king_key[jboard])
 
-      if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V5)
-      {
-        int king_weight = 
-          with->board_neural0.neural_inputs[with->board_neural0
-                                            .your_king_input_map[jboard]];
-
-        update_layer0(&(with->board_neural0),
-                      with->board_neural0
-                      .your_king_input_map[jboard], -king_weight); 
-      }
-
-      if (with->board_neural1_not_null and
-          (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V5))
-      {
-        int king_weight = 
-          with->board_neural1.neural_inputs[with->board_neural1
-                                            .your_king_input_map[jboard]];
-
-        update_layer0(&(with->board_neural1),
-                      with->board_neural1
-                      .your_king_input_map[jboard], -king_weight); 
-      }
-
       with->your_king_bb &= ~BITULL(jboard);
     }
 
-    if (with->board_neural0.neural_input_map != NEURAL_INPUT_MAP_V7)
-    {
-      update_layer0(&(with->board_neural0),
-                    with->board_neural0.empty_input_map[jboard], 1);
-    }
-
-    if (with->board_neural1_not_null and
-        (with->board_neural1.neural_input_map != NEURAL_INPUT_MAP_V7))
-    {
-      update_layer0(&(with->board_neural1),
-                    with->board_neural1.empty_input_map[jboard], 1);
-    }
+    if (!options.material_only)
+      update_layer0(&(with->board_network),
+                    with->board_network.empty_input_map[jboard], 1);
   }
 
-  //adjust weights in case of captures
-
-  {
-    ui64_t king_bb = with->my_king_bb;
-
-    while(king_bb != 0)
-    {
-      int jboard = BIT_CTZ(king_bb);
-
-      king_bb &= ~BITULL(jboard);
-
-      if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V5)
-      {
-        int king_weight = 
-          with->board_neural0.neural_inputs[with->board_neural0
-                                            .my_king_input_map[jboard]];
-
-        if (king0_weight != king_weight)
-          update_layer0(&(with->board_neural0),
-                        with->board_neural0
-                        .my_king_input_map[jboard],
-                        -king_weight + king0_weight); 
-      }
-
-      if (with->board_neural1_not_null and
-          (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V5))
-      { 
-        int king_weight = 
-          with->board_neural1.neural_inputs[with->board_neural1
-                                            .my_king_input_map[jboard]];
-
-        if (king1_weight != king_weight)
-          update_layer0(&(with->board_neural1),
-                        with->board_neural1
-                        .my_king_input_map[jboard],
-                        -king_weight + king1_weight); 
-      }
-    }
-
-    king_bb = with->your_king_bb;
-
-    while(king_bb != 0)
-    {
-      int jboard = BIT_CTZ(king_bb);
-
-      king_bb &= ~BITULL(jboard);
-
-      if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V5)
-      {
-        int king_weight = 
-          with->board_neural0.neural_inputs[with->board_neural0
-                                            .your_king_input_map[jboard]];
-
-        if (king0_weight != king_weight)
-          update_layer0(&(with->board_neural0),
-                        with->board_neural0
-                        .your_king_input_map[jboard],
-                        -king_weight + king0_weight); 
-      }
-
-      if (with->board_neural1_not_null and
-          (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V5))
-      { 
-        int king_weight = 
-          with->board_neural1.neural_inputs[with->board_neural1
-                                            .your_king_input_map[jboard]];
-
-        if (king1_weight != king_weight)
-          update_layer0(&(with->board_neural1),
-                        with->board_neural1
-                        .your_king_input_map[jboard],
-                        -king_weight + king1_weight); 
-      }
-    }
-  }
-
-  int nwc_delta = BIT_COUNT(with->board_white_king_bb) - nwc_before;
-
-  if (nwc_delta != 0)
-  {
-    if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V7) 
-    {
-      update_layer0(&(with->board_neural0),
-                    with->board_neural0.nwc_input_map, nwc_delta);
-    }
-
-    if ((with->board_neural1_not_null and
-        (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V7)))
-    {
-      update_layer0(&(with->board_neural1),
-                      with->board_neural1.nwc_input_map, nwc_delta);
-    }
-  }
-
-  int nbc_delta = BIT_COUNT(with->board_black_king_bb) - nbc_before;
-
-  if (nbc_delta != 0)
-  {
-    if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V7) 
-    {
-      update_layer0(&(with->board_neural0),
-                    with->board_neural0.nbc_input_map, nbc_delta);
-    }
-
-    if ((with->board_neural1_not_null and
-        (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V7)))
-    {
-      update_layer0(&(with->board_neural1),
-                      with->board_neural1.nbc_input_map, nbc_delta);
-    }
-  }
+  label_null:
 
   node->node_move_key = move_key;
 
@@ -742,14 +513,7 @@ void do_my_move(board_t *with, int imove, moves_list_t *moves_list)
   node = with->board_nodes + with->board_inode;
 
   node->node_ncaptx = INVALID;
-  node->node_key = 0; 
   node->node_move_key = 0;
-  node->node_move_tactical = FALSE;
-
-  SOFTBUG(with->board_neural0.neural_colour_bits != NEURAL_COLOUR_BITS_0)
-
-  SOFTBUG(with->board_neural1_not_null and
-          (with->board_neural1.neural_colour_bits != NEURAL_COLOUR_BITS_0))
 
   with->board_colour2move = YOUR_BIT;
 
@@ -757,50 +521,17 @@ void do_my_move(board_t *with, int imove, moves_list_t *moves_list)
   hash_key_t temp_key;
   
   temp_key = return_key_from_bb(with);
+
   HARDBUG(!HASH_KEY_EQ(temp_key, with->board_key))
 
-  if (!options.material_only and
-      (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V5))
+  if (!options.material_only)
   {
-    temp_key = return_key_from_inputs(&(with->board_neural0));
+    check_inputs_against_board(with, &(with->board_network));
 
-    HARDBUG(!HASH_KEY_EQ(temp_key, with->board_key))
+    //check fails due to roundoff accumulation?
+ 
+    check_layer0(&(with->board_network));
   }
-
-  if (!options.material_only and with->board_neural1_not_null and
-      (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V5))
-  {
-    temp_key = return_key_from_inputs(&(with->board_neural1));
-
-    HARDBUG(!HASH_KEY_EQ(temp_key, with->board_key))
-  }
-
-  if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V7)
-  {
-    HARDBUG(with->board_neural0
-            .neural_inputs[with->board_neural0.nwc_input_map] !=
-            BIT_COUNT(with->board_white_king_bb))
-    HARDBUG(with->board_neural0
-            .neural_inputs[with->board_neural0.nbc_input_map] !=
-            BIT_COUNT(with->board_black_king_bb))
-  }
-
-  if (with->board_neural1_not_null and
-      (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V7))
-  {
-    HARDBUG(with->board_neural1
-            .neural_inputs[with->board_neural1.nwc_input_map] !=
-            BIT_COUNT(with->board_white_king_bb))
-    HARDBUG(with->board_neural1
-            .neural_inputs[with->board_neural1.nbc_input_map] !=
-            BIT_COUNT(with->board_black_king_bb))
-  }
-
-  //check fails due to roundoff accumulation
-
-  check_layer0(&(with->board_neural0));
-
-  if (with->board_neural1_not_null) check_layer0(&(with->board_neural1));
 #endif
 
   END_BLOCK
@@ -812,83 +543,37 @@ void undo_my_move(board_t *with, int imove, moves_list_t *moves_list)
 
   SOFTBUG(with->board_colour2move != YOUR_BIT)
 
+  pop_board_state(with);
+
   with->board_inode--;
  
   SOFTBUG(with->board_inode < 0)
 
   node_t *node = with->board_nodes + with->board_inode;
 
-  with->board_key = node->node_key;
-
-  with->board_white_man_bb = node->node_white_man_bb;
-  with->board_white_king_bb = node->node_white_king_bb;
-  with->board_black_man_bb = node->node_black_man_bb;
-  with->board_black_king_bb = node->node_black_king_bb;
-
-  node->node_key = 0;
   node->node_move_key = 0;
-  node->node_move_tactical = FALSE;
-
-  SOFTBUG(with->board_neural0.neural_colour_bits != NEURAL_COLOUR_BITS_0)
-
-  SOFTBUG(with->board_neural1_not_null and 
-          with->board_neural1.neural_colour_bits != NEURAL_COLOUR_BITS_0)
 
   with->board_colour2move = MY_BIT;
 
-  restore_layer0(&(with->board_neural0));
-
-  if (with->board_neural1_not_null)
-    restore_layer0(&(with->board_neural1));
+  if (!options.material_only)
+    pop_network_state(&(with->board_network));
 
 #ifdef DEBUG
   hash_key_t temp_key;
   
   temp_key = return_key_from_bb(with);
+
   HARDBUG(!HASH_KEY_EQ(temp_key, with->board_key))
 
-  if (!options.material_only and
-      (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V5))
+  if (!options.material_only)
   {
-    temp_key = return_key_from_inputs(&(with->board_neural0));
+    check_inputs_against_board(with, &(with->board_network));
 
-    HARDBUG(!HASH_KEY_EQ(temp_key, with->board_key))
+    //check fails due to roundoff accumulation?
+
+    check_layer0(&(with->board_network));
   }
 
-  if (!options.material_only and with->board_neural1_not_null and
-      (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V5))
-  {
-    temp_key = return_key_from_inputs(&(with->board_neural1));
-
-    HARDBUG(!HASH_KEY_EQ(temp_key, with->board_key))
-  }
-
-  if (with->board_neural0.neural_input_map == NEURAL_INPUT_MAP_V7)
-  {
-    HARDBUG(with->board_neural0
-            .neural_inputs[with->board_neural0.nwc_input_map] !=
-            BIT_COUNT(with->board_white_king_bb))
-    HARDBUG(with->board_neural0
-            .neural_inputs[with->board_neural0.nbc_input_map] !=
-            BIT_COUNT(with->board_black_king_bb))
-  }
-
-  if (with->board_neural1_not_null and
-      (with->board_neural1.neural_input_map == NEURAL_INPUT_MAP_V7))
-  {
-    HARDBUG(with->board_neural1
-            .neural_inputs[with->board_neural1.nwc_input_map] !=
-            BIT_COUNT(with->board_white_king_bb))
-    HARDBUG(with->board_neural1
-            .neural_inputs[with->board_neural1.nbc_input_map] !=
-            BIT_COUNT(with->board_black_king_bb))
-  }
-
-  //check fails due to roundoff accumulation
-
-  check_layer0(&(with->board_neural0));
-
-  if (with->board_neural1_not_null) check_layer0(&(with->board_neural1));
 #endif
 
   END_BLOCK
@@ -897,7 +582,6 @@ void undo_my_move(board_t *with, int imove, moves_list_t *moves_list)
 void check_my_moves(board_t *with, moves_list_t *moves_list)
 {
   BEGIN_BLOCK(__FUNC__)
-
   for (int imove = 0; imove < moves_list->nmoves; imove++)
   {
     do_my_move(with, imove, moves_list);

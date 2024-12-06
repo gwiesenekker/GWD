@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 //objects are derived from a class
@@ -172,8 +172,9 @@ local void *construct_my_object(void)
   //construct other parts of the object
 
   time_t t = time(NULL);
-  (void) strftime(object->object_stamp, MY_LINE_MAX,
-    "%H:%M:%S-%d/%m/%Y", localtime(&t));
+
+  HARDBUG(strftime(object->object_stamp, MY_LINE_MAX,
+                  "%H:%M:%S-%d/%m/%Y", localtime(&t)) == 0)
 
   //register object methods
 

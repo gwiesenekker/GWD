@@ -1,9 +1,9 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
-int return_my_score(board_t *with)
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+int return_my_score(board_t *with, moves_list_t *moves_list)
 {
   int result = 0;
 
-  ++(with->total_evaluations);
+  //++(with->S_total_evaluations);
 
   //DO NOT USE board_nmy_man as patterns flip
 
@@ -17,90 +17,183 @@ int return_my_score(board_t *with)
 
   if (options.material_only)
   {
-    ++(with->total_material_only_evaluations);
+    //++(with->S_total_material_only_evaluations);
 
     result = material_score;
   }
   else
   {
-    ++(with->total_neural_evaluations);
+    //++(with->S_total_network_evaluations);
 
-    neural_t *neural = NULL;
+    int colour2move = 
+      with->board_network.network_inputs[with->board_network
+                                       .colour2move_input_map];
 
-    neural_t *neural0 = &(with->board_neural0);
-
-    if (!(with->board_neural1_not_null))
+    if (IS_WHITE(with->board_colour2move) and (colour2move == 0))
     {
-      neural = neural0;
+      update_layer0(&(with->board_network),
+                    with->board_network.colour2move_input_map, 1);
     }
-    else
+
+    if (IS_BLACK(with->board_colour2move) and (colour2move == 1))
     {
-      neural_t *neural1 = &(with->board_neural1);
+      update_layer0(&(with->board_network),
+                    with->board_network.colour2move_input_map, -1);
+    }
+
+    int nmy_king_delta = 
+      -with->board_network.network_inputs[with->board_network
+                                        .nmy_king_input_map] +
+      BIT_COUNT(with->my_king_bb);
+
+    if (nmy_king_delta != 0)
+    {
+      update_layer0(&(with->board_network),
+                    with->board_network.nmy_king_input_map,
+                    nmy_king_delta);
+    }
+
+    int nyour_king_delta = 
+      -with->board_network.network_inputs[with->board_network
+                                        .nyour_king_input_map] +
+      BIT_COUNT(with->your_king_bb);
+
+    if (nyour_king_delta != 0)
+    {
+      update_layer0(&(with->board_network),
+                    with->board_network.nyour_king_input_map,
+                    nyour_king_delta);
+    }
+
+    if (with->board_network.network_wings > 0)
+    {
+      int nleft_wing_delta = 
+        -with->board_network.network_inputs[with->board_network
+                                          .nleft_wing_input_map] +
+        (BIT_COUNT(with->my_man_bb & left_wing_bb) - 
+         BIT_COUNT(with->your_man_bb & left_wing_bb)) * 
+        with->board_network.network_wings;
   
-      if ((neural0->neural_input_map == NEURAL_INPUT_MAP_V6) or
-          (neural1->neural_input_map == NEURAL_INPUT_MAP_V6))
+      if (nleft_wing_delta != 0)
       {
-        if ((nmy_king == 0) and (nyour_king == 0))
-        {
-          if (neural0->neural_input_map == NEURAL_INPUT_MAP_V6)
-            neural = neural0;
-          else
-            neural = neural1;
-        }
-        else
-        {
-          if (neural0->neural_input_map != NEURAL_INPUT_MAP_V6)
-            neural = neural0;
-          else
-            neural = neural1;
-        }
-      } 
-      else
-      {
-        int npieces = nmy_man + nmy_king + nyour_man + nyour_king;
+        update_layer0(&(with->board_network),
+                      with->board_network.nleft_wing_input_map,
+                      nleft_wing_delta);
+      }
   
-        if ((npieces >= neural0->neural_npieces_min) and 
-            (npieces <= neural0->neural_npieces_max))
-        {
-          neural = neural0;
-        }
-        else if ((npieces >= neural1->neural_npieces_min) and 
-                 (npieces <= neural1->neural_npieces_max))
-        {
-          neural = neural1;
-        }
+      int ncenter_delta = 
+        -with->board_network.network_inputs[with->board_network
+                                          .ncenter_input_map] +
+        (BIT_COUNT(with->my_man_bb & center_bb) - 
+         BIT_COUNT(with->your_man_bb & center_bb)) *
+        with->board_network.network_wings;
+  
+      if (ncenter_delta != 0)
+      {
+        update_layer0(&(with->board_network),
+                      with->board_network.ncenter_input_map,
+                      ncenter_delta);
+      }
+  
+      int nright_wing_delta = 
+        -with->board_network.network_inputs[with->board_network
+                                          .nright_wing_input_map] +
+        (BIT_COUNT(with->my_man_bb & right_wing_bb) - 
+         BIT_COUNT(with->your_man_bb & right_wing_bb)) *
+        with->board_network.network_wings;
+  
+      if (nright_wing_delta != 0)
+      {
+        update_layer0(&(with->board_network),
+                      with->board_network.nright_wing_input_map,
+                      nright_wing_delta);
       }
     }
 
-    HARDBUG(neural == NULL)
+    if (with->board_network.network_half > 0)
+    {
+      int nleft_half_delta = 
+        -with->board_network.network_inputs[with->board_network
+                                          .nleft_half_input_map] +
+        (BIT_COUNT(with->my_man_bb & left_half_bb) - 
+         BIT_COUNT(with->your_man_bb & left_half_bb)) * 
+        with->board_network.network_half;
+  
+      if (nleft_half_delta != 0)
+      {
+        update_layer0(&(with->board_network),
+                      with->board_network.nleft_half_input_map,
+                      nleft_half_delta);
+      }
+  
+      int nright_half_delta = 
+        -with->board_network.network_inputs[with->board_network
+                                          .nright_half_input_map] +
+        (BIT_COUNT(with->my_man_bb & right_half_bb) - 
+         BIT_COUNT(with->your_man_bb & right_half_bb)) * 
+        with->board_network.network_half;
+  
+      if (nright_half_delta != 0)
+      {
+        update_layer0(&(with->board_network),
+                      with->board_network.nright_half_input_map,
+                      nright_half_delta);
+      }
+    }
 
-    double neural_score =
-      return_neural_score_scaled(neural, FALSE, TRUE);
+    //blocked
+
+    if (with->board_network.network_blocked > 0)
+    {
+      int nblocked_delta = 0;
+ 
+      if (with->board_network.network_blocked == 1)
+      {
+        nblocked_delta = 
+          -with->board_network.network_inputs[with->board_network
+                                            .nblocked_input_map] +
+        moves_list->nblocked;
+      }
+      else if (with->board_network.network_blocked == 2)
+      {
+        nblocked_delta = 
+          -with->board_network.network_inputs[with->board_network
+                                            .nblocked_input_map] +
+          2 * nmy_man - moves_list->nblocked;
+      }
+  
+      if (nblocked_delta != 0)
+      {
+        update_layer0(&(with->board_network),
+                      with->board_network.nblocked_input_map,
+                      nblocked_delta);
+
+        HARDBUG(with->board_network.network_inputs[with->board_network
+                                                 .nblocked_input_map] < 0)
+      }
+    }
+
+    double network_score =
+      return_network_score_scaled(&(with->board_network), FALSE, TRUE);
 
 #ifdef DEBUG
 static int n = 0;
     double double_score =
-      return_neural_score_double(neural, FALSE);
+      return_network_score_double(&(with->board_network), FALSE);
   
 n++;
-if (n < 99) PRINTF("neural_score=%.6f double_score=%.6f\n",
-neural_score, double_score);
+if (n < 99) PRINTF("network_score=%.6f double_score=%.6f\n",
+network_score, double_score);
 
-    if (fabs(neural_score - double_score) > (1.0 / sqrt(SCALED_DOUBLE_FACTOR)))
+    if (fabs(network_score - double_score) > (1.0 / sqrt(SCALED_DOUBLE_FACTOR)))
     {
       my_printf(with->board_my_printf,
-        "WARNING neural_score=%.6f double_score=%.6f\n",
-        neural_score, double_score);
+        "WARNING network_score=%.6f double_score=%.6f\n",
+        network_score, double_score);
     }
 #endif
 
-    if ((neural->neural_output == NEURAL_OUTPUT_W2M) and
-        IS_BLACK(with->board_colour2move))
-    {
-      neural_score = -neural_score; 
-    }
-
-    result = round(neural_score * neural->neural2material_score);
+    result = round(network_score * with->board_network.network2material_score);
   }
 
   SOFTBUG(result < (SCORE_LOST + NODE_MAX))

@@ -1,5 +1,5 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
-int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta, 
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+int my_mcts_quiescence(search_t *with, int nply, int my_alpha, int my_beta, 
   int node_type, moves_list_t *moves_list, int *best_pv)
 {
   HARDBUG(my_alpha >= my_beta)
@@ -12,11 +12,11 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
 
   *best_pv = INVALID;
 
-  int best_score = SCORE_PLUS_INFINITY * SCALED_FLOAT_FACTOR;
+  int best_score = SCORE_PLUS_INFINITY;
 
   if ((mcts_globals.mcts_globals_nodes++ % 100) == 0)
   {
-    if (return_my_timer(&(mcts_globals.mcts_globals_timer), FALSE) >=
+    if (return_my_timer(&(with->S_timer), FALSE) >=
         mcts_globals.mcts_globals_time_limit)
     {
       PRINTF("time limit in my_mcts_quiescence!\n");
@@ -25,11 +25,9 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
     }
   }
 
-  if (draw_by_repetition(with, FALSE))
+  if (draw_by_repetition(&(with->S_board), FALSE))
   {
     best_score = 0;
-
-    best_score = return_scaled_float_score(best_score, with->board_key);
 
     goto label_return;
   }
@@ -53,8 +51,6 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
       best_score = SCORE_LOST;
     }
 
-    best_score = return_scaled_float_score(best_score, with->board_key);
-
     goto label_return;
   }
 
@@ -62,9 +58,9 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
 
   if (moves_list == NULL)
   {
-    create_moves_list(&my_moves_list);
+    construct_moves_list(&my_moves_list);
 
-    gen_my_moves(with, &my_moves_list, TRUE);
+    gen_my_moves(&(with->S_board), &my_moves_list, TRUE);
   
     moves_list = &my_moves_list;
   }
@@ -73,14 +69,16 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
   {
     best_score = SCORE_LOST;
 
-    best_score = return_scaled_float_score(best_score, with->board_key);
-
     goto label_return;
   }
 
   int all_moves = FALSE;
 
-  if (moves_list->ncaptx > 0)
+  if (IS_PV(node_type))
+  {
+    all_moves = TRUE;
+  }
+  else if (moves_list->ncaptx > 0)
   {
     all_moves = TRUE;
   } 
@@ -90,48 +88,37 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
   }
   else
   {
-    int ntactical = 0;
+    int nextend = 0;
 
     for (int imove = 0; imove < moves_list->nmoves; imove++)
-      if (moves_list->moves_tactical[imove] != 0) ntactical++;
+      if (MOVE_EXTEND_IN_QUIESCENCE(moves_list->moves_flag[imove])) nextend++;
 
-    if (ntactical == moves_list->nmoves)
-    {
-      all_moves = TRUE;
-    }
-    else if ((ntactical == 0) and 
-             (with->board_inode > 0) and
-             (with->board_nodes[with->board_inode - 1].node_move_tactical))
+    if (nextend == moves_list->nmoves)
     {
       all_moves = TRUE;
     }
   }
 
-  best_score = SCORE_MINUS_INFINITY * SCALED_FLOAT_FACTOR;
+  best_score = SCORE_MINUS_INFINITY;
 
   if (!all_moves)
   {
-/*
-    int nmy_man = BIT_COUNT(with->my_man_bb);
-    int nmy_king = BIT_COUNT(with->my_king_bb);
-    int nyour_man = BIT_COUNT(with->your_man_bb);
-    int nyour_king = BIT_COUNT(with->your_king_bb);
+    int nmy_man = BIT_COUNT(with->S_board.my_man_bb);
+    int nmy_king = BIT_COUNT(with->S_board.my_king_bb);
+    int nyour_man = BIT_COUNT(with->S_board.your_man_bb);
+    int nyour_king = BIT_COUNT(with->S_board.your_king_bb);
             
     best_score = (nmy_man - nyour_man) * SCORE_MAN +
                  (nmy_king - nyour_king) * SCORE_KING;
 
-    best_score = return_scaled_float_score(best_score, with->board_key);
-*/
-
-    best_score = return_my_score(with);
+    if (best_score >= my_beta) goto label_return;
   }
-
-  if (best_score >= my_beta) goto label_return;
 
   int moves_weight[MOVES_MAX];
 
   for (int imove = 0; imove < moves_list->nmoves; imove++)
-    moves_weight[imove] = moves_list->moves_weight[imove];
+    moves_weight[imove] = moves_list->moves_weight[imove] +
+                          return_my_random(&mcts_random) % 10;
 
   nply++;
 
@@ -152,7 +139,7 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
 
     if (!all_moves)
     {
-      if (moves_list->moves_tactical[jmove] == 0) continue;
+      if (!MOVE_EXTEND_IN_QUIESCENCE(moves_list->moves_flag[jmove])) continue;
     }
 
     int temp_alpha;
@@ -162,60 +149,59 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
     else
       temp_alpha = best_score;
 
-    int temp_score = SCORE_PLUS_INFINITY * SCALED_FLOAT_FACTOR;
+    int temp_score = SCORE_PLUS_INFINITY;
 
     int temp_pv;
 
     if (IS_MINIMAL_WINDOW(node_type))
     {
-      do_my_move(with, jmove, moves_list);
+      do_my_move(&(with->S_board), jmove, moves_list);
 
       temp_score = -your_mcts_quiescence(with, nply,
         -my_beta, -temp_alpha,
         node_type, NULL, &temp_pv);
 
-      undo_my_move(with, jmove, moves_list);
+      undo_my_move(&(with->S_board), jmove, moves_list);
     }
     else
     {
       if (imove == 0)
       {
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
 
         temp_score = -your_mcts_quiescence(with, nply,
           -my_beta, -temp_alpha,
           node_type, NULL, &temp_pv);
 
-        undo_my_move(with, jmove, moves_list);
+        undo_my_move(&(with->S_board), jmove, moves_list);
       }
       else
       {
         int temp_beta = temp_alpha + 1;
 
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
 
         temp_score = -your_mcts_quiescence(with, nply,
           -temp_beta, -temp_alpha,
           MINIMAL_WINDOW_BIT, NULL, &temp_pv);
 
-        undo_my_move(with, jmove, moves_list);
-  
+        //if time-limit temp_score = -(SCORE_PLUS_INFINITY))
+
         if ((temp_score >= temp_beta) and (temp_score < my_beta))
         {
-          do_my_move(with, jmove, moves_list);
-
           temp_score = -your_mcts_quiescence(with, nply,
             -my_beta, -temp_score,
             node_type, NULL, &temp_pv);
 
-          undo_my_move(with, jmove, moves_list);
         }
+
+        undo_my_move(&(with->S_board), jmove, moves_list);
       }
     }
 
-    HARDBUG(temp_score == (SCORE_PLUS_INFINITY * SCALED_FLOAT_FACTOR))
+    HARDBUG(temp_score == SCORE_PLUS_INFINITY)
 
-    if (temp_score == (SCORE_MINUS_INFINITY * SCALED_FLOAT_FACTOR))
+    if (temp_score == SCORE_MINUS_INFINITY)
     {
       best_score = -temp_score;
 
@@ -236,14 +222,14 @@ int my_mcts_quiescence(board_t *with, int nply, int my_alpha, int my_beta,
   //*best_pv can be invalid, for example if (!all_moves) and
   //move scores are below alpha
 
-  HARDBUG(best_score == (SCORE_MINUS_INFINITY * SCALED_FLOAT_FACTOR))
+  HARDBUG(best_score == SCORE_MINUS_INFINITY)
    
   label_return:
 
   return(best_score);
 }
 
-int my_mcts_alpha_beta(board_t *with, int nply,
+int my_mcts_alpha_beta(search_t *with, int nply,
   int my_alpha, int my_beta, int my_depth,
   int node_type, moves_list_t *moves_list, int *best_pv)
 {
@@ -259,11 +245,11 @@ int my_mcts_alpha_beta(board_t *with, int nply,
 
   *best_pv = INVALID;
 
-  int best_score = SCORE_PLUS_INFINITY * SCALED_FLOAT_FACTOR;
+  int best_score = SCORE_PLUS_INFINITY;
 
   if ((mcts_globals.mcts_globals_nodes++ % 100) == 0)
   {
-    if (return_my_timer(&(mcts_globals.mcts_globals_timer), FALSE) >=
+    if (return_my_timer(&(with->S_timer), FALSE) >=
         mcts_globals.mcts_globals_time_limit)
     {
       PRINTF("time limit in my_mcts_alpha_beta!\n");
@@ -280,11 +266,9 @@ int my_mcts_alpha_beta(board_t *with, int nply,
     goto label_return;
   }
 
-  if (draw_by_repetition(with, FALSE))
+  if (draw_by_repetition(&(with->S_board), FALSE))
   {
     best_score = 0;
-
-    best_score = return_scaled_float_score(best_score, with->board_key);
 
     goto label_return;
   }
@@ -308,8 +292,6 @@ int my_mcts_alpha_beta(board_t *with, int nply,
       best_score = SCORE_LOST;
     }
 
-    best_score = return_scaled_float_score(best_score, with->board_key);
-
     goto label_return;
   }
 
@@ -317,9 +299,9 @@ int my_mcts_alpha_beta(board_t *with, int nply,
 
   if (moves_list == NULL)
   {
-    create_moves_list(&my_moves_list);
+    construct_moves_list(&my_moves_list);
 
-    gen_my_moves(with, &my_moves_list, FALSE);
+    gen_my_moves(&(with->S_board), &my_moves_list, FALSE);
 
     moves_list = &my_moves_list;
   }
@@ -328,17 +310,16 @@ int my_mcts_alpha_beta(board_t *with, int nply,
   {
     best_score = SCORE_LOST;
 
-    best_score = return_scaled_float_score(best_score, with->board_key);
-
     goto label_return;
   }
 
   int moves_weight[MOVES_MAX];
 
   for (int imove = 0; imove < moves_list->nmoves; imove++)
-    moves_weight[imove] = moves_list->moves_weight[imove];
-  
-  best_score = SCORE_MINUS_INFINITY * SCALED_FLOAT_FACTOR;
+    moves_weight[imove] = moves_list->moves_weight[imove] +
+                          return_my_random(&mcts_random) % 10;
+
+  best_score = SCORE_MINUS_INFINITY;
 
   nply++;
 
@@ -369,58 +350,54 @@ int my_mcts_alpha_beta(board_t *with, int nply,
       else
         temp_alpha = best_score;
   
-      int temp_score = SCORE_PLUS_INFINITY * SCALED_FLOAT_FACTOR;
+      int temp_score = SCORE_PLUS_INFINITY;
 
       if (IS_MINIMAL_WINDOW(node_type))
       {
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
 
         temp_score = -your_mcts_alpha_beta(with, nply,
           -my_beta, -temp_alpha, my_depth,
           node_type, NULL, &temp_pv);
 
-        undo_my_move(with, jmove, moves_list);
+        undo_my_move(&(with->S_board), jmove, moves_list);
       }
       else
       {
         if (imove == 0)
         {
-          do_my_move(with, jmove, moves_list);
+          do_my_move(&(with->S_board), jmove, moves_list);
 
           temp_score = -your_mcts_alpha_beta(with, nply,
             -my_beta, -temp_alpha, my_depth,
             node_type, NULL, &temp_pv);
 
-          undo_my_move(with, jmove, moves_list);
+          undo_my_move(&(with->S_board), jmove, moves_list);
         } 
         else
         {
           int temp_beta = temp_alpha + 1;
 
-          do_my_move(with, jmove, moves_list);
+          do_my_move(&(with->S_board), jmove, moves_list);
 
           temp_score = -your_mcts_alpha_beta(with, nply,
             -temp_beta, -temp_alpha, my_depth,
             MINIMAL_WINDOW_BIT, NULL, &temp_pv);
-
-          undo_my_move(with, jmove, moves_list);
   
           if ((temp_score >= temp_beta) and (temp_score < my_beta))
           {
-            do_my_move(with, jmove, moves_list);
-
             temp_score = -your_mcts_alpha_beta(with, nply,
               -my_beta, -temp_score, my_depth,
               node_type, NULL, &temp_pv);
-
-            undo_my_move(with, jmove, moves_list);
           }
+
+          undo_my_move(&(with->S_board), jmove, moves_list);
         }
       }
 
-      HARDBUG(temp_score == (SCORE_PLUS_INFINITY * SCALED_FLOAT_FACTOR))
+      HARDBUG(temp_score == SCORE_PLUS_INFINITY)
 
-      if (temp_score == (SCORE_MINUS_INFINITY * SCALED_FLOAT_FACTOR))
+      if (temp_score == SCORE_MINUS_INFINITY)
       {
         best_score = -temp_score;
   
@@ -468,7 +445,7 @@ int my_mcts_alpha_beta(board_t *with, int nply,
     else
       temp_alpha = best_score;
 
-    int temp_score = SCORE_PLUS_INFINITY * SCALED_FLOAT_FACTOR;
+    int temp_score = SCORE_PLUS_INFINITY;
 
     int temp_pv;
 
@@ -476,54 +453,51 @@ int my_mcts_alpha_beta(board_t *with, int nply,
     {
       HARDBUG(temp_alpha != my_alpha)
 
-      do_my_move(with, jmove, moves_list);
+      do_my_move(&(with->S_board), jmove, moves_list);
 
       temp_score = -your_mcts_alpha_beta(with, nply,
         -my_beta, -my_alpha, your_depth,
         node_type, NULL, &temp_pv);
 
-      undo_my_move(with, jmove, moves_list);
+      undo_my_move(&(with->S_board), jmove, moves_list);
     }
     else
     {
       if (imove == 0)
       {
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
 
         temp_score = -your_mcts_alpha_beta(with, nply,
           -my_beta, -temp_alpha, your_depth,
           node_type, NULL, &temp_pv);
 
-        undo_my_move(with, jmove, moves_list);
+        undo_my_move(&(with->S_board), jmove, moves_list);
       }
       else
       {
         int temp_beta = temp_alpha + 1;
 
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
 
         temp_score = -your_mcts_alpha_beta(with, nply,
           -temp_beta, -temp_alpha, your_depth,
           MINIMAL_WINDOW_BIT, NULL, &temp_pv);
 
-        undo_my_move(with, jmove, moves_list);
-  
         if ((temp_score >= temp_beta) and (temp_score < my_beta))
         {
-          do_my_move(with, jmove, moves_list);
-
           temp_score = -your_mcts_alpha_beta(with, nply,
             -my_beta, -temp_score, your_depth,
             node_type, NULL, &temp_pv);
 
-          undo_my_move(with, jmove, moves_list);
         }
+
+        undo_my_move(&(with->S_board), jmove, moves_list);
       }
     } //IS_MINIMAL_WINDOW
   
-    HARDBUG(temp_score == (SCORE_PLUS_INFINITY * SCALED_FLOAT_FACTOR))
+    HARDBUG(temp_score == SCORE_PLUS_INFINITY)
 
-    if (temp_score == (SCORE_MINUS_INFINITY * SCALED_FLOAT_FACTOR))
+    if (temp_score == SCORE_MINUS_INFINITY)
     {
       best_score = -temp_score;
   
@@ -546,7 +520,7 @@ int my_mcts_alpha_beta(board_t *with, int nply,
 
   HARDBUG(*best_pv == INVALID)
 
-  HARDBUG(best_score == (SCORE_MINUS_INFINITY * SCALED_FLOAT_FACTOR))
+  HARDBUG(best_score == SCORE_MINUS_INFINITY)
    
   label_return:
 

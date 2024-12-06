@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 
@@ -910,17 +910,17 @@ local void decode(i8_t *flag, i16_t *shift, ui8_t code[ARRAY_PAGE_SIZE],
 }
 #endif
 
-int read_endgame(board_t *with, int colour2move, int root_only)
+int read_endgame(search_t *with, int colour2move, int root_only)
 {
   BEGIN_BLOCK(__FUNC__)
 
   int result = ENDGAME_UNKNOWN;
 
-  int nwc = BIT_COUNT(with->board_white_king_bb);
-  int nwm = BIT_COUNT(with->board_white_man_bb);
+  int nwc = BIT_COUNT(with->S_board.board_white_king_bb);
+  int nwm = BIT_COUNT(with->S_board.board_white_man_bb);
 
-  int nbc = BIT_COUNT(with->board_black_king_bb);
-  int nbm = BIT_COUNT(with->board_black_man_bb);
+  int nbc = BIT_COUNT(with->S_board.board_black_king_bb);
+  int nbm = BIT_COUNT(with->S_board.board_black_man_bb);
 
   int npieces = nwc + nwm + nbc + nbm;
 
@@ -1002,7 +1002,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
   {
     if (with_endgame->endgame_unavailable_warning)
     {
-      my_printf(with->board_my_printf,
+      my_printf(with->S_my_printf,
         "WARNING: endgame database %s not available\n",
         with_endgame->endgame_name);
 
@@ -1042,7 +1042,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     ui64_t bb;
     int nbb;
 
-    bb = with->board_white_king_bb; 
+    bb = with->S_board.board_white_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1053,7 +1053,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nwc)
 
-    bb = with->board_white_man_bb; 
+    bb = with->S_board.board_white_man_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1064,7 +1064,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nwm)
 
-    bb = with->board_black_king_bb; 
+    bb = with->S_board.board_black_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1075,7 +1075,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nbc)
 
-    bb = with->board_black_man_bb; 
+    bb = with->S_board.board_black_man_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1091,7 +1091,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     ui64_t bb;
     int nbb;
 
-    bb = with->board_white_king_bb; 
+    bb = with->S_board.board_white_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1102,7 +1102,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nwc)
 
-    bb = with->board_white_man_bb;
+    bb = with->S_board.board_white_man_bb;
     nbb = 0;
   
     while(bb != 0)
@@ -1113,7 +1113,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nwm)
 
-    bb = with->board_black_king_bb; 
+    bb = with->S_board.board_black_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1124,7 +1124,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nbc)
 
-    bb = with->board_black_man_bb;
+    bb = with->S_board.board_black_man_bb;
     nbb = 0;
   
     while(bb != 0)
@@ -1226,7 +1226,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
   
     i64_t endgame_index_key = (endgame_index << 16) | endgame_id;
   
-    if (check_entry_in_cache(&(with->board_endgame_entry_cache),
+    if (check_entry_in_cache(&(with->S_endgame_entry_cache),
                              &endgame_index_key, &entry))
     {
       with_endgame->endgame_nentry_hits++;
@@ -1472,7 +1472,7 @@ int read_endgame(board_t *with, int colour2move, int root_only)
       FATAL("eh", EXIT_FAILURE)
 #endif
 
-    store_entry_in_cache(&(with->board_endgame_entry_cache),
+    store_entry_in_cache(&(with->S_endgame_entry_cache),
                          &endgame_index_key, &entry);
   }
 

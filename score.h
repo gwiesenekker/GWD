@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #ifndef ScoreH
 #define ScoreH
 
@@ -9,8 +9,8 @@
 #define return_my_score     return_the_score(my_colour)
 #define return_your_score   return_the_score(your_colour)
 
-int return_white_score(board_t *);
-int return_black_score(board_t *);
+int return_white_score(board_t *, moves_list_t *);
+int return_black_score(board_t *, moves_list_t *);
 
 #endif
 

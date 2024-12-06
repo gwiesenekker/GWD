@@ -1,9 +1,9 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM  gwd7
-#define REVISION "7.701"
+#define REVISION "7.750"
 
 //generic includes
 
@@ -72,14 +72,13 @@ typedef long long  i64_t;
 
 #define CJSON_PARAMETERS_ID        "parameters"
 #define CJSON_TWEAKS_ID            "tweaks"
-#define CJSON_NEURAL2MATERIAL_SCORE_ID "neural2material_score"
+#define CJSON_NEURAL2MATERIAL_SCORE_ID "network2material_score"
 #define CJSON_INPUT_MAP_ID         "input_map"
 #define CJSON_ACTIVATION_ID        "activation"
 #define CJSON_ACTIVATION_LAST_ID   "activation_last"
-#define CJSON_LABEL_ID             "label"
-#define CJSON_COLOUR_BITS_ID       "colour_bits"
-#define CJSON_OUTPUT_ID            "output"
-#define CJSON_KING_WEIGHT_ID       "king_weight"
+#define CJSON_WINGS_ID             "wings"
+#define CJSON_HALF_ID              "half"
+#define CJSON_BLOCKED_ID           "blocked"
 #define CJSON_NPIECES_MIN_ID       "npieces_min"
 #define CJSON_NPIECES_MAX_ID       "npieces_max"
 #define CJSON_EVENT_ID             "event"
@@ -211,6 +210,7 @@ extern void *STDOUT;
 #include "cJSON.h"
 #include "classes.h"
 #include "my_printf.h"
+#include "my_cjson.h"
 #include "my_malloc.h"
 #include "my_mpi.h"
 #include "my_random.h"
@@ -224,10 +224,11 @@ extern void *STDOUT;
 #include "timers.h"
 #include "utils.h"
 
-#include "threads.h"
-#include "neural.h"
+#include "networks.h"
 #include "boards.h"
 #include "moves.h"
+#include "search.h"
+#include "threads.h"
 #include "book.h"
 #include "dbase.h"
 #include "dxp.h"
@@ -237,7 +238,6 @@ extern void *STDOUT;
 #include "mcts.h"
 #include "pdn.h"
 #include "score.h"
-#include "search.h"
 
 #endif
 

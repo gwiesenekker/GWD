@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 void clear_bucket(void *self)
@@ -177,6 +177,10 @@ void construct_bucket(void *self, double bucket_size,
 
 void test_buckets(void)
 {
+  int ntest = NTEST;
+
+  if (RUNNING_ON_VALGRIND) ntest = 1000;
+ 
   my_random_t test_random;
 
   construct_my_random(&test_random, 0);
@@ -187,10 +191,10 @@ void test_buckets(void)
 
   construct_bucket(&a, 0.1, -1.0, 1.0, BUCKET_LINEAR);
 
-  for (int i = 0; i < NTEST; i++)
+  for (int i = 0; i < ntest; i++)
   {
-    double value = (2.0 * (return_my_random(&test_random) % NTEST)) /
-                   NTEST - 1.0;
+    double value = (2.0 * (return_my_random(&test_random) % ntest)) /
+                   ntest - 1.0;
 
     update_bucket(&a, value);
   }
@@ -199,12 +203,12 @@ void test_buckets(void)
 
   bucket_t b;
 
-  construct_bucket(&b, 10, 0, NTEST, BUCKET_LOG);
+  construct_bucket(&b, 10, 0, ntest, BUCKET_LOG);
 
-  for (int i = 0; i < NTEST; i++)
+  for (int i = 0; i < ntest; i++)
   {
-    double value = (int) (return_my_random(&test_random) % (2 * NTEST)) -
-                         NTEST;
+    double value = (int) (return_my_random(&test_random) % (2 * ntest)) -
+                         ntest;
 
     update_bucket(&b, value);
   }

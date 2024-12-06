@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #ifndef CompatH
 #define CompatH
 
@@ -163,6 +163,7 @@ void compat_sleep(double);
 double compat_time(void);
 
 //threads
+unsigned long compat_pthread_self(void);
 
 int compat_mutex_init(my_mutex_t *);
 int compat_mutex_lock(my_mutex_t *);

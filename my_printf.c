@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #define LOG_PREFIX_ID "LOG_prefix_id"
@@ -12,6 +12,7 @@
 
 #define LOGS_DIR "logs"
 
+//this is more a test for my dynamic cJSON record_t
 local int nlogs = INVALID;
 record_t logs[NLOGS];
 
@@ -21,18 +22,27 @@ void my_printf(void *self, char *arg_format, ...)
 {
   my_printf_t *object = self;
 
-  va_list ap;
-
-  va_start(ap, arg_format);
-
   if (object == NULL)
   {
-    vprintf(arg_format, ap);
+    //stdout
+
+    va_list ap;
+
+    va_start(ap, arg_format);
+
+    if (vprintf(arg_format, ap) < 0)
+    {
+      fprintf(stderr, "vfprintf(arg_format, ap) > 0\n");
+
+      exit(EXIT_FAILURE);
+    }
 
     va_end(ap);
 
     return;
   }
+
+  //flush 
 
   if (compat_strcasecmp(arg_format, "") == 0)
   {
@@ -40,7 +50,9 @@ void my_printf(void *self, char *arg_format, ...)
 
     if (fflush(object->my_printf_flog) != 0)
     {
-      fprintf(stderr, "could not fflush %s\n", object->my_printf_fname);
+      fprintf(stderr, "fflush(%s) != 0\n",
+                      bdata(object->my_printf_bname));
+
       exit(EXIT_FAILURE);
     }
 
@@ -51,86 +63,112 @@ void my_printf(void *self, char *arg_format, ...)
 
   HARDBUG(compat_mutex_lock(&(object->my_printf_mutex)) != 0)
 
-  char line[MY_LINE_MAX];
+  int ret;
 
-  (void) vsnprintf(line, MY_LINE_MAX, arg_format, ap);
+  bvformata(ret, object->my_printf_bbuffer, arg_format, arg_format);
 
-  va_end(ap);
-  
-  int iline = 0;
+  HARDBUG(ret != BSTR_OK)
 
-  while(TRUE)
+  bstring bline;
+
+  HARDBUG((bline = bfromcstr("")) == NULL)
+
+  int ichar = 0;
+
+  while(ichar < blength(object->my_printf_bbuffer))
   {
-    HARDBUG(iline >= MY_LINE_MAX)
-    if (line[iline] == '\0') break;
+    if (bchare(object->my_printf_bbuffer, ichar, '\0') != '\n')
+    {
+      ichar++;
 
-    HARDBUG(object->my_printf_ibuffer >= MY_LINE_MAX)
-
-    if ((object->my_printf_buffer[object->my_printf_ibuffer++] =
-         line[iline++]) != '\n') continue;
-
-    HARDBUG(object->my_printf_ibuffer >= MY_LINE_MAX)
-
-    object->my_printf_buffer[object->my_printf_ibuffer] = '\0';
+      continue;
+    }
 
     //timestamp
 
-    char stamp[MY_LINE_MAX];
-  
+    char time_stamp[MY_LINE_MAX];
+    
     time_t t = time(NULL);
-    (void) strftime(stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t));
+
+    HARDBUG(strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y",
+                     localtime(&t)) == 0)
    
     if (object->my_printf_fsize > MAX_SIZE)
     {
       fprintf(object->my_printf_flog,
-        "\nlog file exceeds maximum size and will be rotated\n");
+              "\n%s@ PTHREAD_SELF=%#lX"
+              " LOG FILE EXCEEDS MAXIMUM SIZE AND WILL BE ROTATED\n",
+              time_stamp, compat_pthread_self());
   
-      if (fclose(object->my_printf_flog) == EOF)
+      if (fclose(object->my_printf_flog) != 0)
       {
-        fprintf(stderr, "could not fclose %s\n", object->my_printf_fname);
-        exit(EXIT_FAILURE);
-      }
-  
-      for (int irotate = NROTATE; irotate > 1; --irotate)
-      {
-        char oldpath[MY_LINE_MAX];
-        char newpath[MY_LINE_MAX];
-
-        snprintf(oldpath, MY_LINE_MAX, "%s-%d",
-          object->my_printf_fname, irotate - 1);
-        snprintf(newpath, MY_LINE_MAX, "%s-%d",
-          object->my_printf_fname, irotate);
-
-        remove(newpath);
-
-        rename(oldpath, newpath);
-      }
-  
-      char newpath[MY_LINE_MAX];
-  
-      snprintf(newpath, MY_LINE_MAX, "%s-1", object->my_printf_fname);
-
-      remove(newpath);
-
-      rename(object->my_printf_fname, newpath);
-  
-      if ((object->my_printf_flog = fopen(object->my_printf_fname, "w")) ==
-          NULL)
-      {
-        fprintf(stderr, "could not fopen %s in mode 'w'\n",
-          object->my_printf_fname);
+        fprintf(stderr, "fclose(%s) != 0\n",
+                        bdata(object->my_printf_bname));
 
         exit(EXIT_FAILURE);
       }
+    
+      bstring bold_path;
 
-      t = time(NULL);
+      HARDBUG((bold_path = bfromcstr("")) == NULL)
+
+      bstring bnew_path;
+
+      HARDBUG((bnew_path = bfromcstr("")) == NULL)
+
+      for (int irotate = NROTATE; irotate >= 1; --irotate)
+      {
+        btrunc(bold_path, 0);
+
+        if (irotate > 1)
+        {
+          HARDBUG(bformata(bold_path, "%s-%d",
+                           bdata(object->my_printf_bname),
+                           irotate - 1) != BSTR_OK)
+        }
+        else
+        {
+          HARDBUG(bformata(bold_path, "%s",
+                           bdata(object->my_printf_bname)) != BSTR_OK)
+        }
+
+        btrunc(bnew_path, 0);
+
+        HARDBUG(bformata(bnew_path, "%s-%d",
+                         bdata(object->my_printf_bname),
+                         irotate) != BSTR_OK)
+  
+        //ignore return value of remove as file might not exist
+
+        (void) remove(bdata(bnew_path));
+  
+        //ignore return value of rename as file might not exist
+
+        (void) rename(bdata(bold_path), bdata(bnew_path));
+      }
+    
+      HARDBUG(bdestroy(bnew_path) == BSTR_ERR)
+
+      HARDBUG(bdestroy(bold_path) == BSTR_ERR)
+    
+      if ((object->my_printf_flog =
+           fopen(bdata(object->my_printf_bname), "w")) == NULL)
+      {
+        fprintf(stderr, "fopen(%s, 'w') == NULL\n",
+                        bdata(object->my_printf_bname));
+  
+        exit(EXIT_FAILURE);
+      }
 
       int nchar = fprintf(object->my_printf_flog,
-       "log file rotated and re-opened at %s\n", ctime(&t));
+                          "%s@ PTHREAD_SELF=%#lX"
+                          " LOG FILE ROTATED AND RE-OPENED\n\n",
+                          time_stamp, compat_pthread_self());
     
       if (nchar < 0)
       {
-        fprintf(stderr, "could not fprintf %s\n", object->my_printf_fname);
+        fprintf(stderr, "fprintf(%s, ...) < 0\n",
+                        bdata(object->my_printf_bname));
 
         exit(EXIT_FAILURE);
       }
@@ -138,18 +176,26 @@ void my_printf(void *self, char *arg_format, ...)
       object->my_printf_fsize = nchar;
     }
 
+    HARDBUG(bassignmidstr(bline, object->my_printf_bbuffer, 0, ichar + 1) !=
+            BSTR_OK)
+
     int nchar = fprintf(object->my_printf_flog, "%s@ %s",
-      stamp, object->my_printf_buffer);
+                        time_stamp, bdata(bline));
 
     if (nchar < 0)
     {
-      fprintf(stderr, "could not fprintf %s\n", object->my_printf_fname);
+      fprintf(stderr, "fprintf(%s, ...) < 0\n",
+                      bdata(object->my_printf_bname));
+
       exit(EXIT_FAILURE);
     }
+
 #ifdef DEBUG
     if (fflush(object->my_printf_flog) != 0)
     {
-      fprintf(stderr, "could not fflush object->my_printf_flog\n");
+      fprintf(stderr, "fflush(%s) != 0\n", 
+                      bdata(object->my_printf_bname));
+
       exit(EXIT_FAILURE);
     }
 #else
@@ -159,38 +205,45 @@ void my_printf(void *self, char *arg_format, ...)
     {
       if (fflush(object->my_printf_flog) != 0)
       {
-        fprintf(stderr, "could not fflush object->my_printf_flog\n");
+        fprintf(stderr, "fflush(%s) != 0\n", 
+                        bdata(object->my_printf_bname));
+
         exit(EXIT_FAILURE);
       }
     }
 #endif
+
     object->my_printf_fsize += nchar;
   
+    //also print to stdout if needed
+
     if (!options.hub and object->my_printf2stdout and
         ((my_mpi_globals.MY_MPIG_id_global == 0) or
          (my_mpi_globals.MY_MPIG_id_global == INVALID)))
     {
-      nchar = fprintf(stdout, "%s", object->my_printf_buffer);
+      nchar = fprintf(stdout, "%s", bdata(bline));
 
       if (nchar < 0)
       {
-        fprintf(stderr, "could not fprintf stdout\n");
+        fprintf(stderr, "fprintf(stdout, ...) < 0\n");
 
         exit(EXIT_FAILURE);
       }
 
       if (fflush(stdout) != 0)
       {
-        fprintf(stderr, "could not fflush stdout\n");
+        fprintf(stderr, "fflush(stdout) != 0\n");
 
         exit(EXIT_FAILURE);
       }
     }
   
-    strcpy(object->my_printf_buffer, "");
+    bdelete(object->my_printf_bbuffer, 0, ichar + 1);
 
-    object->my_printf_ibuffer = 0;
+    ichar = 0;
   }
+
+  HARDBUG(bdestroy(bline) == BSTR_ERR)
 
   HARDBUG(compat_mutex_unlock(&(object->my_printf_mutex)) != 0)
 }
@@ -233,40 +286,49 @@ void construct_my_printf(void *self, char *arg_prefix, int arg2stdout)
 
   get_field(with_record, LOG_OBJECT_ID, &object_id);
 
-  if (my_mpi_globals.MY_MPIG_nglobal <= 1)
-    HARDBUG(snprintf(object->my_printf_fname, MY_LINE_MAX,
-            LOGS_DIR "/%s%d.txt", arg_prefix, object_id) < 0)
-  else
-    HARDBUG(snprintf(object->my_printf_fname, MY_LINE_MAX,
-            LOGS_DIR "/%s%d-%d-%d.txt", arg_prefix, object_id,
-            my_mpi_globals.MY_MPIG_id_global,
-            my_mpi_globals.MY_MPIG_nglobal) < 0)
+  HARDBUG((object->my_printf_bname = bfromcstr("")) == NULL)
 
-  if ((object->my_printf_flog = fopen(object->my_printf_fname, "w")) == NULL)
+  if (my_mpi_globals.MY_MPIG_nglobal <= 1)
+    HARDBUG(bformata(object->my_printf_bname,
+                     LOGS_DIR "/%s%d.txt", arg_prefix, object_id) != BSTR_OK)
+  else
+    HARDBUG(bformata(object->my_printf_bname,
+                     LOGS_DIR "/%s%d-%d-%d.txt", arg_prefix, object_id,
+                     my_mpi_globals.MY_MPIG_id_global,
+                     my_mpi_globals.MY_MPIG_nglobal) != BSTR_OK)
+
+  if ((object->my_printf_flog =
+       fopen(bdata(object->my_printf_bname), "w")) == NULL)
   {
-    fprintf(stderr, "could not fopen %s in mode 'w'\n",
-            object->my_printf_fname);
+    fprintf(stderr, "fopen(%s, 'w') == NULL\n",
+                    bdata(object->my_printf_bname));
 
     exit(EXIT_FAILURE);
   }
 
+
+  char time_stamp[MY_LINE_MAX];
+    
   time_t t = time(NULL);
 
+  HARDBUG(strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y",
+                   localtime(&t)) == 0)
+
   int nchar = fprintf(object->my_printf_flog,
-    "log file opened at %s\n", ctime(&t));
+                      "%s@ PTHREAD_SELF=%#lX LOG FILE OPENED\n\n",
+                      time_stamp, compat_pthread_self());
 
   if (nchar < 0)
   {
-    fprintf(stderr, "could not fprintf %s\n", object->my_printf_fname);
+    fprintf(stderr, "fprintf(%s, ...) < 0\n",
+                    bdata(object->my_printf_bname));
 
     exit(EXIT_FAILURE);
   }
 
   object->my_printf_fsize = nchar;
 
-  strcpy(object->my_printf_buffer, "");
-
-  object->my_printf_ibuffer = 0;
+  HARDBUG((object->my_printf_bbuffer = bfromcstr("")) == NULL)
 
   object_id++;
 

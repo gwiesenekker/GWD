@@ -1,7 +1,9 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #define NPAD (4 * 64)
+
+#define NMY_LEAKS_MAX 1024
 
 typedef struct
 {
@@ -25,11 +27,28 @@ typedef struct
   ui64_t MM_crc64;
 } my_malloc_t;
 
+//cannot use something dynamic like bstrings of course
+
+typedef struct
+{
+  char *ML_name;
+  char *ML_file;
+  const char *ML_func;
+  int ML_line;
+  unsigned long ML_pthread_self;
+} my_leak_t;
+
 local my_random_t my_malloc_random;
 local int nmy_mallocs_max = 128;
 local int nmy_mallocs = 0;
 local my_malloc_t *my_mallocs = NULL;
+
+local int nmy_leaks = 0;
+local my_leak_t *my_leaks = NULL;
+
 local my_mutex_t my_malloc_mutex;
+
+local my_mutex_t my_leak_mutex;
 
 void register_pointer(char *arg_name,
   char *arg_file, const char *arg_func, int arg_line,
@@ -43,7 +62,7 @@ void register_pointer(char *arg_name,
   {
     nmy_mallocs_max += nmy_mallocs / 2;
 
-    PRINTF("DOUBLING nmy_mallocs=%d nmy_mallocs_max=%d"
+    PRINTF("EXPANDING nmy_mallocs=%d nmy_mallocs_max=%d"
            " name=%s file=%s func=%s line=%d size=%zu\n",
            nmy_mallocs, nmy_mallocs_max,
            arg_name, arg_file, arg_func, arg_line, arg_size);
@@ -126,6 +145,95 @@ void *my_malloc(char *arg_name, char *arg_file, const char *arg_func,
   return(result + NPAD);
 }
 
+void print_my_leaks(int arg_all)
+{
+  for (int ileak = nmy_leaks - 1; ileak >= 0; --ileak)
+  {
+    if (arg_all or (my_leaks[ileak].ML_pthread_self == compat_pthread_self()))
+    {
+      PRINTF("ileak=%d name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+        ileak,
+        my_leaks[ileak].ML_name,
+        my_leaks[ileak].ML_file,
+        my_leaks[ileak].ML_func,
+        my_leaks[ileak].ML_line,
+        my_leaks[ileak].ML_pthread_self);
+    }
+  }
+}
+
+void push_leak(char *arg_name, char *arg_file, const char *arg_func,
+  int arg_line)
+{
+  HARDBUG(compat_mutex_lock(&my_leak_mutex) != 0)
+
+  if (nmy_leaks >= NMY_LEAKS_MAX)
+  {
+    PRINTF("PUSH_LEAK name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+           arg_name, arg_file, arg_func, arg_line, compat_pthread_self());
+
+    print_my_leaks(FALSE);
+
+    FATAL("TOO MANY PUSH_LEAKS", EXIT_FAILURE)
+  }
+  
+  my_leaks[nmy_leaks].ML_name = arg_name;
+  my_leaks[nmy_leaks].ML_file = arg_file;
+  my_leaks[nmy_leaks].ML_func = arg_func;
+  my_leaks[nmy_leaks].ML_line = arg_line;
+  my_leaks[nmy_leaks].ML_pthread_self = compat_pthread_self();
+
+  nmy_leaks++;
+
+  HARDBUG(compat_mutex_unlock(&my_leak_mutex) != 0)
+}
+
+void pop_leak(char *arg_name, char *arg_file, const char *arg_func,
+  int arg_line)
+{
+  HARDBUG(compat_mutex_lock(&my_leak_mutex) != 0)
+  
+  if (nmy_leaks == 0)
+  {
+    PRINTF("POP_LEAK name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+           arg_name, arg_file, arg_func, arg_line, compat_pthread_self());
+
+    FATAL("NO PUSHED LEAKS", EXIT_FAILURE)
+  }
+
+  int ileak;
+
+  for (ileak = nmy_leaks - 1; ileak >= 0; --ileak)
+    if (my_leaks[ileak].ML_pthread_self == compat_pthread_self()) break;
+
+  if (ileak < 0)
+  {
+    PRINTF("POP_LEAK name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+           arg_name, arg_file, arg_func, arg_line, compat_pthread_self());
+
+    print_my_leaks(FALSE);
+
+    FATAL("POP_LEAK DID NOT FIND ANY PUSH_LEAK", EXIT_FAILURE)
+  }
+
+  if (strcmp(my_leaks[ileak].ML_name, arg_name) != 0)
+  {
+    PRINTF("POP_LEAK name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+           arg_name, arg_file, arg_func, arg_line, compat_pthread_self());
+
+    print_my_leaks(FALSE);
+
+    FATAL("POP_LEAK DID NOT FIND CORRESPONDING PUSH_LEAK", EXIT_FAILURE)
+  }
+
+  for (int jleak = ileak; jleak < nmy_leaks; jleak++)
+    my_leaks[jleak] = my_leaks[jleak + 1];
+
+  nmy_leaks--;
+
+  HARDBUG(compat_mutex_unlock(&my_leak_mutex) != 0)
+}
+
 void init_my_malloc(void)
 {
   construct_my_random(&my_malloc_random, 0);
@@ -134,7 +242,13 @@ void init_my_malloc(void)
 
   HARDBUG(my_mallocs == NULL)
   
+  my_leaks = malloc(sizeof(my_leak_t) * NMY_LEAKS_MAX);
+
+  HARDBUG(my_leaks == NULL)
+
   HARDBUG(compat_mutex_init(&my_malloc_mutex) != 0)
+
+  HARDBUG(compat_mutex_init(&my_leak_mutex) != 0)
 }
 
 local void heap_sort_i64(i64_t n, i64_t *p, i64_t *a)
@@ -191,7 +305,7 @@ void fin_my_malloc(int verbose)
 {
   int corrupt = FALSE;
 
-  i64_t total_size = 0;
+  i64_t S_total_size = 0;
 
   //gather sizes
 
@@ -219,7 +333,7 @@ void fin_my_malloc(int verbose)
   {
     my_malloc_t *object = my_mallocs + imalloc;
 
-    total_size += object->MM_size;
+    S_total_size += object->MM_size;
 
     if (verbose)
       PRINTF("imalloc=%d name=%s file=%s func=%s line=%d size=%lld\n",
@@ -262,14 +376,14 @@ void fin_my_malloc(int verbose)
   }
   if (corrupt) FATAL("BLOCK(S) CORRUPTED", EXIT_FAILURE)
 
-  PRINTF("nmy_mallocs=%d total_size=%lld(%lld MB)\n",
-    nmy_mallocs, total_size, total_size / MBYTE);
+  PRINTF("nmy_mallocs=%d S_total_size=%lld(%lld MB)\n",
+    nmy_mallocs, S_total_size, S_total_size / MBYTE);
 
   for (int imalloc = 0; imalloc < nmy_mallocs; imalloc++)
   {
     my_malloc_t *object = my_mallocs + psizes[imalloc];
 
-    total_size += object->MM_size;
+    S_total_size += object->MM_size;
 
     PRINTF("imalloc=%d name=%s file=%s func=%s line=%d size=%lld\n",
            imalloc,
@@ -280,6 +394,13 @@ void fin_my_malloc(int verbose)
            object->MM_size);
 
     if (!verbose and (object->MM_size < MBYTE)) break;
+  }
+
+  if (nmy_leaks > 0)
+  {
+    print_my_leaks(TRUE);
+
+    PRINTF("MEMORY LEAK DETECTED!\n");
   }
 }
 

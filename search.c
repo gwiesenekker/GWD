@@ -1,10 +1,10 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
-
-#define TWEAK_PREVIOUS_MOVE_REDUCED_BIT  BIT(0)
-#define TWEAK_PREVIOUS_MOVE_CAPTURE_BIT  BIT(1)
-#define TWEAK_PREVIOUS_MOVE_EXTENDED_BIT BIT(2)
+#define TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT BIT(0)
+#define TWEAK_PREVIOUS_MOVE_NULL_BIT       BIT(1)
+#define TWEAK_PREVIOUS_MOVE_REDUCED_BIT    BIT(2)
+#define TWEAK_PREVIOUS_MOVE_EXTENDED_BIT   BIT(3)
 
 #undef CHECK_TIME_LIMIT_IN_QUIESCENCE
 
@@ -76,53 +76,61 @@ local i64_t global_nodes;
 
 local bucket_t bucket_depth;
 
-local void white_endgame_pv(board_t *, int, char *);
-local void black_endgame_pv(board_t *, int, char *);
+local void white_endgame_pv(search_t *, int, bstring);
+local void black_endgame_pv(search_t *, int, bstring);
 
-local int white_quiescence(board_t *, int, int, int, moves_list_t *,
+local int white_quiescence(search_t *, int, int, int, moves_list_t *,
   pv_t *, int *, int);
-local int black_quiescence(board_t *, int, int, int, moves_list_t *,
+local int black_quiescence(search_t *, int, int, int, moves_list_t *,
   pv_t *, int *, int);
 
-local int white_alpha_beta(board_t *, int, int, int, int, int, int,
+local int white_alpha_beta(search_t *, int, int, int, int, int, int,
   pv_t *, int *);
-local int black_alpha_beta(board_t *, int, int, int, int, int, int,
+local int black_alpha_beta(search_t *, int, int, int, int, int, int,
   pv_t *, int *);
 
-local void white_pv(board_t *, pv_t *, int, char *);
-local void black_pv(board_t *, pv_t *, int, char *);
+local void white_pv(search_t *, pv_t *, int, bstring);
+local void black_pv(search_t *, pv_t *, int, bstring);
 
-local void print_white_pv(board_t *, int, int, int, moves_list_t *, int,
+local void print_white_pv(search_t *, int, int, int, moves_list_t *, int,
   pv_t *, char *);
-local void print_black_pv(board_t *, int, int, int, moves_list_t *, int,
+local void print_black_pv(search_t *, int, int, int, moves_list_t *, int,
   pv_t *, char *);
 
 int draw_by_repetition(board_t *with, int strict)
 {
   int result = FALSE;
 
+  int npieces = BIT_COUNT(with->board_white_man_bb) +
+                BIT_COUNT(with->board_white_king_bb) +
+                BIT_COUNT(with->board_black_man_bb) +
+                BIT_COUNT(with->board_black_king_bb);
+
   int n = 1;
 
-  for (int jnode = with->board_inode - 2; jnode >= 0; jnode -= 2)
+  for (int istate = with->board_inode - 2; istate >= 0; istate -= 2)
   {
-    if (with->board_nodes[jnode + 1].node_ncaptx > 0)
+    if (with->board_states[istate + 1].BS_npieces != npieces)
       goto label_return;
 
-    if (with->board_nodes[jnode].node_ncaptx > 0)
+    if (with->board_states[istate].BS_npieces != npieces)
       goto label_return;
 
-    if (HASH_KEY_EQ(with->board_nodes[jnode].node_key, with->board_key))
+    if (HASH_KEY_EQ(with->board_states[istate].BS_key, with->board_key))
     {
       ++n;
+
       if (!strict or (n >= 3))
       {
         result = TRUE;
+
         goto label_return;
       }
     }
   }
 
   label_return:
+
   return(result);
 }
 
@@ -163,8 +171,6 @@ local int move_repetition(board_t *with)
 
   for (int jnode = with->board_inode - 4; jnode >= 0; jnode -= 2)
   {
-    HARDBUG(with->board_nodes[jnode].node_move_key == 0)
-
     if (HASH_KEY_EQ(with->board_nodes[with->board_inode - 2].node_move_key, 
                     with->board_nodes[jnode].node_move_key))
     {
@@ -172,7 +178,7 @@ local int move_repetition(board_t *with)
 
       if (n >= 3)
       {
-        ++(with->total_move_repetitions);
+        //++(with->S_total_move_repetitions);
 
         return(TRUE);
       }
@@ -186,95 +192,111 @@ local int move_repetition(board_t *with)
   return(FALSE);
 }
 
-void clear_totals(board_t *with)
+void clear_totals(search_t *with)
 {
-  with->total_move_repetitions = 0;
+  with->S_total_move_repetitions = 0;
 
-  with->total_quiescence_nodes = 0;
-  with->total_quiescence_all_moves_captures_only = 0;
-  with->total_quiescence_all_moves_le2_moves = 0;
-  with->total_quiescence_all_moves_tactical = 0;
+  with->S_total_quiescence_nodes = 0;
+  with->S_total_quiescence_all_moves_captures_only = 0;
+  with->S_total_quiescence_all_moves_le2_moves = 0;
+  with->S_total_quiescence_all_moves_extended = 0;
 
-  with->total_nodes = 0;
-  with->total_alpha_beta_nodes = 0;
-  with->total_minimal_window_nodes = 0;
-  with->total_pv_nodes = 0;
+  with->S_total_nodes = 0;
+  with->S_total_alpha_beta_nodes = 0;
+  with->S_total_minimal_window_nodes = 0;
+  with->S_total_pv_nodes = 0;
 
-  with->total_reductions_delta = 0;
-  with->total_reductions_delta_lost = 0;
-  with->total_reductions_delta_le_alpha = 0;
-  with->total_reductions_delta_ge_beta = 0;
+  with->S_total_quiescence_extension_searches = 0;
+  with->S_total_quiescence_extension_searches_le_alpha = 0;
+  with->S_total_quiescence_extension_searches_ge_beta = 0;
 
-  with->total_reductions = 0;
-  with->total_reductions_le_alpha = 0;
-  with->total_reductions_ge_beta = 0;
+  with->S_total_pv_extension_searches = 0;
+  with->S_total_pv_extension_searches_le_alpha = 0;
+  with->S_total_pv_extension_searches_ge_beta = 0;
 
-  with->total_single_reply_extensions = 0;
+  with->S_total_reductions_delta = 0;
+  with->S_total_reductions_delta_lost = 0;
+  with->S_total_reductions_delta_le_alpha = 0;
+  with->S_total_reductions_delta_ge_beta = 0;
 
-  with->total_evaluations = 0;
-  with->total_material_only_evaluations = 0;
-  with->total_neural_evaluations = 0;
+  with->S_total_reductions = 0;
+  with->S_total_reductions_le_alpha = 0;
+  with->S_total_reductions_ge_beta = 0;
 
-  with->total_alpha_beta_cache_hits = 0;
-  with->total_alpha_beta_cache_depth_hits = 0;
-  with->total_alpha_beta_cache_le_alpha_hits = 0;
-  with->total_alpha_beta_cache_le_alpha_cutoffs = 0;
-  with->total_alpha_beta_cache_ge_beta_hits = 0;
-  with->total_alpha_beta_cache_ge_beta_cutoffs = 0;
-  with->total_alpha_beta_cache_true_score_hits = 0;
-  with->total_alpha_beta_cache_le_alpha_stored = 0;
-  with->total_alpha_beta_cache_ge_beta_stored = 0;
-  with->total_alpha_beta_cache_true_score_stored = 0;
-  with->total_alpha_beta_cache_nmoves_errors = 0;
-  with->total_alpha_beta_cache_crc32_errors = 0;
+  with->S_total_single_reply_extensions = 0;
+
+  with->S_total_evaluations = 0;
+  with->S_total_material_only_evaluations = 0;
+  with->S_total_network_evaluations = 0;
+
+  with->S_total_alpha_beta_cache_hits = 0;
+  with->S_total_alpha_beta_cache_depth_hits = 0;
+  with->S_total_alpha_beta_cache_le_alpha_hits = 0;
+  with->S_total_alpha_beta_cache_le_alpha_cutoffs = 0;
+  with->S_total_alpha_beta_cache_ge_beta_hits = 0;
+  with->S_total_alpha_beta_cache_ge_beta_cutoffs = 0;
+  with->S_total_alpha_beta_cache_true_score_hits = 0;
+  with->S_total_alpha_beta_cache_le_alpha_stored = 0;
+  with->S_total_alpha_beta_cache_ge_beta_stored = 0;
+  with->S_total_alpha_beta_cache_true_score_stored = 0;
+  with->S_total_alpha_beta_cache_nmoves_errors = 0;
+  with->S_total_alpha_beta_cache_crc32_errors = 0;
 }
 
-#define PRINTF_TOTAL(X) my_printf(with->board_my_printf, #X "=%lld\n", with->X);
+#define PRINTF_TOTAL(X) my_printf(with->S_my_printf, #X "=%lld\n", with->X);
 
-void print_totals(board_t *with)
+void print_totals(search_t *with)
 {
-  PRINTF_TOTAL(total_move_repetitions)
+  PRINTF_TOTAL(S_total_move_repetitions)
 
-  PRINTF_TOTAL(total_quiescence_nodes)
-  PRINTF_TOTAL(total_quiescence_all_moves_captures_only)
-  PRINTF_TOTAL(total_quiescence_all_moves_le2_moves)
-  PRINTF_TOTAL(total_quiescence_all_moves_tactical)
+  PRINTF_TOTAL(S_total_quiescence_nodes)
+  PRINTF_TOTAL(S_total_quiescence_all_moves_captures_only)
+  PRINTF_TOTAL(S_total_quiescence_all_moves_le2_moves)
+  PRINTF_TOTAL(S_total_quiescence_all_moves_extended)
 
-  PRINTF_TOTAL(total_nodes)
-  PRINTF_TOTAL(total_alpha_beta_nodes)
-  PRINTF_TOTAL(total_minimal_window_nodes)
-  PRINTF_TOTAL(total_pv_nodes)
+  PRINTF_TOTAL(S_total_nodes)
+  PRINTF_TOTAL(S_total_alpha_beta_nodes)
+  PRINTF_TOTAL(S_total_minimal_window_nodes)
+  PRINTF_TOTAL(S_total_pv_nodes)
 
-  PRINTF_TOTAL(total_reductions_delta)
-  PRINTF_TOTAL(total_reductions_delta_lost)
-  PRINTF_TOTAL(total_reductions_delta_le_alpha)
-  PRINTF_TOTAL(total_reductions_delta_ge_beta)
+  PRINTF_TOTAL(S_total_quiescence_extension_searches)
+  PRINTF_TOTAL(S_total_quiescence_extension_searches_le_alpha)
+  PRINTF_TOTAL(S_total_quiescence_extension_searches_ge_beta)
 
-  PRINTF_TOTAL(total_reductions)
-  PRINTF_TOTAL(total_reductions_le_alpha)
-  PRINTF_TOTAL(total_reductions_ge_beta)
+  PRINTF_TOTAL(S_total_pv_extension_searches)
+  PRINTF_TOTAL(S_total_pv_extension_searches_le_alpha)
+  PRINTF_TOTAL(S_total_pv_extension_searches_ge_beta)
 
-  PRINTF_TOTAL(total_single_reply_extensions)
+  PRINTF_TOTAL(S_total_reductions_delta)
+  PRINTF_TOTAL(S_total_reductions_delta_lost)
+  PRINTF_TOTAL(S_total_reductions_delta_le_alpha)
+  PRINTF_TOTAL(S_total_reductions_delta_ge_beta)
 
-  PRINTF_TOTAL(total_evaluations)
-  PRINTF_TOTAL(total_material_only_evaluations)
-  PRINTF_TOTAL(total_neural_evaluations)
+  PRINTF_TOTAL(S_total_reductions)
+  PRINTF_TOTAL(S_total_reductions_le_alpha)
+  PRINTF_TOTAL(S_total_reductions_ge_beta)
 
-  PRINTF_TOTAL(total_alpha_beta_cache_hits)
-  PRINTF_TOTAL(total_alpha_beta_cache_depth_hits)
-  PRINTF_TOTAL(total_alpha_beta_cache_le_alpha_hits)
-  PRINTF_TOTAL(total_alpha_beta_cache_le_alpha_cutoffs)
-  PRINTF_TOTAL(total_alpha_beta_cache_ge_beta_hits)
-  PRINTF_TOTAL(total_alpha_beta_cache_ge_beta_cutoffs)
-  PRINTF_TOTAL(total_alpha_beta_cache_true_score_hits)
-  PRINTF_TOTAL(total_alpha_beta_cache_le_alpha_stored)
-  PRINTF_TOTAL(total_alpha_beta_cache_ge_beta_stored)
-  PRINTF_TOTAL(total_alpha_beta_cache_true_score_stored)
-  PRINTF_TOTAL(total_alpha_beta_cache_nmoves_errors)
-  PRINTF_TOTAL(total_alpha_beta_cache_crc32_errors)
+  PRINTF_TOTAL(S_total_single_reply_extensions)
+
+  PRINTF_TOTAL(S_total_evaluations)
+  PRINTF_TOTAL(S_total_material_only_evaluations)
+  PRINTF_TOTAL(S_total_network_evaluations)
+
+  PRINTF_TOTAL(S_total_alpha_beta_cache_hits)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_depth_hits)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_le_alpha_hits)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_le_alpha_cutoffs)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_ge_beta_hits)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_ge_beta_cutoffs)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_true_score_hits)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_le_alpha_stored)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_ge_beta_stored)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_true_score_stored)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_nmoves_errors)
+  PRINTF_TOTAL(S_total_alpha_beta_cache_crc32_errors)
 }
 
-local int probe_alpha_beta_cache(board_t *with, int node_type, int pv_only,
+local int probe_alpha_beta_cache(search_t *with, int node_type, int pv_only,
   alpha_beta_cache_entry_t *alpha_beta_cache,
   alpha_beta_cache_entry_t *alpha_beta_cache_entry,
   alpha_beta_cache_slot_t **alpha_beta_cache_slot)
@@ -284,7 +306,7 @@ local int probe_alpha_beta_cache(board_t *with, int node_type, int pv_only,
   if (IS_PV(node_type))
   {
     *alpha_beta_cache_entry =
-      alpha_beta_cache[with->board_key % nalpha_beta_pv_cache_entries];
+      alpha_beta_cache[with->S_board.board_key % nalpha_beta_pv_cache_entries];
 
 #ifdef DEBUG
     for (int idebug = 0; idebug < NSLOTS; idebug++)
@@ -315,11 +337,11 @@ local int probe_alpha_beta_cache(board_t *with, int node_type, int pv_only,
     
       if (crc32 != (*alpha_beta_cache_slot)->ABCS_crc32)
       {
-        with->total_alpha_beta_cache_crc32_errors++;
+        with->S_total_alpha_beta_cache_crc32_errors++;
  
         **alpha_beta_cache_slot = alpha_beta_cache_slot_default;
       }
-      else if ((*alpha_beta_cache_slot)->ABCS_key == with->board_key)
+      else if ((*alpha_beta_cache_slot)->ABCS_key == with->S_board.board_key)
       {
         result = TRUE;
 
@@ -332,7 +354,7 @@ local int probe_alpha_beta_cache(board_t *with, int node_type, int pv_only,
   {
     *alpha_beta_cache_entry =
       alpha_beta_cache[nalpha_beta_pv_cache_entries + 
-                       with->board_key % nalpha_beta_cache_entries];
+                       with->S_board.board_key % nalpha_beta_cache_entries];
 
 #ifdef DEBUG
     for (int idebug = 0; idebug < NSLOTS; idebug++)
@@ -363,11 +385,11 @@ local int probe_alpha_beta_cache(board_t *with, int node_type, int pv_only,
     
       if (crc32 != (*alpha_beta_cache_slot)->ABCS_crc32)
       {
-        with->total_alpha_beta_cache_crc32_errors++;
+        with->S_total_alpha_beta_cache_crc32_errors++;
   
         **alpha_beta_cache_slot = alpha_beta_cache_slot_default;
       }
-      else if ((*alpha_beta_cache_slot)->ABCS_key == with->board_key)
+      else if ((*alpha_beta_cache_slot)->ABCS_key == with->S_board.board_key)
       {
         result = TRUE;
 
@@ -391,7 +413,7 @@ local int probe_alpha_beta_cache(board_t *with, int node_type, int pv_only,
     if (islot == NSLOTS)
     {
       *alpha_beta_cache_slot = alpha_beta_cache_entry->ABCE_slots +
-                               with->board_key % NSLOTS;
+                               with->S_board.board_key % NSLOTS;
 
       **alpha_beta_cache_slot = alpha_beta_cache_slot_default;
     }
@@ -488,6 +510,39 @@ void clear_caches(void)
   PRINTF("..done\n");
 }
 
+void construct_search(void *self,
+  my_printf_t *arg_my_printf, void *arg_thread)
+{
+  search_t *object = self;
+
+  object->S_my_printf = arg_my_printf;
+
+  object->S_thread = arg_thread;
+
+  construct_board(&(object->S_board), arg_my_printf);
+  
+  construct_my_timer(&(object->S_timer), "board",
+    object->S_my_printf, FALSE);
+
+  entry_i16_t entry_i16_default = {MATE_DRAW, MATE_DRAW};
+            
+  i64_t key_default = -1;
+            
+  i64_t endgame_entry_cache_size = options.egtb_entry_cache_size * MBYTE;
+              
+  BSTRING(bname)
+
+  HARDBUG(bformata(bname, "S_%p_entry_cache\n", object) !=
+          BSTR_OK)
+
+  construct_cache(&(object->S_endgame_entry_cache),
+                  bdata(bname), endgame_entry_cache_size,
+                  CACHE_ENTRY_KEY_TYPE_I64_T, &key_default,
+                  sizeof(entry_i16_t), &entry_i16_default);
+
+  BDESTROY(bname)
+}
+
 void init_search(void)
 {
   PRINTF("sizeof(alpha_beta_cache_entry_t)=%lld\n",
@@ -547,11 +602,11 @@ void fin_search(void)
 {
 }
 
-void search(board_t *with, moves_list_t *moves_list,
+void do_search(search_t *with, moves_list_t *moves_list,
   int depth_min, int depth_max, int root_score,
   my_random_t *shuffle)
 {
-  if (IS_WHITE(with->board_colour2move))
+  if (IS_WHITE(with->S_board.board_colour2move))
     white_search(with, moves_list, depth_min, depth_max, root_score,
       shuffle);
   else

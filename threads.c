@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #define THREAD_ALPHA_BETA_MASTER 0
@@ -17,34 +17,47 @@ local void solve_problems(void *self, char *arg_name)
   HARDBUG((fname = fopen(arg_name, "r")) == NULL)
   HARDBUG((ftmp = fopen("tmp.fen", "w")) == NULL)
 
-  char line[MY_LINE_MAX];
+  BSTRING(bline)
+
+  struct bStream* bfname;
+
+  HARDBUG((bfname = bsopen((bNread) fread, fname)) == NULL)
 
   int nproblems = 0;
   int nsolved = 0;
 
-  while(fgets(line, MY_LINE_MAX, fname) != NULL)
+  while(bsreadln(bline, bfname, (char) '\n') == BSTR_OK)
   {
-    if (*line == '*') break;
-    if (*line == '#') continue;
+    if (bchar(bline, 0) == '*') break;
+    if (bchar(bline, 0) == '#') continue;
 
-    char fen[MY_LINE_MAX];
+    BSTRING(bfen)
 
-    HARDBUG(sscanf(line, "%[^\n]", fen) != 1)
+    CSTRING(cfen, blength(bline))
+
+    HARDBUG(sscanf(bdata(bline), "%[^\n]", cfen) != 1)
+
+    HARDBUG(bassigncstr(bfen, cfen) != BSTR_OK)
+
+    CDESTROY(cfen)
 
     ++nproblems;
 
-    char text[MY_LINE_MAX];
+    BSTRING(btext)
     
-    snprintf(text, MY_LINE_MAX, "problem #%d", nproblems);
+    bformata(btext, "problem #%d", nproblems);
 
-    enqueue(&main_queue, MESSAGE_INFO, text);
+    enqueue(&main_queue, MESSAGE_INFO, bdata(btext));
+
+    BDESTROY(btext)
 
     //send FEN and GO to other threads
 
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
-        enqueue(return_thread_queue(threads + ithread), MESSAGE_FEN, fen);
+        enqueue(return_thread_queue(threads + ithread), MESSAGE_FEN,
+                bdata(bfen));
 
       for (int ithread = 1; ithread < options.nthreads; ithread++)
         enqueue(return_thread_queue(threads + ithread), MESSAGE_GO,
@@ -53,15 +66,15 @@ local void solve_problems(void *self, char *arg_name)
 
     my_printf(&(object->thread_my_printf), "problem #%d\n", nproblems);
 
-    fen2board(fen, object->thread_board_id);
+    fen2board(&(object->thread_search.S_board), bdata(bfen));
 
-    board_t *with_board = return_with_board(object->thread_board_id);
+    board_t *with_board = &(object->thread_search.S_board);
 
-    print_board(object->thread_board_id);
+    print_board(&(object->thread_search.S_board));
 
     moves_list_t moves_list;
 
-    create_moves_list(&moves_list);
+    construct_moves_list(&moves_list);
 
     gen_moves(with_board, &moves_list, FALSE);
 
@@ -69,11 +82,11 @@ local void solve_problems(void *self, char *arg_name)
 
     if (moves_list.nmoves > 0)
     {
-      search(with_board, &moves_list,
+      do_search(&(object->thread_search), &moves_list,
              INVALID, INVALID, SCORE_MINUS_INFINITY, FALSE);
 
-      if ((with_board->board_search_best_score -
-           with_board->board_search_root_simple_score) > (SCORE_MAN / 2))
+      if ((object->thread_search.S_best_score -
+           object->thread_search.S_root_simple_score) > (SCORE_MAN / 2))
       {
         ++nsolved;
         my_printf(&(object->thread_my_printf),
@@ -83,7 +96,8 @@ local void solve_problems(void *self, char *arg_name)
       {
         my_printf(&(object->thread_my_printf),
           "did not solve problem #%d\n", nproblems);
-        HARDBUG(fprintf(ftmp, "%s\n", fen) < 0)
+
+        HARDBUG(fprintf(ftmp, "%s\n", bdata(bfen)) < 0)
       }
     }
 
@@ -93,16 +107,25 @@ local void solve_problems(void *self, char *arg_name)
         enqueue(return_thread_queue(threads + ithread),
                    MESSAGE_ABORT_SEARCH, "threads/solve_problems");
     }
+    BDESTROY(bfen)
   }
+
+  HARDBUG(bsclose(bfname) == NULL)
+
   FCLOSE(fname)
+
   FCLOSE(ftmp)
 
-  char text[MY_LINE_MAX];
+  BDESTROY(bline)
 
-  snprintf(text, MY_LINE_MAX, "solved %d out of %d problems",
-    nsolved, nproblems);
+  BSTRING(btext)
 
-  enqueue(&main_queue, MESSAGE_INFO, text);
+  HARDBUG(bformata(btext, "solved %d out of %d problems",
+                   nsolved, nproblems) != BSTR_OK)
+
+  enqueue(&main_queue, MESSAGE_INFO, bdata(btext));
+
+  BDESTROY(btext)
 }
 
 local void thread_func_alpha_beta_master(void *self)
@@ -186,7 +209,7 @@ local void thread_func_alpha_beta_master(void *self)
 
         game_state.set_state(&game_state, bdata(message.message_text));
 
-        board_t *with_board = return_with_board(object->thread_board_id);
+        board_t *with_board = &(object->thread_search.S_board);
 
         state2board(with_board, &game_state);
 
@@ -206,13 +229,13 @@ local void thread_func_alpha_beta_master(void *self)
               MESSAGE_GO, "threads/thread_alha_beta_master");
         }
 
-        board_t *with_board = return_with_board(object->thread_board_id);
+        board_t *with_board = &(object->thread_search.S_board);
 
-        print_board(object->thread_board_id);
+        print_board(&(object->thread_search.S_board));
 
         moves_list_t moves_list;
 
-        create_moves_list(&moves_list);
+        construct_moves_list(&moves_list);
 
         gen_moves(with_board, &moves_list, FALSE);
 
@@ -223,7 +246,7 @@ local void thread_func_alpha_beta_master(void *self)
         stop_my_timer(&(object->thread_idle_timer));
         start_my_timer(&(object->thread_busy_timer));
 
-        search(with_board, &moves_list,
+        do_search(&(object->thread_search), &moves_list,
                INVALID, INVALID, SCORE_MINUS_INFINITY, FALSE);
 
         stop_my_timer(&(object->thread_busy_timer));
@@ -231,19 +254,23 @@ local void thread_func_alpha_beta_master(void *self)
 
         //message_t *sent[NTHREADS_MAX];
 
-        char move_string[MY_LINE_MAX];
+        BSTRING(btext)
 
-        strcpy(move_string,
-               moves_list.move2string(&moves_list,
-                                      with_board->board_search_best_move));
+        BSTRING(bmove_string)
 
-        char text[MY_LINE_MAX];
+        move2bstring(&moves_list, object->thread_search.S_best_move,
+                     bmove_string);
 
-        snprintf(text, MY_LINE_MAX, "%s %d %d",
-          move_string, with_board->board_search_best_score,
-          with_board->board_search_best_depth);
+        HARDBUG(bformata(btext, "%s %d %d",
+                         bdata(bmove_string),
+                         object->thread_search.S_best_score,
+                         object->thread_search.S_best_depth) != BSTR_OK)
       
-        enqueue(&main_queue, MESSAGE_RESULT, text);
+        enqueue(&main_queue, MESSAGE_RESULT, bdata(btext));
+
+        BDESTROY(bmove_string)
+
+        BDESTROY(btext)
 
         //send abort to other threads
 
@@ -279,9 +306,10 @@ local void thread_func_alpha_beta_slave(thread_t *object)
         my_printf(&(object->thread_my_printf), "got FEN message %s\n",
           bdata(message.message_text));
 
-        fen2board(bdata(message.message_text), object->thread_board_id);
+        fen2board(&(object->thread_search.S_board),
+                  bdata(message.message_text));
 
-        print_board(object->thread_board_id);
+        print_board(&(object->thread_search.S_board));
       }
       else if (message.message_id == MESSAGE_EXIT_THREAD)
       {
@@ -316,7 +344,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
         game_state.set_state(&game_state, bdata(message.message_text));
 
-        board_t *with_board = return_with_board(object->thread_board_id);
+        board_t *with_board = &(object->thread_search.S_board);
 
         state2board(with_board, &game_state);
 
@@ -337,22 +365,29 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
           if (message.message_id == MESSAGE_ABORT_SEARCH) break;
 
-          char move_string[MY_LINE_MAX];
+          BSTRING(bmove_string)
+
+          CSTRING(cmove_string, blength(message.message_text))
+
           int depth_min;
           int depth_max;
           int root_score;
           int minimal_window;
 
           HARDBUG(sscanf(bdata(message.message_text), "%s%d%d%d%d",
-                     move_string,
-                     &depth_min, &depth_max,
-                     &root_score, &minimal_window) != 5)
+                         cmove_string,
+                         &depth_min, &depth_max,
+                         &root_score, &minimal_window) != 5)
+
+          HARDBUG(bassigncstr(bmove_string, cmove_string) != BSTR_OK)
+
+          CDESTROY(cmove_string)
             
-          board_t *with_board = return_with_board(object->thread_board_id);
+          board_t *with_board = &(object->thread_search.S_board);
 
           moves_list_t moves_list;
 
-          create_moves_list(&moves_list);
+          construct_moves_list(&moves_list);
 
           gen_moves(with_board, &moves_list, FALSE);
 
@@ -362,16 +397,16 @@ local void thread_func_alpha_beta_slave(thread_t *object)
     
           int imove;
 
-          if ((imove = search_move(&moves_list, move_string)) ==
+          if ((imove = search_move(&moves_list, bmove_string)) ==
               INVALID)
           {  
-            print_board(object->thread_board_id);
+            print_board(&(object->thread_search.S_board));
   
             my_printf(&(object->thread_my_printf), "move=%s\n",
-              move_string);
+              bdata(bmove_string));
     
-            moves_list.fprintf_moves(&(object->thread_my_printf),
-              &moves_list, TRUE);
+            fprintf_moves_list(&moves_list, &(object->thread_my_printf),
+                               TRUE);
     
             FATAL("move not found", EXIT_FAILURE)
           }
@@ -382,21 +417,21 @@ local void thread_func_alpha_beta_slave(thread_t *object)
               "got SEARCH FIRST message %s\n", bdata(message.message_text));
 
             my_printf(&(object->thread_my_printf), "%s %d %d %d %d\n",
-              move_string, depth_min, depth_max,
+              bdata(bmove_string), depth_min, depth_max,
               root_score, minimal_window);
 
-            clear_totals(with_board);
+            clear_totals(&(object->thread_search));
 
             stop_my_timer(&(object->thread_idle_timer));
             start_my_timer(&(object->thread_busy_timer));
 
-            search(with_board, &moves_list,
+            do_search(&(object->thread_search), &moves_list,
                    depth_min, depth_max, root_score, FALSE);
 
             stop_my_timer(&(object->thread_busy_timer));
             start_my_timer(&(object->thread_idle_timer));
   
-            print_totals(with_board);
+            print_totals(&(object->thread_search));
           }
           else if (message.message_id == MESSAGE_SEARCH_AHEAD)
           {
@@ -404,32 +439,31 @@ local void thread_func_alpha_beta_slave(thread_t *object)
               "got SEARCH AHEAD message %s\n", bdata(message.message_text));
 
             my_printf(&(object->thread_my_printf), "%s %d %d %d %d\n",
-              move_string, depth_min, depth_max,
+              bdata(bmove_string), depth_min, depth_max,
               root_score, minimal_window);
 
             do_move(with_board, imove, &moves_list);
 
             moves_list_t your_moves_list;
   
-            create_moves_list(&your_moves_list);
+            construct_moves_list(&your_moves_list);
   
             gen_moves(with_board, &your_moves_list, FALSE);
   
             if (your_moves_list.nmoves > 0)
             {
-              clear_totals(with_board);
-
+              clear_totals(&(object->thread_search));
 
               stop_my_timer(&(object->thread_idle_timer));
               start_my_timer(&(object->thread_busy_timer));
 
-              search(with_board, &your_moves_list,
+              do_search(&(object->thread_search), &your_moves_list,
                      depth_min, depth_max, -root_score, FALSE);
 
               stop_my_timer(&(object->thread_busy_timer));
               start_my_timer(&(object->thread_idle_timer));
    
-              print_totals(with_board);
+              print_totals(&(object->thread_search));
             }
 
             undo_move(with_board, imove, &moves_list);
@@ -440,7 +474,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
               "got SEARCH SECOND message %s\n", bdata(message.message_text));
 
             my_printf(&(object->thread_my_printf), "%s %d %d %d %d\n",
-              move_string, depth_min, depth_max,
+              bdata(bmove_string), depth_min, depth_max,
               root_score, minimal_window);
 
             if (moves_list.nmoves > 1)
@@ -453,22 +487,23 @@ local void thread_func_alpha_beta_slave(thread_t *object)
               moves_list.nmoves--;
             }
 
-            clear_totals(with_board);
-
+            clear_totals(&(object->thread_search));
 
             stop_my_timer(&(object->thread_idle_timer));
             start_my_timer(&(object->thread_busy_timer));
 
-            search(with_board, &moves_list,
+            do_search(&(object->thread_search), &moves_list,
                    depth_min, depth_max, root_score, FALSE);
     
             stop_my_timer(&(object->thread_busy_timer));
             start_my_timer(&(object->thread_idle_timer));
 
-            print_totals(with_board);
+            print_totals(&(object->thread_search));
           }
           else
             FATAL("unknown message_id", EXIT_FAILURE)
+
+          BDESTROY(bmove_string)
         }
       }
       else
@@ -485,28 +520,22 @@ local void *thread_func(void *self)
 {
   thread_t *object = self;
 
-#if COMPAT_CSTD == COMPAT_CSTD_C11
-  i64_t tid = thrd_current();
-#else
-  i64_t tid = INVALID;
-#endif
-
-  my_printf(&(object->thread_my_printf), "thread=%p tid=%lld\n",
-    object, tid);
+  my_printf(&(object->thread_my_printf), "thread=%p pthread_self=%#lX\n",
+    object, compat_pthread_self());
 
   BEGIN_BLOCK("main-thread")
 
-  bstring bname = bfromcstr("thread");
+  BSTRING(bname)
 
-  HARDBUG(bname == NULL)
-
-  HARDBUG(bformata(bname, "-%p", object) != BSTR_OK)
+  HARDBUG(bformata(bname, "thread-%#lX", compat_pthread_self()) != BSTR_OK)
 
   construct_my_timer(&(object->thread_idle_timer), bdata(bname),
     &(object->thread_my_printf), FALSE);
 
   construct_my_timer(&(object->thread_busy_timer), bdata(bname),
     &(object->thread_my_printf), FALSE);
+
+  BDESTROY(bname)
 
   object->thread_idle = 0.0;
 
@@ -546,18 +575,19 @@ local void create_thread(void *self, int arg_role)
 
   construct_my_random(&(object->thread_random), INVALID);
 
-  bstring queue_name = bformat("thread-%p", self);
+  BSTRING(queue_name)
+
+  HARDBUG(bformata(queue_name, "thread-%p", self) != BSTR_OK)
 
   construct_queue(&(object->thread_queue), bdata(queue_name),
                   &(object->thread_my_printf));
 
-  bdestroy(queue_name);
+  BDESTROY(queue_name)
 
-  object->thread_board_id =
-    create_board(&(object->thread_my_printf), object);
+  construct_search(&(object->thread_search),
+    &(object->thread_my_printf), object);
 
   compat_thread_create(&(object->thread), thread_func, object);
-
 }
 
 queue_t *return_thread_queue(void *self)

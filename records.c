@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #define CJSON_FIELDS_ID      "fields"
@@ -192,10 +192,13 @@ bstring get_record(void *self)
 {
   record_t *object = self;
 
-  balloc(object->R_string, MY_LINE_MAX);
+  char *cstring;
+  
+  HARDBUG((cstring = cJSON_Print(object->R_cjson)) == NULL)
 
-  HARDBUG(cJSON_PrintPreallocated(object->R_cjson, bdata(object->R_string),
-                                  MY_LINE_MAX, FALSE) == 0)
+  HARDBUG(bassigncstr(object->R_string, cstring) != BSTR_OK)
+
+  free(cstring);
 
   return(object->R_string);
 }
@@ -206,9 +209,7 @@ void test_records(void)
 
   construct_record(&a);
 
-  bstring string = bfromcstr("");
-
-  HARDBUG(string == NULL)
+  BSTRING(string)
 
   PRINTF("empty record: %s\n", bdata(get_record(&a)));
 
@@ -248,5 +249,7 @@ void test_records(void)
   set_record(&b, get_record(&a));
 
   PRINTF("copied record: %s\n", bdata(get_record(&b)));
+
+  BDESTROY(string)
 }
 

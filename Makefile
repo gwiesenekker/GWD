@@ -16,7 +16,7 @@ OBJS=main.o\
   my_mpi.o\
   my_printf.o\
   my_random.o\
-  neural.o\
+  network.o\
   profile.o\
   pdn.o\
   queues.o\
@@ -130,7 +130,7 @@ HEADERS=boards.h\
   my_printf.h\
   my_mpi.h\
   my_random.h\
-  neural.h\
+  network.h\
   pdn.h\
   profile.h\
   queues.h\
@@ -162,7 +162,7 @@ my_mpi.o: Makefile my_mpi.c $(HEADERS)
 my_printf.o: Makefile my_printf.c $(HEADERS)
 my_malloc.o: Makefile my_malloc.c $(HEADERS)
 my_random.o: Makefile my_random.c $(HEADERS)
-neural.o: Makefile neural.c $(HEADERS)
+network.o: Makefile network.c $(HEADERS)
 profile.o: Makefile profile.c profile.h 
 pdn.o: Makefile pdn.c pdn.d $(HEADERS)
 queues.o: Makefile queues.c $(HEADERS)

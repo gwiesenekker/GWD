@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #undef read
@@ -499,6 +499,18 @@ double compat_time(void)
 }
 
 //threads
+
+unsigned long compat_pthread_self(void)
+{
+#if COMPAT_CSTD == COMPAT_CSTD_C11
+  return((unsigned long) thrd_current());
+#elif COMPAT_CSTD == COMPAT_CSTD_WIN
+  DWORD dword = GetCurrentThreadId();
+  return((unsigned long) dword);
+#else
+  return((unsigned long) pthread_self());
+#endif
+}
 
 int compat_mutex_init(my_mutex_t* mutex)
 {

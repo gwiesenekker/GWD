@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #ifndef ThreadsH
 #define ThreadsH
 
@@ -19,7 +19,7 @@ typedef struct
   my_timer_t thread_idle_timer;
   my_timer_t thread_busy_timer;
 
-  int thread_board_id;
+  search_t thread_search;
 
   double thread_idle;
 } thread_t;

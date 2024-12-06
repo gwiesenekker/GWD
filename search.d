@@ -1,26 +1,36 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
-local void my_endgame_pv(board_t *with, int mate, char *pv_string)
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+local void my_endgame_pv(search_t *with, int mate, bstring bpv_string)
 {
   moves_list_t moves_list;
 
-  create_moves_list(&moves_list);
+  construct_moves_list(&moves_list);
 
-  gen_my_moves(with, &moves_list, FALSE);
+  gen_my_moves(&(with->S_board), &moves_list, FALSE);
 
   if (moves_list.nmoves == 0)
   {
     if (options.hub)
-      strcat(pv_string, "\"");
+    {
+      HARDBUG(bcatcstr(bpv_string, "\"") != BSTR_OK)
+    }
     else
-      strcat(pv_string, " #");
+    {
+      HARDBUG(bcatcstr(bpv_string, " #") != BSTR_OK)
+    }
+
     return;
   }
   if (mate == 0)
   {
     if (options.hub)
-      strcat(pv_string, "\"");
+    {
+      HARDBUG(bcatcstr(bpv_string, "\"") != BSTR_OK)
+    }
     else
-      strcat(pv_string, " mate==0?");
+    {
+      HARDBUG(bcatcstr(bpv_string, " mate==0?") != BSTR_OK)
+    }
+
     return;
   }
   
@@ -29,19 +39,24 @@ local void my_endgame_pv(board_t *with, int mate, char *pv_string)
 
   for (int imove = 0; imove < moves_list.nmoves; imove++)
   {
-    do_my_move(with, imove, &moves_list);
+    do_my_move(&(with->S_board), imove, &moves_list);
 
     int your_mate = read_endgame(with, YOUR_BIT, TRUE);
 
-    undo_my_move(with, imove, &moves_list);
+    undo_my_move(&(with->S_board), imove, &moves_list);
 
     //may be this endgame is not loaded
     if (your_mate == ENDGAME_UNKNOWN)
     {
       if (options.hub)
-        strcat(pv_string, "\"");
+      {
+        HARDBUG(bcatcstr(bpv_string, "\"") != BSTR_OK)
+      }
       else
-        strcat(pv_string, " not loaded");
+      {
+        HARDBUG(bcatcstr(bpv_string, " not loaded") != BSTR_OK)
+      }
+
       return;
     }
 
@@ -103,35 +118,49 @@ local void my_endgame_pv(board_t *with, int mate, char *pv_string)
     }
   }
   SOFTBUG(ibest_move == INVALID)
+
   SOFTBUG(best_mate == ENDGAME_UNKNOWN)
+
   if (best_mate != mate)
   {
-    print_board(with->board_id);
+    print_board(&(with->S_board));
 
-    my_printf(with->board_my_printf, "best_mate=%d mate=%d\n",
+    my_printf(with->S_my_printf, "best_mate=%d mate=%d\n",
       best_mate, mate);
 
     for (int imove = 0; imove < moves_list.nmoves; imove++)
     {
-      do_my_move(with, imove, &moves_list);
+      do_my_move(&(with->S_board), imove, &moves_list);
 
       int your_mate = read_endgame(with, YOUR_BIT, TRUE);
 
-      undo_my_move(with, imove, &moves_list);
+      undo_my_move(&(with->S_board), imove, &moves_list);
     
-      my_printf(with->board_my_printf, "move=%s your_mate=%d\n",
-        moves_list.move2string(&moves_list, imove), your_mate);
+      BSTRING(bmove_string)
+
+      move2bstring(&moves_list, imove, bmove_string);
+
+      my_printf(with->S_my_printf, "move=%s your_mate=%d\n",
+        bdata(bmove_string), your_mate);
+
+      BDESTROY(bmove_string)
     }
-    my_printf(with->board_my_printf, "");
+    my_printf(with->S_my_printf, "");
 
     FATAL("best_mate != mate", EXIT_FAILURE)
   }
 
-  strcat(pv_string, " ");
+  HARDBUG(bcatcstr(bpv_string, " ") != BSTR_OK)
 
-  strcat(pv_string, moves_list.move2string(&moves_list, ibest_move));
+  BSTRING(bmove_string)
 
-  do_my_move(with, ibest_move, &moves_list);
+  move2bstring(&moves_list, ibest_move, bmove_string);
+
+  bconcat(bpv_string, bmove_string);
+
+  BDESTROY(bmove_string)
+
+  do_my_move(&(with->S_board), ibest_move, &moves_list);
 
   int temp_mate;
 
@@ -140,12 +169,12 @@ local void my_endgame_pv(board_t *with, int mate, char *pv_string)
   else
     temp_mate = -mate - 1;
 
-  your_endgame_pv(with, temp_mate, pv_string);
+  your_endgame_pv(with, temp_mate, bpv_string);
 
-  undo_my_move(with, ibest_move, &moves_list);
+  undo_my_move(&(with->S_board), ibest_move, &moves_list);
 }
 
-local int my_quiescence(board_t *with, int my_alpha, int my_beta, 
+local int my_quiescence(search_t *with, int my_alpha, int my_beta, 
   int node_type, moves_list_t *moves_list, pv_t *best_pv, int *best_depth,
   int all_moves)
 {
@@ -159,12 +188,12 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
 
   SOFTBUG(IS_MINIMAL_WINDOW(node_type) and ((my_beta - my_alpha) != 1))
 
-  if ((with->board_inode - with->board_root_inode) >= 128)
+  if ((with->S_board.board_inode - with->S_board.board_root_inode) >= 128)
   {
-    my_printf(with->board_my_printf, "quiescence inode=%d\n",
-      with->board_inode - with->board_root_inode);
-    print_board(with->board_id);
-    my_printf(with->board_my_printf, 
+    my_printf(with->S_my_printf, "quiescence inode=%d\n",
+      with->S_board.board_inode - with->S_board.board_root_inode);
+    print_board(&(with->S_board));
+    my_printf(with->S_my_printf, 
       "my_alpha=%d my_beta=%d node_type=%d\n",
       my_alpha, my_beta, node_type);
   }
@@ -175,15 +204,15 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
 
   int best_score = SCORE_MINUS_INFINITY;
 
-  ++(with->total_nodes);
+  ++(with->S_total_nodes);
 
-  ++(with->total_quiescence_nodes);
+  ++(with->S_total_quiescence_nodes);
 
-  if ((with->total_quiescence_nodes % UPDATE_NODES) == 0)
+  if ((with->S_total_quiescence_nodes % UPDATE_NODES) == 0)
   {
     //only thread[0] should check the time limit
 
-    if (with->board_thread == thread_alpha_beta_master)
+    if (with->S_thread == thread_alpha_beta_master)
     {
       //Make sure that CLOCK_THREAD_CPUTIME_ID works in the search
 
@@ -193,29 +222,29 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
 
       //check for input
 
-      if (poll_queue(return_thread_queue(with->board_thread)) != INVALID)
+      if (poll_queue(return_thread_queue(with->S_thread)) != INVALID)
       {
-        my_printf(with->board_my_printf, "got message\n");
+        my_printf(with->S_my_printf, "got message\n");
 
-        with->board_interrupt = BOARD_INTERRUPT_MESSAGE;
+        with->S_interrupt = BOARD_INTERRUPT_MESSAGE;
 
         best_score = SCORE_PLUS_INFINITY;
 
         goto label_return;
       }
 
-      if (return_my_timer(&(with->board_timer), FALSE) >=
+      if (return_my_timer(&(with->S_timer), FALSE) >=
           options.time_limit) 
       {
-        if ((with->board_search_best_score < 0) and
-            ((with->board_search_best_score - with->board_search_root_score) <
+        if ((with->S_best_score < 0) and
+            ((with->S_best_score - with->S_root_score) <
              (-SCORE_MAN / 4)))
         { 
           for (int itrouble = 0; itrouble < options.time_ntrouble; itrouble++)
           {
             if (options.time_trouble[itrouble] > 0.0)
             {
-              my_printf(with->board_my_printf,
+              my_printf(with->S_my_printf,
                 "problems.. itrouble=%d time_trouble=%.2f\n",
                 itrouble, options.time_trouble[itrouble]);
 
@@ -229,10 +258,10 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
         }
       }
       //check time_limit again
-      if (return_my_timer(&(with->board_timer), FALSE) >=
+      if (return_my_timer(&(with->S_timer), FALSE) >=
           options.time_limit) 
       {
-        with->board_interrupt = BOARD_INTERRUPT_TIME;
+        with->S_interrupt = BOARD_INTERRUPT_TIME;
 
         best_score = SCORE_PLUS_INFINITY;
 
@@ -243,9 +272,9 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
     {
       SOFTBUG(options.nthreads <= 1)
 
-      if (poll_queue(return_thread_queue(with->board_thread)) != INVALID)
+      if (poll_queue(return_thread_queue(with->S_thread)) != INVALID)
       {
-        with->board_interrupt = BOARD_INTERRUPT_MESSAGE;
+        with->S_interrupt = BOARD_INTERRUPT_MESSAGE;
 
         best_score = SCORE_PLUS_INFINITY;
 
@@ -254,7 +283,7 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
     }
   }
 
-  if (draw_by_repetition(with, FALSE))
+  if (draw_by_repetition(&(with->S_board), FALSE))
   {
     best_score = 0;
 
@@ -278,9 +307,9 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
       *best_depth = 0;
     }
     else if (temp_mate > 0)
-      best_score = SCORE_WON - with->board_inode - temp_mate;
+      best_score = SCORE_WON - with->S_board.board_inode - temp_mate;
     else
-      best_score = SCORE_LOST + with->board_inode - temp_mate;
+      best_score = SCORE_LOST + with->S_board.board_inode - temp_mate;
 
     goto label_return;
   }
@@ -289,16 +318,16 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
 
   if (moves_list == NULL)
   {
-    create_moves_list(&moves_list_temp);
+    construct_moves_list(&moves_list_temp);
   
-    gen_my_moves(with, &moves_list_temp, TRUE);
+    gen_my_moves(&(with->S_board), &moves_list_temp, TRUE);
 
     moves_list = &moves_list_temp;
   }
 
   if (moves_list->nmoves == 0)
   {
-    best_score = SCORE_LOST + with->board_inode;
+    best_score = SCORE_LOST + with->S_board.board_inode;
 
     *best_depth = DEPTH_MAX;
 
@@ -309,37 +338,75 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
   {
     if (moves_list->ncaptx > 0)
     {
-      ++(with->total_quiescence_all_moves_captures_only);
+      ++(with->S_total_quiescence_all_moves_captures_only);
   
       all_moves = TRUE;
     } 
-    else if ((moves_list->nmoves <= 2) and !move_repetition(with))
+    else if ((moves_list->nmoves <= 2) and !move_repetition(&(with->S_board)))
     {
-      ++(with->total_quiescence_all_moves_le2_moves);
+      ++(with->S_total_quiescence_all_moves_le2_moves);
   
       all_moves = TRUE;
     }
     else
     {
-      int ntactical = 0;
+      int nextend = 0;
   
       for (int imove = 0; imove < moves_list->nmoves; imove++)
       {
-        if (moves_list->moves_tactical[imove] != 0) ntactical++;
+        if (MOVE_EXTEND_IN_QUIESCENCE(moves_list->moves_flag[imove]))
+          nextend++;
       }
   
-      if (ntactical == moves_list->nmoves)
+      if (nextend == moves_list->nmoves)
       {
-        ++(with->total_quiescence_all_moves_tactical);
+        ++(with->S_total_quiescence_all_moves_extended);
   
         all_moves = TRUE;
       }
     }
   }
 
+  if (!all_moves and IS_PV(node_type) and 
+      (my_alpha >= (SCORE_LOST + NODE_MAX)) and
+      (options.quiescence_extension_search_delta > 0))
+  {
+    with->S_total_quiescence_extension_searches++;
+
+    int reduced_alpha = my_alpha - options.quiescence_extension_search_delta;
+    int reduced_beta = reduced_alpha + 1;
+   
+    int temp_score;
+
+    pv_t temp_pv[PV_MAX];
+
+    int temp_depth;
+
+    temp_score = my_quiescence(with, reduced_alpha, reduced_beta,
+      MINIMAL_WINDOW_BIT, moves_list, temp_pv, &temp_depth, TRUE);
+
+    if (with->S_interrupt != 0)
+    {
+      best_score = SCORE_PLUS_INFINITY;
+    
+      goto label_return;
+    }
+
+    if (temp_score <= reduced_alpha)
+    {
+      with->S_total_quiescence_extension_searches_le_alpha++;
+
+      all_moves = TRUE;
+    }
+    else
+    {
+      with->S_total_quiescence_extension_searches_ge_beta++;
+    }
+  }
+
   if (!all_moves)
   {
-    best_score = return_my_score(with);
+    best_score = return_my_score(&(with->S_board), moves_list);
 
     *best_depth = 0;
 
@@ -369,7 +436,7 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
 
     if (!all_moves)
     {
-      if (moves_list->moves_tactical[jmove] == 0) continue;
+      if (!MOVE_EXTEND_IN_QUIESCENCE(moves_list->moves_flag[jmove])) continue;
     }
 
     int temp_alpha;
@@ -387,49 +454,49 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
 
     if (IS_MINIMAL_WINDOW(node_type))
     {
-      do_my_move(with, jmove, moves_list);
+      do_my_move(&(with->S_board), jmove, moves_list);
 
       temp_score = -your_quiescence(with, -my_beta, -temp_alpha,
         node_type, NULL, temp_pv + 1, &temp_depth, FALSE);
 
-      undo_my_move(with, jmove, moves_list);
+      undo_my_move(&(with->S_board), jmove, moves_list);
     }
     else
     {
       if (imove == 0)
       {
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
 
         temp_score = -your_quiescence(with, -my_beta, -temp_alpha,
           node_type, NULL, temp_pv + 1, &temp_depth, FALSE);
 
-        undo_my_move(with, jmove, moves_list);
+        undo_my_move(&(with->S_board), jmove, moves_list);
       }
       else
       {
         int temp_beta = temp_alpha + 1;
 
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
 
         temp_score = -your_quiescence(with, -temp_beta, -temp_alpha,
           MINIMAL_WINDOW_BIT, NULL, temp_pv + 1, &temp_depth, FALSE);
 
-        undo_my_move(with, jmove, moves_list);
+        undo_my_move(&(with->S_board), jmove, moves_list);
   
-        if ((with->board_interrupt == 0) and
+        if ((with->S_interrupt == 0) and
             (temp_score >= temp_beta) and (temp_score < my_beta))
         {
-          do_my_move(with, jmove, moves_list);
+          do_my_move(&(with->S_board), jmove, moves_list);
 
           temp_score = -your_quiescence(with, -my_beta, -temp_score,
             node_type, NULL, temp_pv + 1, &temp_depth, FALSE);
 
-          undo_my_move(with, jmove, moves_list);
+          undo_my_move(&(with->S_board), jmove, moves_list);
         }
       }
     }
 
-    if (with->board_interrupt != 0)
+    if (with->S_interrupt != 0)
     {
        best_score = SCORE_PLUS_INFINITY;
   
@@ -462,17 +529,11 @@ local int my_quiescence(board_t *with, int my_alpha, int my_beta,
 
   END_BLOCK
 
-  if (*best_depth == DEPTH_MAX)
-  {
-    SOFTBUG((best_score < (SCORE_WON - NODE_MAX)) and
-            (best_score > (SCORE_LOST + NODE_MAX)) and 
-            (best_score != 0))
-  }
-
+  if (best_score < my_alpha) best_score = my_alpha;
   return(best_score);
 }
 
-local int my_alpha_beta(board_t *with,
+local int my_alpha_beta(search_t *with,
   int my_alpha, int my_beta, int my_depth, int node_type,
   int reduction_depth_root, int my_tweaks,
   pv_t *best_pv, int *best_depth)
@@ -489,17 +550,17 @@ local int my_alpha_beta(board_t *with,
 
   SOFTBUG(IS_MINIMAL_WINDOW(node_type) and ((my_beta - my_alpha) != 1))
 
-  if (with->board_thread == thread_alpha_beta_master)
+  if (with->S_thread == thread_alpha_beta_master)
   {
     update_bucket(&bucket_depth, my_depth);
   }
 
-  if ((with->board_inode - with->board_root_inode) >= 128)
+  if ((with->S_board.board_inode - with->S_board.board_root_inode) >= 128)
   {
-    my_printf(with->board_my_printf, "alpha_beta inode=%d\n",
-      with->board_inode - with->board_root_inode);
-    print_board(with->board_id);
-    my_printf(with->board_my_printf, 
+    my_printf(with->S_my_printf, "alpha_beta inode=%d\n",
+      with->S_board.board_inode - with->S_board.board_root_inode);
+    print_board(&(with->S_board));
+    my_printf(with->S_my_printf, 
       "my_alpha=%d my_beta=%d my_depth=%d node_type=%d\n",
       my_alpha, my_beta, my_depth, node_type);
   }
@@ -512,22 +573,22 @@ local int my_alpha_beta(board_t *with,
 
   int best_move = INVALID;
 
-  ++(with->total_nodes);
+  ++(with->S_total_nodes);
 
-  ++(with->total_alpha_beta_nodes);
+  ++(with->S_total_alpha_beta_nodes);
 
   if (IS_MINIMAL_WINDOW(node_type))
-    ++(with->total_minimal_window_nodes);
+    ++(with->S_total_minimal_window_nodes);
   else if (IS_PV(node_type))
-    ++(with->total_pv_nodes);
+    ++(with->S_total_pv_nodes);
   else
     FATAL("unknown node_type", EXIT_FAILURE)
 
-  if ((with->total_alpha_beta_nodes % UPDATE_NODES) == 0)
+  if ((with->S_total_alpha_beta_nodes % UPDATE_NODES) == 0)
   {
     //only thread[0] should check the time limit
 
-    if (with->board_thread == thread_alpha_beta_master)
+    if (with->S_thread == thread_alpha_beta_master)
     {
       //Make sure that CLOCK_THREAD_CPUTIME_ID works in the search
 
@@ -537,29 +598,29 @@ local int my_alpha_beta(board_t *with,
 
       //check for input
 
-      if (poll_queue(return_thread_queue(with->board_thread)) != INVALID)
+      if (poll_queue(return_thread_queue(with->S_thread)) != INVALID)
       {
-        my_printf(with->board_my_printf, "got message\n");
+        my_printf(with->S_my_printf, "got message\n");
 
-        with->board_interrupt = BOARD_INTERRUPT_MESSAGE;
+        with->S_interrupt = BOARD_INTERRUPT_MESSAGE;
 
         best_score = SCORE_PLUS_INFINITY;
 
         goto label_return;
       }
 
-      if (return_my_timer(&(with->board_timer), FALSE) >=
+      if (return_my_timer(&(with->S_timer), FALSE) >=
           options.time_limit) 
       {
-        if ((with->board_search_best_score < 0) and
-            ((with->board_search_best_score - with->board_search_root_score) <
+        if ((with->S_best_score < 0) and
+            ((with->S_best_score - with->S_root_score) <
              (-SCORE_MAN / 4)))
         { 
           for (int itrouble = 0; itrouble < options.time_ntrouble; itrouble++)
           {
             if (options.time_trouble[itrouble] > 0.0)
             {
-              my_printf(with->board_my_printf,
+              my_printf(with->S_my_printf,
                 "problems.. itrouble=%d time_trouble=%.2f\n",
                 itrouble, options.time_trouble[itrouble]);
 
@@ -573,10 +634,10 @@ local int my_alpha_beta(board_t *with,
         }
       }
       //check time_limit again
-      if (return_my_timer(&(with->board_timer), FALSE) >=
+      if (return_my_timer(&(with->S_timer), FALSE) >=
           options.time_limit) 
       {
-        with->board_interrupt = BOARD_INTERRUPT_TIME;
+        with->S_interrupt = BOARD_INTERRUPT_TIME;
 
         best_score = SCORE_PLUS_INFINITY;
 
@@ -587,9 +648,9 @@ local int my_alpha_beta(board_t *with,
     {
       SOFTBUG(options.nthreads <= 1)
 
-      if (poll_queue(return_thread_queue(with->board_thread)) != INVALID)
+      if (poll_queue(return_thread_queue(with->S_thread)) != INVALID)
       {
-        with->board_interrupt = BOARD_INTERRUPT_MESSAGE;
+        with->S_interrupt = BOARD_INTERRUPT_MESSAGE;
 
         best_score = SCORE_PLUS_INFINITY;
 
@@ -598,7 +659,7 @@ local int my_alpha_beta(board_t *with,
     }
   }
 
-  if (draw_by_repetition(with, FALSE))
+  if (draw_by_repetition(&(with->S_board), FALSE))
   {
     best_score = 0;
 
@@ -622,9 +683,9 @@ local int my_alpha_beta(board_t *with,
       *best_depth = 0;
     }
     else if (temp_mate > 0)
-      best_score = SCORE_WON - with->board_inode - temp_mate;
+      best_score = SCORE_WON - with->S_board.board_inode - temp_mate;
     else
-      best_score = SCORE_LOST + with->board_inode - temp_mate;
+      best_score = SCORE_LOST + with->S_board.board_inode - temp_mate;
 
     goto label_return;
   }
@@ -643,20 +704,20 @@ local int my_alpha_beta(board_t *with,
 
     if (alpha_beta_cache_hit)
     {
-      ++(with->total_alpha_beta_cache_hits);
+      ++(with->S_total_alpha_beta_cache_hits);
 
       if (!IS_PV(node_type) and 
           (alpha_beta_cache_slot->ABCS_depth >= my_depth))
       {
-        ++(with->total_alpha_beta_cache_depth_hits);
+        ++(with->S_total_alpha_beta_cache_depth_hits);
 
         if (alpha_beta_cache_slot->ABCS_flags & LE_ALPHA_BIT)
         {
-          ++(with->total_alpha_beta_cache_le_alpha_hits);
+          ++(with->S_total_alpha_beta_cache_le_alpha_hits);
   
           if (alpha_beta_cache_slot->ABCS_score <= my_alpha)
           {
-            ++(with->total_alpha_beta_cache_le_alpha_cutoffs);
+            ++(with->S_total_alpha_beta_cache_le_alpha_cutoffs);
   
             best_score = alpha_beta_cache_slot->ABCS_score;
 
@@ -671,11 +732,11 @@ local int my_alpha_beta(board_t *with,
         }
         else if (alpha_beta_cache_slot->ABCS_flags & GE_BETA_BIT)
         {
-          ++(with->total_alpha_beta_cache_ge_beta_hits);
+          ++(with->S_total_alpha_beta_cache_ge_beta_hits);
   
           if (alpha_beta_cache_slot->ABCS_score >= my_beta)
           {
-            ++(with->total_alpha_beta_cache_ge_beta_cutoffs);
+            ++(with->S_total_alpha_beta_cache_ge_beta_cutoffs);
   
             best_score = alpha_beta_cache_slot->ABCS_score;
   
@@ -690,7 +751,7 @@ local int my_alpha_beta(board_t *with,
         }
         else if (alpha_beta_cache_slot->ABCS_flags & TRUE_SCORE_BIT)
         {
-          ++(with->total_alpha_beta_cache_true_score_hits);
+          ++(with->S_total_alpha_beta_cache_true_score_hits);
   
           best_score = alpha_beta_cache_slot->ABCS_score;
   
@@ -708,13 +769,13 @@ local int my_alpha_beta(board_t *with,
 
   moves_list_t moves_list;
 
-  create_moves_list(&moves_list);
+  construct_moves_list(&moves_list);
 
-  gen_my_moves(with, &moves_list, FALSE);
+  gen_my_moves(&(with->S_board), &moves_list, FALSE);
 
   if (moves_list.nmoves == 0)
   {
-    best_score = SCORE_LOST + with->board_inode;
+    best_score = SCORE_LOST + with->S_board.board_inode;
 
     *best_depth = DEPTH_MAX;
 
@@ -735,7 +796,7 @@ local int my_alpha_beta(board_t *with,
       if (jmove == INVALID) break;
 
       if (jmove >= moves_list.nmoves) 
-        with->total_alpha_beta_cache_nmoves_errors++;
+        with->S_total_alpha_beta_cache_nmoves_errors++;
       else
         moves_weight[jmove] = L_MAX - imove;
     }
@@ -749,9 +810,7 @@ local int my_alpha_beta(board_t *with,
 
   int your_tweaks = 0;
  
-  if (moves_list.ncaptx > 0) your_tweaks = TWEAK_PREVIOUS_MOVE_CAPTURE_BIT;
-
-  if (((moves_list.nmoves <= 2) and !move_repetition(with)) or
+  if (((moves_list.nmoves <= 2) and !move_repetition(&(with->S_board))) or
       (options.captures_are_transparent and (moves_list.ncaptx > 0)))
   {
     for (int imove = 0; imove < moves_list.nmoves; imove++)
@@ -782,7 +841,7 @@ local int my_alpha_beta(board_t *with,
 
       if (IS_MINIMAL_WINDOW(node_type))
       {
-        do_my_move(with, jmove, &moves_list);
+        do_my_move(&(with->S_board), jmove, &moves_list);
 
         temp_score = -your_alpha_beta(with,
           -my_beta, -temp_alpha, my_depth, node_type,
@@ -790,13 +849,13 @@ local int my_alpha_beta(board_t *with,
           your_tweaks,
           temp_pv + 1, &temp_depth);
 
-        undo_my_move(with, jmove, &moves_list);
+        undo_my_move(&(with->S_board), jmove, &moves_list);
       }
       else
       {
         if (imove == 0)
         {
-          do_my_move(with, jmove, &moves_list);
+          do_my_move(&(with->S_board), jmove, &moves_list);
 
           temp_score = -your_alpha_beta(with,
             -my_beta, -temp_alpha, my_depth, node_type,
@@ -804,13 +863,13 @@ local int my_alpha_beta(board_t *with,
             your_tweaks,
             temp_pv + 1, &temp_depth);
 
-          undo_my_move(with, jmove, &moves_list);
+          undo_my_move(&(with->S_board), jmove, &moves_list);
         } 
         else
         {
           int temp_beta = temp_alpha + 1;
 
-          do_my_move(with, jmove, &moves_list);
+          do_my_move(&(with->S_board), jmove, &moves_list);
 
           temp_score = -your_alpha_beta(with,
             -temp_beta, -temp_alpha, my_depth, MINIMAL_WINDOW_BIT,
@@ -818,12 +877,12 @@ local int my_alpha_beta(board_t *with,
             your_tweaks, 
             temp_pv + 1, &temp_depth);
 
-          undo_my_move(with, jmove, &moves_list);
+          undo_my_move(&(with->S_board), jmove, &moves_list);
   
-          if ((with->board_interrupt == 0) and
+          if ((with->S_interrupt == 0) and
               (temp_score >= temp_beta) and (temp_score < my_beta))
           {
-            do_my_move(with, jmove, &moves_list);
+            do_my_move(&(with->S_board), jmove, &moves_list);
 
             temp_score = -your_alpha_beta(with,
               -my_beta, -temp_score, my_depth, node_type,
@@ -831,12 +890,12 @@ local int my_alpha_beta(board_t *with,
               your_tweaks,
               temp_pv + 1, &temp_depth);
 
-            undo_my_move(with, jmove, &moves_list);
+            undo_my_move(&(with->S_board), jmove, &moves_list);
           }
         }
       }
 
-      if (with->board_interrupt != 0)
+      if (with->S_interrupt != 0)
       {
         best_score = SCORE_PLUS_INFINITY;
     
@@ -864,60 +923,47 @@ local int my_alpha_beta(board_t *with,
     goto label_break;
   }
 
-  SOFTBUG(((moves_list.nmoves <= 2) and !move_repetition(with)) or
+  SOFTBUG(((moves_list.nmoves <= 2) and !move_repetition(&(with->S_board))) or
           (options.captures_are_transparent and (moves_list.ncaptx > 0)))
 
   if (reduction_depth_root > 0) reduction_depth_root--;
 
   int your_depth = my_depth - 1;
 
-  if ((with->board_inode > 0) and
-      (with->board_nodes[with->board_inode - 1].node_move_tactical))
-  {
-    your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
-
-    your_depth = your_depth + 1;
-  }
-
   if (your_depth < 0)
   {
     best_score = my_quiescence(with, my_alpha, my_beta,
       node_type, &moves_list, best_pv, best_depth, FALSE);
 
-    if (with->board_interrupt != 0) best_score = SCORE_PLUS_INFINITY;
+    if (with->S_interrupt != 0) best_score = SCORE_PLUS_INFINITY;
 
     goto label_return;
   }
 
-  int nfull_min = 1;
-
-/*
-  if (FALSE and (with->board_thread != NULL) and
-      (with->board_thread != thread_alpha_beta_master))
-  {
-    int imove = return_my_random(with->board_thread.thread_random) %
-                moves_list.nmoves;
-
-    if (imove > nfull_min) nfull_min = imove;
-  }
-*/
+  int npassed_min = 1;
 
   if (IS_MINIMAL_WINDOW(node_type))
   {
     int allow_reductions = 
       options.use_reductions and
+      !(my_tweaks & TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT) and
+      !(my_tweaks & TWEAK_PREVIOUS_MOVE_NULL_BIT) and
       !(my_tweaks & TWEAK_PREVIOUS_MOVE_REDUCED_BIT) and
+      !(my_tweaks & TWEAK_PREVIOUS_MOVE_EXTENDED_BIT) and
       (moves_list.ncaptx == 0) and
       (your_depth >= options.reduction_depth_leaf) and
       (reduction_depth_root == 0) and
-      (my_alpha >= (SCORE_LOST + NODE_MAX));
+      (my_alpha >= (SCORE_LOST + NODE_MAX)) and
+      (my_beta <= (SCORE_WON - NODE_MAX));
 
     float factor = 1.0;
 
     if (allow_reductions and (options.reduction_mean > 0))
     {
-      int delta = BIT_COUNT(with->my_man_bb | with->your_man_bb |
-                            with->my_king_bb | with->your_king_bb) -
+      int delta = BIT_COUNT(with->S_board.my_man_bb |
+                            with->S_board.your_man_bb |
+                            with->S_board.my_king_bb |
+                            with->S_board.your_king_bb) -
                   options.reduction_mean;
 
       float gamma = options.reduction_sigma;
@@ -926,43 +972,58 @@ local int my_alpha_beta(board_t *with,
 //PRINTF("factor=%.6f\n", factor);
     }
 
-    {
-      int nfull = 0;
+    int pass[MOVES_MAX];
 
+    for (int imove = 0; imove < moves_list.nmoves; imove++)
+    {
+      pass[imove] = INVALID;
+
+      if (MOVE_DO_NOT_REDUCE(moves_list.moves_flag[imove]))
+        pass[imove] = 0;
+   
+      //backward compatability
+
+      pass[imove] = 0;
+    }
+
+    int npassed = 0;
+
+    for (int ipass = -1; ipass <= 0; ++ipass)
+    {
       for (int imove = 0; imove < moves_list.nmoves; imove++)
       {
         int jmove = INVALID;
 
-        //pick the (next) best move by weight
+        for (jmove = 0; jmove < moves_list.nmoves; jmove++)
+          if (pass[jmove] == ipass) break;
 
-        jmove = 0;
+        if (jmove >= moves_list.nmoves) break;
 
-        for (int kmove = 1; kmove < moves_list.nmoves; kmove++)
+        for (int kmove = jmove + 1; kmove < moves_list.nmoves; kmove++)
         {
-          if (moves_weight[kmove] == L_MIN) continue;
-            
+          if (pass[kmove] != ipass) continue;
+
           if (moves_weight[kmove] > moves_weight[jmove]) jmove = kmove;
         }
 
-        SOFTBUG(moves_weight[jmove] == L_MIN)
-
-        moves_weight[jmove] = L_MIN;
-
         SOFTBUG(jmove == INVALID)
 
-        int temp_score = SCORE_MINUS_INFINITY;
+        HARDBUG(pass[jmove] != ipass)
+
+        int temp_score;
 
         pv_t temp_pv[PV_MAX];
   
         int temp_depth;
 
-        do_my_move(with, jmove, &moves_list);
+        do_my_move(&(with->S_board), jmove, &moves_list);
 
         if (allow_reductions and
-            (moves_list.moves_tactical[jmove] == 0) and
-            (nfull >= nfull_min))
+            !(MOVE_DO_NOT_REDUCE(moves_list.moves_flag[jmove])) and
+            (best_score >= (SCORE_LOST + NODE_MAX)) and
+            (npassed >= npassed_min))
         {
-          ++(with->total_reductions_delta);
+          ++(with->S_total_reductions_delta);
 
           int reduced_alpha = my_alpha - options.reduction_delta;
           int reduced_beta = reduced_alpha + 1;
@@ -979,9 +1040,9 @@ local int my_alpha_beta(board_t *with,
             your_tweaks | TWEAK_PREVIOUS_MOVE_REDUCED_BIT,
             temp_pv + 1, &temp_depth);
 
-          if (with->board_interrupt != 0)
+          if (with->S_interrupt != 0)
           {
-            undo_my_move(with, jmove, &moves_list);
+            undo_my_move(&(with->S_board), jmove, &moves_list);
 
             best_score = SCORE_PLUS_INFINITY;
               
@@ -990,17 +1051,19 @@ local int my_alpha_beta(board_t *with,
   
           if (temp_score < (SCORE_LOST + NODE_MAX))
           {
-            ++(with->total_reductions_delta_lost);
+            ++(with->S_total_reductions_delta_lost);
+
+            pass[jmove] = 1;
           }
           else
           {
-            with->total_reductions++;
+            with->S_total_reductions++;
 
             int percentage = INVALID;
 
             if (temp_score <= reduced_alpha)
             {
-              ++(with->total_reductions_delta_le_alpha);
+              ++(with->S_total_reductions_delta_le_alpha);
 
               percentage = roundf(options.reduction_strong * factor);
             }
@@ -1008,7 +1071,7 @@ local int my_alpha_beta(board_t *with,
             { 
               SOFTBUG(!(temp_score >= reduced_beta))
 
-              ++(with->total_reductions_delta_ge_beta);
+              ++(with->S_total_reductions_delta_ge_beta);
 
               percentage = roundf(options.reduction_weak * factor);
             }
@@ -1027,36 +1090,30 @@ local int my_alpha_beta(board_t *with,
                 your_tweaks | TWEAK_PREVIOUS_MOVE_REDUCED_BIT,
                 temp_pv + 1, &temp_depth);
 
-              if (with->board_interrupt != 0)
+              if (with->S_interrupt != 0)
               {
-                undo_my_move(with, jmove, &moves_list);
+                undo_my_move(&(with->S_board), jmove, &moves_list);
     
                 best_score = SCORE_PLUS_INFINITY;
                   
                 goto label_return;
               }
 
-              if (temp_score <= my_alpha)
+              if (temp_score <= best_score)
               {
-                with->total_reductions_le_alpha++;
+                with->S_total_reductions_le_alpha++;
+
+                pass[jmove] = 1;
               }
               else
               {
-                SOFTBUG(!(temp_score >= my_beta))
-  
-                with->total_reductions_ge_beta++;
-  
-                temp_score = SCORE_MINUS_INFINITY;
+                with->S_total_reductions_ge_beta++;
               }
-            }
-            else
-            {
-              temp_score = SCORE_MINUS_INFINITY;
             }
           }//if (temp_score < (SCORE_LOST + NODE+MAX))
         }//if (!allow_reduction   
 
-        if (temp_score == SCORE_MINUS_INFINITY)
+        if (pass[jmove] != 1)
         {
           temp_score = -your_alpha_beta(with,
             -my_beta, -my_alpha, your_depth,
@@ -1065,12 +1122,14 @@ local int my_alpha_beta(board_t *with,
             your_tweaks,
             temp_pv + 1, &temp_depth);
  
-          nfull++;
+          pass[jmove] = 1;
+
+          npassed++;
         }
 
-        undo_my_move(with, jmove, &moves_list);
+        undo_my_move(&(with->S_board), jmove, &moves_list);
 
-        if (with->board_interrupt != 0)
+        if (with->S_interrupt != 0)
         {
           best_score = SCORE_PLUS_INFINITY;
         
@@ -1102,11 +1161,59 @@ local int my_alpha_beta(board_t *with,
 
           if (best_score >= my_beta) goto label_break;
         }
-      }//imove
-    }
+      }//for (int imove
+    }//for (int ipass
   }
   else //IS_MINIMAL_WINDOW(node_type) NEW
   {
+    //check if position should be extended
+
+    //HARDBUG(my_tweaks & TWEAK_PREVIOUS_MOVE_NULL_BIT)
+    HARDBUG(my_tweaks & TWEAK_PREVIOUS_MOVE_REDUCED_BIT)
+
+    if (!(my_tweaks & TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT) and
+        !(my_tweaks & TWEAK_PREVIOUS_MOVE_EXTENDED_BIT) and
+        (options.pv_extension_search_delta > 0) and
+        (my_alpha >= (SCORE_LOST + NODE_MAX)))
+    {
+      with->S_total_pv_extension_searches++;
+
+      int reduced_alpha = my_alpha - options.pv_extension_search_delta;
+      int reduced_beta = reduced_alpha + 1;
+  
+      int reduced_depth = your_depth;
+
+      pv_t temp_pv[PV_MAX];
+  
+      int temp_depth;
+      
+      int temp_score = my_alpha_beta(with,
+        reduced_alpha, reduced_beta, reduced_depth, MINIMAL_WINDOW_BIT,
+        options.reduction_depth_root,
+        my_tweaks | TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT,
+        temp_pv, &temp_depth);
+  
+      if (with->S_interrupt != 0)
+      {
+        best_score = SCORE_PLUS_INFINITY;
+      
+        goto label_return;
+      }
+  
+      if (temp_score <= reduced_alpha)
+      {
+        with->S_total_pv_extension_searches_le_alpha++;
+
+        your_depth = your_depth + 1;
+
+        your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
+      }
+      else
+      {
+        with->S_total_pv_extension_searches_ge_beta++;
+      }
+    }
+
     for (int ipass = 1; ipass <= 2; ++ipass)
     {
       int nsingle_replies = 0;
@@ -1147,7 +1254,7 @@ local int my_alpha_beta(board_t *with,
   
         if (imove == 0)
         {
-          do_my_move(with, jmove, &moves_list);
+          do_my_move(&(with->S_board), jmove, &moves_list);
   
           temp_score = -your_alpha_beta(with,
             -my_beta, -temp_alpha, your_depth, node_type,
@@ -1155,13 +1262,13 @@ local int my_alpha_beta(board_t *with,
             your_tweaks,
             temp_pv + 1, &temp_depth);
   
-          undo_my_move(with, jmove, &moves_list);
+          undo_my_move(&(with->S_board), jmove, &moves_list);
         }
         else
         {
           int temp_beta = temp_alpha + 1;
   
-          do_my_move(with, jmove, &moves_list);
+          do_my_move(&(with->S_board), jmove, &moves_list);
   
           temp_score = -your_alpha_beta(with,
             -temp_beta, -temp_alpha, your_depth,
@@ -1170,12 +1277,12 @@ local int my_alpha_beta(board_t *with,
             your_tweaks,
             temp_pv + 1, &temp_depth);
   
-          undo_my_move(with, jmove, &moves_list);
+          undo_my_move(&(with->S_board), jmove, &moves_list);
   
-          if ((with->board_interrupt == 0) and
+          if ((with->S_interrupt == 0) and
               (temp_score >= temp_beta) and (temp_score < my_beta))
           {
-            do_my_move(with, jmove, &moves_list);
+            do_my_move(&(with->S_board), jmove, &moves_list);
 
             temp_score = -your_alpha_beta(with,
               -my_beta, -temp_score, your_depth, node_type,
@@ -1183,11 +1290,11 @@ local int my_alpha_beta(board_t *with,
               your_tweaks,
               temp_pv + 1, &temp_depth);
   
-            undo_my_move(with, jmove, &moves_list);
+            undo_my_move(&(with->S_board), jmove, &moves_list);
           }
         }
   
-        if (with->board_interrupt != 0)
+        if (with->S_interrupt != 0)
         {
           best_score = SCORE_PLUS_INFINITY;
     
@@ -1232,7 +1339,7 @@ local int my_alpha_beta(board_t *with,
           (options.use_single_reply_extensions) and
           (nsingle_replies == 1))
       {
-        with->total_single_reply_extensions++;
+        with->S_total_single_reply_extensions++;
 
         *best_pv = INVALID;
 
@@ -1241,6 +1348,8 @@ local int my_alpha_beta(board_t *with,
         best_score = SCORE_MINUS_INFINITY;
 
         your_depth = your_depth + 1;
+
+        your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
 
         for (int imove = 0; imove < moves_list.nmoves; imove++)
           moves_weight[imove] = moves_list.moves_weight[imove];
@@ -1269,24 +1378,27 @@ local int my_alpha_beta(board_t *with,
   //if (best_score == 0) goto label_return;
 
 #ifdef DEBUG
-  for (int idebug = 0; idebug < NMOVES; idebug++)
+  if (options.alpha_beta_cache_size > 0)
   {
-    if (alpha_beta_cache_slot->ABCS_moves[idebug] == INVALID)
-    {  
-      for (int jdebug = idebug + 1; jdebug < NMOVES; jdebug++)
-        HARDBUG(alpha_beta_cache_slot->ABCS_moves[jdebug] != INVALID)
-
-      break;
-    }
-
-    int ndebug = 0;
-    
-    for (int jdebug = 0; jdebug < NMOVES; jdebug++)
+    for (int idebug = 0; idebug < NMOVES; idebug++)
     {
-      if (alpha_beta_cache_slot->ABCS_moves[jdebug] == 
-          alpha_beta_cache_slot->ABCS_moves[idebug]) ndebug++;
+      if (alpha_beta_cache_slot->ABCS_moves[idebug] == INVALID)
+      {  
+        for (int jdebug = idebug + 1; jdebug < NMOVES; jdebug++)
+          HARDBUG(alpha_beta_cache_slot->ABCS_moves[jdebug] != INVALID)
+  
+        break;
+      }
+  
+      int ndebug = 0;
+      
+      for (int jdebug = 0; jdebug < NMOVES; jdebug++)
+      {
+        if (alpha_beta_cache_slot->ABCS_moves[jdebug] == 
+            alpha_beta_cache_slot->ABCS_moves[idebug]) ndebug++;
+      }
+      HARDBUG(ndebug != 1)
     }
-    HARDBUG(ndebug != 1)
   }
 #endif
 
@@ -1301,7 +1413,7 @@ local int my_alpha_beta(board_t *with,
   
     if (best_score <= my_alpha)
     {
-      ++(with->total_alpha_beta_cache_le_alpha_stored);
+      ++(with->S_total_alpha_beta_cache_le_alpha_stored);
 
       if (best_score >= (SCORE_LOST + NODE_MAX))
         alpha_beta_cache_slot->ABCS_score = my_alpha;
@@ -1310,7 +1422,7 @@ local int my_alpha_beta(board_t *with,
     }
     else if (best_score >= my_beta)
     {
-      ++(with->total_alpha_beta_cache_ge_beta_stored);
+      ++(with->S_total_alpha_beta_cache_ge_beta_stored);
 
       if (best_score <= (SCORE_WON - NODE_MAX))
         alpha_beta_cache_slot->ABCS_score = my_beta;
@@ -1319,12 +1431,12 @@ local int my_alpha_beta(board_t *with,
     }
     else
     {
-      ++(with->total_alpha_beta_cache_true_score_stored);
+      ++(with->S_total_alpha_beta_cache_true_score_stored);
 
       alpha_beta_cache_slot->ABCS_flags = TRUE_SCORE_BIT;
     }
  
-    alpha_beta_cache_slot->ABCS_key = with->board_key;
+    alpha_beta_cache_slot->ABCS_key = with->S_board.board_key;
 
     ui32_t crc32 = 0xFFFFFFFF;
     crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot->ABCS_key);
@@ -1333,13 +1445,15 @@ local int my_alpha_beta(board_t *with,
   
     if (IS_PV(node_type))
     {
-      my_alpha_beta_cache[with->board_key % nalpha_beta_pv_cache_entries] = 
+      my_alpha_beta_cache[with->S_board.board_key %
+                          nalpha_beta_pv_cache_entries] =
         alpha_beta_cache_entry;
     }
     else
     {
       my_alpha_beta_cache[nalpha_beta_pv_cache_entries + 
-                          with->board_key % nalpha_beta_cache_entries] = 
+                          with->S_board.board_key %
+                          nalpha_beta_cache_entries] = 
         alpha_beta_cache_entry;
     }
   }
@@ -1348,29 +1462,22 @@ local int my_alpha_beta(board_t *with,
 
   END_BLOCK
 
-  if (*best_depth == DEPTH_MAX)
-  {
-    if ((best_score < (SCORE_WON - NODE_MAX)) and
-        (best_score > (SCORE_LOST + NODE_MAX)) and 
-        (best_score != 0))
-    {
-PRINTF("best_score=%d my_alpha=%d my_beta=%d best_depth=%d\n",
-best_score, my_alpha, my_beta, *best_depth);
-FATAL("eh?", 1)
-    }
-  }
-
+  if (best_score < my_alpha) best_score = my_alpha;
   return(best_score);
 }
 
-void my_pv(board_t *with, pv_t *best_pv, int pv_score, char *pv_string)
+void my_pv(search_t *with, pv_t *best_pv, int pv_score, bstring bpv_string)
 {
-  if (draw_by_repetition(with, FALSE))
+  if (draw_by_repetition(&(with->S_board), FALSE))
   {
     if (options.hub)
-      strcat(pv_string, "\"");
+    {
+      HARDBUG(bcatcstr(bpv_string, "\"") != BSTR_OK)
+    }
     else 
-      strcat(pv_string, " rep");
+    {
+      HARDBUG(bcatcstr(bpv_string, " rep") != BSTR_OK)
+    }
 
     return;
   }
@@ -1384,48 +1491,49 @@ void my_pv(board_t *with, pv_t *best_pv, int pv_score, char *pv_string)
     if (temp_mate == INVALID)
     {
       if (options.hub)
-        strcat(pv_string, "\"");
+      {
+        HARDBUG(bcatcstr(bpv_string, "\"") != BSTR_OK)
+      }
       else
-        strcat(pv_string, " draw");
+      {
+        HARDBUG(bcatcstr(bpv_string, " draw") != BSTR_OK)
+      }
     }
     else if (temp_mate > 0)
     {
       if (!options.hub)
       {
-        char line[MY_LINE_MAX];
-
-        snprintf(line, MY_LINE_MAX, " won in %d", temp_mate);  
-        strcat(pv_string, line);
+        HARDBUG(bformata(bpv_string, " won in %d", temp_mate) != BSTR_OK)
       }
-      my_endgame_pv(with, temp_mate, pv_string);
+      my_endgame_pv(with, temp_mate, bpv_string);
     }
     else
     {
       if (!options.hub)
       {
-        char line[MY_LINE_MAX];
-
-        snprintf(line, MY_LINE_MAX, " lost in %d", -temp_mate);  
-        strcat(pv_string, line);
-  
+        HARDBUG(bformata(bpv_string, " lost in %d", -temp_mate) != BSTR_OK)
       }
-      my_endgame_pv(with, temp_mate, pv_string);
+      my_endgame_pv(with, temp_mate, bpv_string);
     }
     return;
   }
 
   moves_list_t moves_list;
 
-  create_moves_list(&moves_list);
+  construct_moves_list(&moves_list);
 
-  gen_my_moves(with, &moves_list, FALSE);
+  gen_my_moves(&(with->S_board), &moves_list, FALSE);
 
   if (moves_list.nmoves == 0)
   {
     if (options.hub)
-      strcat(pv_string, "\"");
+    {
+      HARDBUG(bcatcstr(bpv_string, "\"") != BSTR_OK)
+    }
     else
-      strcat(pv_string, " #");
+    {
+      HARDBUG(bcatcstr(bpv_string, " #") != BSTR_OK)
+    }
 
     return;
   }
@@ -1436,22 +1544,20 @@ void my_pv(board_t *with, pv_t *best_pv, int pv_score, char *pv_string)
   {
     if (options.hub)
     {
-      strcat(pv_string, "\"");
+      HARDBUG(bcatcstr(bpv_string, "\"") != BSTR_OK)
     }
     else
     {
       int temp_score;
 
-      temp_score = return_my_score(with);
+      temp_score = return_my_score(&(with->S_board), &moves_list);
     
-      char line[MY_LINE_MAX];
-
-      snprintf(line, MY_LINE_MAX, " %d", temp_score);
-
-      strcat(pv_string, line);
+      HARDBUG(bformata(bpv_string, " %d", temp_score) != BSTR_OK)
 
       if (temp_score != pv_score)
-        strcat(pv_string, " PV ERROR");
+      {
+        HARDBUG(bcatcstr(bpv_string, " PV ERROR") != BSTR_OK)
+      }
     }
   }
   else
@@ -1471,46 +1577,50 @@ void my_pv(board_t *with, pv_t *best_pv, int pv_score, char *pv_string)
 
       alpha_beta_cache_slot->ABCS_moves[0] = jmove;
 
-      alpha_beta_cache_slot->ABCS_key = with->board_key;
+      alpha_beta_cache_slot->ABCS_key = with->S_board.board_key;
 
       ui32_t crc32 = 0xFFFFFFFF;
       crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot->ABCS_key);
       crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot->ABCS_data);
       alpha_beta_cache_slot->ABCS_crc32 = ~crc32;
 
-      my_alpha_beta_cache[with->board_key % nalpha_beta_pv_cache_entries] =
+      my_alpha_beta_cache[with->S_board.board_key % 
+                          nalpha_beta_pv_cache_entries] =
         alpha_beta_cache_entry;
     }
 
-    char line[MY_LINE_MAX];
-  
-    snprintf(line, MY_LINE_MAX, " %s", 
-      moves_list.move2string(&moves_list, jmove));
+    BSTRING(bmove_string)
 
-    strcat(pv_string, line);
-  
-    do_my_move(with, jmove, &moves_list);
-  
-    your_pv(with, best_pv + 1, -pv_score, pv_string);
+    move2bstring(&moves_list, jmove, bmove_string);
 
-    undo_my_move(with, jmove, &moves_list);
+    HARDBUG(bcatcstr(bpv_string, " ") != BSTR_OK)
+
+    HARDBUG(bconcat(bpv_string, bmove_string) != BSTR_OK)
+  
+    BDESTROY(bmove_string)
+
+    do_my_move(&(with->S_board), jmove, &moves_list);
+  
+    your_pv(with, best_pv + 1, -pv_score, bpv_string);
+
+    undo_my_move(&(with->S_board), jmove, &moves_list);
   }
 }
 
-local void print_my_pv(board_t *with, int my_depth,
+local void print_my_pv(search_t *with, int my_depth,
   int imove, int jmove, moves_list_t *moves_list,
   int move_score, pv_t *best_pv, char *move_status)
 {
-  char move_string[MY_LINE_MAX];
+  BSTRING(bmove_string)
 
-  strcpy(move_string, moves_list->move2string(moves_list, jmove));
+  move2bstring(moves_list, jmove, bmove_string);
 
-  char pv_string[MY_LINE_MAX];
+  BSTRING(bpv_string)
 
   if (options.hub)
   {
     if (options.nthreads == INVALID)
-      global_nodes = with->total_nodes;
+      global_nodes = with->S_total_nodes;
     else
     {
       global_nodes = 0;
@@ -1519,74 +1629,76 @@ local void print_my_pv(board_t *with, int my_depth,
       {
         thread_t *object = threads + ithread;
 
-        board_t *with_board = return_with_board(object->thread_board_id);
-
-        global_nodes += with_board->total_nodes;
+        global_nodes += object->thread_search.S_total_nodes;
       }
     }
-    snprintf(pv_string, MY_LINE_MAX,
+    bformata(bpv_string, 
       "depth=%d score=%.3f time=%.2f nps=%.2f pv=\"%s",
       my_depth,
       (float) move_score / (float) SCORE_MAN,
-      return_my_timer(&(with->board_timer), FALSE),
-      global_nodes / return_my_timer(&(with->board_timer), TRUE) / 1000000.0,
-      move_string);
+      return_my_timer(&(with->S_timer), FALSE),
+      global_nodes / return_my_timer(&(with->S_timer), TRUE) / 1000000.0,
+      bdata(bmove_string));
   }
   else
   {
-    snprintf(pv_string, MY_LINE_MAX,
+    bformata(bpv_string,
       "d=%d i=%d j=%d m=%s s=%d (%.2f) r=%d t=%.2f n=%lld/%lld/%lld x=%s pv=%s",
       my_depth,
       imove,
       jmove,
-      move_string,
+      bdata(bmove_string),
       move_score,
       (float) move_score / (float) SCORE_MAN,
-      with->board_search_root_score,
-      return_my_timer(&(with->board_timer), FALSE),
-      with->total_nodes,
-      with->total_alpha_beta_nodes,
-      with->total_quiescence_nodes,
+      with->S_root_score,
+      return_my_timer(&(with->S_timer), FALSE),
+      with->S_total_nodes,
+      with->S_total_alpha_beta_nodes,
+      with->S_total_quiescence_nodes,
       move_status,
-      move_string);
+      bdata(bmove_string));
   }
 
-  do_my_move(with, jmove, moves_list);
+  do_my_move(&(with->S_board), jmove, moves_list);
 
-  your_pv(with, best_pv + 1, -move_score, pv_string);
+  your_pv(with, best_pv + 1, -move_score, bpv_string);
 
-  undo_my_move(with, jmove, moves_list);
+  undo_my_move(&(with->S_board), jmove, moves_list);
 
-  my_printf(with->board_my_printf, "%s\n", pv_string);
+  my_printf(with->S_my_printf, "%s\n", bdata(bpv_string));
 
   //flush
 
-  if (with->board_thread == NULL) my_printf(with->board_my_printf, "");
+  if (with->S_thread == NULL) my_printf(with->S_my_printf, "");
 
   if (options.mode == GAME_MODE)
   {
-    if ((with->board_thread != NULL) and
-        (with->board_thread == thread_alpha_beta_master))
-      enqueue(&main_queue, MESSAGE_INFO, pv_string);
+    if ((with->S_thread != NULL) and
+        (with->S_thread == thread_alpha_beta_master))
+      enqueue(&main_queue, MESSAGE_INFO, bdata(bpv_string));
   }
+
+  BDESTROY(bpv_string)
+
+  BDESTROY(bmove_string)
 }
 
-void my_search(board_t *with, moves_list_t *moves_list,
+void my_search(search_t *with, moves_list_t *moves_list,
   int depth_min, int depth_max, int root_score,
   my_random_t *shuffle)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  my_printf(with->board_my_printf, "time_limit=%.2f\n", options.time_limit);
+  my_printf(with->S_my_printf, "time_limit=%.2f\n", options.time_limit);
 
-  my_printf(with->board_my_printf, "time_ntrouble=%d\n", 
+  my_printf(with->S_my_printf, "time_ntrouble=%d\n", 
     options.time_ntrouble);
 
   for (int itrouble = 0; itrouble < options.time_ntrouble; itrouble++)
-    my_printf(with->board_my_printf, "itrouble=%d time_trouble=%.2f\n",
+    my_printf(with->S_my_printf, "itrouble=%d time_trouble=%.2f\n",
             itrouble, options.time_trouble[itrouble]);
 
-  if (with->board_thread == thread_alpha_beta_master)
+  if (with->S_thread == thread_alpha_beta_master)
   {
     clear_bucket(&bucket_depth);
   }
@@ -1598,13 +1710,13 @@ void my_search(board_t *with, moves_list_t *moves_list,
   if (depth_min == INVALID) depth_min = 1;
   if (depth_max == INVALID) depth_max = options.depth_limit;
 
-  with->board_interrupt = 0;
+  with->S_interrupt = 0;
 
-  with->board_root_inode = with->board_inode;
+  with->S_board.board_root_inode = with->S_board.board_inode;
 
   clear_totals(with);
 
-  reset_my_timer(&(with->board_timer));
+  reset_my_timer(&(with->S_timer));
 
   int sort[MOVES_MAX];
 
@@ -1631,13 +1743,13 @@ void my_search(board_t *with, moves_list_t *moves_list,
       HARDBUG(ndebug != 1)
     }
 
-    my_printf(with->board_my_printf, "shuffle nmoves=%d",
+    my_printf(with->S_my_printf, "shuffle nmoves=%d",
       moves_list->nmoves);
 
     for (int imove = 0; imove < moves_list->nmoves; imove++)
-      my_printf(with->board_my_printf, " %d", sort[imove]);
+      my_printf(with->S_my_printf, " %d", sort[imove]);
 
-    my_printf(with->board_my_printf, "\n");
+    my_printf(with->S_my_printf, "\n");
   }
 
   //check for known endgame
@@ -1646,12 +1758,12 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
   if (egtb_mate != ENDGAME_UNKNOWN)
   {
-    print_board(with->board_id);
+    print_board(&(with->S_board));
 
-    my_printf(with->board_my_printf, "known endgame egtb_mate=%d\n",
+    my_printf(with->S_my_printf, "known endgame egtb_mate=%d\n",
       egtb_mate);
 
-    with->board_search_best_score = SCORE_MINUS_INFINITY;
+    with->S_best_score = SCORE_MINUS_INFINITY;
 
     int your_mate = INVALID;
 
@@ -1659,9 +1771,9 @@ void my_search(board_t *with, moves_list_t *moves_list,
     {
       int jmove = sort[imove];
 
-      do_my_move(with, jmove, moves_list);
+      do_my_move(&(with->S_board), jmove, moves_list);
 
-      ++(with->total_nodes);
+      ++(with->S_total_nodes);
 
       int temp_mate = read_endgame(with, YOUR_BIT, TRUE);
 
@@ -1672,33 +1784,36 @@ void my_search(board_t *with, moves_list_t *moves_list,
       if (temp_mate == INVALID)
         temp_score = 0;
       else if (temp_mate > 0)
-        temp_score = SCORE_WON - with->board_inode - temp_mate;
+        temp_score = SCORE_WON - with->S_board.board_inode - temp_mate;
       else
-        temp_score = SCORE_LOST + with->board_inode - temp_mate;
+        temp_score = SCORE_LOST + with->S_board.board_inode - temp_mate;
 
-      undo_my_move(with, jmove, moves_list);
+      undo_my_move(&(with->S_board), jmove, moves_list);
 
       int move_score = -temp_score;
 
-      char move_string[MY_LINE_MAX];
+      BSTRING(bmove_string)
   
-      strcpy(move_string, moves_list->move2string(moves_list, imove));
+      move2bstring(moves_list, imove, bmove_string);
 
-      my_printf(with->board_my_printf, "%s %d\n",  move_string, move_score);
+      my_printf(with->S_my_printf, "%s %d\n", bdata(bmove_string),
+                move_score);
 
-      if (move_score > with->board_search_best_score)
+      BDESTROY(bmove_string)
+
+      if (move_score > with->S_best_score)
       {
         for (int kmove = imove; kmove > 0; kmove--)
           sort[kmove] = sort[kmove - 1];
 
         sort[0] = jmove;
 
-        with->board_search_best_score = move_score;
+        with->S_best_score = move_score;
 
-        with->board_search_best_move = jmove;
+        with->S_best_move = jmove;
 
-        with->board_search_best_pv[0] = jmove;
-        with->board_search_best_pv[1] = INVALID;
+        with->S_best_pv[0] = jmove;
+        with->S_best_pv[1] = INVALID;
 
         your_mate = temp_mate;
       }
@@ -1713,123 +1828,147 @@ void my_search(board_t *with, moves_list_t *moves_list,
 #endif
     }
 
-    SOFTBUG(with->board_search_best_score == SCORE_MINUS_INFINITY)
+    SOFTBUG(with->S_best_score == SCORE_MINUS_INFINITY)
 
-    with->board_search_best_score_kind = SEARCH_BEST_SCORE_EGTB;
+    with->S_best_score_kind = SEARCH_BEST_SCORE_EGTB;
 
-    with->board_search_best_depth = 0;
+    with->S_best_depth = 0;
 
-    char move_string[MY_LINE_MAX];
+    BSTRING(bmove_string)
     
-    strcpy(move_string, moves_list->move2string(moves_list, sort[0]));
+    move2bstring(moves_list, sort[0], bmove_string);
 
-    char pv_string[MY_LINE_MAX];
+    BSTRING(bpv_string)
 
     if (options.hub)
-      snprintf(pv_string, MY_LINE_MAX, "depth=127 score=%d nps=0.00 pv=\"%s",
-        with->board_search_best_score, move_string);
+    {
+      HARDBUG(bformata(bpv_string, "depth=127 score=%d nps=0.00 pv=\"%s",
+        with->S_best_score, bdata(bmove_string)) != BSTR_OK)
+    }
     else
-      snprintf(pv_string, MY_LINE_MAX, "s=%d (%d) x=egtb pv=%s ",
-        with->board_search_best_score, egtb_mate, move_string);
+    {
+      HARDBUG(bformata(bpv_string, "s=%d (%d) x=egtb pv=%s ",
+        with->S_best_score,
+        egtb_mate, bdata(bmove_string)) != BSTR_OK)
+    }
 
     if (your_mate != INVALID)
     {
-      do_my_move(with, sort[0], moves_list);
+      do_my_move(&(with->S_board), sort[0], moves_list);
 
-      your_endgame_pv(with, your_mate, pv_string);
+      your_endgame_pv(with, your_mate, bpv_string);
 
-      undo_my_move(with, sort[0], moves_list);
+      undo_my_move(&(with->S_board), sort[0], moves_list);
     } 
     else
     {
-      if (options.hub) strcat(pv_string, "\"");
+      if (options.hub)
+      {
+        HARDBUG(bcatcstr(bpv_string, "\"") != BSTR_OK)
+      }
     }
 
-    my_printf(with->board_my_printf, "%s\n", pv_string);
+    my_printf(with->S_my_printf, "%s\n", bdata(bpv_string));
 
     if (options.mode == GAME_MODE)
     {
-      if ((with->board_thread != NULL) and
-          (with->board_thread == thread_alpha_beta_master))
-        enqueue(&main_queue, MESSAGE_INFO, pv_string); 
+      if ((with->S_thread != NULL) and
+          (with->S_thread == thread_alpha_beta_master))
+        enqueue(&main_queue, MESSAGE_INFO, bdata(bpv_string)); 
     }
+
+    BDESTROY(bpv_string)
+
+    BDESTROY(bmove_string)
 
     goto label_limit;
   }
 
   int your_tweaks = 0;
  
-  if (moves_list->ncaptx > 0) your_tweaks = TWEAK_PREVIOUS_MOVE_CAPTURE_BIT;
-
   //RE-INITIALIZE ACCUMULATOR
 
-  return_neural_score_scaled(&(with->board_neural0), FALSE, FALSE);
+  return_network_score_scaled(&(with->S_board.board_network), FALSE, FALSE);
 
-  if (with->board_neural1_not_null)
-    return_neural_score_scaled(&(with->board_neural1), FALSE, FALSE);
-
-  with->board_search_root_simple_score = return_my_score(with);
+  with->S_root_simple_score = return_my_score(&(with->S_board), moves_list);
 
   pv_t temp_pv[PV_MAX];
 
   int temp_depth;
 
-  with->board_search_root_score = my_alpha_beta(with,
-    SCORE_MINUS_INFINITY, SCORE_PLUS_INFINITY, 1, PV_BIT,
-    options.reduction_depth_root,
-    your_tweaks, temp_pv + 1, &temp_depth);
+  if (FALSE and (moves_list->ncaptx == 0) and (moves_list->nmoves > 2))
+  { 
+    do_my_move(&(with->S_board), INVALID, NULL);
 
-  if (with->board_interrupt != 0)
+    with->S_root_score = -your_alpha_beta(with,
+      SCORE_MINUS_INFINITY, SCORE_PLUS_INFINITY, 1, PV_BIT,
+      options.reduction_depth_root,
+      TWEAK_PREVIOUS_MOVE_NULL_BIT, temp_pv + 1, &temp_depth);
+
+    undo_my_move(&(with->S_board), INVALID, NULL);
+  }
+  else
   {
-    with->board_search_root_score = return_my_score(with);
+    with->S_root_score = my_alpha_beta(with,
+      SCORE_MINUS_INFINITY, SCORE_PLUS_INFINITY, 1, PV_BIT,
+      options.reduction_depth_root,
+      0, temp_pv, &temp_depth);
+  }
 
-    with->board_search_best_score_kind = SEARCH_BEST_SCORE_AB;
+  if (with->S_interrupt != 0)
+  {
+    with->S_root_score = return_my_score(&(with->S_board), moves_list);
 
-    with->board_search_best_move = 0;
+    with->S_best_score_kind = SEARCH_BEST_SCORE_AB;
 
-    with->board_search_best_depth = INVALID;
+    with->S_best_move = 0;
 
-    with->board_search_best_pv[0] = 0;
-    with->board_search_best_pv[1] = INVALID;
+    with->S_best_depth = INVALID;
+
+    with->S_best_pv[0] = 0;
+    with->S_best_pv[1] = INVALID;
 
     goto label_limit;
   }
 
-  with->board_search_best_score_kind = SEARCH_BEST_SCORE_AB;
+  my_printf(with->S_my_printf, "root_simple_score=%d root_score=%d\n",
+    with->S_root_simple_score, with->S_root_score);
 
-  with->board_search_best_move = 0;
+  with->S_best_score_kind = SEARCH_BEST_SCORE_AB;
 
-  with->board_search_best_depth = 0;
+  with->S_best_move = 0;
 
-  with->board_search_best_pv[0] = 0;
-  with->board_search_best_pv[1] = INVALID;
+  with->S_best_depth = 0;
+
+  with->S_best_pv[0] = 0;
+  with->S_best_pv[1] = INVALID;
 
   if (root_score == SCORE_MINUS_INFINITY)
-    with->board_search_best_score = with->board_search_root_score;
+    with->S_best_score = with->S_root_score;
   else
-    with->board_search_best_score = root_score;
+    with->S_best_score = root_score;
 
   //publish work
 
-  if ((with->board_thread != NULL) and
-      (with->board_thread == thread_alpha_beta_master))
+  if ((with->S_thread != NULL) and
+      (with->S_thread == thread_alpha_beta_master))
   {
-    char message[MY_LINE_MAX];
+    BSTRING(bmove_string)
 
-    char move_string[MY_LINE_MAX];
-
-    strcpy(move_string, moves_list->move2string(moves_list, 0));
+    move2bstring(moves_list, 0, bmove_string);
   
+    BSTRING(bmessage)
+
+    HARDBUG(bformata(bmessage, "%s %d %d %d %d",
+      bdata(bmove_string), depth_min, depth_max, 
+      with->S_best_score, FALSE) != BSTR_OK)
+        
     if (options.lazy_smp_policy == 0)
     {
       for (int ithread = 1; ithread < options.nthreads_alpha_beta; ithread++)
       {
-        snprintf(message, MY_LINE_MAX, "%s %d %d %d %d",
-          move_string, depth_min, depth_max, 
-          with->board_search_best_score, FALSE);
-        
         enqueue(return_thread_queue(threads + ithread),
-                   MESSAGE_SEARCH_FIRST, message);
+                MESSAGE_SEARCH_FIRST, bdata(bmessage));
       }
     }
     else
@@ -1838,33 +1977,24 @@ void my_search(board_t *with, moves_list_t *moves_list,
       {
         if ((ithread % 3) == 1)
         {
-          snprintf(message, MY_LINE_MAX, "%s %d %d %d %d",
-            move_string, depth_min, depth_max, 
-            with->board_search_best_score, FALSE);
-      
           enqueue(return_thread_queue(threads + ithread),
-                     MESSAGE_SEARCH_FIRST, message);
+                  MESSAGE_SEARCH_FIRST, bdata(bmessage));
         }
         else if ((ithread % 3) == 2)
         {
-          snprintf(message, MY_LINE_MAX, "%s %d %d %d %d",
-            move_string, depth_min, depth_max, 
-            with->board_search_best_score, FALSE);
-
           enqueue(return_thread_queue(threads + ithread),
-                     MESSAGE_SEARCH_AHEAD, message);
+                  MESSAGE_SEARCH_AHEAD, bdata(bmessage));
         }
         else
         {
-          snprintf(message, MY_LINE_MAX, "%s %d %d %d %d",
-            move_string, depth_min, depth_max, 
-            with->board_search_best_score, FALSE);
-      
           enqueue(return_thread_queue(threads + ithread),
-                     MESSAGE_SEARCH_SECOND, message);
+                  MESSAGE_SEARCH_SECOND, bdata(bmessage));
         }
       }
     }
+    BDESTROY(bmessage)
+
+    BDESTROY(bmove_string)
   }
 
   for (my_depth = depth_min; my_depth <= depth_max;
@@ -1876,32 +2006,32 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
     int jmove = sort[0];
 
-    int my_alpha = with->board_search_best_score - SEARCH_WINDOW;
-    int my_beta = with->board_search_best_score + SEARCH_WINDOW;
+    int my_alpha = with->S_best_score - SEARCH_WINDOW;
+    int my_beta = with->S_best_score + SEARCH_WINDOW;
 
-    do_my_move(with, jmove, moves_list);
+    do_my_move(&(with->S_board), jmove, moves_list);
 
     int move_score = -your_alpha_beta(with,
       -my_beta, -my_alpha, your_depth, PV_BIT,
       options.reduction_depth_root,
       your_tweaks, temp_pv + 1, &temp_depth);
 
-    undo_my_move(with, jmove, moves_list);
+    undo_my_move(&(with->S_board), jmove, moves_list);
 
-    if (with->board_interrupt != 0) goto label_limit;
+    if (with->S_interrupt != 0) goto label_limit;
 
     //update search best score so that trouble can kick in
 
-    with->board_search_best_score = move_score;
+    with->S_best_score = move_score;
 
-    with->board_search_best_move = jmove;
+    with->S_best_move = jmove;
 
-    //with->board_search_best_depth = temp_depth + my_depth - your_depth;
-    with->board_search_best_depth = my_depth;
+    //with->S_best_depth = temp_depth + my_depth - your_depth;
+    with->S_best_depth = my_depth;
 
-    with->board_search_best_pv[0] = jmove;
+    with->S_best_pv[0] = jmove;
     for (int ipv = 1;
-         (with->board_search_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
+         (with->S_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
     
     //handle fail low or fail high
 
@@ -1913,37 +2043,38 @@ void my_search(board_t *with, moves_list_t *moves_list,
             (move_score >= (SCORE_LOST + NODE_MAX)))
       {
         print_my_pv(with, my_depth, 0, jmove, moves_list, move_score,
-                    with->board_search_best_pv, "<=");
+                    with->S_best_pv, "<=");
 
         my_beta = move_score;
         my_alpha = my_beta - window;
         if (my_alpha < SCORE_MINUS_INFINITY) my_alpha = SCORE_MINUS_INFINITY;
 
-        my_printf(with->board_my_printf,
-          "PV0 fail-low my_alpha=%d my_beta=%d window=%d\n",
-          my_alpha, my_beta, window);
+        my_printf(with->S_my_printf,
+          "PV0 fail-low my_depth=%d my_alpha=%d my_beta=%d window=%d\n",
+          my_depth, my_alpha, my_beta, window);
 
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
 
         move_score = -your_alpha_beta(with,
-          -my_beta, -my_alpha, your_depth, PV_BIT,
+          -my_beta, -my_alpha, your_depth + 1, PV_BIT,
           options.reduction_depth_root,
-          your_tweaks, temp_pv + 1, &temp_depth);
+          your_tweaks | TWEAK_PREVIOUS_MOVE_EXTENDED_BIT,
+          temp_pv + 1, &temp_depth);
 
-        undo_my_move(with, jmove, moves_list);
+        undo_my_move(&(with->S_board), jmove, moves_list);
 
-        if (with->board_interrupt != 0) goto label_limit;
+        if (with->S_interrupt != 0) goto label_limit;
 
-        with->board_search_best_score = move_score;
+        with->S_best_score = move_score;
 
-        with->board_search_best_move = jmove;
+        with->S_best_move = jmove;
 
-        //with->board_search_best_depth = temp_depth + my_depth - your_depth;
-        with->board_search_best_depth = my_depth;
+        //with->S_best_depth = temp_depth + my_depth - your_depth;
+        with->S_best_depth = my_depth;
 
-        with->board_search_best_pv[0] = jmove;
+        with->S_best_pv[0] = jmove;
         for (int ipv = 1;
-          (with->board_search_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
+          (with->S_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
   
         window *= 2;
       }
@@ -1956,45 +2087,45 @@ void my_search(board_t *with, moves_list_t *moves_list,
             (move_score <= (SCORE_WON - NODE_MAX)))
       {
         print_my_pv(with, my_depth, 0, jmove, moves_list, move_score,
-                    with->board_search_best_pv, ">=");
+                    with->S_best_pv, ">=");
 
         my_alpha = move_score;
         my_beta = my_alpha + window;
         if (my_beta > SCORE_PLUS_INFINITY) my_beta = SCORE_PLUS_INFINITY;
   
-        my_printf(with->board_my_printf,
+        my_printf(with->S_my_printf,
           "PV0 fail-high my_alpha=%d my_beta=%d window=%d\n",
           my_alpha, my_beta, window);
 
-        do_my_move(with, jmove, moves_list);
+        do_my_move(&(with->S_board), jmove, moves_list);
   
         move_score = -your_alpha_beta(with,
           -my_beta, -my_alpha, your_depth, PV_BIT,
           options.reduction_depth_root,
           your_tweaks, temp_pv + 1, &temp_depth);
   
-        undo_my_move(with, jmove, moves_list);
+        undo_my_move(&(with->S_board), jmove, moves_list);
 
-        if (with->board_interrupt != 0) goto label_limit;
+        if (with->S_interrupt != 0) goto label_limit;
 
-        with->board_search_best_score = move_score;
-        with->board_search_best_move = jmove;
-        //with->board_search_best_depth = temp_depth + my_depth - your_depth;
-        with->board_search_best_depth = my_depth;
+        with->S_best_score = move_score;
+        with->S_best_move = jmove;
+        //with->S_best_depth = temp_depth + my_depth - your_depth;
+        with->S_best_depth = my_depth;
 
-        with->board_search_best_pv[0] = jmove;
+        with->S_best_pv[0] = jmove;
 
         for (int ipv = 1;
-          (with->board_search_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
+          (with->S_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
   
         window *= 2;
       }
     }
 
-    if (with->board_interrupt != 0) goto label_limit;
+    if (with->S_interrupt != 0) goto label_limit;
 
     print_my_pv(with, my_depth, 0, jmove, moves_list, move_score,
-                with->board_search_best_pv, "==");
+                with->S_best_pv, "==");
 
     //now search remaining moves
 
@@ -2006,19 +2137,19 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
       jmove = sort[imove];
 
-      my_alpha = with->board_search_best_score;
-      my_beta = with->board_search_best_score + 1;
+      my_alpha = with->S_best_score;
+      my_beta = with->S_best_score + 1;
   
-      do_my_move(with, jmove, moves_list);
+      do_my_move(&(with->S_board), jmove, moves_list);
 
       move_score = -your_alpha_beta(with,
         -my_beta, -my_alpha, your_depth, MINIMAL_WINDOW_BIT,
         options.reduction_depth_root,
         your_tweaks, temp_pv + 1, &temp_depth);
 
-      undo_my_move(with, jmove, moves_list);
+      undo_my_move(&(with->S_board), jmove, moves_list);
 
-      if (with->board_interrupt != 0) goto label_limit;
+      if (with->S_interrupt != 0) goto label_limit;
 
       if (move_score >= my_beta)
       {
@@ -2027,48 +2158,48 @@ void my_search(board_t *with, moves_list_t *moves_list,
 
         sort[0] = jmove;
 
-        if ((with->board_thread != NULL) and
-            (with->board_thread == thread_alpha_beta_master) and
+        if ((with->S_thread != NULL) and
+            (with->S_thread == thread_alpha_beta_master) and
             (options.lazy_smp_policy > 0))
         {
-          char message[MY_LINE_MAX];
-
-          char move_string[MY_LINE_MAX];
+          BSTRING(bmove_string)
     
-          strcpy(move_string, moves_list->move2string(moves_list, jmove));
+          move2bstring(moves_list, jmove, bmove_string);
       
+          BSTRING(bmessage)
+
+          HARDBUG(bformata(bmessage, "%s %d %d %d %d",
+            bdata(bmove_string), depth_min, depth_max, 
+            with->S_best_score, FALSE) != BSTR_OK)
+
           for (int ithread = 1; ithread < options.nthreads_alpha_beta;
                ithread++)
           {
             if ((ithread % 3) == 2)
             {
-              snprintf(message, MY_LINE_MAX, "%s %d %d %d %d",
-                move_string, depth_min, depth_max, 
-                with->board_search_best_score, FALSE);
-    
               enqueue(return_thread_queue(threads + ithread),
-                         MESSAGE_SEARCH_AHEAD, message);
+                      MESSAGE_SEARCH_AHEAD, bdata(bmessage));
             }
             else if ((ithread % 3) == 0)
             {
-              snprintf(message, MY_LINE_MAX, "%s %d %d %d %d",
-                move_string, depth_min, depth_max, 
-                with->board_search_best_score, FALSE);
-          
               enqueue(return_thread_queue(threads + ithread),
-                         MESSAGE_SEARCH_SECOND, message);
+                      MESSAGE_SEARCH_SECOND, bdata(bmessage));
             }
           }
+
+          BDESTROY(bmessage)
+
+          BDESTROY(bmove_string)
         }
 
-        with->board_search_best_score = move_score;
-        with->board_search_best_move = jmove;
-        //with->board_search_best_depth = temp_depth + my_depth - your_depth;
-        with->board_search_best_depth = my_depth;
+        with->S_best_score = move_score;
+        with->S_best_move = jmove;
+        //with->S_best_depth = temp_depth + my_depth - your_depth;
+        with->S_best_depth = my_depth;
 
-        with->board_search_best_pv[0] = jmove;
+        with->S_best_pv[0] = jmove;
         for (int ipv = 1;
-          (with->board_search_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
+          (with->S_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
 
         int window = SEARCH_WINDOW;
 
@@ -2076,42 +2207,42 @@ void my_search(board_t *with, moves_list_t *moves_list,
               (move_score <= (SCORE_WON - NODE_MAX)))
         {
           print_my_pv(with, my_depth, imove, jmove, moves_list, move_score,
-                      with->board_search_best_pv, ">=");
+                      with->S_best_pv, ">=");
 
           my_alpha = move_score;
           my_beta = my_alpha + window;
           if (my_beta > SCORE_PLUS_INFINITY) my_beta = SCORE_PLUS_INFINITY;
   
-          my_printf(with->board_my_printf,
+          my_printf(with->S_my_printf,
             "PV1 fail-high my_alpha=%d my_beta=%d window=%d\n",
             my_alpha, my_beta, window);
 
-          do_my_move(with, jmove, moves_list);
+          do_my_move(&(with->S_board), jmove, moves_list);
 
           move_score = -your_alpha_beta(with,
             -my_beta, -my_alpha, your_depth, PV_BIT,
             options.reduction_depth_root,
             your_tweaks, temp_pv + 1, &temp_depth);
 
-          undo_my_move(with, jmove, moves_list);
+          undo_my_move(&(with->S_board), jmove, moves_list);
 
-          if (with->board_interrupt != 0) goto label_limit;
+          if (with->S_interrupt != 0) goto label_limit;
 
-          with->board_search_best_score = move_score;
+          with->S_best_score = move_score;
 
-          with->board_search_best_move = jmove;
+          with->S_best_move = jmove;
 
-          //with->board_search_best_depth = temp_depth + my_depth - your_depth;
-          with->board_search_best_depth = my_depth;
+          //with->S_best_depth = temp_depth + my_depth - your_depth;
+          with->S_best_depth = my_depth;
 
-          with->board_search_best_pv[0] = jmove;
+          with->S_best_pv[0] = jmove;
           for (int ipv = 1;
-           (with->board_search_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
+           (with->S_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++);
 
           window *= 2;
         }
         print_my_pv(with, my_depth, imove, jmove, moves_list, move_score,
-                    with->board_search_best_pv, "==");
+                    with->S_best_pv, "==");
       }
 
       for (int idebug = 0; idebug < moves_list->nmoves; idebug++)
@@ -2125,62 +2256,83 @@ void my_search(board_t *with, moves_list_t *moves_list,
       imove++;
     }
 
-    if (with->board_search_best_score > (SCORE_WON - NODE_MAX)) break;
-    if (with->board_search_best_score < (SCORE_LOST + NODE_MAX)) break;
+    if (with->S_best_score > (SCORE_WON - NODE_MAX)) break;
+    if (with->S_best_score < (SCORE_LOST + NODE_MAX)) break;
   }
   label_limit:
 
-  if (with->board_thread == thread_alpha_beta_master)
+  if (with->S_thread == thread_alpha_beta_master)
   {
-    if (FALSE and (with->board_search_best_score < -(SCORE_MAN / 4)))
+    if (FALSE and (with->S_best_score < -(SCORE_MAN / 4)))
     {
-      char fen[MY_LINE_MAX];
+      BSTRING(bfen)
 
-      board2fen(with->board_id, fen, TRUE);
+      board2fen(with->S_board.board_colour2move,
+        with->S_board.board_white_man_bb,
+        with->S_board.board_black_man_bb,
+        with->S_board.board_white_king_bb,
+        with->S_board.board_black_king_bb,
+        bfen, TRUE);
 
-      my_printf(with->board_my_printf, "%s bs=%d bm=%s md=%d bd=%d\n",
-        fen,
-        with->board_search_best_score,
-        moves_list->move2string(moves_list, with->board_search_best_move),
+      BSTRING(bmove_string)
+
+      move2bstring(moves_list, with->S_best_move, bmove_string);
+
+      my_printf(with->S_my_printf, "%s bs=%d bm=%s md=%d bd=%d\n",
+        bdata(bfen),
+        with->S_best_score,
+        bdata(bmove_string),
         my_depth,
-        with->board_search_best_depth);
+        with->S_best_depth);
 
       char stamp[MY_LINE_MAX];
 
       time_t t = time(NULL);
-      (void) strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t));
 
+      HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S",
+                       localtime(&t)) == 0)
+ 
       FILE *fbugs;
     
       HARDBUG((fbugs = fopen("bugs.txt", "a")) == NULL)
  
       fprintf(fbugs, "%s %s %s bs=%d bm=%s md=%d bd=%d\n",
-        fen, stamp, REVISION,
-        with->board_search_best_score,
-        moves_list->move2string(moves_list, with->board_search_best_move),
+        bdata(bfen), stamp, REVISION,
+        with->S_best_score,
+        bdata(bmove_string),
         my_depth,
-        with->board_search_best_depth);
+        with->S_best_depth);
 
       FCLOSE(fbugs)
+
+      BDESTROY(bmove_string)
+
+      BDESTROY(bfen)
     }
   }
 
-  stop_my_timer(&(with->board_timer));
+  stop_my_timer(&(with->S_timer));
 
-  my_printf(with->board_my_printf, "best_move=%s best_score=%d\n",
-    moves_list->move2string(moves_list, with->board_search_best_move),
-    with->board_search_best_score);
+  BSTRING(bmove_string)
 
-  my_printf(with->board_my_printf,
+  move2bstring(moves_list, with->S_best_move, bmove_string),
+
+  my_printf(with->S_my_printf, "best_move=%s best_score=%d\n",
+    bdata(bmove_string),
+    with->S_best_score);
+
+  BDESTROY(bmove_string)
+
+  my_printf(with->S_my_printf,
     "%lld nodes in %.2f seconds\n"
     "%.0f nodes/second\n",
-    with->total_nodes, return_my_timer(&(with->board_timer), FALSE),
-    with->total_nodes / return_my_timer(&(with->board_timer), FALSE));
+    with->S_total_nodes, return_my_timer(&(with->S_timer), FALSE),
+    with->S_total_nodes / return_my_timer(&(with->S_timer), FALSE));
 
   if (options.verbose > 0) print_totals(with);
 
-  if ((with->board_thread != NULL) and
-      (with->board_thread == thread_alpha_beta_master))
+  if ((with->S_thread != NULL) and
+      (with->S_thread == thread_alpha_beta_master))
   {
     global_nodes = 0;
 
@@ -2188,22 +2340,19 @@ void my_search(board_t *with, moves_list_t *moves_list,
     {
       thread_t *object = threads + ithread;
 
-      board_t *with_board = return_with_board(object->thread_board_id);
-
-      global_nodes += with_board->total_nodes;
+      global_nodes += object->thread_search.S_total_nodes;
     }
 
-    my_printf(with->board_my_printf,
+    my_printf(with->S_my_printf,
       "%lld global_nodes in %.2f seconds\n"
       "%.0f global_nodes/second\n",
-      global_nodes, return_my_timer(&(with->board_timer), FALSE),
-      global_nodes / return_my_timer(&(with->board_timer), FALSE));
+      global_nodes, return_my_timer(&(with->S_timer), FALSE),
+      global_nodes / return_my_timer(&(with->S_timer), FALSE));
   }
 
-  if (with->board_thread == thread_alpha_beta_master)
+  if (with->S_thread == thread_alpha_beta_master)
   {
     printf_bucket(&bucket_depth);
   }
-
   END_BLOCK
 }

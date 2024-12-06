@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -166,9 +166,13 @@ local int hub_input(void)
 
 void hub(void)
 {
-  int iboard = create_board(STDOUT, NULL);
+  search_t search;
 
-  string2board(STARTING_POSITION, iboard);
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
+
+  string2board(&(with->S_board), STARTING_POSITION);
 
   state_t game_state;
   
@@ -202,15 +206,22 @@ void hub(void)
 
       HARDBUG(compat_strcasecmp(name, "pos") != 0)
 
-      string2board(start_board, iboard);
+      string2board(&(with->S_board), start_board);
 
-      print_board(iboard);
+      print_board(&(with->S_board));
 
-      char fen[MY_LINE_MAX];
+      BSTRING(bfen)
 
-      board2fen(iboard, fen, FALSE);
+      board2fen(with->S_board.board_colour2move,
+        with->S_board.board_white_man_bb,
+        with->S_board.board_black_man_bb,
+        with->S_board.board_white_king_bb, 
+        with->S_board.board_black_king_bb,
+        bfen, FALSE);
 
-      game_state.set_starting_position(&game_state, fen);
+      game_state.set_starting_position(&game_state, bdata(bfen));
+
+      BDESTROY(bfen)
 
       while(game_state.pop_move(&game_state) > 0);
 
@@ -394,34 +405,32 @@ void hub(void)
         options.time_ntrouble = 0;
       }
 
-      print_board(iboard);
+      print_board(&(with->S_board));
 
       moves_list_t moves_list;
 
-      create_moves_list(&moves_list);
+      construct_moves_list(&moves_list);
 
-      board_t *with_board = return_with_board(iboard);
-
-      gen_moves(with_board, &moves_list, FALSE);
+      gen_moves(&(with->S_board), &moves_list, FALSE);
 
       HARDBUG(moves_list.nmoves == 0)
 
-      check_moves(with_board, &moves_list);
+      check_moves(&(with->S_board), &moves_list);
 
-      char move_string[MY_LINE_MAX];
+      BSTRING(bmove_string)
 
-      strcpy(move_string, "NULL");
+      HARDBUG(bassigncstr(bmove_string, "NULL") != BSTR_OK)
 
       if ((compat_strcasecmp(name, "think") == 0) and (moves_list.nmoves == 1))
       {
-        strcpy(move_string, moves_list.move2string(&moves_list, 0));
+        move2bstring(&moves_list, 0, bmove_string);
       }
       else
       {
         if ((compat_strcasecmp(name, "think") == 0) and options.use_book)
-          return_book_move(with_board, &moves_list, move_string);
+          return_book_move(&(with->S_board), &moves_list, bmove_string);
 
-        if (compat_strcasecmp(move_string, "NULL") == 0)
+        if (compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
         {
           enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_STATE, game_state.get_state(&game_state));
@@ -472,15 +481,24 @@ void hub(void)
               FATAL("message.message_id error", EXIT_FAILURE)
           }//while(TRUE)
 
-          HARDBUG(sscanf(bdata(message.message_text), "%s", move_string) != 1)
+          CSTRING(cmove_string, blength(message.message_text))
+
+          HARDBUG(sscanf(bdata(message.message_text), "%s",
+                         cmove_string) != 1)
+
+          HARDBUG(bassigncstr(bmove_string, cmove_string) != BSTR_OK)
+
+          CDESTROY(cmove_string)
         }
       }
 
-      HARDBUG(compat_strcasecmp(move_string, "NULL") == 0)
+      HARDBUG(compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
 
-      snprintf(line, MY_LINE_MAX, "done move=%s\n", move_string);
+      snprintf(line, MY_LINE_MAX, "done move=%s\n", bdata(bmove_string));
   
       write_to_hub(line);
+
+      BDESTROY(bmove_string)
     }
     else if (compat_strcasecmp(command.command, "ping") == 0)
     {
@@ -754,7 +772,7 @@ local double return_sigmoid(double x)
   return(2.0 / (1.0 + exp(-x)) - 1.0);
 }
 
-local int play_game(board_t *with, int my_colour,
+local int play_game(search_t *with, int my_colour,
   pipe_t parent2child, pipe_t child2parent)
 {
   int result = INVALID;
@@ -776,15 +794,20 @@ local int play_game(board_t *with, int my_colour,
     game_state.set_black(&game_state, my_name);
   }
 
-  char fen[MY_LINE_MAX];
+  BSTRING(bfen)
 
-  board2fen(with->board_id, fen, FALSE);
+  board2fen(with->S_board.board_colour2move,
+    with->S_board.board_white_man_bb,
+    with->S_board.board_black_man_bb,
+    with->S_board.board_white_king_bb,
+    with->S_board.board_black_king_bb,
+    bfen, FALSE);
 
-  game_state.set_starting_position(&game_state, fen);
+  game_state.set_starting_position(&game_state, bdata(bfen));
 
   char pos[MY_LINE_MAX];
 
-  strcpy(pos, with->board2string(with, TRUE));
+  strcpy(pos, board2string(&(with->S_board), TRUE));
 
   PRINTF("pos=%s\n", pos);
 
@@ -803,22 +826,22 @@ local int play_game(board_t *with, int my_colour,
 
   while(TRUE)
   {
-    print_board(with->board_id);
+    print_board(&(with->S_board));
 
     moves_list_t moves_list;
 
-    create_moves_list(&moves_list);
+    construct_moves_list(&moves_list);
 
-    gen_moves(with, &moves_list, FALSE);
+    gen_moves(&(with->S_board), &moves_list, FALSE);
 
     PRINTF("nmy_game_moves_done=%d nyour_game_moves_done=%d\n",
       nmy_game_moves_done, nyour_game_moves_done);
 
-    if (with->board_colour2move != my_colour)
+    if (with->S_board.board_colour2move != my_colour)
     {
       if (moves_list.nmoves == 0)
       {
-        if (IS_WHITE(with->board_colour2move))
+        if (IS_WHITE(with->S_board.board_colour2move))
           result = 0;
         else
           result = 2;
@@ -956,15 +979,20 @@ local int play_game(board_t *with, int my_colour,
 
       HARDBUG(compat_strcasecmp(command.command_args[0].arg_name, "move") != 0)
 
-      char *move_string = command.command_args[0].arg_value;
+      BSTRING(bmove_string)
+
+      HARDBUG(bassigncstr(bmove_string, command.command_args[0].arg_value) !=
+              BSTR_OK)
 
       int imove;
 
-      HARDBUG((imove = search_move(&moves_list, move_string)) == INVALID)
+      HARDBUG((imove = search_move(&moves_list, bmove_string)) == INVALID)
 
-      game_state.push_move(&game_state, move_string, NULL);
+      game_state.push_move(&game_state, bdata(bmove_string), NULL);
 
-      do_move(with, imove, &moves_list);
+      do_move(&(with->S_board), imove, &moves_list);
+
+      BDESTROY(bmove_string)
     }
     else
     {  
@@ -972,7 +1000,7 @@ local int play_game(board_t *with, int my_colour,
 
       if (moves_list.nmoves == 0)
       {
-        if (IS_WHITE(with->board_colour2move))
+        if (IS_WHITE(with->S_board.board_colour2move))
           result = 0;
         else
           result = 2;
@@ -982,7 +1010,8 @@ local int play_game(board_t *with, int my_colour,
 
       //check for known endgame
 
-      int egtb_mate = read_endgame(with, with->board_colour2move, TRUE);
+      int egtb_mate =
+        read_endgame(with, with->S_board.board_colour2move, TRUE);
     
       if (egtb_mate != ENDGAME_UNKNOWN)
       {
@@ -994,14 +1023,14 @@ local int play_game(board_t *with, int my_colour,
         }
         else if (egtb_mate > 0)
         {
-          if (IS_WHITE(with->board_colour2move))
+          if (IS_WHITE(with->S_board.board_colour2move))
             result = 2;
           else
             result = 0;
         }
         else
         {
-          if (IS_WHITE(with->board_colour2move))
+          if (IS_WHITE(with->S_board.board_colour2move))
             result = 0;
           else
             result = 2;
@@ -1017,15 +1046,16 @@ local int play_game(board_t *with, int my_colour,
         break;
       }
    
-      char best_move[MY_LINE_MAX];
+      BSTRING(bbest_move)
+
       int best_score;
       int best_depth;
 
-      strcpy(best_move, "NULL");
+      HARDBUG(bassigncstr(bbest_move, "NULL") != BSTR_OK)
 
-      char best_string[MY_LINE_MAX];
+      BSTRING(bbest_string)
 
-      strcpy(best_string, "NULL");
+      HARDBUG(bassigncstr(bbest_string, "NULL") != BSTR_OK)
 
       PRINTF("\nthinking..\n");
 
@@ -1033,9 +1063,9 @@ local int play_game(board_t *with, int my_colour,
 
       if (moves_list.nmoves == 1)
       {
-        strcpy(best_move, moves_list.move2string(&moves_list, 0));
+        move2bstring(&moves_list, 0, bbest_move);
 
-        strcpy(best_string, "only move");
+        HARDBUG(bassigncstr(bbest_string, "only move") != BSTR_OK)
 
         best_score = 0;
  
@@ -1044,11 +1074,11 @@ local int play_game(board_t *with, int my_colour,
       else
       {
         if (options.use_book)
-          return_book_move(with, &moves_list, best_move);
+          return_book_move(&(with->S_board), &moves_list, bbest_move);
       
-        if (compat_strcasecmp(best_move, "NULL") != 0)
+        if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
         {
-          strcpy(best_string, "book move");
+          HARDBUG(bassigncstr(bbest_string, "book move") != BSTR_OK)
 
           best_score = 0;
  
@@ -1078,13 +1108,19 @@ local int play_game(board_t *with, int my_colour,
               }
               else if (message.message_id == MESSAGE_RESULT)
               {
-                strcpy(best_string, bdata(message.message_text));
+                HARDBUG(bassign(bbest_string, message.message_text) != BSTR_OK)
 
-                PRINTF("got result %s\n", best_string);
-    
-                
-                HARDBUG(sscanf(best_string, "%s%d%d",
-                               best_move, &best_score, &best_depth) != 3)
+                PRINTF("got result %s\n", bdata(bbest_string));
+
+                CSTRING(cbest_move, blength(bbest_string))
+
+                HARDBUG(sscanf(bdata(bbest_string), "%s%d%d",
+                               cbest_move,
+                               &best_score, &best_depth) != 3)
+
+                HARDBUG(bassigncstr(bbest_move, cbest_move) != BSTR_OK)
+
+                CDESTROY(cbest_move)
   
                 break;
               }
@@ -1111,27 +1147,28 @@ local int play_game(board_t *with, int my_colour,
       nmy_game_moves_done++;
 
       PRINTF("\n* * * * * * * * * * %s %d %d\n\n",
-        best_move, best_score, best_depth);
+        bdata(bbest_move), best_score, best_depth);
 
       if (options.hub_annotate_level == 0)
-        game_state.push_move(&game_state, best_move, NULL);
+        game_state.push_move(&game_state, bdata(bbest_move), NULL);
       else
-        game_state.push_move(&game_state, best_move, best_string);
+        game_state.push_move(&game_state, bdata(bbest_move),
+                             bdata(bbest_string));
 
       int imove;
 
-      HARDBUG((imove = search_move(&moves_list, best_move)) == INVALID)
+      HARDBUG((imove = search_move(&moves_list, bbest_move)) == INVALID)
 
       //evaluate if needed
 
       if ((moves_list.nmoves > 1) and
-          (options.neural_evaluation_time > 0) and
-          (best_score >= options.neural_evaluation_min) and
-          (best_score <= options.neural_evaluation_max))
+          (options.network_evaluation_time > 0) and
+          (best_score >= options.network_evaluation_min) and
+          (best_score <= options.network_evaluation_max))
       {
         PRINTF("evaluating..\n");
 
-        options.time_limit = options.neural_evaluation_time;
+        options.time_limit = options.network_evaluation_time;
         options.time_ntrouble = 0;
 
         enqueue(return_thread_queue(thread_alpha_beta_master),
@@ -1151,8 +1188,15 @@ local int play_game(board_t *with, int my_colour,
             {
               PRINTF("got result %s\n", bdata(message.message_text));
   
+              CSTRING(cbest_move, blength(message.message_text))
+
               HARDBUG(sscanf(bdata(message.message_text), "%s%d%d",
-                             best_move, &best_score, &best_depth) != 3)
+                             cbest_move,
+                             &best_score, &best_depth) != 3)
+
+              HARDBUG(bassigncstr(bbest_move, cbest_move) != BSTR_OK)
+
+              CDESTROY(cbest_move)
 
               break;
             }
@@ -1163,23 +1207,32 @@ local int play_game(board_t *with, int my_colour,
         }
 
         PRINTF("evaluate best_move=%s best_score=%d best_depth=%d\n",
-               best_move, best_score, best_depth);
+               bdata(bbest_move), best_score, best_depth);
 
         int fd = compat_lock_file("hub.fen");
 
         HARDBUG(fd == -1)
       
-        board2fen(with->board_id, fen, FALSE);
+        btrunc(bfen, 0);
 
-        if (IS_BLACK(with->board_colour2move)) best_score = -best_score;
-
-        compat_fdprintf(fd, "%s {%.5f}\n", fen,
+        board2fen(with->S_board.board_colour2move,
+          with->S_board.board_white_man_bb,
+          with->S_board.board_black_man_bb,
+          with->S_board.board_white_king_bb,
+          with->S_board.board_black_king_bb,
+          bfen, FALSE);
+      
+        compat_fdprintf(fd, "%s {%.5f}\n", bdata(bfen),
                         return_sigmoid(best_score / 100.0));
 
         compat_unlock_file(fd);
       }
 
-      do_move(with, imove, &moves_list);
+      BDESTROY(bbest_string)
+
+      BDESTROY(bbest_move)
+
+      do_move(&(with->S_board), imove, &moves_list);
     }
   }
 
@@ -1208,16 +1261,22 @@ local int play_game(board_t *with, int my_colour,
 
   destroy_state(&game_state);
 
+  BDESTROY(bfen)
+
   return(result);
 }
 
 local void hub_server_game_initiator(pipe_t parent2child, pipe_t child2parent)
 {
-  snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.neural0_name);
+  snprintf(my_name, MY_LINE_MAX, "GWD %s %s",
+           REVISION, options.network_name);
   snprintf(your_name, MY_LINE_MAX, "%s", options.hub_server_client);
 
-  int iboard = create_board(STDOUT, NULL);
-  board_t *with = return_with_board(iboard);
+  search_t search;
+
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
 
   int nwon = 0;
   int ndraw = 0;
@@ -1319,9 +1378,9 @@ local void hub_server_game_initiator(pipe_t parent2child, pipe_t child2parent)
 
       PRINTF("game=%d opening=%s\n", igame, opening);
 
-      fen2board(fen, with->board_id);
+      fen2board(&(with->S_board), fen);
 
-      print_board(with->board_id);
+      print_board(&(with->S_board));
 
       int result = play_game(with, my_colour, parent2child, child2parent);
   

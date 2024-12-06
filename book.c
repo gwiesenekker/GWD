@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #define NRETRIES 5
@@ -17,13 +17,13 @@ local int help_walk_book_alpha_beta(sqlite3 *db, board_t *with,
 {
   moves_list_t my_moves_list;
 
-  create_moves_list(&my_moves_list);
+  construct_moves_list(&my_moves_list);
 
   gen_moves(with, &my_moves_list, FALSE);
 
   if (my_moves_list.nmoves == 0) return(SCORE_LOST + depth);
 
-  char *position = with->board2string(with, FALSE);
+  char *position = board2string(with, FALSE);
 
   int position_id = query_position(db, position, NRETRIES);
  
@@ -46,11 +46,15 @@ local int help_walk_book_alpha_beta(sqlite3 *db, board_t *with,
     }
     else
     {
-      char *move = my_moves_list.move2string(&my_moves_list, imove);
+      BSTRING(bmove)
+
+      move2bstring(&my_moves_list, imove, bmove);
 
       int move_id;
   
-      move_id = query_move(db, position_id, move, NRETRIES);
+      move_id = query_move(db, position_id, bdata(bmove), NRETRIES);
+
+      BDESTROY(bmove)
 
       if (move_id == INVALID) return(SCORE_PLUS_INFINITY);
 
@@ -64,6 +68,7 @@ local int help_walk_book_alpha_beta(sqlite3 *db, board_t *with,
       undo_move(with, imove, &my_moves_list);
 
       if (temp_score == SCORE_MINUS_INFINITY) temp_score = evaluation;
+
     }
     if (temp_score > best_score) best_score = temp_score;
   }
@@ -71,22 +76,22 @@ local int help_walk_book_alpha_beta(sqlite3 *db, board_t *with,
 }
 
 local void help_walk_book(sqlite3 *db, board_t *with, int depth,
-  int eval_time, char *pv)
+  int eval_time, bstring arg_bpv)
 {
-  char *position = with->board2string(with, FALSE);
+  char *position = board2string(with, FALSE);
 
   int position_id = query_position(db, position, NRETRIES);
 
   if (position_id == INVALID)
   {
-    PRINTF("%s\n", pv);
+    PRINTF("%s\n", bdata(arg_bpv));
 
     return;
   }
 
   moves_list_t my_moves_list;
 
-  create_moves_list(&my_moves_list);
+  construct_moves_list(&my_moves_list);
 
   gen_moves(with, &my_moves_list, FALSE);
 
@@ -94,7 +99,9 @@ local void help_walk_book(sqlite3 *db, board_t *with, int depth,
 
   for (int imove = 0; imove < my_moves_list.nmoves; imove++)
   {
-    char *move = my_moves_list.move2string(&my_moves_list, imove);
+    BSTRING(bmove)
+
+    move2bstring(&my_moves_list, imove, bmove);
 
     int evaluation = SCORE_PLUS_INFINITY;
 
@@ -104,7 +111,7 @@ local void help_walk_book(sqlite3 *db, board_t *with, int depth,
     {
       int move_id;
   
-      move_id = query_move(db, position_id, move, NRETRIES);
+      move_id = query_move(db, position_id, bdata(bmove), NRETRIES);
 
       if (move_id != INVALID)
       {
@@ -120,16 +127,21 @@ local void help_walk_book(sqlite3 *db, board_t *with, int depth,
       }
     }
 
-    char string[MY_LINE_MAX];
+    BSTRING(bpv)
 
-    snprintf(string, MY_LINE_MAX, "%s%s(%d, %d) ",
-                                  pv, move, evaluation, best_score);
+    HARDBUG(bformata(bpv, "%s%s(%d, %d) ",
+                     bdata(arg_bpv), bdata(bmove),
+                     evaluation, best_score) != BSTR_OK)
 
     do_move(with, imove, &my_moves_list);
 
-    help_walk_book(db, with, depth + 1, eval_time, string);
+    help_walk_book(db, with, depth + 1, eval_time, bpv);
 
     undo_move(with, imove, &my_moves_list);
+
+    BDESTROY(bpv)
+
+    BDESTROY(bmove)
   }
 }
 
@@ -241,26 +253,32 @@ void open_book(void)
 
   if (TRUE)
   {
-    int iboard = create_board(STDOUT, NULL);
+    board_t board;
+    
+    construct_board(&board, STDOUT);
 
-    board_t *with = return_with_board(iboard);
+    board_t *with = &board;
   
-    string2board(STARTING_POSITION, iboard);
+    string2board(with, STARTING_POSITION);
   
-    help_walk_book(book, with, 0, 30, "");
+    BSTRING(bempty)
+
+    help_walk_book(book, with, 0, 30, bempty);
+
+    BDESTROY(bempty)
   }
 }
 
 void return_book_move(board_t *with, moves_list_t *moves_list,
-  char book_move[MY_LINE_MAX])
+  bstring bbook_move)
 {
   int eval_time = 30;
 
-  strcpy(book_move, "NULL");
+  HARDBUG(bassigncstr(bbook_move, "NULL") != BSTR_OK)
 
   moves_list_t my_moves_list;
 
-  create_moves_list(&my_moves_list);
+  construct_moves_list(&my_moves_list);
 
   gen_moves(with, &my_moves_list, FALSE);
 
@@ -268,12 +286,12 @@ void return_book_move(board_t *with, moves_list_t *moves_list,
 
   if (my_moves_list.nmoves == 1)
   {
-    strncpy(book_move, moves_list->move2string(moves_list, 0), MY_LINE_MAX);
+    move2bstring(moves_list, 0, bbook_move);
 
     return;
   }
 
-  char *position = with->board2string(with, FALSE);
+  char *position = board2string(with, FALSE);
 
   int position_id = query_position(book, position, NRETRIES);
 
@@ -317,7 +335,9 @@ void return_book_move(board_t *with, moves_list_t *moves_list,
   {
     int jmove = sort[imove];
 
-    char *move = my_moves_list.move2string(&my_moves_list, jmove);
+    BSTRING(bmove)
+
+    move2bstring(&my_moves_list, jmove, bmove);
 
     int evaluation = SCORE_PLUS_INFINITY;
 
@@ -325,13 +345,16 @@ void return_book_move(board_t *with, moves_list_t *moves_list,
 
     int move_id;
   
-    move_id = query_move(book, position_id, move, NRETRIES);
+    move_id = query_move(book, position_id, bdata(bmove), NRETRIES);
 
     if (move_id == INVALID)
     {
       PRINTF("WARNING: no evaluation for move %s in positions %s!\n",
-             move, position);
+             bdata(bmove), position);
 
+      //if we have no evaluation for one move
+      //we do not have a best_score
+      FATAL("YOU STILL HAVE TO THINK ABOUT THIS", EXIT_FAILURE)
       return;
     }
 
@@ -355,7 +378,7 @@ void return_book_move(board_t *with, moves_list_t *moves_list,
       random_score = temp_score / options.book_randomness;
 
     PRINTF("move=%s evaluation=%d temp_score=%d random_score=%d\n",
-      move, evaluation, temp_score, random_score);
+      bdata(bmove), evaluation, temp_score, random_score);
 
     if (random_score > best_score)
     {
@@ -363,26 +386,23 @@ void return_book_move(board_t *with, moves_list_t *moves_list,
 
       best_score = temp_score;
     }
+    BDESTROY(bmove)
   }
 
   HARDBUG(best_move == INVALID)
 
   HARDBUG(best_score == SCORE_MINUS_INFINITY)
 
-  char *move = my_moves_list.move2string(&my_moves_list, best_move);
+  move2bstring(&my_moves_list, best_move, bbook_move);
 
-  PRINTF("best_move=%s best_score=%d\n", move, best_score);
-
-  strncpy(book_move, move, MY_LINE_MAX);
- 
-  PRINTF("book_move=%s\n", book_move);
+  PRINTF("book_move=%s best_score=%d\n", bdata(bbook_move), best_score);
 }
 
 local int *semaphore;
 local MPI_Win win;
 local i64_t npositions;
 
-local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
+local void drop_out(sqlite3 *db, search_t *with, int depth, int depth_max,
   int eval_time)
 {
   if (depth > depth_max) return;
@@ -391,7 +411,7 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
 
   //we query the position and add all moves to the database if needed
 
-  char *position = with->board2string(with, FALSE);
+  char *position = board2string(&(with->S_board), FALSE);
 
   my_mpi_acquire_semaphore(win);
 
@@ -404,9 +424,9 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
 
   moves_list_t my_moves_list;
 
-  create_moves_list(&my_moves_list);
+  construct_moves_list(&my_moves_list);
 
-  gen_moves(with, &my_moves_list, FALSE);
+  gen_moves(&(with->S_board), &my_moves_list, FALSE);
 
   //for each move we check if we have a result
 
@@ -417,21 +437,23 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
       if ((imove % my_mpi_globals.MY_MPIG_nslaves) !=
           my_mpi_globals.MY_MPIG_id_slave) continue;
 
-      char *move = my_moves_list.move2string(&my_moves_list, imove);
+      BSTRING(bmove)
+
+      move2bstring(&my_moves_list, imove, bmove);
   
       my_mpi_acquire_semaphore(win);
 
-      int move_id = query_move(db, position_id, move, NRETRIES);
+      int move_id = query_move(db, position_id, bdata(bmove), NRETRIES);
   
       if (move_id == INVALID)
-        move_id = insert_move(db, position_id, move, NRETRIES);
+        move_id = insert_move(db, position_id, bdata(bmove), NRETRIES);
   
       int evaluation = query_evaluation(db, move_id, eval_time, NRETRIES);
 
       my_mpi_release_semaphore(win);
   
       PRINTF("db move=%s eval_time=%d evaluation=%d\n",
-        move, eval_time, evaluation);
+        bdata(bmove), eval_time, evaluation);
   
       if (evaluation == SCORE_PLUS_INFINITY)
       {
@@ -440,13 +462,13 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
         options.time_limit = eval_time;
         options.time_ntrouble = 0;
 
-        do_move(with, imove, &my_moves_list);
+        do_move(&(with->S_board), imove, &my_moves_list);
 
         moves_list_t your_moves_list;
 
-        create_moves_list(&your_moves_list);
+        construct_moves_list(&your_moves_list);
 
-        gen_moves(with, &your_moves_list, FALSE);
+        gen_moves(&(with->S_board), &your_moves_list, FALSE);
 
         if (your_moves_list.nmoves == 0)
         {
@@ -454,16 +476,16 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
         }
         else
         {
-          search(with, &your_moves_list,
+          do_search(with, &your_moves_list,
             INVALID, INVALID, SCORE_MINUS_INFINITY, FALSE);
 
-          evaluation = -with->board_search_best_score;
+          evaluation = -with->S_best_score;
         }
 
-        undo_move(with, imove, &my_moves_list);
+        undo_move(&(with->S_board), imove, &my_moves_list);
 
         PRINTF("search move=%s eval_time=%d evaluation=%d\n",
-          move, eval_time, evaluation);
+          bdata(bmove), eval_time, evaluation);
 
         //update the evaluation
   
@@ -497,6 +519,7 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
 
         sqlite3_finalize(stmt);
       }
+      BDESTROY(bmove)
     }
     my_mpi_barrier("after imove", my_mpi_globals.MY_MPIG_comm_slaves, FALSE);
   }
@@ -509,7 +532,9 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
 
   for (int imove = 0; imove < my_moves_list.nmoves; imove++)
   {
-    char *move = my_moves_list.move2string(&my_moves_list, imove);
+    BSTRING(bmove)
+
+    move2bstring(&my_moves_list, imove, bmove);
 
     int evaluation = SCORE_PLUS_INFINITY;
 
@@ -519,8 +544,8 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
   
       my_mpi_acquire_semaphore(win);
 
-      HARDBUG((move_id = query_move(db, position_id, move, NRETRIES)) ==
-              INVALID)
+      HARDBUG((move_id = query_move(db, position_id, bdata(bmove),
+                                    NRETRIES)) == INVALID)
 
       evaluation = query_evaluation(db, move_id, eval_time, NRETRIES);
 
@@ -533,9 +558,9 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
     {
       PRINTF("expanding depth=%d depth_next=%d depth_max=%d"
              " move=%s evaluation=%d\n",
-        depth, depth_next, depth_max, move, evaluation);
+             depth, depth_next, depth_max, bdata(bmove), evaluation);
 
-      do_move(with, imove, &my_moves_list);
+      do_move(&(with->S_board), imove, &my_moves_list);
 
       ++nexpand;
 
@@ -543,8 +568,9 @@ local void drop_out(sqlite3 *db, board_t *with, int depth, int depth_max,
 
       drop_out(db, with, depth_next, depth_max, eval_time);
 
-      undo_move(with, imove, &my_moves_list); 
+      undo_move(&(with->S_board), imove, &my_moves_list); 
     }
+    BDESTROY(bmove)
   }
   if (nexpand == 0) PRINTF("nothing to expand\n");
 }
@@ -580,10 +606,13 @@ void gen_book(int eval_time, int depth_limit)
 
   //we start with the starting position
 
-  int iboard = create_board(STDOUT, NULL);
-  board_t *with = return_with_board(iboard);
+  search_t search;
 
-  string2board(STARTING_POSITION, iboard);
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
+
+  string2board(&(with->S_board), STARTING_POSITION);
 
   //query the position and the moves
 
@@ -614,13 +643,19 @@ void walk_book(int eval_time)
 
   //we start with the starting position
 
-  int iboard = create_board(STDOUT, NULL);
+  board_t board;
 
-  board_t *with = return_with_board(iboard);
+  construct_board(&board, STDOUT);
 
-  string2board(STARTING_POSITION, iboard);
+  board_t *with = &board;
 
-  help_walk_book(db, with, 0, eval_time, "");
+  string2board(with, STARTING_POSITION);
+
+  BSTRING(bempty)
+
+  help_walk_book(db, with, 0, eval_time, bempty);
+
+  BDESTROY(bempty)
 }
 
 local void help_count_book(sqlite3 *db, board_t *with, int depth,
@@ -628,7 +663,7 @@ local void help_count_book(sqlite3 *db, board_t *with, int depth,
 {
   if (depth > depth_max) return;
 
-  char *position = with->board2string(with, FALSE);
+  char *position = board2string(with, FALSE);
 
   int position_id = query_position(db, position, NRETRIES);
 
@@ -637,7 +672,7 @@ local void help_count_book(sqlite3 *db, board_t *with, int depth,
 
   moves_list_t my_moves_list;
 
-  create_moves_list(&my_moves_list);
+  construct_moves_list(&my_moves_list);
 
   gen_moves(with, &my_moves_list, FALSE);
 
@@ -647,16 +682,20 @@ local void help_count_book(sqlite3 *db, board_t *with, int depth,
   {
     for (int imove = 0; imove < my_moves_list.nmoves; imove++)
     {
-      char *move = my_moves_list.move2string(&my_moves_list, imove);
+      BSTRING(bmove)
+
+      move2bstring(&my_moves_list, imove, bmove);
   
-      int move_id = query_move(db, position_id, move, NRETRIES);
+      int move_id = query_move(db, position_id, bdata(bmove), NRETRIES);
   
       if (move_id == INVALID)
       {
-        move_id = insert_move(db, position_id, move, NRETRIES);
+        move_id = insert_move(db, position_id, bdata(bmove), NRETRIES);
 
         npositions++;
       }
+
+      BDESTROY(bmove)
     }
   }
 
@@ -690,10 +729,13 @@ void count_book(int depth_limit)
 
   //we start with the starting position
 
-  int iboard = create_board(STDOUT, NULL);
-  board_t *with = return_with_board(iboard);
+  board_t board;
 
-  string2board(STARTING_POSITION, iboard);
+  construct_board(&board, STDOUT);
+
+  board_t *with = &board;
+
+  string2board(with, STARTING_POSITION);
 
   //query the position and the moves
 

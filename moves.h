@@ -1,12 +1,15 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #ifndef MovesH
 #define MovesH
 
 #define MOVES_MAX       128
 #define MOVE_STRING_MAX 128
 
-#define ROW9_CAPTURE_BIT BIT(0)
-#define PROMOTION_BIT    BIT(1)
+#define MOVE_DO_NOT_REDUCE_BIT        BIT(0)
+#define MOVE_EXTEND_IN_QUIESCENCE_BIT BIT(1)
+
+#define MOVE_DO_NOT_REDUCE(F)        ((F) & MOVE_DO_NOT_REDUCE_BIT)
+#define MOVE_EXTEND_IN_QUIESCENCE(F) ((F) & MOVE_EXTEND_IN_QUIESCENCE_BIT)
 
 typedef struct
 {
@@ -15,25 +18,16 @@ typedef struct
   ui64_t move_captures_bb;
 } move_t;
 
-typedef struct moves_list
+typedef struct
 {
   int nmoves;
+  int nblocked;
+  int ncaptx;
 
   move_t moves[MOVES_MAX];
 
   int moves_weight[MOVES_MAX];
-  i8_t moves_tactical[MOVES_MAX];
-
-  int ncaptx;
-
-  char move_string[MOVE_STRING_MAX];
-
-  void (*new_moves_list)(struct moves_list *);
-
-  //TODO change order of moves_list and imove?
-  char * (*move2string)(struct moves_list *, int);
-  void (*fprintf_moves)(my_printf_t *, struct moves_list *, int);
-  void (*printf_moves)(struct moves_list *, int);
+  int moves_flag[MOVES_MAX];
 } moves_list_t;
 
 //moves.c
@@ -54,9 +48,6 @@ typedef struct moves_list
 #define undo_my_move     undo_the_move(my_colour)
 #define undo_your_move   undo_the_move(your_colour)
 
-//typedef i8_t move_t;
-
-//moves.d
 void gen_white_moves(board_t *, moves_list_t *, int);
 void gen_black_moves(board_t *, moves_list_t *, int);
 int white_can_capture(board_t *, int);
@@ -68,13 +59,17 @@ void undo_black_move(board_t *, int, moves_list_t *);
 void check_white_moves(board_t *, moves_list_t *);
 void check_black_moves(board_t *, moves_list_t *);
 
+void move2bstring(void *, int, bstring);
+int search_move(void *, bstring);
+
 void gen_moves(board_t *, moves_list_t *, int);
 void do_move(board_t *, int, moves_list_t *);
 void undo_move(board_t *, int, moves_list_t *);
 void check_moves(board_t *, moves_list_t *);
-//TODO move search_move to moves_list
-int search_move(moves_list_t *, char *);
-void create_moves_list(moves_list_t *);
+
+void construct_moves_list(void *);
+
+void fprintf_moves_list(void *, my_printf_t *, int);
 
 #endif
 

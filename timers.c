@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0
@@ -9,7 +9,7 @@ void construct_my_timer(void *self, char *arg_name,
 {
   my_timer_t *object = self;
 
-  HARDBUG((object->MT_name = bfromcstr(arg_name)) == NULL)
+  HARDBUG((object->MT_bname = bfromcstr(arg_name)) == NULL)
 
   object->MT_my_printf = arg_my_printf;
 
@@ -99,7 +99,7 @@ double return_my_timer(void *self, int arg_wall)
     {
       my_printf(object->MT_my_printf,
         "WARNING: RETURNING WALL CLOCK FOR TIMER %s!\n",
-        bdata(object->MT_name));
+        bdata(object->MT_bname));
 
       object->MT_return_wall_clock_warning_given = TRUE;
     }
@@ -130,7 +130,7 @@ void stop_my_timer(void *self)
   object->MT_status = MY_TIMER_STOPPED;
 
   my_printf(object->MT_my_printf, "TIMER=%s CPU=%.2f WALL=%.2f\n",
-    bdata(object->MT_name),
+    bdata(object->MT_bname),
     object->MT_cpu_time_used, object->MT_wall_time_used);
 }
 
@@ -217,7 +217,7 @@ void configure_time_control(int game_time, int ngame_moves,
   
   PRINTF("game_time_left=%.2f\n", game_time_left);
   
-  double total_game_time = 0.0;
+  double S_total_game_time = 0.0;
   
   for (int imove = 0; imove <= ngame_moves; ++imove)
   {
@@ -227,10 +227,10 @@ void configure_time_control(int game_time, int ngame_moves,
     PRINTF("imove=%d time_per_move[imove]=%.2f\n",
       imove, time_control->TC_game_time_per_move[imove]);
   
-    total_game_time += time_control->TC_game_time_per_move[imove];
+    S_total_game_time += time_control->TC_game_time_per_move[imove];
   }
 
-  PRINTF("game_time=%d total_game_time=%.2f\n", game_time, total_game_time);
+  PRINTF("game_time=%d S_total_game_time=%.2f\n", game_time, S_total_game_time);
 }
 
 void update_time_control(int jmove, double move_time,
@@ -307,13 +307,13 @@ void test_my_timers(void)
 
   for (int itest = 0; itest < NTEST; itest++)
   {
-    bstring bname = bfromcstr("test");
+    BSTRING(bname)
 
-    HARDBUG(bname == NULL)
-
-    HARDBUG(bformata(bname, "%d", itest) != BSTR_OK)
+    HARDBUG(bformata(bname, "-%d", itest) != BSTR_OK)
 
     construct_my_timer(test + itest, bdata(bname),  STDOUT, FALSE);
+
+    BDESTROY(bname)
   }
 
   PRINTF("resetting and starting timers..\n");

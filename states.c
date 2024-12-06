@@ -1,4 +1,4 @@
-//SCU REVISION 7.701 zo  3 nov 2024 10:59:01 CET
+//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
 #include "globals.h"
 
 //the game state is maintained in a cJSON object
@@ -180,7 +180,7 @@ local void save(void *self, char *name)
 
   fprintf(fsave, "%s\n", object->get_state(object));
 
-  FCLOSE(fsave);
+  FCLOSE(fsave)
 }
 
 local void save2pdn(void *self, char *pdn)
@@ -392,14 +392,16 @@ void construct_state(void *self)
 
   time_t t = time(NULL);
 
-  (void) strftime(event, MY_LINE_MAX, "%Y.%m.%d %H:%M:%S", localtime(&t));
+  HARDBUG(strftime(event, MY_LINE_MAX, "%Y.%m.%d %H:%M:%S",
+                   localtime(&t)) == 0)
 
   HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_EVENT_ID,
                                   event) == NULL)
 
   char date[MY_LINE_MAX];
 
-  (void) strftime(date, MY_LINE_MAX, "%Y.%m.%d", localtime(&t));
+  HARDBUG(strftime(date, MY_LINE_MAX, "%Y.%m.%d",
+                   localtime(&t)) == 0)
 
   HARDBUG(cJSON_AddStringToObject(object->cjson_object, CJSON_DATE_ID,
                                   date) == NULL)
