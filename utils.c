@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #ifdef USE_HARDWARE_CRC32
@@ -9,9 +9,7 @@
 
 int zzzzzz_invocation = 0;
 
-#define NFRAMES_MAX 256
-
-void zzzzzz(char *file, const char *func, long line, char *error, int code)
+void zzzzzz(char *arg_file, const char *arg_func, long arg_line, char *arg_error, int arg_code)
 {
   fprintf(stderr, "** %s **\n"
     " my_mpi_globals.MY_MPIG_id_global=%d\n"
@@ -23,17 +21,17 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
     " error=%s\n"
     " code=%d\n"
     " version=%s\n",
-   code == 0 ? "OK" : "FATAL",
+   arg_code == 0 ? "OK" : "FATAL",
    my_mpi_globals.MY_MPIG_id_global,
    my_mpi_globals.MY_MPIG_nglobal,
    compat_pthread_self(),
-   file, func, line, error, code, REVISION);
+   arg_file, arg_func, arg_line, arg_error, arg_code, REVISION);
 
   if (zzzzzz_invocation > 1)
   {
     fprintf(stderr, "WARNING: zzzzzz_invocation=%d\n", zzzzzz_invocation);
   }
-  else if (code != EXIT_SUCCESS)
+  else if (arg_code != EXIT_SUCCESS)
   { 
     PRINTF("** %s **\n"
       " my_mpi_globals.MY_MPIG_id_global=%d\n"
@@ -45,11 +43,11 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
       " error=%s\n"
       " code=%d\n"
       " version=%s\n",
-     code == 0 ? "OK" : "FATAL",
+     arg_code == 0 ? "OK" : "FATAL",
      my_mpi_globals.MY_MPIG_id_global,
      my_mpi_globals.MY_MPIG_nglobal,
      compat_pthread_self(),
-     file, func, line, error, code, REVISION);
+     arg_file, arg_func, arg_line, arg_error, arg_code, REVISION);
 
      //flush
 
@@ -59,7 +57,7 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
 #ifdef USE_OPENMPI
   if (my_mpi_globals.MY_MPIG_init)
   {
-    if (code == EXIT_SUCCESS)
+    if (arg_code == EXIT_SUCCESS)
     {
       MPI_Finalize();
     }
@@ -67,16 +65,16 @@ void zzzzzz(char *file, const char *func, long line, char *error, int code)
     {
       //issue when multiple processes call MPI_Abort
 
-      MPI_Abort(my_mpi_globals.MY_MPIG_comm_global, code);
+      MPI_Abort(my_mpi_globals.MY_MPIG_comm_global, arg_code);
     }
   }
 #endif
-  exit(code);
+  exit(arg_code);
 }
 
-int fexists(char *name)
+int fexists(char *arg_name)
 {
-  if (compat_access(name, F_OK) == 0)
+  if (compat_access(arg_name, F_OK) == 0)
     return(TRUE);
   else
     return(FALSE);
@@ -201,7 +199,7 @@ void test_utils(void)
 {
   ui32_t c;
   char *f = "The quick brown fox jumps over the lazy dog";
-  char s[9];
+  char s[MY_LINE_MAX];
 
   init_crc32(&c);
 
@@ -211,46 +209,55 @@ void test_utils(void)
 
   HARDBUG(c != return_crc32(f, strlen(f)))
 
-  (void) snprintf(s, 9, "%X", c);
+  (void) snprintf(s, MY_LINE_MAX, "%#X", c);
 
 #ifdef USE_HARDWARE_CRC32
   PRINTF("the HW crc32 of '%s' is %s hex\n", f, s);
-  HARDBUG(strcmp(s, "22620404") != 0)
+  HARDBUG(strcmp(s, "0X22620404") != 0)
 #else
   PRINTF("the SW crc32 of '%s' is %s hex\n", f, s);
-  HARDBUG(strcmp(s, "414FA339") != 0)
+  HARDBUG(strcmp(s, "0X414FA339") != 0)
 #endif
+}
+
+void file2bstring(char *arg_name, bstring arg_bstring)
+{
+  FILE *farg_name;
+
+  HARDBUG((farg_name = fopen(arg_name, "r")) == NULL)
+
+  struct bStream* barg_name;
+
+  HARDBUG((barg_name = bsopen((bNread) fread, farg_name)) == NULL)
+
+  while (bsreadlna(arg_bstring, barg_name, (char) '\n') == BSTR_OK)
+  ;
+  
+  HARDBUG(bsclose(barg_name) == NULL)
+
+  FCLOSE(farg_name)
+
+  BSTRING(newline)
+
+  HARDBUG(bassigncstr(newline, "\n") == BSTR_ERR)
+
+  BSTRING(space)
+
+  HARDBUG(bassigncstr(space, " ") == BSTR_ERR)
+
+  bfindreplace(arg_bstring, newline, space, 0);
+  
+  BDESTROY(space)
+
+  BDESTROY(newline)
 }
 
 void file2cjson(char *arg_name, cJSON **arg_json)
 {
-  FILE *fjson;
-
-  HARDBUG((fjson = fopen(arg_name, "r")) == NULL)
-
-  struct bStream* bjson;
-
-  HARDBUG((bjson = bsopen((bNread) fread, fjson)) == NULL)
-
   BSTRING(string)
 
-  while (bsreadlna(string, bjson, (char) '\n') == BSTR_OK)
-  ;
-  
-  HARDBUG(bsclose(bjson) == NULL)
+  file2bstring(arg_name, string);
 
-  FCLOSE(fjson)
-
-  BSTRING(newline)
-
-  HARDBUG(bassigncstr(newline, "\n") != BSTR_OK)
-
-  BSTRING(space)
-
-  HARDBUG(bassigncstr(newline, " ") != BSTR_OK)
-
-  bfindreplace(string, newline, space, 0);
-  
   if ((*arg_json = cJSON_Parse(bdata(string))) == NULL)
   {
     const char *error = cJSON_GetErrorPtr();
@@ -260,14 +267,10 @@ void file2cjson(char *arg_name, cJSON **arg_json)
     FATAL("cJSON error", EXIT_FAILURE)
   }
 
-  BDESTROY(space)
-
-  BDESTROY(newline)
-
   BDESTROY(string)
 }
 
-cJSON *cJSON_FindItemInObject(cJSON *object, char *name)
+cJSON *cJSON_FindItemInObject(cJSON *object, char *arg_name)
 {
   cJSON *result = NULL;
 
@@ -275,7 +278,7 @@ cJSON *cJSON_FindItemInObject(cJSON *object, char *name)
 
   cJSON_ArrayForEach(entry, object)
   {
-    if (compat_strcasecmp(entry->string, name) == 0)
+    if (compat_strcasecmp(entry->string, arg_name) == 0)
     {
       result = entry;
       break;

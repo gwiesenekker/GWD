@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define LOG_PREFIX_ID "LOG_prefix_id"
@@ -21,6 +21,8 @@ local my_mutex_t my_printf_mutex;
 void my_printf(void *self, char *arg_format, ...)
 {
   my_printf_t *object = self;
+
+  if (object->my_printf_verbose == 0) return;
 
   if (object == NULL)
   {
@@ -67,7 +69,7 @@ void my_printf(void *self, char *arg_format, ...)
 
   bvformata(ret, object->my_printf_bbuffer, arg_format, arg_format);
 
-  HARDBUG(ret != BSTR_OK)
+  HARDBUG(ret == BSTR_ERR)
 
   bstring bline;
 
@@ -124,19 +126,19 @@ void my_printf(void *self, char *arg_format, ...)
         {
           HARDBUG(bformata(bold_path, "%s-%d",
                            bdata(object->my_printf_bname),
-                           irotate - 1) != BSTR_OK)
+                           irotate - 1) == BSTR_ERR)
         }
         else
         {
           HARDBUG(bformata(bold_path, "%s",
-                           bdata(object->my_printf_bname)) != BSTR_OK)
+                           bdata(object->my_printf_bname)) == BSTR_ERR)
         }
 
         btrunc(bnew_path, 0);
 
         HARDBUG(bformata(bnew_path, "%s-%d",
                          bdata(object->my_printf_bname),
-                         irotate) != BSTR_OK)
+                         irotate) == BSTR_ERR)
   
         //ignore return value of remove as file might not exist
 
@@ -176,8 +178,8 @@ void my_printf(void *self, char *arg_format, ...)
       object->my_printf_fsize = nchar;
     }
 
-    HARDBUG(bassignmidstr(bline, object->my_printf_bbuffer, 0, ichar + 1) !=
-            BSTR_OK)
+    HARDBUG(bassignmidstr(bline, object->my_printf_bbuffer, 0, ichar + 1) ==
+            BSTR_ERR)
 
     int nchar = fprintf(object->my_printf_flog, "%s@ %s",
                         time_stamp, bdata(bline));
@@ -290,12 +292,12 @@ void construct_my_printf(void *self, char *arg_prefix, int arg2stdout)
 
   if (my_mpi_globals.MY_MPIG_nglobal <= 1)
     HARDBUG(bformata(object->my_printf_bname,
-                     LOGS_DIR "/%s%d.txt", arg_prefix, object_id) != BSTR_OK)
+                     LOGS_DIR "/%s%d.txt", arg_prefix, object_id) == BSTR_ERR)
   else
     HARDBUG(bformata(object->my_printf_bname,
                      LOGS_DIR "/%s%d-%d-%d.txt", arg_prefix, object_id,
                      my_mpi_globals.MY_MPIG_id_global,
-                     my_mpi_globals.MY_MPIG_nglobal) != BSTR_OK)
+                     my_mpi_globals.MY_MPIG_nglobal) == BSTR_ERR)
 
   if ((object->my_printf_flog =
        fopen(bdata(object->my_printf_bname), "w")) == NULL)
@@ -333,6 +335,8 @@ void construct_my_printf(void *self, char *arg_prefix, int arg2stdout)
   object_id++;
 
   set_field(with_record, LOG_OBJECT_ID, &object_id);
+
+  object->my_printf_verbose = 1;
 
   HARDBUG(compat_mutex_init(&(object->my_printf_mutex)) != 0)
 }

@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define the_dir(X) cat2(X, _dir)
@@ -19,6 +19,140 @@
 
 local int white_dir[4] = {-6, -5, 5, 6};
 local int black_dir[4] = {5, 6, -6, -5};
+
+//we always have to update the mask
+//not always the input
+
+void update_patterns_and_layer0(board_t *self,
+  int arg_colour2move, int arg_iboard, int arg_delta)
+{
+  board_t *object = self;
+
+  //loop over all patterns in which iboard occurs
+
+  patterns_t *with_patterns = object->board_network.network_patterns;
+
+  for (int ipattern = 0; ipattern < with_patterns->npatterns; ipattern++)
+  {
+    int jpattern = with_patterns->patterns_map[arg_iboard][ipattern];
+
+    //last pattern
+
+    if (jpattern == INVALID) break;
+
+    //iboard occurs in pattern jpattern
+
+    pattern_t *with_pattern = with_patterns->patterns + jpattern;
+
+    //*mask is the current occupation of pattern jpattern
+    //as iboard occurs in pattern jpattern *with will always be updated
+    //if delta > 0 an empty square will be removed and
+    //a white man or black man will be added
+    //if delta < 0 a white man or black man will be removed and
+    //an empty square will be added
+
+    int *mask = object->board_pattern_mask->PM_mask + jpattern;
+
+    //we only have to update the associated input if
+    //the current and/or the next occupation are valid
+
+    int input = with_pattern->P_mask2inputs[*mask];
+
+    if (input == INVALID)
+    {
+      //there is no input associated with the current occupation
+
+      HARDBUG((*mask & with_pattern->P_valid_mask)
+              == with_pattern->P_valid_mask)
+    }
+    else
+    {
+      //there is an input associated with the current occupation
+
+      //valid or NINPUTS_MAX
+
+      HARDBUG((*mask & with_pattern->P_valid_mask) != with_pattern->P_valid_mask)
+
+      if (input != NINPUTS_MAX)
+      {
+        if (object->board_network.network_inputs[input] == 1)
+        {
+          update_layer0(&(object->board_network), input, -1);
+        }
+      }
+    }
+
+    int nshift =
+      (arg_iboard - with_patterns->patterns[jpattern].P_root_square) * 4;
+
+    HARDBUG(nshift < 0)
+    HARDBUG(nshift > 60)
+
+    int ilinear =
+      (with_pattern->P_square2linear >> nshift) & 0xF;
+
+    HARDBUG(ilinear >= with_pattern->P_nlinear)
+
+    if (IS_WHITE(arg_colour2move))
+    {
+      if (arg_delta > 0)
+      {
+        HARDBUG((*mask & (MASK_EMPTY << (2 * ilinear))) !=
+                (MASK_EMPTY << (2 * ilinear)))
+
+        *mask ^= (MASK_EMPTY << (2 * ilinear));
+        *mask |= (MASK_WHITE_MAN << (2 * ilinear));
+      }
+      else
+      {
+        HARDBUG((*mask & (MASK_WHITE_MAN << (2 * ilinear))) !=
+                (MASK_WHITE_MAN << (2 * ilinear)))
+
+        *mask ^= (MASK_WHITE_MAN << (2 * ilinear));
+        *mask |= (MASK_EMPTY << (2 * ilinear));
+      }
+    }
+    else
+    {
+      if (arg_delta > 0)
+      {
+        HARDBUG((*mask & (MASK_EMPTY << (2 * ilinear))) !=
+                (MASK_EMPTY << (2 * ilinear)))
+
+        *mask ^= (MASK_EMPTY << (2 * ilinear));
+        *mask |= (MASK_BLACK_MAN << (2 * ilinear));
+      }
+      else
+      {
+        HARDBUG((*mask & (MASK_BLACK_MAN << (2 * ilinear))) !=
+                (MASK_BLACK_MAN << (2 * ilinear)))
+
+        *mask ^= (MASK_BLACK_MAN << (2 * ilinear));
+        *mask |= (MASK_EMPTY << (2 * ilinear));
+      }
+    }
+
+    input = with_pattern->P_mask2inputs[*mask];
+
+    if ((*mask & with_pattern->P_valid_mask) == with_pattern->P_valid_mask)
+    {
+      HARDBUG(input == INVALID)
+
+      //valid or NINPUTS_MAX
+
+      if (input != NINPUTS_MAX)
+      {
+        HARDBUG(object->board_network.network_inputs[input] != 0)
+
+        update_layer0(&(object->board_network), input, 1);
+      }
+    }
+    else
+    {
+      HARDBUG(input != INVALID)
+    }
+  }
+}
 
 #define MY_BIT      WHITE_BIT
 #define YOUR_BIT    BLACK_BIT
@@ -44,34 +178,34 @@ local int black_dir[4] = {5, 6, -6, -5};
 #undef my_colour
 #undef your_colour
 
-void move2bstring(void *self, int imove, bstring move_string)
+void move2bstring(void *self, int arg_imove, bstring arg_bmove_string)
 {
   moves_list_t *object = self;
 
-  HARDBUG(imove < 0)
+  HARDBUG(arg_imove < 0)
 
-  HARDBUG(imove >= object->nmoves)
+  HARDBUG(arg_imove >= object->nmoves)
 
-  move_t *move = object->moves + imove;
+  move_t *move = object->moves + arg_imove;
    
   int iboard = move->move_from;
   int kboard = move->move_to;
 
-  btrunc(move_string, 0);
+  btrunc(arg_bmove_string, 0);
 
   ui64_t captures_bb = move->move_captures_bb;
 
   if (captures_bb == 0)
-    HARDBUG(bformata(move_string, "%s-%s",
-                     nota[iboard], nota[kboard]) != BSTR_OK)
+    HARDBUG(bformata(arg_bmove_string, "%s-%s",
+                     nota[iboard], nota[kboard]) == BSTR_ERR)
   else
   {
     int jboard = BIT_CTZ(captures_bb);
    
     captures_bb &= ~BITULL(jboard);
 
-    HARDBUG(bformata(move_string, "%sx%sx%s",
-                     nota[iboard], nota[kboard], nota[jboard]) != BSTR_OK)
+    HARDBUG(bformata(arg_bmove_string, "%sx%sx%s",
+                     nota[iboard], nota[kboard], nota[jboard]) == BSTR_ERR)
 
     while(captures_bb != 0)
     {
@@ -79,12 +213,12 @@ void move2bstring(void *self, int imove, bstring move_string)
 
       captures_bb &= ~BITULL(jboard);
 
-      HARDBUG(bformata(move_string, "x%s", nota[jboard]) != BSTR_OK)
+      HARDBUG(bformata(arg_bmove_string, "x%s", nota[jboard]) == BSTR_ERR)
     }
   }
 }
 
-local int move2ints(bstring bmove, int m[50])
+local int move2ints(bstring arg_bmove, int arg_m[50])
 {
   BSTRING(bsplit)
 
@@ -92,13 +226,17 @@ local int move2ints(bstring bmove, int m[50])
 
   struct bstrList *btokens;
   
-  HARDBUG((btokens = bsplits(bmove, bsplit)) == NULL)
+  HARDBUG((btokens = bsplits(arg_bmove, bsplit)) == NULL)
 
   HARDBUG(btokens->qty > 50)
 
   for (int itoken = 0; itoken < btokens->qty; itoken++)
   {
-    HARDBUG(sscanf(bdata(btokens->entry[itoken]), "%d", m + itoken) != 1)
+    if (sscanf(bdata(btokens->entry[itoken]), "%d", arg_m + itoken) != 1)
+    {
+      PRINTF("bmove=%s\n", bdata(arg_bmove));
+      FATAL("eh?", EXIT_FAILURE)
+    }
   }
 
   int result = btokens->qty;
@@ -110,7 +248,7 @@ local int move2ints(bstring bmove, int m[50])
   return(result);
 }
 
-int search_move(void *self, bstring barg_move)
+int search_move(void *self, bstring arg_bmove)
 {
   moves_list_t *object = self;
 
@@ -120,7 +258,7 @@ int search_move(void *self, bstring barg_move)
 
   int m1[50];
 
-  int n1 = move2ints(barg_move, m1);
+  int n1 = move2ints(arg_bmove, m1);
 
   if (n1 < 2) return(INVALID);
 
@@ -168,36 +306,36 @@ int search_move(void *self, bstring barg_move)
   return(ihit);  
 }
 
-void gen_moves(board_t *with, moves_list_t *moves_list, int quiescence)
+void gen_moves(board_t *object, moves_list_t *arg_moves_list, int arg_quiescence)
 {
-  if (IS_WHITE(with->board_colour2move))
-    gen_white_moves(with, moves_list, quiescence);
+  if (IS_WHITE(object->board_colour2move))
+    gen_white_moves(object, arg_moves_list, arg_quiescence);
   else
-    gen_black_moves(with, moves_list, quiescence);
+    gen_black_moves(object, arg_moves_list, arg_quiescence);
 }
 
-void do_move(board_t *with, int imove, moves_list_t *moves_list)
+void do_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list)
 {
-  if (IS_WHITE(with->board_colour2move))
-    do_white_move(with, imove, moves_list);
+  if (IS_WHITE(object->board_colour2move))
+    do_white_move(object, arg_imove, arg_moves_list, FALSE);
   else
-    do_black_move(with, imove, moves_list);
+    do_black_move(object, arg_imove, arg_moves_list, FALSE);
 }
 
-void undo_move(board_t *with, int imove, moves_list_t *moves_list)
+void undo_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list)
 {
-  if (IS_WHITE(with->board_colour2move))
-    undo_black_move(with, imove, moves_list);
+  if (IS_WHITE(object->board_colour2move))
+    undo_black_move(object, arg_imove, arg_moves_list, FALSE);
   else
-    undo_white_move(with, imove, moves_list);
+    undo_white_move(object, arg_imove, arg_moves_list, FALSE);
 }
 
-void check_moves(board_t *with, moves_list_t *moves_list)
+void check_moves(board_t *object, moves_list_t *arg_moves_list)
 {
-  if (IS_WHITE(with->board_colour2move))
-    check_white_moves(with, moves_list);
+  if (IS_WHITE(object->board_colour2move))
+    check_white_moves(object, arg_moves_list);
   else
-    check_black_moves(with, moves_list);
+    check_black_moves(object, arg_moves_list);
 }
 
 void construct_moves_list(void *self)
@@ -236,4 +374,3 @@ void fprintf_moves_list(void *self, my_printf_t *arg_my_printf,
 
   BDESTROY(bmove_string)
 }
-

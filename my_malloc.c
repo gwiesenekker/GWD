@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define NPAD (4 * 64)
@@ -13,6 +13,7 @@ typedef struct
   int MM_line;
   i64_t MM_size;
 
+  void *MM_heap;
   void *MM_pointer;
 
   int MM_pad;
@@ -52,7 +53,7 @@ local my_mutex_t my_leak_mutex;
 
 void register_pointer(char *arg_name,
   char *arg_file, const char *arg_func, int arg_line,
-  void *arg_pointer, size_t arg_size, int arg_pad, int arg_read_only)
+  void *arg_heap, size_t arg_size, int arg_pad, int arg_read_only)
 {
   HARDBUG(my_mallocs == NULL)
 
@@ -86,25 +87,27 @@ void register_pointer(char *arg_name,
 
   object->MM_pad = arg_pad;
 
+  object->MM_heap = arg_heap;
+
   if (!arg_pad)
   {
-    object->MM_pointer = arg_pointer;
+    object->MM_pointer = arg_heap;
 
     object->MM_prefix = object->MM_postfix = NULL;
     object->MM_prefix_crc64 = object->MM_postfix_crc64 = 0;
   }
   else
   {
-    object->MM_prefix = arg_pointer;
+    object->MM_prefix = arg_heap;
 
     for (int i = 0; i < NPAD; i++)
       object->MM_prefix[i] = return_my_random(&my_malloc_random) % 256;
 
     object->MM_prefix_crc64 = return_crc64(object->MM_prefix, NPAD, TRUE);
 
-    object->MM_pointer = arg_pointer + NPAD;
+    object->MM_pointer = (char *) arg_heap + NPAD;
 
-    object->MM_postfix = arg_pointer + NPAD + object->MM_size;
+    object->MM_postfix = (ui8_t *) ((char *) arg_heap + NPAD + object->MM_size);
 
     for (int i = 0; i < NPAD; i++)
       object->MM_postfix[i] = return_my_random(&my_malloc_random) % 256;
@@ -117,11 +120,99 @@ void register_pointer(char *arg_name,
   object->MM_crc64 = 0;
 
   if (arg_read_only)
-    object->MM_crc64 = return_crc64(arg_pointer, arg_size, TRUE);
+    object->MM_crc64 = return_crc64(arg_heap, arg_size, TRUE);
 
   nmy_mallocs++;
 
   HARDBUG(compat_mutex_unlock(&my_malloc_mutex) != 0)
+}
+
+void *deregister_pointer(void *arg_pointer)
+{
+  HARDBUG(my_mallocs == NULL)
+
+  HARDBUG(compat_mutex_lock(&my_malloc_mutex) != 0)
+
+  HARDBUG(nmy_mallocs <= 0)
+
+  void *result = NULL;
+
+  int imalloc;
+
+  for (imalloc = 0; imalloc < nmy_mallocs; imalloc++)
+  {
+    my_malloc_t *object = my_mallocs + imalloc;
+
+    if (object->MM_pointer != arg_pointer) continue;
+
+    result = object->MM_heap;
+
+    if (object->MM_pad)
+    {
+      if (object->MM_prefix_crc64 !=
+          return_crc64(object->MM_prefix, NPAD, TRUE))
+      {
+        PRINTF("WARNING: PREFIX BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+
+        result = NULL;
+
+        break;
+      }
+      else
+      {
+        PRINTF("PREFIX BLOCK %s OK!\n", bdata(object->MM_name));
+      }
+
+      if (object->MM_postfix_crc64 !=
+          return_crc64(object->MM_postfix, NPAD, TRUE))
+      {
+        PRINTF("WARNING: POSTFIX BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+ 
+        result = NULL;
+
+        break;
+      }
+      else
+      {
+        PRINTF("POSTFIX BLOCK %s OK!\n", bdata(object->MM_name));
+      }
+    }
+   
+    if (object->MM_read_only)
+    {
+      if (object->MM_crc64 !=
+          return_crc64(object->MM_pointer, object->MM_size, TRUE))
+      {
+        PRINTF("WARNING: READONLY BLOCK %s CORRUPT!\n",
+               bdata(object->MM_name));
+
+        result = NULL;
+
+        break;
+      }
+      else
+      {
+        PRINTF("READONLY BLOCK %s(%llX) OK!\n",
+               bdata(object->MM_name), object->MM_crc64);
+      }
+    }
+
+
+    break;
+  }
+
+  HARDBUG(imalloc >= nmy_mallocs)
+
+  --nmy_mallocs;
+
+  HARDBUG(nmy_mallocs < 0)
+
+  if (imalloc != nmy_mallocs)
+    my_mallocs[imalloc] = my_mallocs[nmy_mallocs];
+
+  HARDBUG(compat_mutex_unlock(&my_malloc_mutex) != 0)
+
+  return(result);
 }
 
 void *my_malloc(char *arg_name, char *arg_file, const char *arg_func,
@@ -142,7 +233,16 @@ void *my_malloc(char *arg_name, char *arg_file, const char *arg_func,
   register_pointer(arg_name, arg_file, arg_func, arg_line,
     result, arg_size, TRUE, FALSE);
 
-  return(result + NPAD);
+  return((char *) result + NPAD);
+}
+
+void my_free(void *arg_pointer)
+{
+  void *heap;
+
+  HARDBUG((heap = deregister_pointer(arg_pointer)) == NULL)
+ 
+  FREE(heap)
 }
 
 void print_my_leaks(int arg_all)
@@ -301,7 +401,7 @@ local void heap_sort_i64(i64_t n, i64_t *p, i64_t *a)
   for (i = 0; i < m - 1; i++) HARDBUG(a[p[i]] < a[p[i + 1]])
 }
 
-void fin_my_malloc(int verbose)
+void fin_my_malloc(int arg_verbose)
 {
   int corrupt = FALSE;
 
@@ -335,7 +435,7 @@ void fin_my_malloc(int verbose)
 
     S_total_size += object->MM_size;
 
-    if (verbose)
+    if (arg_verbose)
       PRINTF("imalloc=%d name=%s file=%s func=%s line=%d size=%lld\n",
              imalloc,
              bdata(object->MM_name),
@@ -353,6 +453,7 @@ void fin_my_malloc(int verbose)
  
         corrupt = TRUE;
       }
+
       if (object->MM_postfix_crc64 !=
           return_crc64(object->MM_postfix, NPAD, TRUE))
       {
@@ -367,13 +468,14 @@ void fin_my_malloc(int verbose)
       if (object->MM_crc64 !=
           return_crc64(object->MM_pointer, object->MM_size, TRUE))
       {
-        PRINTF("WARNING: BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+        PRINTF("WARNING: READONLY BLOCK %s CORRUPT!\n", bdata(object->MM_name));
   
         corrupt = TRUE;
       }
-      PRINTF("BLOCK %s(%llX) OK!\n", bdata(object->MM_name), object->MM_crc64);
+      PRINTF("READONLY BLOCK %s(%llX) OK!\n", bdata(object->MM_name), object->MM_crc64);
     }
   }
+
   if (corrupt) FATAL("BLOCK(S) CORRUPTED", EXIT_FAILURE)
 
   PRINTF("nmy_mallocs=%d S_total_size=%lld(%lld MB)\n",
@@ -393,7 +495,7 @@ void fin_my_malloc(int verbose)
            object->MM_line,
            object->MM_size);
 
-    if (!verbose and (object->MM_size < MBYTE)) break;
+    if (!arg_verbose and (object->MM_size < MBYTE)) break;
   }
 
   if (nmy_leaks > 0)

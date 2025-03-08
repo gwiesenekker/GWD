@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 void construct_my_cjson(void *self)
@@ -7,18 +7,18 @@ void construct_my_cjson(void *self)
 
   HARDBUG((object->MCJ_cjson = cJSON_CreateObject()) == NULL)
 
-  HARDBUG((object->MCJ_bcjson = bfromcstr("")) == NULL)
+  HARDBUG((object->MCJ_bstring = bfromcstr("")) == NULL)
 }
 
-void my_cjson_add_number(void *self, char *arg_id, int arg_number)
+void my_cjson_add_int(void *self, char *arg_id, int arg_int)
 {
   my_cjson_t *object = self;
 
-  HARDBUG(cJSON_AddNumberToObject(object->MCJ_cjson, arg_id, arg_number) == 
+  HARDBUG(cJSON_AddNumberToObject(object->MCJ_cjson, arg_id, arg_int) == 
           NULL)
 }
 
-void my_cjson_set_number(void *self, char *arg_id, int arg_number)
+void my_cjson_set_int(void *self, char *arg_id, int arg_int)
 {
   my_cjson_t *object = self;
 
@@ -29,10 +29,10 @@ void my_cjson_set_number(void *self, char *arg_id, int arg_number)
 
   HARDBUG(!cJSON_IsNumber(number))
 
-  cJSON_SetNumberValue(number, arg_number);
+  cJSON_SetNumberValue(number, arg_int);
 }
 
-int my_cjson_get_number(void *self, char *arg_id)
+int my_cjson_get_int(void *self, char *arg_id)
 {
   my_cjson_t *object = self;
 
@@ -46,9 +46,60 @@ int my_cjson_get_number(void *self, char *arg_id)
    return(round(cJSON_GetNumberValue(number)));
 }
 
-void my_cjon2string(void *self)
+void my_cjson_add_cstring(void *self, char *arg_id, char *arg_cstring)
 {
+  my_cjson_t *object = self;
+
+  HARDBUG(cJSON_AddStringToObject(object->MCJ_cjson, arg_id, arg_cstring) == 
+          NULL)
 }
+
+void my_cjson_set_cstring(void *self, char *arg_id, char *arg_cstring)
+{
+  my_cjson_t *object = self;
+
+  cJSON *cstring;
+
+  HARDBUG((cstring = cJSON_GetObjectItem(object->MCJ_cjson, arg_id)) ==
+          NULL)
+
+  HARDBUG(!cJSON_IsString(cstring))
+
+  cJSON_SetValuestring(cstring, arg_cstring);
+}
+
+char *my_cjson_get_cstring(void *self, char *arg_id)
+{
+  my_cjson_t *object = self;
+
+  cJSON *cstring;
+
+  HARDBUG((cstring = cJSON_GetObjectItem(object->MCJ_cjson, arg_id)) == 
+          NULL)
+
+  HARDBUG(!cJSON_IsString(cstring))
+
+   return(cJSON_GetStringValue(cstring));
+}
+
+char *my_cjson2cstring(void *self)
+{
+  my_cjson_t *object = self;
+
+  char *cstring;
+
+  HARDBUG((cstring = cJSON_PrintUnformatted(object->MCJ_cjson)) == NULL)
+
+  HARDBUG(bassigncstr(object->MCJ_bstring, cstring) == BSTR_ERR)
+
+  free(cstring);
+
+  return(bdata(object->MCJ_bstring));
+
+}
+
+#define CJSON_ID_NAME "name"
+#define CJSON_ID_INT "int"
 
 void test_my_cjson(void)
 {
@@ -58,16 +109,26 @@ void test_my_cjson(void)
 
   construct_my_cjson(&test);
 
-  my_cjson_add_number(&test, "n", 65);
+  PRINTF("test=%s\n", my_cjson2cstring(&test));
 
-  int  n = my_cjson_get_number(&test, "n");
+  my_cjson_add_cstring(&test, CJSON_ID_NAME, "n");
+  my_cjson_add_int(&test, CJSON_ID_INT, 65);
 
-  PRINTF("n=%d\n", n);
+  PRINTF("test=%s\n", my_cjson2cstring(&test));
 
-  my_cjson_set_number(&test, "n", 130);
+  char *c  = my_cjson_get_cstring(&test, CJSON_ID_NAME);
+  int n = my_cjson_get_int(&test, CJSON_ID_INT);
 
-  n = my_cjson_get_number(&test, "n");
+  PRINTF("c=%s n=%d\n", c, n);
 
-  PRINTF("n=%d\n", n);
+  my_cjson_set_cstring(&test, CJSON_ID_NAME, "n updated");
+  my_cjson_set_int(&test, CJSON_ID_INT, 130);
+
+  PRINTF("test=%s\n", my_cjson2cstring(&test));
+
+  c  = my_cjson_get_cstring(&test, CJSON_ID_NAME);
+  n = my_cjson_get_int(&test, CJSON_ID_INT);
+
+  PRINTF("c=%s n=%d\n", c, n);
 }
 

@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef UtilsH
 #define UtilsH
 
@@ -18,6 +18,7 @@ void init_crc32(ui32_t *);
 void update_crc32(ui32_t *, void *, ui32_t);
 ui32_t return_crc32(void *, ui32_t);
 ui64_t return_crc64(void *, ui64_t, int);
+void file2bstring(char *, bstring);
 void file2cjson(char *, cJSON **);
 cJSON *cJSON_FindItemInObject(cJSON *, char *);
 

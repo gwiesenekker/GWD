@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define THREAD_ALPHA_BETA_MASTER 0
@@ -37,7 +37,7 @@ local void solve_problems(void *self, char *arg_name)
 
     HARDBUG(sscanf(bdata(bline), "%[^\n]", cfen) != 1)
 
-    HARDBUG(bassigncstr(bfen, cfen) != BSTR_OK)
+    HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
     CDESTROY(cfen)
 
@@ -66,7 +66,7 @@ local void solve_problems(void *self, char *arg_name)
 
     my_printf(&(object->thread_my_printf), "problem #%d\n", nproblems);
 
-    fen2board(&(object->thread_search.S_board), bdata(bfen));
+    fen2board(&(object->thread_search.S_board), bdata(bfen), TRUE);
 
     board_t *with_board = &(object->thread_search.S_board);
 
@@ -121,7 +121,7 @@ local void solve_problems(void *self, char *arg_name)
   BSTRING(btext)
 
   HARDBUG(bformata(btext, "solved %d out of %d problems",
-                   nsolved, nproblems) != BSTR_OK)
+                   nsolved, nproblems) == BSTR_ERR)
 
   enqueue(&main_queue, MESSAGE_INFO, bdata(btext));
 
@@ -264,7 +264,7 @@ local void thread_func_alpha_beta_master(void *self)
         HARDBUG(bformata(btext, "%s %d %d",
                          bdata(bmove_string),
                          object->thread_search.S_best_score,
-                         object->thread_search.S_best_depth) != BSTR_OK)
+                         object->thread_search.S_best_depth) == BSTR_ERR)
       
         enqueue(&main_queue, MESSAGE_RESULT, bdata(btext));
 
@@ -307,7 +307,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
           bdata(message.message_text));
 
         fen2board(&(object->thread_search.S_board),
-                  bdata(message.message_text));
+                  bdata(message.message_text), TRUE);
 
         print_board(&(object->thread_search.S_board));
       }
@@ -379,7 +379,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
                          &depth_min, &depth_max,
                          &root_score, &minimal_window) != 5)
 
-          HARDBUG(bassigncstr(bmove_string, cmove_string) != BSTR_OK)
+          HARDBUG(bassigncstr(bmove_string, cmove_string) == BSTR_ERR)
 
           CDESTROY(cmove_string)
             
@@ -527,7 +527,7 @@ local void *thread_func(void *self)
 
   BSTRING(bname)
 
-  HARDBUG(bformata(bname, "thread-%#lX", compat_pthread_self()) != BSTR_OK)
+  HARDBUG(bformata(bname, "thread-%#lX", compat_pthread_self()) == BSTR_ERR)
 
   construct_my_timer(&(object->thread_idle_timer), bdata(bname),
     &(object->thread_my_printf), FALSE);
@@ -577,7 +577,7 @@ local void create_thread(void *self, int arg_role)
 
   BSTRING(queue_name)
 
-  HARDBUG(bformata(queue_name, "thread-%p", self) != BSTR_OK)
+  HARDBUG(bformata(queue_name, "thread-%p", self) == BSTR_ERR)
 
   construct_queue(&(object->thread_queue), bdata(queue_name),
                   &(object->thread_my_printf));

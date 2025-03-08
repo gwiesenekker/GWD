@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef MyPrintfH
 #define MyPrintfH
 
@@ -15,6 +15,8 @@ typedef struct
   bstring my_printf_bbuffer;
 
   my_mutex_t my_printf_mutex;
+
+  int my_printf_verbose;
 } my_printf_t;
 
 //my_printf.c

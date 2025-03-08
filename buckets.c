@@ -1,5 +1,7 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
+
+#undef WEIBULL
 
 void clear_bucket(void *self)
 {
@@ -9,19 +11,19 @@ void clear_bucket(void *self)
    object->buckets[ibucket] = 0;
 }
 
-void update_bucket(void *self, double value)
+void update_bucket(void *self, double arg_value)
 {
   bucket_t *object = self;
 
-  if (value < object->bucket_min)
+  if (arg_value < object->bucket_min)
     object->bucket_nlt_min++;
-  else if (value >= object->bucket_max)
+  else if (arg_value >= object->bucket_max)
     object->bucket_nge_max++;
   else
   {
     if (object->bucket_scale == BUCKET_LINEAR)
     {
-      i64_t ibucket = floor((value - object->bucket_min) /
+      i64_t ibucket = floor((arg_value - object->bucket_min) /
                             object->bucket_size);
 
       if (ibucket >= object->nbuckets) ibucket = object->nbuckets - 1;
@@ -37,7 +39,7 @@ void update_bucket(void *self, double value)
 
       while(TRUE)
       {
-        if ((value >= bucket_min) and (value < bucket_max)) break;
+        if ((arg_value >= bucket_min) and (arg_value < bucket_max)) break;
 
         ibucket++;
 
@@ -57,25 +59,30 @@ void printf_bucket(void *self)
 {
   bucket_t *object = self;
 
+  PRINTF("bucket_name=%s\n", bdata(object->bucket_name));
   PRINTF("bucket_size=%.2f\n", object->bucket_size);
   PRINTF("bucket_min=%.2f\n", object->bucket_min);
   PRINTF("bucket_max=%.2f\n", object->bucket_max);
   PRINTF("nbuckets=%lld\n", (i64_t) object->nbuckets);
 
-  i64_t bucket_total_sum = 0;
+  i64_t bucket_total_sum = object->bucket_nlt_min;
 
   for (int ibucket = 0; ibucket < object->nbuckets; ibucket++)
     bucket_total_sum += object->buckets[ibucket];
+
+  bucket_total_sum += object->bucket_nge_max;
 
   PRINTF("bucket_total_sum=%lld\n", bucket_total_sum);
 
   i64_t bucket_partial_sum = object->bucket_nlt_min;
 
+#ifndef WEIBULL
   PRINTF("< o-o, %.2f>: %10lld %5.2f %10lld %5.2f\n", object->bucket_min,
-   object->bucket_nlt_min, 
+   object->bucket_nlt_min,
    100.0 * object->bucket_nlt_min / bucket_total_sum,
    bucket_partial_sum,
    100.0 * bucket_partial_sum / bucket_total_sum);
+#endif
 
   int nzero = 0;
 
@@ -122,46 +129,55 @@ void printf_bucket(void *self)
 
     bucket_partial_sum += object->buckets[ibucket];
 
+#ifdef WEIBULL
+    PRINTF("%.2f %.4f\n", bucket_min,
+      1.0 * object->buckets[ibucket] / bucket_total_sum);
+#else
     PRINTF("[%.2f, %.2f>: %10lld %5.2f %10lld %5.2f\n", bucket_min, bucket_max,
       object->buckets[ibucket],
       100.0 * object->buckets[ibucket] / bucket_total_sum,
       bucket_partial_sum,
       100.0 * bucket_partial_sum / bucket_total_sum);
+#endif
   }
 
   bucket_partial_sum += object->bucket_nge_max;
 
+#ifndef WEIBULL
   PRINTF("[%.2f, o-o>: %10lld %5.2f %10lld %5.2f\n", object->bucket_max,
-   object->bucket_nge_max, 
+   object->bucket_nge_max,
    100.0 * object->bucket_nge_max / bucket_total_sum,
    bucket_partial_sum,
    100.0 * bucket_partial_sum / bucket_total_sum);
+#endif
 }
 
-void construct_bucket(void *self, double bucket_size,
-  double bucket_min, double bucket_max, int bucket_scale)
+void construct_bucket(void *self, char *arg_bucket_name,
+  double arg_bucket_size, double arg_bucket_min, double arg_bucket_max, int arg_bucket_scale)
 {
   bucket_t *object = self;
 
-  HARDBUG(bucket_size <= 0.0)
+  HARDBUG(arg_bucket_size <= 0.0)
 
-  HARDBUG(bucket_min >= bucket_max)
+  HARDBUG(arg_bucket_min >= arg_bucket_max)
 
-  object->bucket_size = bucket_size;
-  object->bucket_min = bucket_min;
-  object->bucket_max = bucket_max;
-  object->bucket_scale = bucket_scale;
+  HARDBUG((object->bucket_name = bfromcstr(arg_bucket_name)) == NULL)
+
+  object->bucket_size = arg_bucket_size;
+  object->bucket_min = arg_bucket_min;
+  object->bucket_max = arg_bucket_max;
+  object->bucket_scale = arg_bucket_scale;
 
   object->bucket_nlt_min = 0;
   object->bucket_nge_max = 0;
 
   if (object->bucket_scale == BUCKET_LINEAR)
-    object->nbuckets = (bucket_max - bucket_min) / bucket_size;
+    object->nbuckets = (arg_bucket_max - arg_bucket_min) / arg_bucket_size;
   else if (object->bucket_scale == BUCKET_LOG)
   {
     object->nbuckets = 1;
 
-    while((bucket_min + pow(bucket_size, object->nbuckets)) < bucket_max)
+    while((arg_bucket_min + pow(arg_bucket_size, object->nbuckets)) < arg_bucket_max)
       object->nbuckets++;
   }
   else
@@ -171,6 +187,21 @@ void construct_bucket(void *self, double bucket_size,
 
   for (int ibucket = 0; ibucket < object->nbuckets; ibucket++)
    object->buckets[ibucket] = 0;
+}
+
+void my_mpi_bucket_aggregate(void *self, MPI_Comm arg_comm)
+{
+  if (arg_comm == MPI_COMM_NULL) return;
+
+  bucket_t *object = self;
+
+  my_mpi_allreduce(MPI_IN_PLACE, &(object->bucket_nlt_min), 1,
+    MPI_LONG_LONG_INT, MPI_SUM, arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE, &(object->bucket_nge_max), 1,
+    MPI_LONG_LONG_INT, MPI_SUM, arg_comm);
+
+  my_mpi_allreduce(MPI_IN_PLACE, object->buckets, object->nbuckets,
+    MPI_LONG_LONG_INT, MPI_SUM, arg_comm);
 }
 
 #define NTEST 1000000
@@ -189,7 +220,7 @@ void test_buckets(void)
 
   bucket_t a;
 
-  construct_bucket(&a, 0.1, -1.0, 1.0, BUCKET_LINEAR);
+  construct_bucket(&a, "a", 0.1, -1.0, 1.0, BUCKET_LINEAR);
 
   for (int i = 0; i < ntest; i++)
   {
@@ -203,7 +234,7 @@ void test_buckets(void)
 
   bucket_t b;
 
-  construct_bucket(&b, 10, 0, ntest, BUCKET_LOG);
+  construct_bucket(&b, "b", 10, 0, ntest, BUCKET_LOG);
 
   for (int i = 0; i < ntest; i++)
   {

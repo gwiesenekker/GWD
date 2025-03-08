@@ -1,225 +1,144 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
-#undef SIGMOID
+#define NRETRIES 5
 
-#define TOKEN_ERROR           (-1)
-#define TOKEN_READY           0
-#define TOKEN_LSQUARE_BRACKET 1
-#define TOKEN_RSQUARE_BRACKET 2
-#define TOKEN_LCURLY_BRACKET  3
-#define TOKEN_LPARENTHESIS    4
-#define TOKEN_COLON           5
-#define TOKEN_COMMA           6
-#define TOKEN_DOT             7
-#define TOKEN_DOLLAR          8
-#define TOKEN_MOVE            9
-#define TOKEN_CAPTURE         10
-#define TOKEN_STRING          11
-#define TOKEN_RESULT          12
-#define TOKEN_INTEGER         13
-#define TOKEN_WORD            14
+#define NAG            '$'
 
-#define RESULT_WON      "1-0"
-#define RESULT_WON_ALT  "2-0"
-#define RESULT_DRAW     "1/2-1/2"
-#define RESULT_DRAW_ALT "1-1"
-#define RESULT_LOST     "0-1"
-#define RESULT_LOST_ALT "0-2"
+#define RESULT_WON     "1-0"
+#define RESULT_DRAW    "1/2-1/2"
+#define RESULT_LOST    "0-1"
 #define RESULT_UNKNOWN "*"
 
-local char *pline;
-local char token[MY_LINE_MAX];
-local int itoken;
-local char error[MY_LINE_MAX];
+#define TOKEN_SKIP    0
+#define TOKEN_MOVE    1
+#define TOKEN_WON     2
+#define TOKEN_DRAW    3
+#define TOKEN_LOST    4
+#define TOKEN_UNKNOWN 5
 
-local void get_next_token(void)
+local int get_next_token(bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
 {
-  local char *ptoken;
-  int i;
+  int result = INVALID;
 
-  ptoken = token;
-  *ptoken = '\0';
+  HARDBUG(bassigncstr(arg_btoken, "NULL") == BSTR_ERR)
 
-  while (isspace(*pline))
-    pline++;
-  if (*pline == '\0')
+  while((*arg_ichar < blength(arg_bstring)) and
+        (bchar(arg_bstring, *arg_ichar) == ' ')) (*arg_ichar)++;
+
+  if (*arg_ichar >= blength(arg_bstring)) return(result);
+
+  int jchar = *arg_ichar;
+
+  if (strncmp(bdata(arg_bstring) + jchar, RESULT_WON,
+              strlen(RESULT_WON)) == 0)
   {
-    itoken = TOKEN_READY;
-    goto label_token;
+    jchar += strlen("1-0");
+
+    result = TOKEN_WON;
+
   }
-  if (*pline == '[')
+  else if (strncmp(bdata(arg_bstring) + jchar, RESULT_DRAW,
+                   strlen(RESULT_DRAW)) == 0)
   {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_LSQUARE_BRACKET;
-    goto label_token;
+    jchar += strlen("1/2-1/2");
+
+    result = TOKEN_DRAW;
   }
-  if (*pline == ']')
+  else if (strncmp(bdata(arg_bstring) + jchar, RESULT_LOST,
+                   strlen(RESULT_LOST)) == 0)
   {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_RSQUARE_BRACKET;
-    goto label_token;
+    jchar += strlen("0-1");
+
+    result = TOKEN_LOST;
   }
-  if (*pline == '{')
+  else if (strncmp(bdata(arg_bstring) + jchar, RESULT_UNKNOWN,
+                   strlen(RESULT_UNKNOWN)) == 0)
   {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_LCURLY_BRACKET;
-    goto label_token;
+    jchar += strlen("*");
+
+    result = TOKEN_UNKNOWN;
   }
-  if (*pline == '(')
-  {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_LPARENTHESIS;
-    goto label_token;
-  }
-  if (*pline == ':')
-  {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_COLON;
-    goto label_token;
-  }
-  if (*pline == ',')
-  {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_COMMA;
-    goto label_token;
-  }
-  if (*pline == '.')
-  {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_DOT;
-    goto label_token;
-  }
-  if (*pline == '$')
-  {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_DOLLAR;
-    goto label_token;
-  }
-  if (*pline == '-')
-  {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_MOVE;
-    goto label_token;
-  }
-  if (*pline == 'x')
-  {
-    *ptoken++ = *pline++;
-    itoken = TOKEN_CAPTURE;
-    goto label_token;
-  }
-  if (*pline == '"')
-  {
-    pline++;
-    while(TRUE)
+  else if ((bchar(arg_bstring, jchar) == '"') or
+           (bchar(arg_bstring, jchar) == '[') or
+           (bchar(arg_bstring, jchar) == '(') or
+           (bchar(arg_bstring, jchar) == '{'))
+  {  
+    char bopen = bchar(arg_bstring, jchar);
+
+    char bclose = '"';
+
+    if (bopen == '[') bclose = ']';
+
+    if (bopen == '(') bclose = ')';
+
+    if (bopen == '{') bclose = '}';
+    
+    jchar++;
+
+    int nest = 1;
+
+    while(jchar < blength(arg_bstring)) 
     {
-      if (*pline == '\0')
+      if (bchar(arg_bstring, jchar) == bopen) ++nest;
+
+      if (bchar(arg_bstring, jchar) == bclose)
       {
-        snprintf(error, MY_LINE_MAX, "unterminated string");
-        itoken = TOKEN_ERROR;  
-        break;
-      }  
-      if (*pline == '"')
-      {
-        pline++;
-        itoken = TOKEN_STRING;
-        break;
+        if (--nest == 0) break;
       }
-      *ptoken++ = *pline++;
+
+      jchar++;
     }
-    goto label_token;
+    HARDBUG(nest != 0)
+
+    jchar++;
+
+    result = TOKEN_SKIP;
   }
-  if (strncmp(pline, RESULT_WON, strlen(RESULT_WON)) == 0)
-  {  
-    if (!isdigit(pline[strlen(RESULT_WON)]))
-    {
-      for (i = 0; i < strlen(RESULT_WON); i++)
-        *ptoken++ = *pline++;
-      itoken = TOKEN_RESULT;
-      goto label_token;
-    }
-  }
-  if (strncmp(pline, RESULT_WON_ALT, strlen(RESULT_WON_ALT)) == 0)
-  {  
-    if (!isdigit(pline[strlen(RESULT_WON_ALT)]))
-    {
-      for (i = 0; i < strlen(RESULT_WON_ALT); i++)
-        *ptoken++ = *pline++;
-      itoken = TOKEN_RESULT;
-      goto label_token;
-    }
-  }
-  if (strncmp(pline, RESULT_DRAW, strlen(RESULT_DRAW)) == 0)
-  {  
-    if (!isdigit(pline[strlen(RESULT_DRAW)]))
-    {
-      for (i = 0; i < strlen(RESULT_DRAW); i++)
-        *ptoken++ = *pline++;
-      itoken = TOKEN_RESULT;
-      goto label_token;
-    }
-  }
-  if (strncmp(pline, RESULT_DRAW_ALT, strlen(RESULT_DRAW_ALT)) == 0)
-  {  
-    if (!isdigit(pline[strlen(RESULT_DRAW_ALT)]))
-    {
-      for (i = 0; i < strlen(RESULT_DRAW_ALT); i++)
-        *ptoken++ = *pline++;
-      itoken = TOKEN_RESULT;
-      goto label_token;
-    }
-  }
-  if (strncmp(pline, RESULT_LOST, strlen(RESULT_LOST)) == 0)
-  {  
-    if (!isdigit(pline[strlen(RESULT_LOST)]))
-    {
-      for (i = 0; i < strlen(RESULT_LOST); i++)
-        *ptoken++ = *pline++;
-      itoken = TOKEN_RESULT;
-      goto label_token;
-    }
-  }
-  if (strncmp(pline, RESULT_LOST_ALT, strlen(RESULT_LOST_ALT)) == 0)
-  {  
-    if (!isdigit(pline[strlen(RESULT_LOST_ALT)]))
-    {
-      for (i = 0; i < strlen(RESULT_LOST_ALT); i++)
-        *ptoken++ = *pline++;
-      itoken = TOKEN_RESULT;
-      goto label_token;
-    }
-  }
-  if (strncmp(pline, RESULT_UNKNOWN, strlen(RESULT_UNKNOWN)) == 0)
-  {  
-    for (i = 0; i < strlen(RESULT_UNKNOWN); i++)
-      *ptoken++ = *pline++;
-    itoken = TOKEN_RESULT;
-    goto label_token;
-  }
-  if (isdigit(*pline))
+  else if (bchar(arg_bstring, jchar) == NAG)
   {
-    while(isdigit(*pline))
-      *ptoken++ = *pline++;
-    itoken = TOKEN_INTEGER;
-    goto label_token;
-  }
-  if (isalpha(*pline))
-  {
-    while(isalpha(*pline))
-      *ptoken++ = *pline++;
-    itoken = TOKEN_WORD;
-    goto label_token;
+    jchar++;
+
+    while ((jchar < blength(arg_bstring)) and
+           isdigit(bchar(arg_bstring, jchar))) jchar++;
+
+    result = TOKEN_SKIP;
   }
   else
   {
-    snprintf(error, MY_LINE_MAX, "invalid character '%c'", *pline);
-    itoken = TOKEN_ERROR;
+    //move number or move
+
+    //read until space or '.'
+  
+    while (jchar < blength(arg_bstring))
+    {
+      if (bchar(arg_bstring, jchar) == ' ') break;
+      if (bchar(arg_bstring, jchar) == '.') break;
+  
+      jchar++;
+    }
+  
+    result = TOKEN_MOVE;
+
+    if ((jchar < blength(arg_bstring)) and
+        (bchar(arg_bstring, jchar) == '.'))
+    {
+      jchar++;
+    
+      result = TOKEN_SKIP;
+    }
   }
-  label_token:
-  *ptoken = '\0';
+
+  HARDBUG(jchar <= *arg_ichar)
+
+  HARDBUG(bassignmidstr(arg_btoken, arg_bstring, *arg_ichar, jchar - *arg_ichar) == BSTR_ERR)
+
+  *arg_ichar = jchar;
+
+  return(result);
 }
 
-void read_games(char *name)
+void read_games(char *arg_name)
 {
   (void) remove("book.db");
 
@@ -242,355 +161,192 @@ void read_games(char *name)
 
   HARDBUG(execute_sql(db, "BEGIN TRANSACTION;", FALSE, 0) != SQLITE_OK)
 
-  FILE *fname;
+  BSTRING(string);
 
-  HARDBUG((fname = fopen(name, "r")) == NULL)
-
-  FILE *fstring;
-
-  HARDBUG((fstring = fopen("pos.str", "w")) == NULL)
+  file2bstring(arg_name, string);
 
   board_t board;
 
-  construct_board(&board, STDOUT);
+  construct_board(&board, STDOUT, FALSE);
 
   board_t *with = &board;
 
-  i64_t ngames = 0;
-  int game = FALSE;
-  int move_error = FALSE;
-  int result = INVALID;
-  int iply = 0;
-  int nply = INVALID;
+  bucket_t bucket_nman;
 
-  long iline = 0;
-  char line[MY_LINE_MAX];
-  while(fgets(line, MY_LINE_MAX, fname) != NULL)
+  bucket_t bucket_rows[NPIECES_MAX + 1];
+
+  bucket_t bucket_kings[NPIECES_MAX + 1];
+
+  construct_bucket(&bucket_nman, "bucket_nman",
+                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+    construct_bucket(bucket_rows + npieces, "bucket_rows",
+                     1, 0, 9, BUCKET_LINEAR);
+
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+    construct_bucket(bucket_kings + npieces, "bucket_kings",
+                     1, 0, NPIECES_MAX, BUCKET_LINEAR);
+
+  i64_t ngames = 0;
+  i64_t nerrors = 0;
+
+  state_t game_state;
+
+  int ichar = 0;
+
+  BSTRING(btoken)
+
+  BSTRING(bmove_string)
+
+  BSTRING(bfen)
+ 
+  while(TRUE)
   {
-    ++iline;
-    pline = line;
-    get_next_token();
+    int itoken = INVALID;
+
+    construct_state(&game_state);
+
+    //read game into game_state
+
     while(TRUE)
     {
-      if (itoken == TOKEN_ERROR)
-      {
-        PRINTF("%ld:%s\n", iline, line);
-        PRINTF("%s\n", error);
-        FATAL("error in PDN", EXIT_FAILURE)
-      }
+      //read tokens until result
 
-      if (itoken == TOKEN_READY)
-        break;
+      itoken = get_next_token(string, &ichar, btoken);
 
-      if (itoken == TOKEN_LSQUARE_BRACKET)
-      {
-        get_next_token();
-        if (itoken != TOKEN_WORD)
-        {
-          PRINTF("%ld:%s\n", iline, line);
-          FATAL("WORD expected after '[' in PDN", EXIT_FAILURE)
-        }
-        if (compat_strcasecmp(token, "Event") == 0)
-        {
-          game = TRUE;
-          iply = 0;
-          nply = INVALID;
+      if (itoken == INVALID) break;
 
-          string2board(with, STARTING_POSITION);
+      //PRINTF("itoken=%d btoken=%s\n", itoken, bdata(btoken));
 
-          get_next_token();
-          if (itoken != TOKEN_STRING)
-          {
-            PRINTF("%ld:%s\n", iline, line);
-            FATAL("STRING expected after '[WORD' in PDN", EXIT_FAILURE)
-          }
-        }
-        else if (compat_strcasecmp(token, "Result") == 0)
-        {
-          HARDBUG(!game)
-          get_next_token();
-          if (itoken != TOKEN_STRING)
-          {
-            PRINTF("%ld:%s\n", iline, line);
-            FATAL("STRING expected after '[Result' in PDN", EXIT_FAILURE)
-          } 
-          if ((compat_strcasecmp(token, RESULT_WON) == 0) or
-              (compat_strcasecmp(token, RESULT_WON_ALT) == 0))
-          {
-            result = 2;
-          }
-          else if ((compat_strcasecmp(token, RESULT_DRAW) == 0) or
-                   (compat_strcasecmp(token, RESULT_DRAW_ALT) == 0))
-          {
-            result = 1;
-          }
-          else if ((compat_strcasecmp(token, RESULT_LOST) == 0) or
-                   (compat_strcasecmp(token, RESULT_LOST_ALT) == 0))
-          {
-            result = 0;
-          }
-          else  
-          {
-            result = INVALID;
-          }
-        }
-        else if (compat_strcasecmp(token, "PlyCount") == 0)
-        {
-          HARDBUG(!game)
-          get_next_token();
-          if (itoken != TOKEN_STRING)
-          {
-            PRINTF("%ld:%s\n", iline, line);
-            FATAL("STRING expected after '[PlyCount' in PDN", EXIT_FAILURE)
-          } 
-          if (sscanf(token, "%d", &nply) != 1)
-          {
-            PRINTF("%ld:%s\n", iline, line);
-            FATAL("Number expected after '[PlyCount' in PDN", EXIT_FAILURE)
-          }
-          HARDBUG(nply < 0)
-        }
-        else
-        {
-          get_next_token();
-          if (itoken != TOKEN_STRING)
-          {
-            PRINTF("%ld:%s\n", iline, line);
-            FATAL("STRING expected after '[WORD' in PDN", EXIT_FAILURE)
-          }
-        }
-        get_next_token();
-        if (itoken != TOKEN_RSQUARE_BRACKET)
-        {
-          PRINTF("%ld:%s\n", iline, line);
-          FATAL("] expected after '[WORD STRING' in PDN", EXIT_FAILURE)
-        }
+      if (itoken == TOKEN_SKIP) continue;
 
-        get_next_token();
-      }
-      else if (itoken == TOKEN_LCURLY_BRACKET)
-      {  
-        int nest = 1;
-        while(nest > 0)
-        {
-          if (*pline == '\0')
-          {
-            if (fgets(line, MY_LINE_MAX, fname) == NULL)
-            {
-              PRINTF("%ld:%s\n", iline, line);
-              FATAL("unterminated comment in PDN", EXIT_FAILURE)
-            }
-            ++iline;
-            pline = line;
-            continue;
-          }
-          if (*pline == '{') ++nest;
-          if (*pline == '}') --nest;
-          ++pline;
-        }
-        get_next_token();
-      }
-      else if (itoken == TOKEN_LPARENTHESIS)
-      {  
-        int nest = 1;
-        while(nest > 0)
-        {
-          if (*pline == '\0')
-          {
-            if (fgets(line, MY_LINE_MAX, fname) == NULL)
-            {
-              PRINTF("%ld:%s\n", iline, line);
-              FATAL("unterminated comment in PDN", EXIT_FAILURE)
-            }
-            ++iline;
-            pline = line;
-            continue;
-          }
-          if (*pline == '(') ++nest;
-          if (*pline == ')') --nest;
-          ++pline;
-        }
-        get_next_token();
-      }
-      else if (itoken == TOKEN_DOLLAR)
-      {
-        get_next_token();
-        if (itoken != TOKEN_INTEGER)
-        {
-          PRINTF("%ld:%s\n", iline, line);
-          FATAL("INTEGER expected after '$' in PDN", EXIT_FAILURE)
-        }
-        get_next_token();
-      }
-      else if (itoken == TOKEN_INTEGER)
-      {
-        BSTRING(bmove_string)
+      if (itoken != TOKEN_MOVE) break;
 
-        HARDBUG(bassigncstr(bmove_string, token) != BSTR_OK)
+      game_state.push_move(&game_state, bdata(btoken), "");
+    }
 
-        HARDBUG(!game)
+    if (itoken == INVALID) break;
 
-        get_next_token();
+    if (itoken == TOKEN_UNKNOWN) continue;
+ 
+    int game_result = INVALID;
 
-        if ((itoken == TOKEN_MOVE) or (itoken == TOKEN_CAPTURE))
-        {
-          while(TRUE)
-          {
-            HARDBUG(bcatcstr(bmove_string, token) != BSTR_OK)
+    if (itoken == TOKEN_WON)
+      game_result = 2;
+    else if (itoken == TOKEN_DRAW)
+      game_result = 1;
+    else if (itoken == TOKEN_LOST)
+      game_result = 0;
+    else 
+      FATAL("invalid token", EXIT_FAILURE)
 
-            get_next_token();
+    HARDBUG(game_result == INVALID)
 
-            if (itoken != TOKEN_INTEGER)
-            {
-              PRINTF("%ld:%s\n", iline, line);
+    ++ngames;
 
-              FATAL("INTEGER expected after 'INTEGER-x' in PDN", EXIT_FAILURE)
-            }
+    if ((ngames % 1000) == 0) PRINTF("ngames=%lld\n", ngames);
 
-            HARDBUG(bcatcstr(bmove_string, token) != BSTR_OK)
+    //replay the game
 
-            get_next_token();
+    fen2board(with, game_state.get_starting_position(&game_state), TRUE);
 
-            if ((itoken != TOKEN_MOVE) and (itoken != TOKEN_CAPTURE)) break;
-          }
+    cJSON *game_move;
 
-          //HARDBUG(return_white_score(with) != -return_black_score(with))
+    cJSON_ArrayForEach(game_move, game_state.get_moves(&game_state))
+    {
+      cJSON *move_string = cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
 
-          moves_list_t moves_list;
+      HARDBUG(!cJSON_IsString(move_string))
+      
+      HARDBUG(bassigncstr(bmove_string, cJSON_GetStringValue(move_string)) == BSTR_ERR)
 
-          construct_moves_list(&moves_list);
+      moves_list_t moves_list;
 
-          gen_moves(with, &moves_list, FALSE);
+      construct_moves_list(&moves_list);
+
+      gen_moves(with, &moves_list, FALSE);
 
 #ifdef DEBUG
-          check_moves(with, &moves_list);
+      check_moves(with, &moves_list);
 #endif
-          int can_capture;
 
-          if (IS_WHITE(with->board_colour2move))
-            can_capture = black_can_capture(with, FALSE);
-          else
-            can_capture = white_can_capture(with, FALSE);
-      
-          if (move_error)
-          {
-            //PRINTF("%ld:%s\n", iline, line);
+      int imove = INVALID;
 
-            PRINTF("ignoring move: %s\n", bdata(bmove_string));
+      if ((imove = search_move(&moves_list, bmove_string)) == INVALID)
+      {  
+        print_board(with);
 
-            goto label_move_error;
-          }
+        PRINTF("move not found: %s\n", bdata(bmove_string));
 
-          int imove;
+        fprintf_moves_list(&moves_list, STDOUT, TRUE);
 
-          if ((imove = search_move(&moves_list, bmove_string)) == INVALID)
-          {  
-            print_board(with);
+        ++nerrors;
 
-            PRINTF("move not found: %s\n", bdata(bmove_string));
+        break;
+      }
 
-            fprintf_moves_list(&moves_list, STDOUT, TRUE);
+      //update statistics
 
-            PRINTF("%ld:%s\n", iline, line);
+      update_bucket(&bucket_nman, BIT_COUNT(with->board_black_man_bb));
 
-            move_error = TRUE;
+      for (int i = 1; i <= 50; ++i)
+      {
+        int iboard = map[i];
 
-            goto label_move_error;
-          }
+        if (with->board_black_man_bb & BITULL(iboard))
+        {
+          update_bucket(bucket_rows + BIT_COUNT(with->board_black_man_bb),
+            (i - 1) / 5);
+        }
+      }
 
-          //bmove_string does not contain leading 0
+      update_bucket(bucket_kings + BIT_COUNT(with->board_black_man_bb),
+        BIT_COUNT(with->board_black_king_bb));
 
-          move2bstring(&moves_list, imove, bmove_string);
+      //update book
+
+      if (moves_list.nmoves > 0)
+      {
+        move2bstring(&moves_list, imove, bmove_string);
    
-          if (moves_list.nmoves == 1) goto label_skip;
+        int result = game_result;
 
-          //now add position and move to book
+        if (IS_BLACK(with->board_colour2move)) result = 2 - result;
 
-          if (result != INVALID)
-          {
-            if (IS_BLACK(with->board_colour2move)) result = 2 - result;
+        board2fen(with, bfen, FALSE);
 
-            char *position = board2string(with, FALSE);
+        int position_id = query_position(db, bdata(bfen), 0);
 
-            int position_id = query_position(db, position, 0);
+        if (position_id == INVALID)
+          position_id = insert_position(db, bdata(bfen), 0);
 
-            if (position_id == INVALID)
-              position_id = insert_position(db, position, 0);
+        int move_id = query_move(db, position_id, bdata(bmove_string), 0);
 
-            int move_id = query_move(db, position_id, bdata(bmove_string), 0);
-
-            if (move_id == INVALID)
-              move_id = insert_move(db, position_id, bdata(bmove_string), 0);
+        if (move_id == INVALID)
+          move_id = insert_move(db, position_id, bdata(bmove_string), 0);
   
-            if (result == 2)
-              increment_nwon_ndraw_nlost(db, position_id, move_id, 1, 0, 0, 0);
-            else if (result == 1)
-              increment_nwon_ndraw_nlost(db, position_id, move_id, 0, 1, 0, 0);
-            else if (result == 0)
-              increment_nwon_ndraw_nlost(db, position_id, move_id, 0, 0, 1, 0);
-          }
-
-          label_skip:
-
-          if (FALSE and (result != INVALID) and
-              IS_WHITE(with->board_colour2move) and
-              (moves_list.nmoves > 1) and
-              (moves_list.ncaptx == 0) and
-              (with->board_white_king_bb == 0) and
-              (with->board_black_king_bb == 0) and
-              (BIT_COUNT(with->board_white_man_bb |
-                         with->board_black_man_bb) > 8) and
-              !can_capture)
-          {
-            HARDBUG(fprintf(fstring, "%s %d %d %d #result iply nply\n",
-                            board2string(with, FALSE),
-                            result, iply, nply) < 0)
-          }
-          do_move(with, imove, &moves_list);
-
-          label_move_error:
-
-          ++iply;
-        }
-        else if (itoken == TOKEN_DOT)
-        {
-          while(TRUE)
-          {
-            get_next_token();
-            if (itoken != TOKEN_DOT) break;
-          }
-        }
-        else
-        {
-          PRINTF("%ld:%s\n", iline, line);
-          FATAL("unexpected token in PDN", EXIT_FAILURE)
-        }
-
-        BDESTROY(bmove_string)
+        if (result == 2)
+          increment_nwon_ndraw_nlost(db, position_id, move_id, 1, 0, 0, 0);
+        else if (result == 1)
+          increment_nwon_ndraw_nlost(db, position_id, move_id, 0, 1, 0, 0);
+        else if (result == 0)
+          increment_nwon_ndraw_nlost(db, position_id, move_id, 0, 0, 1, 0);
       }
-      else if (itoken == TOKEN_RESULT)
-      {
-        game = FALSE;    
-        move_error = FALSE;
 
-        result = INVALID;
-
-        ++ngames;
-
-        if ((ngames % 1000) == 0)
-          PRINTF("processed %lld games\n", ngames);
-
-        get_next_token();
-      }
-      else
-      {
-        PRINTF("%ld:%s\n", iline, line);
-        FATAL("unexpected token in PDN", EXIT_FAILURE)
-      }
+      do_move(with, imove, &moves_list);
     }
+
+    destroy_state(&game_state);
   }
-  FCLOSE(fname)
-  FCLOSE(fstring)
+
+  BDESTROY(bfen)
+ 
+  BDESTROY(bmove_string)
+
+  BDESTROY(btoken)
+
+  BDESTROY(string)
 
   HARDBUG(execute_sql(db, "END TRANSACTION;", FALSE, 0) != SQLITE_OK)
 
@@ -626,86 +382,109 @@ void read_games(char *name)
 
   backup_db(db, "book.db");
 
-  sqlite3_close(db);
+  HARDBUG(sqlite3_close(db) != SQLITE_OK)
 
-  PRINTF("read %lld games\n", ngames);
-}
+  printf_bucket(&bucket_nman);
 
-#define NBUFFER_MAX 1000000
-
-local void flush_buffer(bstring bname, bstring bbuffer)
-{
-  int fd = compat_lock_file(bdata(bname));
-
-  HARDBUG(fd == -1)
-
-  HARDBUG(compat_write(fd, bdata(bbuffer), blength(bbuffer)) !=
-                       blength(bbuffer))
-
-  compat_unlock_file(fd);
-
-  HARDBUG(bassigncstr(bbuffer, "") != BSTR_OK)
-}
-
-local void append_fen(bstring fen, double result, int egtb_mate,
-  int *nbuffer, bstring bname, bstring bbuffer)
-{
-  if (*nbuffer >= NBUFFER_MAX)
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
   {
-    flush_buffer(bname, bbuffer);
+    PRINTF("npieces=%d\n", npieces);
 
-    *nbuffer = 0;
+    printf_bucket(bucket_rows + npieces);
   }
 
-  bformata(bbuffer, "%s {%.6f} egtb_mate=%d\n",
-           bdata(fen), result, egtb_mate);
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+  {
+    PRINTF("npieces=%d\n", npieces);
 
-  (*nbuffer)++;
+    printf_bucket(bucket_kings + npieces);
+  }
+
+  PRINTF("ngames=%lld nerrors=%lld\n", ngames, nerrors);
 }
 
-#define DEPTH_GEN    4
-#define DEPTH_MCTS   (INVALID)
-#define NSHOOT_OUTS  100
+local int *semaphore = NULL;
+local MPI_Win win;
 
-void gen_pos(i64_t npositions_max, int npieces)
+void gen_db(char *arg_db_name,
+  i64_t arg_npositions_max, int arg_mcts_depth, double arg_mcts_time_limit)
 {
-  options.time_limit = 0.5;
-  options.time_ntrouble = 0;
-  options.use_reductions = FALSE;
-
-  PRINTF("options.material_only=%d\n", options.material_only);
-  PRINTF("options.use_reductions=%d\n", options.use_reductions);
-
-#ifndef USE_OPENMPI
-  FATAL("gen_pos disabled", EXIT_FAILURE)
-#else
 #ifdef DEBUG
-  npositions_max = 1000;
+  arg_npositions_max = 1000;
 #endif
-  PRINTF("npositions_max=%lld\n", npositions_max);
+  PRINTF("npositions_max=%lld\n", arg_npositions_max);
 
-  HARDBUG(my_mpi_globals.MY_MPIG_nslaves < 1)
+  BSTRING(bdb_name)
+
+  HARDBUG(bassigncstr(bdb_name, arg_db_name) == BSTR_ERR)
+
+  //sqlite3 *db = (void *) INVALID;
+  sqlite3 *db = NULL;
+
+  fbuffer_t fdb;
+
+  if (db != NULL)
+  {
+    if (my_mpi_globals.MY_MPIG_id_slave <= 0)
+    {
+      int rc = sqlite3_open(bdata(bdb_name), &db);
+    
+      if (rc != SQLITE_OK)
+      {
+        PRINTF("Cannot open database: %s err_msg=%s\n",
+               arg_db_name, sqlite3_errmsg(db));
+    
+        FATAL("sqlite3", EXIT_FAILURE)
+      }
+  
+      create_tables(db, 0);
+  
+      HARDBUG(execute_sql(db, "PRAGMA journal_mode = WAL;", FALSE, 0) !=
+              SQLITE_OK)
+    }
+
+    my_mpi_barrier("after create_tables", my_mpi_globals.MY_MPIG_comm_slaves,
+      TRUE);
+  
+    //open database
+  
+    if (my_mpi_globals.MY_MPIG_id_slave > 0)
+    {
+      int rc = sqlite3_open(bdata(bdb_name), &db);
+    
+      if (rc != SQLITE_OK)
+      {
+        PRINTF("Cannot open database: %s err_msg=%s\n",
+               arg_db_name, sqlite3_errmsg(db));
+    
+        FATAL("sqlite3", EXIT_FAILURE)
+      }
+    }
+
+    my_mpi_win_allocate(sizeof(int), sizeof(int), MPI_INFO_NULL,
+      my_mpi_globals.MY_MPIG_comm_slaves, &semaphore, &win);
+
+    if (semaphore != NULL) *semaphore = 0;
+
+    my_mpi_win_fence(my_mpi_globals.MY_MPIG_comm_slaves, 0, win);
+  }
+  else
+  {
+    construct_fbuffer(&fdb, bdb_name, NULL, TRUE);
+  }
 
   my_timer_t timer;
 
-  construct_my_timer(&timer, "gen_pos", STDOUT, FALSE);
+  construct_my_timer(&timer, "gen_db", STDOUT, FALSE);
 
   reset_my_timer(&timer);
 
-  BSTRING(gen_bname)
+  my_random_t gen_db_random;
 
-  bassigncstr(gen_bname, "gen.fen");
-
-  int gen_nbuffer = 0;
-
-  BSTRING(gen_bbuffer)
-
-  my_random_t gen_pos_random;
-
-  if (my_mpi_globals.MY_MPIG_nslaves == 1)
-    construct_my_random(&gen_pos_random, 0);
+  if (my_mpi_globals.MY_MPIG_nslaves == 0)
+    construct_my_random(&gen_db_random, 0);
   else
-    construct_my_random(&gen_pos_random, INVALID);
+    construct_my_random(&gen_db_random, INVALID);
 
   search_t search;
 
@@ -713,42 +492,51 @@ void gen_pos(i64_t npositions_max, int npieces)
 
   search_t *with = &search;
   
-  i64_t npositions = npositions_max / my_mpi_globals.MY_MPIG_nslaves;
+  i64_t npositions = arg_npositions_max; 
+
+  if (my_mpi_globals.MY_MPIG_nslaves > 0)
+    npositions = arg_npositions_max / my_mpi_globals.MY_MPIG_nslaves;
+
   HARDBUG(npositions < 1)
 
   PRINTF("npositions=%lld\n", npositions);
 
   i64_t ngames = 0;
   i64_t ngames_failed = 0;
-  i64_t nwon = 0;
-  i64_t ndraw = 0;
-  i64_t nlost = 0;
 
   i64_t iposition = 0;
   i64_t iposition_prev = 0;
 
-  ui64_t alpha_beta_cache_size = options.alpha_beta_cache_size;
-
-  BSTRING(bbest_move)
+  BSTRING(bmove_string)
 
   BSTRING(bfen)
+
+  bucket_t bucket_root_score;
+
+  construct_bucket(&bucket_root_score, "bucket_root_score",
+                   SCORE_MAN, SCORE_LOST, SCORE_WON, BUCKET_LINEAR);
+
+  bucket_t bucket_npieces;
+
+  construct_bucket(&bucket_npieces, "bucket_npieces",
+                   1, 0, 2 * NPIECES_MAX, BUCKET_LINEAR);
 
   while(iposition < npositions)
   {
     ++ngames;
 
-    options.material_only = TRUE;
+    char *starting_position;
 
-    options.alpha_beta_cache_size = 0;
+    starting_position = STARTING_POSITION;
 
-    PRINTF("options.material_only=%d\n", options.material_only);
+    string2board(&(with->S_board), starting_position, TRUE);
 
-    PRINTF("options.alpha_beta_cache_size=%lldd\n",
-           options.alpha_beta_cache_size);
+    PRINTF("auto play\n");
 
-    string2board(&(with->S_board), STARTING_POSITION);
+    //auto play 
+    //no time limit
 
-    //autoplay 
+    mcts_globals.mcts_globals_time_limit = 0.0;
 
     int nply = 0;
 
@@ -760,20 +548,12 @@ void gen_pos(i64_t npositions_max, int npieces)
 
     HARDBUG(game_moves == NULL)
 
-    int ncount = 0;
+    int best_score = SCORE_PLUS_INFINITY;
 
     while(TRUE)
     {
       if (nply == MCTS_PLY_MAX) break;
  
-      ncount = 
-        BIT_COUNT(with->S_board.board_white_man_bb |
-                  with->S_board.board_white_king_bb |
-                  with->S_board.board_black_man_bb |
-                  with->S_board.board_black_king_bb);
-
-      if (ncount < npieces) break;
-
       moves_list_t moves_list;
 
       construct_moves_list(&moves_list);
@@ -782,24 +562,30 @@ void gen_pos(i64_t npositions_max, int npieces)
 
       if (moves_list.nmoves == 0) break;
 
-      do_search(with, &moves_list, 1, DEPTH_GEN,
-        SCORE_MINUS_INFINITY, &gen_pos_random);
+      int best_pv;
 
-      int best_score = with->S_best_score;
+      reset_my_timer(&(with->S_timer));
 
-      move2bstring(&moves_list, with->S_best_move, bbest_move);
+      int root_score = return_material_score(&(with->S_board));
+
+      best_score = mcts_search(with, root_score, 0, arg_mcts_depth,
+        &moves_list, &best_pv, TRUE);
+
+      if (best_pv == INVALID) break;
+    
+      move2bstring(&moves_list, best_pv, bmove_string);
 
       print_board(&(with->S_board));
 
-      PRINTF("nply=%d best_move=%s best_score=%d\n",
-        nply, bdata(bbest_move), best_score);
+      PRINTF("nply=%d best_move=%s root_score=%d best_score=%d\n",
+        nply, bdata(bmove_string), best_score);
 
       cJSON *game_move = cJSON_CreateObject();
 
       HARDBUG(game_move == NULL)
 
       HARDBUG(cJSON_AddStringToObject(game_move, CJSON_MOVE_STRING_ID,
-                                      bdata(bbest_move)) == NULL)
+                                      bdata(bmove_string)) == NULL)
 
       HARDBUG(cJSON_AddNumberToObject(game_move, CJSON_MOVE_SCORE_ID,
                                       best_score) == NULL)
@@ -808,35 +594,46 @@ void gen_pos(i64_t npositions_max, int npieces)
 
       ++nply;
 
-      if (with->S_best_score_kind == SEARCH_BEST_SCORE_EGTB) break;
-
-      do_move(&(with->S_board), with->S_best_move, &moves_list);
+      do_move(&(with->S_board), best_pv, &moves_list);
     }
 
-    if (ncount > npieces)
+    HARDBUG(best_score == SCORE_PLUS_INFINITY)
+
+    int wdl;
+
+    int egtb_mate = read_endgame(with, with->S_board.board_colour2move, &wdl);
+
+    if (egtb_mate == ENDGAME_UNKNOWN)
     {
       ++ngames_failed;
- 
+
       PRINTF("ngames=%lld ngames_failed=%lld (%.2f%%)\n",
         ngames, ngames_failed, ngames_failed * 100.0 / ngames);
 
       continue;
     }
+    
+    int result = INVALID;
 
-    //now loop over all moves
+    if (egtb_mate == INVALID)
+      result = 1;
+    else if (egtb_mate > 0)
+      result = 2;
+    else
+      result = 0;
 
-    if (npieces > 6) options.material_only = FALSE;
+    //result as seen from white
 
-    options.alpha_beta_cache_size = alpha_beta_cache_size;
+    if (IS_BLACK(with->S_board.board_colour2move)) result = 2 - result;
 
-    PRINTF("options.material_only=%d\n", options.material_only);
+    PRINTF("replay\n");
 
-    PRINTF("options.alpha_beta_cache_size=%lld\n",
-           options.alpha_beta_cache_size);
+    //loop over all moves
+    //use time limit
 
-    string2board(&(with->S_board), STARTING_POSITION);
+    mcts_globals.mcts_globals_time_limit = arg_mcts_time_limit;
 
-    int iply = 0;
+    string2board(&(with->S_board), starting_position, TRUE);
 
     cJSON *game_move;
 
@@ -847,15 +644,15 @@ void gen_pos(i64_t npositions_max, int npieces)
 
       HARDBUG(!cJSON_IsString(cjson_move_string))
 
-      HARDBUG(bassigncstr(bbest_move,
-                          cJSON_GetStringValue(cjson_move_string)) != BSTR_OK)
+      HARDBUG(bassigncstr(bmove_string,
+                          cJSON_GetStringValue(cjson_move_string)) == BSTR_ERR)
 
       cJSON *cjson_move_score =
         cJSON_GetObjectItem(game_move, CJSON_MOVE_SCORE_ID);
 
       HARDBUG(!cJSON_IsNumber(cjson_move_score))
 
-      int best_score = round(cJSON_GetNumberValue(cjson_move_score));
+      //int best_score = round(cJSON_GetNumberValue(cjson_move_score));
 
       moves_list_t moves_list;
   
@@ -867,102 +664,490 @@ void gen_pos(i64_t npositions_max, int npieces)
      
       int best_pv;
 
-      HARDBUG((best_pv = search_move(&moves_list, bbest_move)) == INVALID)
+      HARDBUG((best_pv = search_move(&moves_list, bmove_string)) == INVALID)
 
-      ncount = 
-        BIT_COUNT(with->S_board.board_white_man_bb |
-                  with->S_board.board_white_king_bb |
-                  with->S_board.board_black_man_bb |
-                  with->S_board.board_black_king_bb);
-
-      if ((moves_list.nmoves > 1) and
-          (moves_list.ncaptx == 0) and
-          (ncount == npieces))
+      print_board(&(with->S_board));
+ 
+      if ((moves_list.nmoves <= 1) or (moves_list.ncaptx > 0))
       {
-        print_board(&(with->S_board));
+        PRINTF("position rejected nmoves=%d ncaptx=%d\n",
+               moves_list.nmoves, moves_list.ncaptx);
 
-        reset_my_timer(&(with->S_timer));
+        do_move(&(with->S_board), best_pv, &moves_list);
 
-        double mcts_result = mcts_shoot_outs(with, iply,
-          NSHOOT_OUTS, DEPTH_MCTS);
+        continue;
+      }
 
-        int egtb_mate =
-          read_endgame(with, with->S_board.board_colour2move, TRUE);
+      int root_score = return_material_score(&(with->S_board));
 
-        board2fen(with->S_board.board_colour2move,
-          with->S_board.board_white_man_bb,
-          with->S_board.board_black_man_bb,
-          with->S_board.board_white_king_bb,
-          with->S_board.board_black_king_bb,
-          bfen, FALSE);
+      reset_my_timer(&(with->S_timer));
 
-        PRINTF("bfen=%s best_score=%d egtb_mate=%d mcts_result=%.6f\n",
-          bdata(bfen), best_score, egtb_mate, mcts_result);
+      int temp_pv;
 
-        if (egtb_mate != ENDGAME_UNKNOWN)
-        {
-          if (((egtb_mate == INVALID) and (fabs(mcts_result) <= 0.20)) or
-              ((egtb_mate > 0) and (mcts_result >= 0.60)) or
-              ((egtb_mate <= 0) and (mcts_result <= -0.60)))
-          {
-            append_fen(bfen, mcts_result, egtb_mate,
-                       &gen_nbuffer, gen_bname, gen_bbuffer);
+      best_score = mcts_search(with, root_score, 0, MCTS_PLY_MAX, 
+        &moves_list, &temp_pv, TRUE);
 
-            ++iposition;
+      PRINTF("root_score=%d best_score=%d\n", root_score, best_score);
 
-            if ((iposition - iposition_prev) > 100)
-            {
-              iposition_prev = iposition;
+      if (abs(root_score - best_score) > (SCORE_MAN / 4))
+      {
+        PRINTF("position rejected root_score=%d best_score=%d\n",
+               root_score, best_score);
+
+        do_move(&(with->S_board), best_pv, &moves_list);
+
+        continue;
+      }
+
+      int npieces = return_npieces(&(with->S_board));
+
+      PRINTF("position accepted npieces=%d root_score=%d best_score=%d\n",
+             npieces, root_score, best_score);
+
+      update_bucket(&bucket_root_score, root_score);
+      update_bucket(&bucket_npieces, npieces);
+
+      board2fen(&(with->S_board), bfen, FALSE);
+
+      if (db != NULL)
+      {
+        my_mpi_acquire_semaphore(my_mpi_globals.MY_MPIG_comm_slaves, win);
+        
+        HARDBUG(execute_sql(db, "BEGIN TRANSACTION;", FALSE, NRETRIES) !=
+                SQLITE_OK)
     
-              PRINTF("iposition=%lld time=%.2f (%.2f positions/second)\n",
-                iposition, return_my_timer(&timer, FALSE),
-                iposition / return_my_timer(&timer, FALSE));
-            }
+        int position_id = query_position(db, bdata(bfen), 0);
+        
+        if (position_id == INVALID)
+        {
+          position_id = insert_position(db, bdata(bfen), 0);
+    
+          BSTRING(bmove)
+    
+          for (int imove = 0; imove < moves_list.nmoves; imove++)
+          {
+            move2bstring(&moves_list, imove, bmove);
+                 
+            (void) insert_move(db, position_id, bdata(bmove), 0);
           }
+    
+          BDESTROY(bmove)
         }
+
+        int move_id = query_move(db, position_id, bdata(bmove_string), 0);
+  
+        HARDBUG(move_id == INVALID)
+    
+        if (IS_WHITE(with->S_board.board_colour2move))
+        {
+          if (result == 2)
+            increment_nwon_ndraw_nlost(db, position_id, move_id, 1, 0, 0, 0);
+          else if (result == 1)
+            increment_nwon_ndraw_nlost(db, position_id, move_id, 0, 1, 0, 0);
+          else if (result == 0)
+            increment_nwon_ndraw_nlost(db, position_id, move_id, 0, 0, 1, 0);
+          else
+            FATAL("unknown result", EXIT_FAILURE)
+        }
+        else
+        {
+          if (result == 2)
+            increment_nwon_ndraw_nlost(db, position_id, move_id, 0, 0, 1, 0);
+          else if (result == 1)
+            increment_nwon_ndraw_nlost(db, position_id, move_id, 0, 1, 0, 0);
+          else if (result == 0)
+            increment_nwon_ndraw_nlost(db, position_id, move_id, 1, 0, 0, 0);
+          else
+            FATAL("unknown result", EXIT_FAILURE)
+        }
+          
+        HARDBUG(execute_sql(db, "COMMIT;", FALSE, NRETRIES) != SQLITE_OK)
+
+        my_mpi_release_semaphore(my_mpi_globals.MY_MPIG_comm_slaves, win);
+      }
+      else
+      {
+        board2fen(&(with->S_board), bfen, FALSE);
+      
+        append_fbuffer(&fdb, "%s {0.000000}\n", bdata(bfen));
+      }
+
+      ++iposition;
+
+      if ((iposition - iposition_prev) > 100)
+      {
+        iposition_prev = iposition;
+      
+        PRINTF("iposition=%lld time=%.2f (%.2f positions/second)\n",
+          iposition, return_my_timer(&timer, FALSE),
+          iposition / return_my_timer(&timer, FALSE));
       }
 
       do_move(&(with->S_board), best_pv, &moves_list);
-
-      ++iply;
     }
 
     cJSON_Delete(game);
   }
+ 
+  if (db == NULL) flush_fbuffer(&fdb, 0);
 
   BDESTROY(bfen)
 
-  BDESTROY(bbest_move)
-
-  //write remaining
-
-  if (gen_nbuffer > 0) flush_buffer(gen_bname, gen_bbuffer);
-
-  BDESTROY(gen_bbuffer)
-
-  BDESTROY(gen_bname)
+  BDESTROY(bmove_string)
 
   PRINTF("generating %lld positions took %.2f seconds\n",
     iposition, return_my_timer(&timer, FALSE));
+ 
+  printf_bucket(&bucket_root_score);
+  printf_bucket(&bucket_npieces);
 
   my_mpi_barrier("after gen", my_mpi_globals.MY_MPIG_comm_slaves, TRUE);
 
-  MPI_Allreduce(MPI_IN_PLACE, &ngames, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nwon, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &ndraw, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-  MPI_Allreduce(MPI_IN_PLACE, &nlost, 1, MPI_LONG_LONG_INT,
+  my_mpi_allreduce(MPI_IN_PLACE, &ngames, 1, MPI_LONG_LONG_INT,
     MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
-  MPI_Allreduce(MPI_IN_PLACE, &iposition, 1, MPI_LONG_LONG_INT,
+  my_mpi_allreduce(MPI_IN_PLACE, &iposition, 1, MPI_LONG_LONG_INT,
     MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
-  PRINTF("ngames=%lld nwon=%lld ndraw=%lld nlost=%lld\n",
-    ngames, nwon, ndraw, nlost);
+  PRINTF("ngames=%lld\n", ngames);
 
   PRINTF("iposition=%lld\n", iposition);
-#endif
+  
+  my_mpi_bucket_aggregate(&bucket_root_score,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_npieces,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  printf_bucket(&bucket_root_score);
+  printf_bucket(&bucket_npieces);
+
+  if (db != NULL)
+  {
+    if (my_mpi_globals.MY_MPIG_id_slave > 0)
+      HARDBUG(sqlite3_close(db) != SQLITE_OK)
+  
+    my_mpi_barrier("before wal_checkpoint",
+                   my_mpi_globals.MY_MPIG_comm_slaves, TRUE);
+
+    if (my_mpi_globals.MY_MPIG_id_slave <= 0)
+    {
+      wal_checkpoint(db);
+
+      HARDBUG(sqlite3_close(db) != SQLITE_OK)
+
+      HARDBUG(sqlite3_open(bdata(bdb_name), &db) != SQLITE_OK)
+
+      wal_checkpoint(db);
+
+      HARDBUG(sqlite3_close(db) != SQLITE_OK)
+    }
+  
+    my_mpi_barrier("after wal_checkpoint",
+                   my_mpi_globals.MY_MPIG_comm_slaves, TRUE);
+  }
+ 
+  BDESTROY(bdb_name)
+}
+
+void update_db(char *arg_db_name, int arg_nshoot_outs,
+  int arg_mcts_depth, double arg_mcts_time_limit)
+{
+  mcts_globals.mcts_globals_time_limit = arg_mcts_time_limit;
+
+  BSTRING(bdb_name)
+
+  HARDBUG(bassigncstr(bdb_name, arg_db_name) == BSTR_ERR)
+
+  sqlite3 *db = NULL;
+
+  //open database
+
+  if (my_mpi_globals.MY_MPIG_id_slave <= 0)
+  {
+    int rc = sqlite3_open(bdata(bdb_name), &db);
+  
+    if (rc != SQLITE_OK)
+    {
+      PRINTF("Cannot open database: %s err_msg=%s\n",
+             arg_db_name, sqlite3_errmsg(db));
+  
+      FATAL("sqlite3", EXIT_FAILURE)
+    }
+
+    HARDBUG(execute_sql(db, "PRAGMA journal_mode = WAL;", FALSE, 0) !=
+            SQLITE_OK)
+  }
+
+  my_mpi_barrier("after open database", my_mpi_globals.MY_MPIG_comm_slaves,
+                 TRUE);
+
+  if (my_mpi_globals.MY_MPIG_id_slave > 0)
+  {
+    HARDBUG(my_mpi_globals.MY_MPIG_nslaves == 0)
+
+    int rc = sqlite3_open(bdata(bdb_name), &db);
+  
+    if (rc != SQLITE_OK)
+    {
+      PRINTF("Cannot open database: %s err_msg=%s\n",
+             arg_db_name, sqlite3_errmsg(db));
+  
+      FATAL("sqlite3", EXIT_FAILURE)
+    }
+  }
+
+  HARDBUG(execute_sql(db, "PRAGMA cache_size=-131072;", FALSE, 0) != SQLITE_OK)
+
+  my_mpi_win_allocate(sizeof(int), sizeof(int), MPI_INFO_NULL,
+    my_mpi_globals.MY_MPIG_comm_slaves, &semaphore, &win);
+
+  if (semaphore != NULL) *semaphore = 0;
+
+  my_mpi_win_fence(my_mpi_globals.MY_MPIG_comm_slaves, 0, win);
+
+  my_timer_t timer;
+
+  construct_my_timer(&timer, "update_pos", STDOUT, FALSE);
+
+  reset_my_timer(&timer);
+
+  search_t search;
+
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
+
+  //query the number of positions
+
+  const char *sql = "SELECT COUNT(*) FROM positions;";
+
+  sqlite3_stmt *stmt;
+
+  int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+
+  if (rc != SQLITE_OK)
+  {
+    PRINTF("Failed to prepare statement: %s rc=%d err_msg=%s\n",
+           sql, rc, sqlite3_errmsg(db));
+
+    FATAL("sqlite3", EXIT_FAILURE)
+  }
+
+  HARDBUG((rc = execute_sql(db, stmt, TRUE, 0)) != SQLITE_ROW)
+
+  i64_t npositions = sqlite3_column_int(stmt, 0);
+
+  HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
+
+  PRINTF("npositions=%lld\n", npositions);
+
+  i64_t iposition = 0;
+  i64_t nupdates = 0;
+
+  BSTRING(bfen)
+
+  BSTRING(bmove_string)
+
+  sql_buffer_t sql_buffer;
+
+  construct_sql_buffer(&sql_buffer, db,
+                       my_mpi_globals.MY_MPIG_comm_slaves, win, INVALID);
+
+  for (i64_t position_id = 1; position_id <= npositions; ++position_id)
+  {
+    if (my_mpi_globals.MY_MPIG_nslaves > 0)
+    {
+      if (((position_id - 1) % my_mpi_globals.MY_MPIG_nslaves) !=
+          my_mpi_globals.MY_MPIG_id_slave) continue;
+    }
+
+    ++nupdates;
+
+    if ((++iposition % 1000) == 0) PRINTF("iposition=%lld\n", iposition);
+
+    sql = "SELECT position FROM positions WHERE id = ?;";
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+
+    if (rc != SQLITE_OK)
+    {
+      PRINTF("Failed to prepare statement: %s rc=%d err_msg=%s\n",
+             sql, rc, sqlite3_errmsg(db));
+  
+      FATAL("sqlite3", EXIT_FAILURE)
+    }
+
+    HARDBUG(sqlite3_bind_int(stmt, 1, position_id) != SQLITE_OK)
+
+    HARDBUG((rc = execute_sql(db, stmt, TRUE, NRETRIES)) != SQLITE_ROW)
+
+    HARDBUG(bassigncstr(bfen,
+                        (const char *) sqlite3_column_text(stmt, 0)) == BSTR_ERR)
+
+    HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
+
+    fen2board(&(with->S_board), bdata(bfen), FALSE);
+
+    print_board(&(with->S_board));
+
+    PRINTF("position_id=%lld FEN=%s\n", position_id, bdata(bfen));
+
+    moves_list_t moves_list;
+  
+    construct_moves_list(&moves_list);
+
+    gen_moves(&(with->S_board), &moves_list, FALSE);
+
+    HARDBUG(moves_list.nmoves < 1)
+
+    sql =
+     "SELECT id, move, nwon, ndraw, nlost from moves WHERE position_id = ?;";
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+  
+    if (rc != SQLITE_OK)
+    {
+      PRINTF("Failed to prepare statement: %s\n", sqlite3_errmsg(db));
+  
+      FATAL("sqlite3", EXIT_FAILURE)
+    }
+  
+    HARDBUG(sqlite3_bind_int(stmt, 1, position_id) != SQLITE_OK)
+
+    int move_id[MOVES_MAX];
+    int nwon[MOVES_MAX];
+    int ndraw[MOVES_MAX];
+    int nlost[MOVES_MAX];
+
+    for (int imove = 0; imove < moves_list.nmoves; imove++)
+      move_id[imove] = nwon[imove] = ndraw[imove] = nlost[imove] = INVALID;
+  
+    while ((rc = execute_sql(db, stmt, TRUE, NRETRIES)) == SQLITE_ROW)
+    {
+      const unsigned char *move = sqlite3_column_text(stmt, 1);
+
+      HARDBUG(bassigncstr(bmove_string, (char *) move) == BSTR_ERR)
+
+      int imove;
+
+      HARDBUG((imove = search_move(&moves_list, bmove_string)) == INVALID)
+    
+      HARDBUG(move_id[imove] != INVALID)
+      HARDBUG(nwon[imove] != INVALID)
+      HARDBUG(ndraw[imove] != INVALID)
+      HARDBUG(nlost[imove] != INVALID)
+
+      move_id[imove] = sqlite3_column_int(stmt, 0);
+      nwon[imove] = sqlite3_column_int(stmt, 2);
+      ndraw[imove] = sqlite3_column_int(stmt, 3);
+      nlost[imove] = sqlite3_column_int(stmt, 4);
+  
+      PRINTF("move=%s imove=%d move_id=%d nwon=%d ndraw=%d nlost=%d\n",
+             bdata(bmove_string), imove, move_id[imove],
+             nwon[imove], ndraw[imove], nlost[imove]);
+    }//while ((rc
+
+    HARDBUG(rc != SQLITE_DONE)
+
+    HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
+
+    for (int imove = 0; imove < moves_list.nmoves; imove++)
+    {
+      HARDBUG(move_id[imove] == INVALID)
+      HARDBUG(nwon[imove] == INVALID)
+      HARDBUG(ndraw[imove] == INVALID)
+      HARDBUG(nlost[imove] == INVALID)
+    }
+
+    for (int imove = 0; imove < moves_list.nmoves; imove++)
+    {
+      move2bstring(&moves_list, imove, bmove_string);
+
+      int nshoot_outs = arg_nshoot_outs -
+                        (nwon[imove] + ndraw[imove] + nlost[imove]);
+
+      if (nshoot_outs <= 0)
+      {
+        PRINTF("skipping move=%s nwon=%d ndraw=%d nlost=%d\n",
+               bdata(bmove_string), nwon[imove], ndraw[imove], nlost[imove]);
+
+        continue;
+      }
+
+      PRINTF("updating move=%s nwon=%d ndraw=%d nlost=%d\n",
+             bdata(bmove_string), nwon[imove], ndraw[imove], nlost[imove]);
+
+      int nwon_prev = nwon[imove];
+      int ndraw_prev = ndraw[imove];
+      int nlost_prev = nlost[imove];
+
+      do_move(&(with->S_board), imove, &moves_list);
+
+      reset_my_timer(&(with->S_timer));
+
+      double result = 
+        -mcts_shoot_outs(with, 0, &nshoot_outs,
+                         arg_mcts_depth, arg_mcts_time_limit,
+                         nlost + imove, ndraw + imove, nwon + imove);
+
+      undo_move(&(with->S_board), imove, &moves_list);
+
+      print_board(&(with->S_board));
+
+      PRINTF("done move=%s nwon=%d ndraw=%d nlost=%d result=%.6f\n",
+             bdata(bmove_string), nwon[imove], ndraw[imove], nlost[imove],
+             result);
+
+      HARDBUG(nwon[imove] < nwon_prev)
+      HARDBUG(ndraw[imove] < ndraw_prev)
+      HARDBUG(nlost[imove] < nlost_prev)
+
+      append_sql_buffer(&sql_buffer,
+        "UPDATE moves SET nwon = %d, ndraw = %d, nlost = %d"
+        " WHERE position_id = %lld AND id = %d;",
+        nwon[imove], ndraw[imove], nlost[imove], position_id, move_id[imove]);
+    }//imove
+
+    //flush_sql_buffer(&sql_buffer, 0);
+  }//iposition
+
+  flush_sql_buffer(&sql_buffer, 0);
+
+  BDESTROY(bmove_string)
+
+  BDESTROY(bfen)
+
+  PRINTF("nupdates=%lld\n", nupdates);
+
+  PRINTF("updating %lld positions took %.2f seconds\n",
+    nupdates, return_my_timer(&timer, FALSE));
+
+  my_mpi_allreduce(MPI_IN_PLACE, &nupdates, 1, MPI_LONG_LONG_INT,
+                   MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+
+  PRINTF("my_mpi_allreduce:nupdates=%lld\n", nupdates);
+
+  //close database
+
+  if (my_mpi_globals.MY_MPIG_id_slave > 0)
+    HARDBUG(sqlite3_close(db) != SQLITE_OK)
+
+  my_mpi_barrier("before wal_checkpoint",
+                 my_mpi_globals.MY_MPIG_comm_slaves, TRUE);
+
+  if (my_mpi_globals.MY_MPIG_id_slave <= 0)
+  {
+    wal_checkpoint(db);
+    HARDBUG(sqlite3_close(db) != SQLITE_OK)
+    HARDBUG(sqlite3_open(bdata(bdb_name), &db) != SQLITE_OK)
+    wal_checkpoint(db);
+
+    HARDBUG(sqlite3_close(db) != SQLITE_OK)
+  }
+
+  my_mpi_barrier("after wal_checkpoint",
+                 my_mpi_globals.MY_MPIG_comm_slaves, TRUE);
+
+  BDESTROY(bdb_name)
 }
 

@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 void construct_queue(void *self,
@@ -47,7 +47,7 @@ void enqueue(void *self, int arg_message_id, char *arg_message_text)
 
   message->message_id = arg_message_id;
 
-  HARDBUG(bassigncstr(message->message_text, arg_message_text) != BSTR_OK)
+  HARDBUG(bassigncstr(message->message_text, arg_message_text) == BSTR_ERR)
 
   message->message_read = FALSE;
 

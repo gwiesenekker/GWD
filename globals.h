@@ -1,9 +1,9 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM  gwd7
-#define REVISION "7.750"
+#define REVISION "7.809"
 
 //generic includes
 
@@ -73,12 +73,9 @@ typedef long long  i64_t;
 #define CJSON_PARAMETERS_ID        "parameters"
 #define CJSON_TWEAKS_ID            "tweaks"
 #define CJSON_NEURAL2MATERIAL_SCORE_ID "network2material_score"
-#define CJSON_INPUT_MAP_ID         "input_map"
-#define CJSON_ACTIVATION_ID        "activation"
+#define CJSON_SHAPE_ID             "shape"
+#define CJSON_CLIP_ID              "clip"
 #define CJSON_ACTIVATION_LAST_ID   "activation_last"
-#define CJSON_WINGS_ID             "wings"
-#define CJSON_HALF_ID              "half"
-#define CJSON_BLOCKED_ID           "blocked"
 #define CJSON_NPIECES_MIN_ID       "npieces_min"
 #define CJSON_NPIECES_MAX_ID       "npieces_max"
 #define CJSON_EVENT_ID             "event"
@@ -214,6 +211,7 @@ extern void *STDOUT;
 #include "my_malloc.h"
 #include "my_mpi.h"
 #include "my_random.h"
+#include "fbuffer.h"
 
 #include "buckets.h"
 #include "caches.h"
@@ -223,6 +221,7 @@ extern void *STDOUT;
 #include "stats.h"
 #include "timers.h"
 #include "utils.h"
+#include "patterns.h"
 
 #include "networks.h"
 #include "boards.h"

@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define CJSON_FIELDS_ID      "fields"
@@ -132,7 +132,7 @@ void set_field(void *self, char *arg_field_name, void *arg_value)
 
     HARDBUG(!cJSON_IsString(field_value))
 
-    cJSON_SetStringValue(field_value, (char *) arg_value);
+    cJSON_SetValuestring(field_value, (char *) arg_value);
   }
 }
 
@@ -167,15 +167,15 @@ void get_field(void *self, char *arg_field_name, void *arg_value)
     HARDBUG(!cJSON_IsString(field_value))
 
     HARDBUG(bassigncstr((bstring) arg_value,
-                        cJSON_GetStringValue(field_value)) != BSTR_OK)
+                        cJSON_GetStringValue(field_value)) == BSTR_ERR)
   }
 }
 
-void set_record(void *self, bstring string)
+void set_record(void *self, bstring arg_bstring)
 {
   record_t *object = self;
 
-  object->R_cjson = cJSON_Parse(bdata(string));
+  object->R_cjson = cJSON_Parse(bdata(arg_bstring));
 
   if (object->R_cjson == NULL)
   { 
@@ -196,7 +196,7 @@ bstring get_record(void *self)
   
   HARDBUG((cstring = cJSON_Print(object->R_cjson)) == NULL)
 
-  HARDBUG(bassigncstr(object->R_string, cstring) != BSTR_OK)
+  HARDBUG(bassigncstr(object->R_string, cstring) == BSTR_ERR)
 
   free(cstring);
 

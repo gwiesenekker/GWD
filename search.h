@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef SearchH
 #define SearchH
 
@@ -13,11 +13,6 @@
 #define IS_MINIMAL_WINDOW(X) ((X) & MINIMAL_WINDOW_BIT)
 #define IS_PV(X)             ((X) & PV_BIT)
 
-#define SCORE_WON            10000
-#define SCORE_LOST           (-SCORE_WON)
-#define SCORE_PLUS_INFINITY  20000
-#define SCORE_MINUS_INFINITY (-SCORE_PLUS_INFINITY)
-
 #define SEARCH_BEST_SCORE_EGTB 0
 #define SEARCH_BEST_SCORE_AB   1
 
@@ -30,7 +25,10 @@ typedef struct
 
   my_timer_t S_timer;
 
+  my_random_t S_random;
+
   cache_t S_endgame_entry_cache;
+  cache_t S_endgame_wdl_entry_cache;
 
   int S_root_simple_score;
   int S_root_score;

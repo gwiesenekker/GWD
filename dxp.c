@@ -1,9 +1,7 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define SA struct sockaddr
-
-#define GAME_MOVES 40
 
 #define DXP_GAMEREQ 'R'
 #define DXP_GAMEACC 'A'
@@ -12,14 +10,11 @@
 #define DXP_CHAT    'C'
 #define DXP_BACKREQ '?'
 #define DXP_BACKACC '?'
-#define DXP_INVALID '?'
 
 #define DXP_UNKNOWN '0'
 #define DXP_IGIVEUP '1'
 #define DXP_DRAW    '2'
 #define DXP_IWIN    '3'
-
-#define SQR(X) ((X) * (X))
 
 #define MARGIN 5
 
@@ -40,34 +35,34 @@ local char event[MY_LINE_MAX];
 local char my_name[MY_LINE_MAX];
 local char your_name[MY_LINE_MAX];
 
-local void encode(char type, dxp_t *with,
-  char buffer[MY_LINE_MAX], int *nbuffer)
+local void encode(char arg_type, dxp_t *object,
+  char arg_buffer[MY_LINE_MAX], int *arg_nbuffer)
 {
-  *nbuffer = 0;
+  *arg_nbuffer = 0;
 
-  if (type == DXP_GAMEREQ)
+  if (arg_type == DXP_GAMEREQ)
   {
     int i = 0;
 
-    buffer[i] = DXP_GAMEREQ;
+    arg_buffer[i] = DXP_GAMEREQ;
     i++;
 
-    strcpy(buffer + i, "01");
+    strcpy(arg_buffer + i, "01");
     i += 2;
 
     //                  01234567890123456789012345678901
 
-    strncpy(buffer + i, my_name, 32);
+    strncpy(arg_buffer + i, my_name, 32);
 
     i += 32;
 
-    if (IS_WHITE(with->DXP_game_colour))
+    if (IS_WHITE(object->DXP_game_colour))
     {
-      buffer[i] = 'Z';
+      arg_buffer[i] = 'Z';
     }
     else
     {
-      buffer[i] = 'W';
+      arg_buffer[i] = 'W';
     }
     i++;
 
@@ -75,31 +70,31 @@ local void encode(char type, dxp_t *with,
 
     snprintf(string, MY_LINE_MAX, "%03d", options.dxp_game_time);
 
-    strcpy(buffer + i, string); 
+    strcpy(arg_buffer + i, string); 
     i += 3;
 
     //dependency
 
-    with->DXP_game_time = options.dxp_game_time * 60;
+    object->DXP_game_time = options.dxp_game_time * 60;
 
     snprintf(string, MY_LINE_MAX, "%03d", options.dxp_game_moves);
 
-    with->DXP_game_moves = options.dxp_game_moves;
+    object->DXP_game_moves = options.dxp_game_moves;
 
-    strcpy(buffer + i, string); 
+    strcpy(arg_buffer + i, string); 
     i += 3;
 
-    strcpy(buffer + i, "B");
+    strcpy(arg_buffer + i, "B");
     i++;
 
-    if (IS_WHITE(with->DXP_search.S_board.board_colour2move))
+    if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
     {
-      strcpy(buffer + i, "W");
+      strcpy(arg_buffer + i, "W");
       i++;
     }
     else
     {
-      strcpy(buffer + i, "Z");
+      strcpy(arg_buffer + i, "Z");
       i++;
     }
 
@@ -107,144 +102,144 @@ local void encode(char type, dxp_t *with,
     {
       int jboard = map[j];
 
-      if (with->DXP_search.S_board.board_white_man_bb & BITULL(jboard))
+      if (object->DXP_search.S_board.board_white_man_bb & BITULL(jboard))
       {
-        strcpy(buffer + i, "w");
+        strcpy(arg_buffer + i, "w");
         i++;
       }
-      else if (with->DXP_search.S_board.board_white_king_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.board_white_king_bb & BITULL(jboard))
       {
-        strcpy(buffer + i, "W");
+        strcpy(arg_buffer + i, "W");
         i++;
       } 
-      else if (with->DXP_search.S_board.board_black_man_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.board_black_man_bb & BITULL(jboard))
       {
-        strcpy(buffer + i, "z");
+        strcpy(arg_buffer + i, "z");
         i++;
       }
-      else if (with->DXP_search.S_board.board_black_king_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.board_black_king_bb & BITULL(jboard))
       {
-        strcpy(buffer + i, "Z");
+        strcpy(arg_buffer + i, "Z");
         i++;
       } 
       else
       {
-        strcpy(buffer + i, "e");
+        strcpy(arg_buffer + i, "e");
         i++;
       }  
     }
 
-    buffer[i] = '\0';
+    arg_buffer[i] = '\0';
     i++;
 
-    *nbuffer = i;
+    *arg_nbuffer = i;
 
-    PRINTF("DXP_GAMEREQ buffer=%s nbuffer=%d\n", buffer, *nbuffer);
+    PRINTF("DXP_GAMEREQ buffer=%s nbuffer=%d\n", arg_buffer, *arg_nbuffer);
   } 
-  else if (type == DXP_GAMEACC)
+  else if (arg_type == DXP_GAMEACC)
   {
     int i = 0;
 
-    buffer[i] = DXP_GAMEACC;
+    arg_buffer[i] = DXP_GAMEACC;
     i++;
 
     //                  01234567890123456789012345678901
-    strncpy(buffer + i, my_name, 32);
+    strncpy(arg_buffer + i, my_name, 32);
     i += 32;
 
-    buffer[i] = '0';
+    arg_buffer[i] = '0';
     i++;
 
-    buffer[i] = '\0';
+    arg_buffer[i] = '\0';
     i++;
 
-    *nbuffer = i;
+    *arg_nbuffer = i;
 
-    PRINTF("DXP_GAMEACC buffer=%s nbuffer=%d\n", buffer, *nbuffer);
+    PRINTF("DXP_GAMEACC buffer=%s nbuffer=%d\n", arg_buffer, *arg_nbuffer);
   }
-  else if (type == DXP_MOVE)
+  else if (arg_type == DXP_MOVE)
   {
     int i = 0;
 
-    buffer[i] = DXP_MOVE;
+    arg_buffer[i] = DXP_MOVE;
     i++;
 
     char string[MY_LINE_MAX];
 
-    snprintf(string, MY_LINE_MAX, "%04d", with->DXP_game_time_used);
+    snprintf(string, MY_LINE_MAX, "%04d", object->DXP_game_time_used);
 
-    strcpy(buffer + i, string); 
+    strcpy(arg_buffer + i, string); 
     i += 4;
 
     //ugly
 
     int j = 0;
 
-    strncpy(buffer + i, with->DXP_move_string + j, 2);
+    strncpy(arg_buffer + i, object->DXP_move_string + j, 2);
     j += 3;
     i += 2;
 
-    strncpy(buffer + i, with->DXP_move_string + j, 2);
+    strncpy(arg_buffer + i, object->DXP_move_string + j, 2);
     j += 2;
     i += 2;
     
     int n = 0;
     int k = j;
-    while (with->DXP_move_string[k] == 'x')
+    while (object->DXP_move_string[k] == 'x')
     { 
       n++;
       k += 3;
     }
 
     snprintf(string, MY_LINE_MAX, "%02d", n);
-    strcpy(buffer + i, string); 
+    strcpy(arg_buffer + i, string); 
     i += 2;
 
     k = j;
-    while (with->DXP_move_string[k] == 'x')
+    while (object->DXP_move_string[k] == 'x')
     { 
       k++;
-      strncpy(buffer + i, with->DXP_move_string + k, 2);
+      strncpy(arg_buffer + i, object->DXP_move_string + k, 2);
       k += 2;
       i += 2;
     }
 
-    buffer[i] = '\0';
+    arg_buffer[i] = '\0';
     i++;
 
-    *nbuffer = i;
+    *arg_nbuffer = i;
 
-    PRINTF("DXP_MOVE buffer=%s nbuffer=%d\n", buffer, *nbuffer);
+    PRINTF("DXP_MOVE buffer=%s nbuffer=%d\n", arg_buffer, *arg_nbuffer);
   }
-  else if (type == DXP_GAMEEND)
+  else if (arg_type == DXP_GAMEEND)
   {
     int i = 0;
 
-    buffer[i] = DXP_GAMEEND;
+    arg_buffer[i] = DXP_GAMEEND;
     i++;
   
-    buffer[i] = with->DXP_game_code;
+    arg_buffer[i] = object->DXP_game_code;
     i++;
 
-    buffer[i] = '0';
+    arg_buffer[i] = '0';
     i++;
 
-    buffer[i] = '\0';
+    arg_buffer[i] = '\0';
     i++;
 
-    *nbuffer = i;
+    *arg_nbuffer = i;
 
-    PRINTF("DXP_GAMEEND buffer=%s nbuffer=%d\n", buffer, *nbuffer);
+    PRINTF("DXP_GAMEEND buffer=%s nbuffer=%d\n", arg_buffer, *arg_nbuffer);
   }
-  else if (type == DXP_CHAT)
+  else if (arg_type == DXP_CHAT)
   { 
     FATAL("DXP_CHAT not implemented", EXIT_FAILURE)
   }
-  else if (type == DXP_BACKREQ)
+  else if (arg_type == DXP_BACKREQ)
   {
     FATAL("DXP_BACKREQ not implemented", EXIT_FAILURE)
   }
-  else if (type == DXP_BACKACC)
+  else if (arg_type == DXP_BACKACC)
   {
     FATAL("DXP_BACKACC not implemented", EXIT_FAILURE)
   }
@@ -254,14 +249,14 @@ local void encode(char type, dxp_t *with,
   }
 }
 
-char decode(int nbuffer, char *buffer, dxp_t *with)
+char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
 {
-  HARDBUG(nbuffer < 1)
+  HARDBUG(arg_nhuffer < 1)
 
   //buffer[nbuffer] = '\0';
-  PRINTF("decode nbuffer=%d buffer=%s\n", nbuffer, buffer);
+  PRINTF("decode nbuffer=%d buffer=%s\n", arg_nhuffer, arg_buffer);
 
-  if (buffer[0] == DXP_GAMEREQ)
+  if (arg_buffer[0] == DXP_GAMEREQ)
   {
     //ignore version
 
@@ -269,9 +264,9 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
  
     char string[MY_LINE_MAX];
 
-    HARDBUG((i + 31) >= nbuffer)
+    HARDBUG((i + 31) >= arg_nhuffer)
 
-    strncpy(your_name, buffer + i, 32);
+    strncpy(your_name, arg_buffer + i, 32);
 
     your_name[32] = '\0';
 
@@ -279,53 +274,53 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
 
     i += 32;
 
-    HARDBUG(i >= nbuffer)
+    HARDBUG(i >= arg_nhuffer)
 
-    char game_colour = buffer[i];
+    char game_colour = arg_buffer[i];
     i++;
 
     PRINTF("game_colour=%c\n", game_colour);
 
     if (game_colour == 'W')
-      with->DXP_game_colour = WHITE_BIT;
+      object->DXP_game_colour = WHITE_BIT;
     else
-      with->DXP_game_colour = BLACK_BIT;
+      object->DXP_game_colour = BLACK_BIT;
 
     int game_time;
  
-    HARDBUG((i + 2) >= nbuffer)
-    HARDBUG(sscanf(buffer + i, "%3d", &game_time) != 1)
+    HARDBUG((i + 2) >= arg_nhuffer)
+    HARDBUG(sscanf(arg_buffer + i, "%3d", &game_time) != 1)
     i += 3;
 
     PRINTF("game_time=%d\n", game_time);
 
-    with->DXP_game_time = game_time * 60;
+    object->DXP_game_time = game_time * 60;
 
     int game_moves;
 
-    HARDBUG((i + 2) >= nbuffer)
-    HARDBUG(sscanf(buffer + i, "%3d", &game_moves) != 1)
+    HARDBUG((i + 2) >= arg_nhuffer)
+    HARDBUG(sscanf(arg_buffer + i, "%3d", &game_moves) != 1)
     i += 3;
 
     PRINTF("game_moves=%d\n", game_moves);
 
-    with->DXP_game_moves = game_moves;
+    object->DXP_game_moves = game_moves;
  
-    HARDBUG(i >= nbuffer)
-    if (buffer[i] == 'A')
+    HARDBUG(i >= arg_nhuffer)
+    if (arg_buffer[i] == 'A')
     {
       PRINTF("starting position\n");
 
-      string2board(&(with->DXP_search.S_board), STARTING_POSITION);
+      string2board(&(object->DXP_search.S_board), STARTING_POSITION, TRUE);
     }
-    else if (buffer[i] == 'B')
+    else if (arg_buffer[i] == 'B')
     {
       i++;
-      HARDBUG(i >= nbuffer)
+      HARDBUG(i >= arg_nhuffer)
 
-      if (buffer[i] == 'W')
+      if (arg_buffer[i] == 'W')
         string[0] = 'w';
-      else if (buffer[i] == 'Z')
+      else if (arg_buffer[i] == 'Z')
         string[0] = 'b';
       else
         FATAL("error in B/colour2move", EXIT_FAILURE)
@@ -333,17 +328,17 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
       for (int j = 1; j <= 50; j++)
       {
         i++;
-        HARDBUG(i >= nbuffer)
+        HARDBUG(i >= arg_nhuffer)
   
-        if (buffer[i] == 'e')
+        if (arg_buffer[i] == 'e')
           string[j] = *nn;
-        else if (buffer[i] == 'w')
+        else if (arg_buffer[i] == 'w')
           string[j] = *wO;
-        else if (buffer[i] == 'z')
+        else if (arg_buffer[i] == 'z')
           string[j] = *bO;
-        else if (buffer[i] == 'W')
+        else if (arg_buffer[i] == 'W')
           string[j] = *wX;
-        else if (buffer[i] == 'Z')
+        else if (arg_buffer[i] == 'Z')
           string[j] = *bX;
         else
           FATAL("error in B/position", EXIT_FAILURE)
@@ -353,24 +348,24 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
 
       PRINTF("string=%s\n", string);
 
-      string2board(&(with->DXP_search.S_board), string);
+      string2board(&(object->DXP_search.S_board), string, TRUE);
 
       PRINTF("starting position\n");
 
-      print_board(&(with->DXP_search.S_board));
+      print_board(&(object->DXP_search.S_board));
     }
     else
       FATAL("error in DXP", EXIT_FAILURE)
 
     return(DXP_GAMEREQ);
   } 
-  else if (buffer[0] == DXP_GAMEACC)
+  else if (arg_buffer[0] == DXP_GAMEACC)
   {
     int i = 1;
 
-    HARDBUG((i + 31) >= nbuffer)
+    HARDBUG((i + 31) >= arg_nhuffer)
 
-    strncpy(your_name, buffer + i, 32);
+    strncpy(your_name, arg_buffer + i, 32);
 
     your_name[32] = '\0';
 
@@ -378,23 +373,23 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
 
     i += 32;
 
-    HARDBUG(i >= nbuffer)
+    HARDBUG(i >= arg_nhuffer)
 
-    char code = buffer[i];
+    char code = arg_buffer[i];
 
     PRINTF("acceptance code=%c\n", code);
 
     return(DXP_GAMEACC);
   }
-  else if (buffer[0] == DXP_MOVE)
+  else if (arg_buffer[0] == DXP_MOVE)
   {
     //ignore time
     
     int i = 5;
 
     int f;
-    HARDBUG(i >= nbuffer)
-    HARDBUG(sscanf(buffer + i, "%2d", &f) != 1)
+    HARDBUG(i >= arg_nhuffer)
+    HARDBUG(sscanf(arg_buffer + i, "%2d", &f) != 1)
     HARDBUG(f < 1)
     HARDBUG(f > 50)
     PRINTF("f=%d\n", f);
@@ -403,8 +398,8 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
     i += 2;
 
     int t;
-    HARDBUG(i >= nbuffer)
-    HARDBUG(sscanf(buffer + i, "%2d", &t) != 1)
+    HARDBUG(i >= arg_nhuffer)
+    HARDBUG(sscanf(arg_buffer + i, "%2d", &t) != 1)
     HARDBUG(t < 1)
     HARDBUG(t > 50)
     PRINTF("t=%d\n", t);
@@ -412,8 +407,8 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
     i += 2;
 
     int n;
-    HARDBUG(i >= nbuffer)
-    HARDBUG(sscanf(buffer + i, "%2d", &n) != 1)
+    HARDBUG(i >= arg_nhuffer)
+    HARDBUG(sscanf(arg_buffer + i, "%2d", &n) != 1)
     HARDBUG(n > NPIECES_MAX)
     PRINTF("n=%d\n", n);
     i += 2;
@@ -421,8 +416,8 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
     int c[NPIECES_MAX];
     for (int j = 0; j < n; j++)
     { 
-      HARDBUG(i >= nbuffer)
-      HARDBUG(sscanf(buffer + i, "%2d", c + j) != 1)
+      HARDBUG(i >= arg_nhuffer)
+      HARDBUG(sscanf(arg_buffer + i, "%2d", c + j) != 1)
       HARDBUG(c[j] < 1)
       HARDBUG(c[j] > 50) 
       PRINTF("j=%d c[j]=%d\n", j, c[j]);
@@ -434,7 +429,7 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->DXP_search.S_board), &moves_list, FALSE);
+    gen_moves(&(object->DXP_search.S_board), &moves_list, FALSE);
 
     HARDBUG(moves_list.nmoves == 0)
 
@@ -487,40 +482,40 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
 
     move2bstring(&moves_list, jmove, move);
 
-    strcpy(with->DXP_move_string, bdata(move));
+    strcpy(object->DXP_move_string, bdata(move));
 
     BDESTROY(move)
 
-    PRINTF("DXP_move_string=%s\n", with->DXP_move_string);
+    PRINTF("DXP_move_string=%s\n", object->DXP_move_string);
 
     return(DXP_MOVE);
   }
-  else if (buffer[0] == DXP_GAMEEND)
+  else if (arg_buffer[0] == DXP_GAMEEND)
   {
     int i = 1;
 
-    HARDBUG(i >= nbuffer)
+    HARDBUG(i >= arg_nhuffer)
 
-    PRINTF("reason=%c\n", buffer[i]);
+    PRINTF("reason=%c\n", arg_buffer[i]);
 
-    with->DXP_game_code = buffer[i];
+    object->DXP_game_code = arg_buffer[i];
 
     i++;
 
-    HARDBUG(i >= nbuffer)
-    PRINTF("stop code=%c\n", buffer[i]);
+    HARDBUG(i >= arg_nhuffer)
+    PRINTF("stop code=%c\n", arg_buffer[i]);
 
     return(DXP_GAMEEND);
   }
-  else if (buffer[0] == DXP_CHAT)
+  else if (arg_buffer[0] == DXP_CHAT)
   {
     return(DXP_CHAT);
   }
-  else if (buffer[0] == DXP_BACKREQ)
+  else if (arg_buffer[0] == DXP_BACKREQ)
   {
     FATAL("DXP_BACKREQ message not implemented", EXIT_FAILURE)
   }
-  else if (buffer[0] == DXP_BACKACC)
+  else if (arg_buffer[0] == DXP_BACKACC)
   {
     FATAL("DXP_BACKACC message not implemented", EXIT_FAILURE)
   }
@@ -532,9 +527,9 @@ char decode(int nbuffer, char *buffer, dxp_t *with)
 }
 
 //read from socket until \0
-int reads(int sockfd, char buffer[MY_LINE_MAX], int *nbuffer)
+int reads(int arg_sockfd, char arg_buffer[MY_LINE_MAX], int *arg_nbuffer)
 {
-  *nbuffer = 0;
+  *arg_nbuffer = 0;
 
   int i;
 
@@ -549,7 +544,7 @@ int reads(int sockfd, char buffer[MY_LINE_MAX], int *nbuffer)
       int n;
       char c;
   
-      if ((n = compat_socket_read(sockfd, &c, 1)) == INVALID)
+      if ((n = compat_socket_read(arg_sockfd, &c, 1)) == INVALID)
         return(INVALID);
   
       if (n != 1)
@@ -559,44 +554,44 @@ int reads(int sockfd, char buffer[MY_LINE_MAX], int *nbuffer)
         return(INVALID);
       }
   
-      buffer[i++] = c;
+      arg_buffer[i++] = c;
   
       if (c == '\0') break;
     }
 
-    if (buffer[0] == DXP_CHAT)
+    if (arg_buffer[0] == DXP_CHAT)
     {
-      PRINTF("ignoring DXP_CHAT %s\n", buffer);
+      PRINTF("ignoring DXP_CHAT %s\n", arg_buffer);
       continue;
     }
 
     break;
   }
-  *nbuffer = i;
+  *arg_nbuffer = i;
   return(i);
 }
 
-local char *secs2string(int t)
+local char *secs2string(int arg_t)
 {
   local char string[MY_LINE_MAX];
   int hours;
   int minutes;
   int seconds;
 
-  hours = t / 3600;
-  minutes = (t - hours * 3600) / 60;
-  seconds = t - hours * 3600 - minutes * 60;
-  HARDBUG((hours * 3600 + minutes * 60 + seconds) != t)
+  hours = arg_t / 3600;
+  minutes = (arg_t - hours * 3600) / 60;
+  seconds = arg_t - hours * 3600 - minutes * 60;
+  HARDBUG((hours * 3600 + minutes * 60 + seconds) != arg_t)
 
   snprintf(string, MY_LINE_MAX, "%02d:%02d:%02d", hours, minutes, seconds);
   return(string);
 }
 
-local char *rtrim(char *trim)
+local char *rtrim(char *arg_trim)
 {
   static char strim[MY_LINE_MAX];
 
-  strcpy(strim, trim);
+  strcpy(strim, arg_trim);
 
   int i;
 
@@ -609,7 +604,7 @@ local char *rtrim(char *trim)
   return(strim);
 }
 
-local int play_game(dxp_t *with, int sockfd)
+local int play_game(dxp_t *object, int arg_sockfd)
 {
   int result = INVALID;
 
@@ -619,7 +614,7 @@ local int play_game(dxp_t *with, int sockfd)
 
   game_state.set_event(&game_state, event);
 
-  if (IS_WHITE(with->DXP_game_colour))
+  if (IS_WHITE(object->DXP_game_colour))
   {
     game_state.set_white(&game_state, rtrim(my_name));
     game_state.set_black(&game_state, rtrim(your_name));
@@ -632,66 +627,61 @@ local int play_game(dxp_t *with, int sockfd)
 
   BSTRING(bfen)
 
-  board2fen(with->DXP_search.S_board.board_colour2move,
-    with->DXP_search.S_board.board_white_man_bb,
-    with->DXP_search.S_board.board_black_man_bb,
-    with->DXP_search.S_board.board_white_king_bb,
-    with->DXP_search.S_board.board_black_king_bb,
-    bfen, FALSE);
+  board2fen(&(object->DXP_search.S_board), bfen, FALSE);
 
   game_state.set_starting_position(&game_state, bdata(bfen));
 
   BDESTROY(bfen)
 
-  if (IS_BLACK(with->DXP_search.S_board.board_colour2move))
+  if (IS_BLACK(object->DXP_search.S_board.board_colour2move))
     game_state.push_move(&game_state, "...", NULL);
 
   int nbuffer;
   char buffer[MY_LINE_MAX];
 
-  with->DXP_game_time_used = 0; 
-  with->DXP_move_number = 0;
+  object->DXP_game_time_used = 0; 
+  object->DXP_move_number = 0;
 
   time_control_t time_control;
 
-  configure_time_control(with->DXP_game_time,
-    with->DXP_game_moves, &time_control);
+  configure_time_control(object->DXP_game_time,
+    object->DXP_game_moves, &time_control);
 
   while(TRUE)
   {
-    print_board(&(with->DXP_search.S_board));
+    print_board(&(object->DXP_search.S_board));
 
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->DXP_search.S_board), &moves_list, FALSE);
+    gen_moves(&(object->DXP_search.S_board), &moves_list, FALSE);
 
-    if (with->DXP_search.S_board.board_colour2move != with->DXP_game_colour)
+    if (object->DXP_search.S_board.board_colour2move != object->DXP_game_colour)
     {
       if (moves_list.nmoves == 0)
       {
         PRINTF("waiting for DXP_GAMEEND..\n");
 
-        if (reads(sockfd, buffer, &nbuffer) == INVALID) break;
+        if (reads(arg_sockfd, buffer, &nbuffer) == INVALID) break;
   
-        char type = decode(nbuffer, buffer, with);
+        char type = decode(nbuffer, buffer, object);
     
         HARDBUG(type != DXP_GAMEEND)
 
         if (options.dxp_strict_gameend)
         {
-          encode(DXP_GAMEEND, with, buffer, &nbuffer);
+          encode(DXP_GAMEEND, object, buffer, &nbuffer);
 
           PRINTF("sending DXP_GAMEEND..\n");
   
           int nwrite;
 
-          if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
+          if ((nwrite = compat_socket_write(arg_sockfd, buffer, nbuffer)) ==
               INVALID) break;
         }
 
-        if (IS_WHITE(with->DXP_search.S_board.board_colour2move))
+        if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
           result = 0;
         else
           result = 2;
@@ -721,7 +711,7 @@ local int play_game(dxp_t *with, int sockfd)
 
       PRINTF("waiting for DXP_MOVE or DXP_GAMEEND..\n");
 
-      int nread = reads(sockfd, buffer, &nbuffer);
+      int nread = reads(arg_sockfd, buffer, &nbuffer);
 
       if (options.ponder)
       {
@@ -756,35 +746,35 @@ local int play_game(dxp_t *with, int sockfd)
 
       if (nread == INVALID) break;
 
-      char type = decode(nbuffer, buffer, with);
+      char type = decode(nbuffer, buffer, object);
   
       if (type == DXP_GAMEEND)
       {
         if (options.dxp_strict_gameend)
         {
-          encode(DXP_GAMEEND, with, buffer, &nbuffer);
+          encode(DXP_GAMEEND, object, buffer, &nbuffer);
 
           PRINTF("sending DXP_GAMEEND..\n");
 
           int nwrite;
 
-          if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
+          if ((nwrite = compat_socket_write(arg_sockfd, buffer, nbuffer)) ==
               INVALID) break;
         }
-        if (with->DXP_game_code == DXP_IGIVEUP)
+        if (object->DXP_game_code == DXP_IGIVEUP)
         {
-          if (IS_WHITE(with->DXP_search.S_board.board_colour2move))
+          if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
             result = 0;
           else
             result = 2;
         }
-        else if (with->DXP_game_code == DXP_DRAW)
+        else if (object->DXP_game_code == DXP_DRAW)
         {
           result = 1;
         }
-        else if (with->DXP_game_code == DXP_IWIN)
+        else if (object->DXP_game_code == DXP_IWIN)
         {
-          if (IS_WHITE(with->DXP_search.S_board.board_colour2move))
+          if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
             result = 2;
           else
             result = 0;
@@ -803,18 +793,18 @@ local int play_game(dxp_t *with, int sockfd)
 
       BSTRING(move)
 
-      HARDBUG(bassigncstr(move, with->DXP_move_string) != BSTR_OK)
+      HARDBUG(bassigncstr(move, object->DXP_move_string) == BSTR_ERR)
 
       HARDBUG((imove = search_move(&moves_list, move)) == INVALID)
 
       BDESTROY(move)
 
       if (compat_strcasecmp(comment, "NULL") == 0)
-        game_state.push_move(&game_state, with->DXP_move_string, NULL);
+        game_state.push_move(&game_state, object->DXP_move_string, NULL);
       else
-        game_state.push_move(&game_state, with->DXP_move_string, comment);
+        game_state.push_move(&game_state, object->DXP_move_string, comment);
 
-      do_move(&(with->DXP_search.S_board), imove, &moves_list);
+      do_move(&(object->DXP_search.S_board), imove, &moves_list);
     }
     else
     {  
@@ -823,15 +813,15 @@ local int play_game(dxp_t *with, int sockfd)
       if (moves_list.nmoves == 0)
       {
         PRINTF("DXP game lost (nmoves == 0)\n");
-        with->DXP_game_code = DXP_IGIVEUP;
+        object->DXP_game_code = DXP_IGIVEUP;
   
-        encode(DXP_GAMEEND, with, buffer, &nbuffer);
+        encode(DXP_GAMEEND, object, buffer, &nbuffer);
 
         PRINTF("sending DXP_GAMEEND..\n");
 
         int nwrite;
 
-        if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
+        if ((nwrite = compat_socket_write(arg_sockfd, buffer, nbuffer)) ==
             INVALID) break;
   
         HARDBUG(nwrite != nbuffer)
@@ -840,14 +830,14 @@ local int play_game(dxp_t *with, int sockfd)
         {
           PRINTF("waiting for DXP_GAMEEND..\n");
 
-          if (reads(sockfd, buffer, &nbuffer) == INVALID) break;
+          if (reads(arg_sockfd, buffer, &nbuffer) == INVALID) break;
   
-          char type = decode(nbuffer, buffer, with);
+          char type = decode(nbuffer, buffer, object);
       
           HARDBUG(type != DXP_GAMEEND)
         }
   
-        if (IS_WHITE(with->DXP_search.S_board.board_colour2move))
+        if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
           result = 0;
         else
           result = 2;
@@ -857,9 +847,9 @@ local int play_game(dxp_t *with, int sockfd)
 
       //check for known endgame
 
-      int egtb_mate = read_endgame(&(with->DXP_search),
-                                   with->DXP_search.S_board.board_colour2move,
-                                   TRUE);
+      int egtb_mate = read_endgame(&(object->DXP_search),
+                                   object->DXP_search.S_board.board_colour2move,
+                                   NULL);
     
       if (egtb_mate != ENDGAME_UNKNOWN)
       {
@@ -869,7 +859,7 @@ local int play_game(dxp_t *with, int sockfd)
         {
           PRINTF("DXP game draw (egtb_mate=%d)\n", egtb_mate);
 
-          with->DXP_game_code = DXP_DRAW;
+          object->DXP_game_code = DXP_DRAW;
 
           result = 1;
         }
@@ -877,9 +867,9 @@ local int play_game(dxp_t *with, int sockfd)
         {
           PRINTF("DXP game won (egtb_mate=%d)\n", egtb_mate);
 
-          with->DXP_game_code = DXP_IWIN;
+          object->DXP_game_code = DXP_IWIN;
 
-          if (IS_WHITE(with->DXP_search.S_board.board_colour2move))
+          if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
             result = 2;
           else
             result = 0;
@@ -888,21 +878,21 @@ local int play_game(dxp_t *with, int sockfd)
         {
           PRINTF("DXP game lost (egtb_mate=%d)\n", egtb_mate);
 
-          with->DXP_game_code = DXP_IGIVEUP;
+          object->DXP_game_code = DXP_IGIVEUP;
 
-          if (IS_WHITE(with->DXP_search.S_board.board_colour2move))
+          if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
             result = 0;
           else
             result = 2;
         }
 
-        encode(DXP_GAMEEND, with, buffer, &nbuffer);
+        encode(DXP_GAMEEND, object, buffer, &nbuffer);
 
         PRINTF("sending DXP_GAMEEND..\n");
   
         int nwrite;
 
-        if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
+        if ((nwrite = compat_socket_write(arg_sockfd, buffer, nbuffer)) ==
             INVALID) break;
   
         HARDBUG(nwrite != nbuffer)
@@ -911,9 +901,9 @@ local int play_game(dxp_t *with, int sockfd)
         {
           PRINTF("waiting for DXP_GAMEEND..\n");
 
-          if (reads(sockfd, buffer, &nbuffer) == INVALID) break;
+          if (reads(arg_sockfd, buffer, &nbuffer) == INVALID) break;
     
-          char type = decode(nbuffer, buffer, with);
+          char type = decode(nbuffer, buffer, object);
       
           HARDBUG(type != DXP_GAMEEND)
         }
@@ -921,20 +911,20 @@ local int play_game(dxp_t *with, int sockfd)
         break;
       }
 
-      if (with->DXP_move_number >=
-          (with->DXP_game_moves + MARGIN))
+      if (object->DXP_move_number >=
+          (object->DXP_game_moves + MARGIN))
       {
         PRINTF("moves exceeded\n");
 
-        with->DXP_game_code = DXP_UNKNOWN;
+        object->DXP_game_code = DXP_UNKNOWN;
 
-        encode(DXP_GAMEEND, with, buffer, &nbuffer);
+        encode(DXP_GAMEEND, object, buffer, &nbuffer);
 
         PRINTF("sending DXP_GAMEEND..\n");
   
         int nwrite;
 
-        if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
+        if ((nwrite = compat_socket_write(arg_sockfd, buffer, nbuffer)) ==
             INVALID) break;
   
         HARDBUG(nwrite != nbuffer)
@@ -946,7 +936,7 @@ local int play_game(dxp_t *with, int sockfd)
 
       BSTRING(bbest_move)
 
-      HARDBUG(bassigncstr(bbest_move, "NULL") != BSTR_OK)
+      HARDBUG(bassigncstr(bbest_move, "NULL") == BSTR_ERR)
 
       int best_score;
       int best_depth;
@@ -956,11 +946,11 @@ local int play_game(dxp_t *with, int sockfd)
       //check for book
 
       if (options.dxp_book)
-        return_book_move(&(with->DXP_search.S_board), &moves_list, bbest_move);
+        return_book_move(&(object->DXP_search.S_board), &moves_list, bbest_move);
   
       if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
       {
-        HARDBUG(bassigncstr(bcomment, "book") != BSTR_OK)
+        HARDBUG(bassigncstr(bcomment, "book") == BSTR_ERR)
 
         PRINTF("\nbook_move=%s\n", bdata(bbest_move));
 
@@ -978,7 +968,7 @@ local int play_game(dxp_t *with, int sockfd)
         {
           move2bstring(&moves_list, 0, bbest_move);
   
-          HARDBUG(bassigncstr(bcomment, "only move") != BSTR_OK)
+          HARDBUG(bassigncstr(bcomment, "only move") == BSTR_ERR)
 
           best_score = 0;
   
@@ -988,7 +978,7 @@ local int play_game(dxp_t *with, int sockfd)
         {
           //configure thread for search
   
-          set_time_limit(with->DXP_move_number, &time_control);
+          set_time_limit(object->DXP_move_number, &time_control);
   
           enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_STATE, game_state.get_state(&game_state));
@@ -1015,11 +1005,11 @@ local int play_game(dxp_t *with, int sockfd)
                 HARDBUG(sscanf(bdata(message.message_text), "%s%d%d",
                                cbest_move, &best_score, &best_depth) != 3)
    
-                HARDBUG(bassigncstr(bbest_move, cbest_move) != BSTR_OK)
+                HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
   
                 CDESTROY(cbest_move)
 
-                HARDBUG(bassign(bcomment, message.message_text) != BSTR_OK)
+                HARDBUG(bassign(bcomment, message.message_text) == BSTR_ERR)
   
                 break;
               }
@@ -1034,39 +1024,39 @@ local int play_game(dxp_t *with, int sockfd)
   
         double move_time = t2 - t1;
   
-        update_time_control(with->DXP_move_number, move_time,
+        update_time_control(object->DXP_move_number, move_time,
           &time_control);
   
-        with->DXP_game_time_used += move_time;
+        object->DXP_game_time_used += move_time;
   
-        with->DXP_move_number++;
+        object->DXP_move_number++;
   
         PRINTF("used   %s\n", secs2string(move_time));
   
-        PRINTF("total  %s\n", secs2string(with->DXP_game_time_used));
+        PRINTF("total  %s\n", secs2string(object->DXP_game_time_used));
   
-        PRINTF("remain %s\n", secs2string(with->DXP_game_time -
-                                          with->DXP_game_time_used));
+        PRINTF("remain %s\n", secs2string(object->DXP_game_time -
+                                          object->DXP_game_time_used));
   
         PRINTF("\n* * * * * * * * * * %s %d %d\n\n",
           bdata(bbest_move), best_score, best_depth);
       }
 
-      strcpy(with->DXP_move_string, bdata(bbest_move));
+      strcpy(object->DXP_move_string, bdata(bbest_move));
   
       if (options.dxp_annotate_level == 0)
-        game_state.push_move(&game_state, with->DXP_move_string, NULL);
+        game_state.push_move(&game_state, object->DXP_move_string, NULL);
       else
-        game_state.push_move(&game_state, with->DXP_move_string,
+        game_state.push_move(&game_state, object->DXP_move_string,
                              bdata(bcomment));
   
-      encode(DXP_MOVE, with, buffer, &nbuffer);
+      encode(DXP_MOVE, object, buffer, &nbuffer);
 
       PRINTF("sending DXP_MOVE..\n");
   
       int nwrite;
 
-      if ((nwrite = compat_socket_write(sockfd, buffer, nbuffer)) ==
+      if ((nwrite = compat_socket_write(arg_sockfd, buffer, nbuffer)) ==
           INVALID) break;
 
       HARDBUG(nwrite != nbuffer)
@@ -1075,7 +1065,7 @@ local int play_game(dxp_t *with, int sockfd)
 
       HARDBUG((imove = search_move(&moves_list, bbest_move)) == INVALID)
 
-      do_move(&(with->DXP_search.S_board), imove, &moves_list);
+      do_move(&(object->DXP_search.S_board), imove, &moves_list);
 
       BDESTROY(bcomment)
 
@@ -1208,7 +1198,7 @@ local void dxp_game_initiator(int arg_fd)
 
       PRINTF("event=%s\n", event);
 
-      fen2board(with, fen);
+      fen2board(&(with->DXP_search.S_board), fen, TRUE);
 
       PRINTF("The starting position for game %d is:\n", igame);
 

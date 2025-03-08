@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -18,19 +18,19 @@ typedef struct
   arg_t command_args[NARGS_MAX];
 } command_t;
 
-local void line2command(char *line, command_t *with)
+local void line2command(char *arg_line, command_t *object)
 {
-  with->command = NULL;
-  with->command_nargs = 0;
+  object->command = NULL;
+  object->command_nargs = 0;
 
-  char *c = line;
+  char *c = arg_line;
 
   //command
 
   while(isspace(*c)) c++;
   if (*c == '\0') return;
 
-  with->command = c;
+  object->command = c;
 
   while(isgraph(*c)) c++;
 
@@ -40,7 +40,7 @@ local void line2command(char *line, command_t *with)
 
   c++;
 
-  PRINTF("command=%s\n", with->command);
+  PRINTF("command=%s\n", object->command);
 
   //params
 
@@ -50,9 +50,9 @@ local void line2command(char *line, command_t *with)
 
     if (*c == '\0') return;
 
-    HARDBUG(with->command_nargs >= NARGS_MAX)
+    HARDBUG(object->command_nargs >= NARGS_MAX)
 
-    arg_t *with_param = with->command_args + with->command_nargs;
+    arg_t *with_param = object->command_args + object->command_nargs;
 
     with_param->arg_name = c;
     with_param->arg_value = NULL;
@@ -97,22 +97,22 @@ local void line2command(char *line, command_t *with)
       }
       PRINTF("arg_value=%s\n", with_param->arg_value);
     }
-    with->command_nargs++;
+    object->command_nargs++;
   }
 }
 
-local void write_to_hub(char *line)
+local void write_to_hub(char *arg_line)
 {
-  int nline = strlen(line);
+  int nline = strlen(arg_line);
 
-  PRINTF("write_to_hub: %d:%s", nline, line);
+  PRINTF("write_to_hub: %d:%s", nline, arg_line);
 
-  HARDBUG(line[nline - 1] != '\n')
+  HARDBUG(arg_line[nline - 1] != '\n')
 
-  HARDBUG(compat_write(1, line, nline) != nline)
+  HARDBUG(compat_write(1, arg_line, nline) != nline)
 }
 
-local char *pgets(char *s, int size, pipe_t pfd)
+local char *pgets(char *arg_s, int arg_size, pipe_t arg_pfd)
 {
   //read pipe until '\n'
 
@@ -125,36 +125,36 @@ local char *pgets(char *s, int size, pipe_t pfd)
 
     //error 
 
-    if (pfd == 0)
+    if (arg_pfd == 0)
     {
       if ((n = compat_read(0, &c, 1)) == INVALID) return(NULL);
     }
     else
     {
-      if ((n = compat_pipe_read(pfd, &c, 1)) == INVALID) return(NULL);
+      if ((n = compat_pipe_read(arg_pfd, &c, 1)) == INVALID) return(NULL);
     }
 
     //eof
 
     if (n == 0) return(NULL);
 
-    HARDBUG(i >= (size - 1))
+    HARDBUG(i >= (arg_size - 1))
 
-    if ((s[i++] = c) == '\n') break;
+    if ((arg_s[i++] = c) == '\n') break;
   }
 
-  s[i++] = '\0';
+  arg_s[i++] = '\0';
 
-  return(s);
+  return(arg_s);
 }
 
-local int read_from_hub(char line[MY_LINE_MAX])
+local int read_from_hub(char arg_line[MY_LINE_MAX])
 {
   PRINTF("waiting for input..\n");
 
-  if (pgets(line, MY_LINE_MAX, 0) == NULL) return(INVALID);
+  if (pgets(arg_line, MY_LINE_MAX, 0) == NULL) return(INVALID);
 
-  PRINTF("read_from_hub: %s", line);
+  PRINTF("read_from_hub: %s", arg_line);
 
   return(TRUE);
 }
@@ -172,7 +172,7 @@ void hub(void)
 
   search_t *with = &search;
 
-  string2board(&(with->S_board), STARTING_POSITION);
+  string2board(&(with->S_board), STARTING_POSITION, TRUE);
 
   state_t game_state;
   
@@ -206,18 +206,13 @@ void hub(void)
 
       HARDBUG(compat_strcasecmp(name, "pos") != 0)
 
-      string2board(&(with->S_board), start_board);
+      string2board(&(with->S_board), start_board, TRUE);
 
       print_board(&(with->S_board));
 
       BSTRING(bfen)
 
-      board2fen(with->S_board.board_colour2move,
-        with->S_board.board_white_man_bb,
-        with->S_board.board_black_man_bb,
-        with->S_board.board_white_king_bb, 
-        with->S_board.board_black_king_bb,
-        bfen, FALSE);
+      board2fen(&(with->S_board), bfen, FALSE);
 
       game_state.set_starting_position(&game_state, bdata(bfen));
 
@@ -419,7 +414,7 @@ void hub(void)
 
       BSTRING(bmove_string)
 
-      HARDBUG(bassigncstr(bmove_string, "NULL") != BSTR_OK)
+      HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
 
       if ((compat_strcasecmp(name, "think") == 0) and (moves_list.nmoves == 1))
       {
@@ -486,7 +481,7 @@ void hub(void)
           HARDBUG(sscanf(bdata(message.message_text), "%s",
                          cmove_string) != 1)
 
-          HARDBUG(bassigncstr(bmove_string, cmove_string) != BSTR_OK)
+          HARDBUG(bassigncstr(bmove_string, cmove_string) == BSTR_ERR)
 
           CDESTROY(cmove_string)
         }
@@ -717,7 +712,7 @@ void init_hub(void)
   
         HARDBUG(!cJSON_IsString(cjson_value))
 
-        cJSON_SetStringValue(cjson_value, value);
+        cJSON_SetValuestring(cjson_value, value);
 
         cJSON_AddBoolToObject(parameter, "cli", TRUE);
       }
@@ -740,25 +735,25 @@ void init_hub(void)
   }
 }
 
-local void write_to_hub_client(char *line, pipe_t pfd)
+local void write_to_hub_client(char *arg_line, pipe_t arg_pfd)
 {
-  int nline = strlen(line);
+  int nline = strlen(arg_line);
 
-  PRINTF("write_to_hub_client: %d:%s", nline, line);
+  PRINTF("write_to_hub_client: %d:%s", nline, arg_line);
 
-  HARDBUG(line[nline - 1] != '\n')
+  HARDBUG(arg_line[nline - 1] != '\n')
 
-  HARDBUG(compat_pipe_write(pfd, line, nline) != nline)
+  HARDBUG(compat_pipe_write(arg_pfd, arg_line, nline) != nline)
 }
 
 
-local int read_from_hub_client(char line[MY_LINE_MAX], pipe_t pfd)
+local int read_from_hub_client(char arg_line[MY_LINE_MAX], pipe_t arg_pfd)
 {
   PRINTF("waiting for input..\n");
 
-  if (pgets(line, MY_LINE_MAX, pfd) == NULL) return(INVALID);
+  if (pgets(arg_line, MY_LINE_MAX, arg_pfd) == NULL) return(INVALID);
 
-  PRINTF("read_from_hub_client: %s", line);
+  PRINTF("read_from_hub_client: %s", arg_line);
 
   return(TRUE);
 }
@@ -772,8 +767,8 @@ local double return_sigmoid(double x)
   return(2.0 / (1.0 + exp(-x)) - 1.0);
 }
 
-local int play_game(search_t *with, int my_colour,
-  pipe_t parent2child, pipe_t child2parent)
+local int play_game(search_t *object, int arg_my_colour,
+  pipe_t arg_parent2child, pipe_t arg_child2parent)
 {
   int result = INVALID;
 
@@ -783,7 +778,7 @@ local int play_game(search_t *with, int my_colour,
 
   game_state.set_event(&game_state, event);
 
-  if (IS_WHITE(my_colour))
+  if (IS_WHITE(arg_my_colour))
   {
     game_state.set_white(&game_state, my_name);
     game_state.set_black(&game_state, your_name);
@@ -796,18 +791,13 @@ local int play_game(search_t *with, int my_colour,
 
   BSTRING(bfen)
 
-  board2fen(with->S_board.board_colour2move,
-    with->S_board.board_white_man_bb,
-    with->S_board.board_black_man_bb,
-    with->S_board.board_white_king_bb,
-    with->S_board.board_black_king_bb,
-    bfen, FALSE);
+  board2fen(&(object->S_board), bfen, FALSE);
 
   game_state.set_starting_position(&game_state, bdata(bfen));
 
   char pos[MY_LINE_MAX];
 
-  strcpy(pos, board2string(&(with->S_board), TRUE));
+  strcpy(pos, board2string(&(object->S_board), TRUE));
 
   PRINTF("pos=%s\n", pos);
 
@@ -826,22 +816,22 @@ local int play_game(search_t *with, int my_colour,
 
   while(TRUE)
   {
-    print_board(&(with->S_board));
+    print_board(&(object->S_board));
 
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->S_board), &moves_list, FALSE);
+    gen_moves(&(object->S_board), &moves_list, FALSE);
 
     PRINTF("nmy_game_moves_done=%d nyour_game_moves_done=%d\n",
       nmy_game_moves_done, nyour_game_moves_done);
 
-    if (with->S_board.board_colour2move != my_colour)
+    if (object->S_board.board_colour2move != arg_my_colour)
     {
       if (moves_list.nmoves == 0)
       {
-        if (IS_WHITE(with->S_board.board_colour2move))
+        if (IS_WHITE(object->S_board.board_colour2move))
           result = 0;
         else
           result = 2;
@@ -903,7 +893,7 @@ local int play_game(search_t *with, int my_colour,
       snprintf(line, MY_LINE_MAX, "pos pos=%s moves=\"%s\"\n",
                pos, moves_string);
 
-      write_to_hub_client(line, parent2child);
+      write_to_hub_client(line, arg_parent2child);
 
       int nyour_game_moves_left =
         options.hub_server_game_moves - nyour_game_moves_done;
@@ -914,9 +904,9 @@ local int play_game(search_t *with, int my_colour,
       snprintf(line, MY_LINE_MAX, "level moves=%d time=%d\n",
         nyour_game_moves_left, (int) round(your_game_time_left));
 
-      write_to_hub_client(line, parent2child);
+      write_to_hub_client(line, arg_parent2child);
 
-      write_to_hub_client("go think\n", parent2child);
+      write_to_hub_client("go think\n", arg_parent2child);
 
       PRINTF("waiting for 'info' or 'done'..\n");
 
@@ -926,7 +916,7 @@ local int play_game(search_t *with, int my_colour,
 
       while(TRUE)
       {
-        if (read_from_hub_client(line, child2parent) == INVALID) break;
+        if (read_from_hub_client(line, arg_child2parent) == INVALID) break;
       
         line2command(line, &command);
       
@@ -981,8 +971,8 @@ local int play_game(search_t *with, int my_colour,
 
       BSTRING(bmove_string)
 
-      HARDBUG(bassigncstr(bmove_string, command.command_args[0].arg_value) !=
-              BSTR_OK)
+      HARDBUG(bassigncstr(bmove_string, command.command_args[0].arg_value) ==
+              BSTR_ERR)
 
       int imove;
 
@@ -990,7 +980,7 @@ local int play_game(search_t *with, int my_colour,
 
       game_state.push_move(&game_state, bdata(bmove_string), NULL);
 
-      do_move(&(with->S_board), imove, &moves_list);
+      do_move(&(object->S_board), imove, &moves_list);
 
       BDESTROY(bmove_string)
     }
@@ -1000,7 +990,7 @@ local int play_game(search_t *with, int my_colour,
 
       if (moves_list.nmoves == 0)
       {
-        if (IS_WHITE(with->S_board.board_colour2move))
+        if (IS_WHITE(object->S_board.board_colour2move))
           result = 0;
         else
           result = 2;
@@ -1011,7 +1001,7 @@ local int play_game(search_t *with, int my_colour,
       //check for known endgame
 
       int egtb_mate =
-        read_endgame(with, with->S_board.board_colour2move, TRUE);
+        read_endgame(object, object->S_board.board_colour2move, NULL);
     
       if (egtb_mate != ENDGAME_UNKNOWN)
       {
@@ -1023,14 +1013,14 @@ local int play_game(search_t *with, int my_colour,
         }
         else if (egtb_mate > 0)
         {
-          if (IS_WHITE(with->S_board.board_colour2move))
+          if (IS_WHITE(object->S_board.board_colour2move))
             result = 2;
           else
             result = 0;
         }
         else
         {
-          if (IS_WHITE(with->S_board.board_colour2move))
+          if (IS_WHITE(object->S_board.board_colour2move))
             result = 0;
           else
             result = 2;
@@ -1051,11 +1041,11 @@ local int play_game(search_t *with, int my_colour,
       int best_score;
       int best_depth;
 
-      HARDBUG(bassigncstr(bbest_move, "NULL") != BSTR_OK)
+      HARDBUG(bassigncstr(bbest_move, "NULL") == BSTR_ERR)
 
       BSTRING(bbest_string)
 
-      HARDBUG(bassigncstr(bbest_string, "NULL") != BSTR_OK)
+      HARDBUG(bassigncstr(bbest_string, "NULL") == BSTR_ERR)
 
       PRINTF("\nthinking..\n");
 
@@ -1065,7 +1055,7 @@ local int play_game(search_t *with, int my_colour,
       {
         move2bstring(&moves_list, 0, bbest_move);
 
-        HARDBUG(bassigncstr(bbest_string, "only move") != BSTR_OK)
+        HARDBUG(bassigncstr(bbest_string, "only move") == BSTR_ERR)
 
         best_score = 0;
  
@@ -1074,11 +1064,11 @@ local int play_game(search_t *with, int my_colour,
       else
       {
         if (options.use_book)
-          return_book_move(&(with->S_board), &moves_list, bbest_move);
+          return_book_move(&(object->S_board), &moves_list, bbest_move);
       
         if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
         {
-          HARDBUG(bassigncstr(bbest_string, "book move") != BSTR_OK)
+          HARDBUG(bassigncstr(bbest_string, "book move") == BSTR_ERR)
 
           best_score = 0;
  
@@ -1108,7 +1098,7 @@ local int play_game(search_t *with, int my_colour,
               }
               else if (message.message_id == MESSAGE_RESULT)
               {
-                HARDBUG(bassign(bbest_string, message.message_text) != BSTR_OK)
+                HARDBUG(bassign(bbest_string, message.message_text) == BSTR_ERR)
 
                 PRINTF("got result %s\n", bdata(bbest_string));
 
@@ -1118,7 +1108,7 @@ local int play_game(search_t *with, int my_colour,
                                cbest_move,
                                &best_score, &best_depth) != 3)
 
-                HARDBUG(bassigncstr(bbest_move, cbest_move) != BSTR_OK)
+                HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
 
                 CDESTROY(cbest_move)
   
@@ -1194,7 +1184,7 @@ local int play_game(search_t *with, int my_colour,
                              cbest_move,
                              &best_score, &best_depth) != 3)
 
-              HARDBUG(bassigncstr(bbest_move, cbest_move) != BSTR_OK)
+              HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
 
               CDESTROY(cbest_move)
 
@@ -1215,12 +1205,7 @@ local int play_game(search_t *with, int my_colour,
       
         btrunc(bfen, 0);
 
-        board2fen(with->S_board.board_colour2move,
-          with->S_board.board_white_man_bb,
-          with->S_board.board_black_man_bb,
-          with->S_board.board_white_king_bb,
-          with->S_board.board_black_king_bb,
-          bfen, FALSE);
+        board2fen(&(object->S_board), bfen, FALSE);
       
         compat_fdprintf(fd, "%s {%.5f}\n", bdata(bfen),
                         return_sigmoid(best_score / 100.0));
@@ -1232,7 +1217,7 @@ local int play_game(search_t *with, int my_colour,
 
       BDESTROY(bbest_move)
 
-      do_move(&(with->S_board), imove, &moves_list);
+      do_move(&(object->S_board), imove, &moves_list);
     }
   }
 
@@ -1266,7 +1251,7 @@ local int play_game(search_t *with, int my_colour,
   return(result);
 }
 
-local void hub_server_game_initiator(pipe_t parent2child, pipe_t child2parent)
+local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2parent)
 {
   snprintf(my_name, MY_LINE_MAX, "GWD %s %s",
            REVISION, options.network_name);
@@ -1378,11 +1363,11 @@ local void hub_server_game_initiator(pipe_t parent2child, pipe_t child2parent)
 
       PRINTF("game=%d opening=%s\n", igame, opening);
 
-      fen2board(&(with->S_board), fen);
+      fen2board(&(with->S_board), fen, TRUE);
 
       print_board(&(with->S_board));
 
-      int result = play_game(with, my_colour, parent2child, child2parent);
+      int result = play_game(with, my_colour, arg_parent2child, arg_child2parent);
   
       if (result == 2)
       {
@@ -1415,7 +1400,7 @@ local void hub_server_game_initiator(pipe_t parent2child, pipe_t child2parent)
 #ifdef USE_OPENMPI
   if (my_mpi_globals.MY_MPIG_id_slave != INVALID)
   {
-    MPI_Allreduce(MPI_IN_PLACE, &nfen_mpi, 1, MPI_INT,
+    my_mpi_allreduce(MPI_IN_PLACE, &nfen_mpi, 1, MPI_INT,
       MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
 
     PRINTF("nfen=%d nfen_mpi=%d\n", nfen, nfen_mpi);
@@ -1423,13 +1408,13 @@ local void hub_server_game_initiator(pipe_t parent2child, pipe_t child2parent)
     //if options.hub_server_games is hit this is not true
     //HARDBUG(nfen_mpi != nfen)
 
-    MPI_Allreduce(MPI_IN_PLACE, &nwon, 1, MPI_INT,
+    my_mpi_allreduce(MPI_IN_PLACE, &nwon, 1, MPI_INT,
       MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-    MPI_Allreduce(MPI_IN_PLACE, &ndraw, 1, MPI_INT,
+    my_mpi_allreduce(MPI_IN_PLACE, &ndraw, 1, MPI_INT,
       MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-    MPI_Allreduce(MPI_IN_PLACE, &nlost, 1, MPI_INT,
+    my_mpi_allreduce(MPI_IN_PLACE, &nlost, 1, MPI_INT,
       MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-    MPI_Allreduce(MPI_IN_PLACE, &nunknown, 1, MPI_INT,
+    my_mpi_allreduce(MPI_IN_PLACE, &nunknown, 1, MPI_INT,
       MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
   }
 #endif
@@ -1441,9 +1426,9 @@ local void hub_server_game_initiator(pipe_t parent2child, pipe_t child2parent)
     results2csv(nwon, ndraw, nlost, nunknown);
 }
 
-void hub_server(pipe_t parent2child, pipe_t child2parent)
+void hub_server(pipe_t arg_parent2child, pipe_t arg_child2parent)
 {
-  write_to_hub_client("hub\n", parent2child);
+  write_to_hub_client("hub\n", arg_parent2child);
 
   PRINTF("waiting for 'wait'..\n");
 
@@ -1451,7 +1436,7 @@ void hub_server(pipe_t parent2child, pipe_t child2parent)
   {
     char line[MY_LINE_MAX];
 
-    if (read_from_hub_client(line, child2parent) == INVALID) return;
+    if (read_from_hub_client(line, arg_child2parent) == INVALID) return;
 
     command_t command;
   
@@ -1462,7 +1447,7 @@ void hub_server(pipe_t parent2child, pipe_t child2parent)
     if (compat_strcasecmp(command.command, "wait") == 0) break;
   }
 
-  write_to_hub_client("init\n", parent2child);
+  write_to_hub_client("init\n", arg_parent2child);
 
   PRINTF("waiting for 'ready'..\n");
 
@@ -1470,7 +1455,7 @@ void hub_server(pipe_t parent2child, pipe_t child2parent)
   {
     char line[MY_LINE_MAX];
 
-    if (read_from_hub_client(line, child2parent) == INVALID) return;
+    if (read_from_hub_client(line, arg_child2parent) == INVALID) return;
 
     command_t command;
   
@@ -1481,9 +1466,9 @@ void hub_server(pipe_t parent2child, pipe_t child2parent)
     if (compat_strcasecmp(command.command, "ready") == 0) break;
   }
 
-  hub_server_game_initiator(parent2child, child2parent);
+  hub_server_game_initiator(arg_parent2child, arg_child2parent);
 
-  write_to_hub_client("quit\n", parent2child);
+  write_to_hub_client("quit\n", arg_parent2child);
 
   //wait for close
 
@@ -1493,7 +1478,7 @@ void hub_server(pipe_t parent2child, pipe_t child2parent)
   {
     char line[MY_LINE_MAX];
 
-    if (read_from_hub_client(line, child2parent) == INVALID) return;
+    if (read_from_hub_client(line, arg_child2parent) == INVALID) return;
 
     command_t command;
   

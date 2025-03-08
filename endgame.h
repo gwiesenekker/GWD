@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef EndgameH
 #define EndgameH
 
@@ -25,7 +25,7 @@ typedef struct
 } entry_i16_t;
 
 void init_endgame(void);
-int read_endgame(search_t *, int, int);
+int read_endgame(search_t *, int, int *);
 void fin_endgame(void);
 void recompress_endgame(char *, int, int);
 

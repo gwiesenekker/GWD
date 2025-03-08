@@ -1,5 +1,7 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
+
+#undef GEN_CSV
 
 #define MY_BIT      WHITE_BIT
 #define my_colour   white
@@ -21,3 +23,29 @@
 #undef my_colour
 #undef your_colour
 
+int return_npieces(board_t *self)
+{
+  board_t *object = self;
+
+  return(BIT_COUNT(object->board_white_man_bb) +
+         BIT_COUNT(object->board_white_king_bb) +
+         BIT_COUNT(object->board_black_man_bb) +
+         BIT_COUNT(object->board_black_king_bb));
+}
+
+int return_material_score(board_t *self)
+{
+  board_t *object = self;
+
+  int nwhite_man = BIT_COUNT(object->board_white_man_bb);
+  int nblack_man = BIT_COUNT(object->board_black_man_bb);
+  int nwhite_king = BIT_COUNT(object->board_white_king_bb);
+  int nblack_king = BIT_COUNT(object->board_black_king_bb);
+
+  int material_score = (nwhite_man - nblack_man) * SCORE_MAN +
+                       (nwhite_king - nblack_king) * SCORE_KING;
+  if (IS_WHITE(object->board_colour2move))
+    return(material_score);
+  else
+    return(-material_score);
+}

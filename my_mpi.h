@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef MpiH
 #define MpiH
 
@@ -28,8 +28,17 @@ extern my_mpi_globals_t my_mpi_globals;
 #ifdef USE_OPENMPI
 void my_mpi_barrier(char *, MPI_Comm, int);
 void my_mpi_probe(MPI_Comm);
-void my_mpi_acquire_semaphore(MPI_Win);
-void my_mpi_release_semaphore(MPI_Win);
+
+void my_mpi_acquire_semaphore(MPI_Comm, MPI_Win);
+void my_mpi_release_semaphore(MPI_Comm, MPI_Win);
+
+int my_mpi_allreduce(const void *sendbuf, void *recvbuf, int count,
+                     MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
+
+int my_mpi_win_allocate(MPI_Aint size, int disp_unit, MPI_Info info,
+                        MPI_Comm comm, void *baseptr, MPI_Win *win);
+int my_mpi_win_fence(MPI_Comm comm, int assert, MPI_Win win);
+
 void test_mpi(void);
 #endif
 

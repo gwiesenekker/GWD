@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef BoardsH
 #define BoardsH
 
@@ -58,6 +58,10 @@
 #define my_king_key     the_king_key(my_colour)
 #define your_king_key   the_king_key(your_colour)
 
+#define the_row_empty_bb(X) cat2(X, _row_empty_bb)
+#define my_row_empty_bb     the_row_empty_bb(my_colour)
+#define your_row_empty_bb   the_row_empty_bb(your_colour)
+
 #define PV_MAX 256
 
 typedef i8_t pv_t;
@@ -96,6 +100,8 @@ typedef struct board
 
   node_t board_nodes[NODE_MAX];
 
+  pattern_mask_t *board_pattern_mask;
+
   network_t board_network;
 
   char board_string[MY_LINE_MAX];
@@ -126,15 +132,17 @@ extern ui64_t right_wing_bb;
 extern ui64_t left_half_bb;
 extern ui64_t right_half_bb;
 
-void construct_board(void *, my_printf_t *);
+extern ui64_t white_row_empty_bb;
+extern ui64_t black_row_empty_bb;
+
+void construct_board(void *, my_printf_t *, int);
 void push_board_state(void *self);
 void pop_board_state(void *self);
 
 hash_key_t return_key_from_bb(void *);
-void check_inputs_against_board(void *, network_t *);
-void string2board(board_t *, char *);
-void fen2board(void *, char *);
-void board2fen(int, ui64_t, ui64_t, ui64_t, ui64_t, bstring, int);
+void string2board(board_t *, char *, int);
+void fen2board(board_t *, char *, int);
+void board2fen(board_t *, bstring, int);
 void print_board(board_t *);
 void init_boards();
 void state2board(board_t *, state_t *);

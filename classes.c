@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 //objects are derived from a class
@@ -62,7 +62,7 @@ local void deregister_object(class_t *self, void *object)
 //init_class registers the class constructor register_object
 //and the class destructor deregister_object
 
-class_t *init_class(int nobjects_max, ctor_t ctor, dtor_t dtor, iter_t iter)
+class_t *init_class(int nobjects_max, ctor_t arg_ctor, dtor_t arg_dtor, iter_t arg_iter)
 {
   class_t *self;
  
@@ -89,15 +89,15 @@ class_t *init_class(int nobjects_max, ctor_t ctor, dtor_t dtor, iter_t iter)
 
   //register the object constructor
 
-  self->objects_ctor = ctor;
+  self->objects_ctor = arg_ctor;
 
   //register the object destructor
 
-  self->objects_dtor = dtor;
+  self->objects_dtor = arg_dtor;
 
   //register the object iterator
 
-  self->objects_iter = iter;
+  self->objects_iter = arg_iter;
 
   //make the class constructor thread safe
 

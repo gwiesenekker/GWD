@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 /*
@@ -10,11 +10,11 @@ uint64_t splitmix64_next(uint64_t* state) {
 }
 */
 
-local ui64_t splitmix64(ui64_t *seed)
+local ui64_t splitmix64(ui64_t *arg_seed)
 {
-  *seed += 0x9e3779b97f4a7c15ULL;
+  *arg_seed += 0x9e3779b97f4a7c15ULL;
 
-  ui64_t result = *seed;
+  ui64_t result = *arg_seed;
 
   result = (result ^ (result >> 30)) * 0xbf58476d1ce4e5b9ULL;
 
@@ -153,7 +153,11 @@ void test_my_random(void)
     stats_t stats;
     construct_stats(&stats);
   
-    for (i64_t isample = 0; isample < (TEST_NBUCKETS * TEST_NFILL); isample++)
+    int nsamples = TEST_NBUCKETS * TEST_NFILL;
+
+    if (RUNNING_ON_VALGRIND) nsamples = TEST_NBUCKETS;
+
+    for (i64_t isample = 0; isample < nsamples; isample++)
     {
       int r = (return_my_random(&test_random) >> ishift) & TEST_MASK;
   

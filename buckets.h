@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef BucketsH
 #define BucketsH
 
@@ -7,6 +7,10 @@
 
 typedef struct 
 {
+  my_printf_t *bucket_my_printf;
+
+  bstring bucket_name;
+
   double bucket_size;
   double bucket_min;
   double bucket_max;
@@ -17,15 +21,15 @@ typedef struct
 
   int nbuckets;
   i64_t *buckets;
-
-  pter_t printf_bucket;
-
 } bucket_t;
 
 void clear_bucket(void *);
 void update_bucket(void *, double);
 void printf_bucket(void *);
-void construct_bucket(void *, double, double, double, int);
+void construct_bucket(void *, char *, double, double, double, int);
+
+void my_mpi_bucket_aggregate(void *, MPI_Comm);
+
 void test_buckets(void);
 
 #endif

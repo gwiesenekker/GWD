@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef MctsH
 #define MctsH
 
@@ -9,7 +9,7 @@
 #define MCTS_THRESHOLD_LOST (-2 * SCORE_MAN)
 #define MCTS_THRESHOLD_WON  (2 * SCORE_MAN)
 
-#define MCTS_PLY_MAX 128
+#define MCTS_PLY_MAX 150
 
 typedef struct
 {
@@ -19,7 +19,10 @@ typedef struct
 
 extern mcts_globals_t mcts_globals;
 
-double mcts_shoot_outs(search_t *, int, int, int);
+int mcts_search(search_t *, int, int, int, moves_list_t *, int *, int);
+
+double mcts_shoot_outs(search_t *, int, int *, int, double,
+  int *, int *, int *);
 
 void init_mcts(void);
 

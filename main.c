@@ -1,6 +1,5 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
-
 
 //TODO: naming conventions type-qualifier, so not white_score but score_white
 
@@ -21,13 +20,9 @@ local void solve_problems(char *arg_name)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  FILE *fname, *ftmp;
+  FILE *ftmp;
   
-  HARDBUG((fname = fopen(arg_name, "r")) == NULL)
   HARDBUG((ftmp = fopen("tmp.fen", "w")) == NULL)
-
-  int nproblems = 0;
-  int nsolved = 0;
 
   search_t search;
 
@@ -35,22 +30,40 @@ local void solve_problems(char *arg_name)
 
   search_t *with = &search;
 
-  print_board(&(with->S_board));
+  //print_board(&(with->S_board));
 
-  char line[MY_LINE_MAX];
+  FILE *farg_name;
 
-  while(fgets(line, MY_LINE_MAX, fname) != NULL)
+  HARDBUG((farg_name = fopen(arg_name, "r")) == NULL)
+
+  struct bStream* bfarg_name;
+
+  HARDBUG((bfarg_name = bsopen((bNread) fread, farg_name)) == NULL)
+
+  BSTRING(bline)
+
+  BSTRING(bfen)
+
+  int nproblems = 0;
+
+  int nsolved = 0;
+
+  while (bsreadln(bline, bfarg_name, (char) '\n') == BSTR_OK)
   {
-    if (*line == '*') break;
-    if (*line == '#') continue;
+    if (bchar(bline, 0) == '*') break;
+    if (bchar(bline, 0) == '#') continue;
 
-    char fen[MY_LINE_MAX];
+    CSTRING(cfen, blength(bline))
 
-    HARDBUG(sscanf(line, "%[^\n]", fen) != 1)
+    HARDBUG(sscanf(bdata(bline), "%s", cfen) != 1)
+
+    HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
+
+    fen2board(&(with->S_board), bdata(bfen), FALSE);
+
+    CDESTROY(cfen)
 
     ++nproblems;
-
-    fen2board(&(with->S_board), fen);
 
     print_board(&(with->S_board));
 
@@ -76,6 +89,7 @@ local void solve_problems(char *arg_name)
     if (moves_list.nmoves > 0)
     {
       //options.hub=1;
+
       do_search(with, &moves_list,
         INVALID, INVALID, SCORE_MINUS_INFINITY, FALSE);
 
@@ -88,14 +102,131 @@ local void solve_problems(char *arg_name)
       else
       {
         PRINTF("did not solve problem #%d\n", nproblems);
-        HARDBUG(fprintf(ftmp, "%s\n", fen) < 0)
+
+        HARDBUG(fprintf(ftmp, "%s\n", bdata(bfen)) < 0)
       }
     }
   }
-  FCLOSE(fname)
-  FCLOSE(ftmp)
+  HARDBUG(bsclose(bfarg_name) == NULL)
+
+  FCLOSE(farg_name)
+
+  BDESTROY(bfen)
+
+  BDESTROY(bline)
 
   PRINTF("solved %d out of %d problems\n", nsolved, nproblems);
+
+  END_BLOCK
+}
+
+local void solve_problems_mcts(char *arg_name,
+  int arg_nshoot_outs, int arg_mcts_depth, double arg_mcts_time_limit)
+{
+  BEGIN_BLOCK(__FUNC__)
+
+  search_t search;
+
+  construct_search(&search, STDOUT, NULL);
+
+  search_t *with = &search;
+
+  //print_board(&(with->S_board));
+
+  fbuffer_t fcsv;
+
+  BSTRING(barg_name)
+
+  HARDBUG(bassigncstr(barg_name, arg_name) == BSTR_ERR)
+
+  construct_fbuffer(&fcsv, barg_name, ".csv", TRUE);
+
+  FILE *farg_name;
+
+  HARDBUG((farg_name = fopen(arg_name, "r")) == NULL)
+
+  struct bStream* bfarg_name;
+
+  HARDBUG((bfarg_name = bsopen((bNread) fread, farg_name)) == NULL)
+
+  BSTRING(bline)
+
+  BSTRING(bfen)
+
+  i64_t nproblems = 0;
+  i64_t nproblems_mpi = 0;
+
+  while (bsreadln(bline, bfarg_name, (char) '\n') == BSTR_OK)
+  {
+    if (bchar(bline, 0) == '*') break;
+    if (bchar(bline, 0) == '#') continue;
+
+    ++nproblems;
+
+    CSTRING(cfen, blength(bline))
+
+    double result;
+
+    HARDBUG(sscanf(bdata(bline), "%s {%lf}",
+                   cfen, &result) != 2)
+
+    HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
+
+    fen2board(&(with->S_board), bdata(bfen), FALSE);
+
+    CDESTROY(cfen)
+
+    if ((my_mpi_globals.MY_MPIG_nslaves > 0) and
+        (((nproblems - 1) % my_mpi_globals.MY_MPIG_nslaves) !=
+         my_mpi_globals.MY_MPIG_id_slave)) continue;
+
+    ++nproblems_mpi;
+
+    print_board(&(with->S_board));
+
+    moves_list_t moves_list;
+
+    construct_moves_list(&moves_list);
+
+    gen_moves(&(with->S_board), &moves_list, FALSE);
+
+    check_moves(&(with->S_board), &moves_list);
+
+    fprintf_moves_list(&moves_list, STDOUT, FALSE);
+
+    if (moves_list.nmoves > 0)
+    {
+      int nshoot_outs = arg_nshoot_outs;
+
+      double mcts_result =
+        mcts_shoot_outs(with, 0, &nshoot_outs,
+        arg_mcts_depth, arg_mcts_time_limit,
+        NULL, NULL, NULL);
+
+      PRINTF("mcts_result=%.6f\n", mcts_result);
+
+      append_fbuffer(&fcsv, "%.6f,%.6f\n", result, mcts_result);
+    }
+  }
+  HARDBUG(bsclose(bfarg_name) == NULL)
+
+  FCLOSE(farg_name)
+
+  flush_fbuffer(&fcsv, 0);
+
+  BDESTROY(bfen)
+
+  BDESTROY(bline)
+
+  PRINTF("nproblems=%lld nproblems_mpi=%lld\n", nproblems, nproblems_mpi);
+
+  my_mpi_allreduce(MPI_IN_PLACE, &nproblems_mpi, 1, MPI_LONG_LONG_INT,
+    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+  
+  HARDBUG(nproblems != nproblems_mpi)
+
+  BDESTROY(barg_name)
+
   END_BLOCK
 }
 
@@ -125,17 +256,109 @@ local void solve_problems_multi_threaded(char *arg_name)
   }
 }
 
-local char *secs2string(int t)
+local void txt2fen(char *arg_name)
+{
+  board_t board;
+
+  construct_board(&board, STDOUT, TRUE);
+
+  board_t *with = &board;
+
+  BSTRING(barg_name)
+
+  HARDBUG(bassigncstr(barg_name, arg_name) == BSTR_ERR)
+
+  int pdot;
+
+  HARDBUG((pdot = bstrrchr(barg_name, '.')) == BSTR_ERR)
+
+  BSTRING(bprefix)
+
+  HARDBUG(bassignmidstr(bprefix, barg_name, 0, pdot) == BSTR_ERR)
+
+  PRINTF("prefix=%s\n", bdata(bprefix));
+
+  BSTRING(bfen_name)
+
+  HARDBUG(bformata(bfen_name, "%s.fen", bdata(bprefix)) == BSTR_ERR)
+
+  PRINTF("fen_name=%s\n", bdata(bfen_name));
+
+  FILE *farg_name;
+
+  HARDBUG((farg_name = fopen(arg_name, "r")) == NULL)
+
+  struct bStream* bfarg_name;
+
+  HARDBUG((bfarg_name = bsopen((bNread) fread, farg_name)) == NULL)
+
+  FILE *ffen_name;
+
+  HARDBUG((ffen_name = fopen(bdata(bfen_name), "w")) == NULL)
+
+  FILE *fcsv;
+
+  HARDBUG((fcsv = fopen("xy.csv", "w")) == NULL)
+
+  //read txt
+
+  BSTRING(bline)
+
+  BSTRING(bfen)
+
+  while (bsreadln(bline, bfarg_name, (char) '\n') == BSTR_OK)
+  {
+    CSTRING(cposition, blength(bline))
+
+    double result;
+
+    HARDBUG(sscanf(bdata(bline), "%s {%lf}", cposition, &result) != 2)
+
+    //PRINTF("position=%s\n", cposition);
+
+    string2board(with, cposition, FALSE);
+
+    //print_board(with);
+
+    board2fen(with, bfen, FALSE);
+
+    CDESTROY(cposition)
+
+    HARDBUG(fprintf(ffen_name, "%s {%.6f}\n", bdata(bfen), result) < 0)
+
+    fprintf(fcsv, "%d,%.6f\n", return_material_score(with), result);
+  }
+
+  FCLOSE(ffen_name)
+
+  FCLOSE(fcsv)
+
+  HARDBUG(bsclose(bfarg_name) == NULL)
+
+  FCLOSE(farg_name)
+
+  BDESTROY(bfen)
+
+  BDESTROY(bline)
+
+  BDESTROY(bfen_name)
+
+  BDESTROY(bprefix)
+
+  BDESTROY(barg_name)
+}
+
+local char *secs2string(int arg_t)
 {
   local char string[MY_LINE_MAX];
   int hours;
   int minutes;
   int seconds;
 
-  hours = t / 3600;
-  minutes = (t - hours * 3600) / 60;
-  seconds = t - hours * 3600 - minutes * 60;
-  HARDBUG((hours * 3600 + minutes * 60 + seconds) != t)
+  hours = arg_t / 3600;
+  minutes = (arg_t - hours * 3600) / 60;
+  seconds = arg_t - hours * 3600 - minutes * 60;
+  HARDBUG((hours * 3600 + minutes * 60 + seconds) != arg_t)
 
   snprintf(string, MY_LINE_MAX, "%02d:%02d:%02d", hours, minutes, seconds);
   return(string);
@@ -143,8 +366,8 @@ local char *secs2string(int t)
 
 #define GAME_MOVES 40
 
-void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
-  int game_minutes, int used_minutes)
+void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
+  int arg_game_minutes, int arg_used_minutes)
 {
   my_random_t play_random;
 
@@ -154,13 +377,13 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
   construct_state(&game_state);
 
-  if (fexists(name))
+  if (fexists(arg_name))
   {
-    game_state.load(&game_state, name);
+    game_state.load(&game_state, arg_name);
   }
   else
   {
-    if (*colour == 'w')
+    if (*arg_colour == 'w')
     {
       game_state.set_white(&game_state, "Human");
       game_state.set_black(&game_state, "GWD");
@@ -174,13 +397,13 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
   int human_colour;
 
-  if (*colour == 'w')
+  if (*arg_colour == 'w')
     human_colour = WHITE_BIT;
   else
     human_colour = BLACK_BIT;
 
-  double game_time = game_minutes * 60.0;
-  double game_time_used = used_minutes * 60.0;
+  double game_time = arg_game_minutes * 60.0;
+  double game_time_used = arg_used_minutes * 60.0;
 
   search_t search;
 
@@ -260,7 +483,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
         if (automatic) 
         {
-          HARDBUG(bassigncstr(banswer, ".") != BSTR_OK)
+          HARDBUG(bassigncstr(banswer, ".") == BSTR_ERR)
         }
         else
         {
@@ -285,7 +508,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
             continue;
           }
 
-          HARDBUG(bassigncstr(banswer, canswer) != BSTR_OK)
+          HARDBUG(bassigncstr(banswer, canswer) == BSTR_ERR)
 
           CDESTROY(canswer)
         }
@@ -420,7 +643,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
 
       //check book move
  
-      HARDBUG(bassigncstr(bbest_move, "NULL") != BSTR_OK)
+      HARDBUG(bassigncstr(bbest_move, "NULL") == BSTR_ERR)
  
       if (options.use_book)
         return_book_move(&(with->S_board), &moves_list, bbest_move);
@@ -476,7 +699,7 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
             HARDBUG(sscanf(bdata(message.message_text), "%s%d",
                            cbest_move, &best_score) != 2)
 
-            HARDBUG(bassigncstr(bbest_move, cbest_move) != BSTR_OK)
+            HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
 
             CDESTROY(cbest_move)
 
@@ -518,123 +741,622 @@ void play_game(char name[MY_LINE_MAX], char colour[MY_LINE_MAX],
   }
   label_return:
 
-  game_state.save(&game_state, name);
+  game_state.save(&game_state, arg_name);
 
   game_state.save2pdn(&game_state, "play.pdn");
 
   destroy_state(&game_state);
 }
 
-local void gen_random(char *name, int nwhite, int nblack)
+double weibull_shape(int arg_npieces)
+{
+  double a = 0.66;
+  double mu = 7.65;
+  double sigma = 3.57;
+  double offset = 1.87;
+
+  return(a * exp(-((arg_npieces - mu) * (arg_npieces - mu)) / (2 * sigma * sigma)) +
+         offset);
+}
+
+double weibull_scale(int arg_npieces)
+{
+  double a = 3.66;
+  double b = 0.12;
+  double offset = 2.74;
+
+  return(a * exp(-b * arg_npieces) + offset);
+}
+
+int weibull_sample_row(double arg_probability, double arg_shape, double arg_scale)
+{
+  int result = INVALID;
+
+  if (arg_probability <= 0.0)
+    result = 1;
+  else if (arg_probability >= 1.0)
+    result = 9;
+  else
+  {
+    result = round(arg_scale * pow(-log(1.0 - arg_probability), 1.0 / arg_shape));
+  
+    if (result < 1) result = 1;
+    if (result > 9) result = 9;
+  }
+
+  return(result - 1);
+}
+
+local void test_weibull(void)
+{
+  for (int npieces = 1; npieces <= 20; npieces++)
+  {
+    double shape = weibull_shape(npieces);
+    double scale = weibull_scale(npieces);
+    
+    for (int percentage = 1; percentage <= 99; ++percentage)
+    {
+      int row = weibull_sample_row(percentage / 100.0, shape, scale);
+  
+      PRINTF("npieces=%d percentage=%d row=%d\n",
+             npieces, percentage, row + 1);
+    }
+  }
+}
+
+//10 pieces 25%
+local double probability_one_king(int arg_npieces)
+{
+  double a = 0.83;
+  double b = -0.12;
+
+  return(a * exp(b * arg_npieces));
+}
+
+#define NMAN_MIN              4
+#define NKING_MAX             2
+#define PROBABILITY_EQUAL     0.5
+#define MAN_REDUCTION_FACTOR  ((sqrt(3.0) - 1.0) / 2.0)
+#define KING_REDUCTION_FACTOR ((sqrt(3.0) - 1.0) / 2.0)
+#define NPIECES_MIN           7
+
+local void gen_random(char *arg_fen_name, i64_t arg_npositions_max, double arg_time_limit)
 {
   my_random_t temp_random;
 
   construct_my_random(&temp_random, 0);
 
-  FILE *frandom;
+  my_timer_t position_timer;
 
-  HARDBUG((frandom = fopen(name, "w")) == NULL)
+  construct_my_timer(&position_timer, "position_timer", STDOUT, FALSE);
+
+  reset_my_timer(&position_timer);
+
+  my_timer_t timer;
+
+  construct_my_timer(&timer, "timer", STDOUT, FALSE);
+
+  reset_my_timer(&timer);
+
+  BSTRING(bfen_name)
+
+  HARDBUG(bassigncstr(bfen_name, arg_fen_name) == BSTR_ERR)
+
+  fbuffer_t ffen;
+
+  construct_fbuffer(&ffen, bfen_name, NULL, TRUE);
 
   search_t search;
 
   construct_search(&search, STDOUT, NULL);
 
+  mcts_globals.mcts_globals_time_limit = arg_time_limit;
+
   search_t *with = &search;
 
-  for (int iwhite = 1; iwhite <= nwhite; ++iwhite)
+  i64_t npositions = arg_npositions_max;
+
+  if (my_mpi_globals.MY_MPIG_nslaves > 0)
   {
-    for (int iblack = 1; iblack <= nblack; ++iblack)
+    npositions = arg_npositions_max / my_mpi_globals.MY_MPIG_nslaves;
+   
+    if (npositions * my_mpi_globals.MY_MPIG_nslaves < 
+        arg_npositions_max) ++npositions;
+  }
+
+  HARDBUG(npositions < 1)
+
+  PRINTF("npositions=%lld\n", npositions);
+
+  i64_t iposition = 0;
+  i64_t iposition_prev = 0;
+
+  bucket_t bucket_root_score;
+
+  construct_bucket(&bucket_root_score, "bucket_root_score",
+                   SCORE_MAN, SCORE_LOST, SCORE_WON, BUCKET_LINEAR);
+
+  bucket_t bucket_npieces;
+
+  construct_bucket(&bucket_npieces, "bucket_npieces",
+                   1, 0, 2 * NPIECES_MAX, BUCKET_LINEAR);
+
+  bucket_t bucket_ndelta;
+
+  construct_bucket(&bucket_ndelta, "bucket_ndelta",
+                   1, -NMAN_MIN, NMAN_MIN, BUCKET_LINEAR);
+
+  bucket_t bucket_nwhite_man;
+
+  construct_bucket(&bucket_nwhite_man, "bucket_nwhite_man",
+                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+
+  bucket_t bucket_nblack_man;
+
+  construct_bucket(&bucket_nblack_man, "bucket_nblack_man",
+                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+
+  bucket_t bucket_nwhite_kings;
+
+  construct_bucket(&bucket_nwhite_kings, "bucket_nwhite_kings",
+                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+
+  bucket_t bucket_nblack_kings;
+
+  construct_bucket(&bucket_nblack_kings, "bucket_nblack_kings",
+                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+
+  bucket_t bucket_nkings;
+
+  construct_bucket(&bucket_nkings, "bucket_nkings",
+                   1, 0, 2 * NPIECES_MAX, BUCKET_LINEAR);
+
+  while(iposition < npositions)
+  {
+    double probability = return_my_random(&temp_random) / (double) ULL_MAX;
+
+    int npieces = INVALID;
+    int nwhite = INVALID;
+    int nblack = INVALID;
+    int nwhite_man = INVALID;
+    int nwhite_kings = INVALID; 
+    int nblack_man = INVALID;
+    int nblack_kings = INVALID;
+
+    while(TRUE)
     {
+      nwhite_man = return_my_random(&temp_random) %
+                   (20 - NKING_MAX - NMAN_MIN + 1) +
+                   NMAN_MIN;
+
+      nblack_man = nwhite_man;
+
+      int ndelta = 0;
+
+      double cumulative_probability = PROBABILITY_EQUAL;
+
+      double delta_probability = (1.0 - PROBABILITY_EQUAL) / NMAN_MIN;
+      
+      while (TRUE)
+      {
+        if (probability < cumulative_probability) break;
+      
+        ++ndelta;
+      
+        if (ndelta >= NMAN_MIN) break;
+
+        cumulative_probability += delta_probability;
+      }
+
+      if ((return_my_random(&temp_random) % 2) == 0)
+      {
+        nwhite_man -= ndelta;
+      }
+      else
+      {
+        nblack_man -= ndelta;
+      }
+
+      nwhite_kings = 0;
+
+      probability = return_my_random(&temp_random) / (double) ULL_MAX;
+
+      cumulative_probability = 1.0 - probability_one_king(nwhite_man);
+
+      delta_probability = (1.0 - cumulative_probability) / NKING_MAX;
+      
+      while (TRUE)
+      {
+        if (probability < cumulative_probability) break;
+      
+        ++nwhite_kings;
+      
+        if (nwhite_kings >= NKING_MAX) break;
+
+        cumulative_probability += delta_probability;
+      }
+
+      nblack_kings = 0;
+
+      probability = return_my_random(&temp_random) / (double) ULL_MAX;
+
+      cumulative_probability = 1.0 - probability_one_king(nblack_man);
+
+      delta_probability = (1.0 - cumulative_probability) / NKING_MAX;
+      
+      while (TRUE)
+      {
+        if (probability < cumulative_probability) break;
+      
+        ++nblack_kings;
+      
+        if (nblack_kings >= NKING_MAX) break;
+
+        cumulative_probability += delta_probability;
+      }
+
+      nwhite = nwhite_man + nwhite_kings;
+      nblack = nblack_man + nblack_kings;
+
+      npieces = nwhite + nblack;
+
+      if (npieces >= NPIECES_MIN) break;
+    }
+
+    HARDBUG(npieces == INVALID)
+    HARDBUG(nwhite == INVALID)
+    HARDBUG(nblack == INVALID)
+    HARDBUG(nwhite_man == INVALID)
+    HARDBUG(nwhite_kings == INVALID)
+    HARDBUG(nblack_man == INVALID)
+    HARDBUG(nblack_kings == INVALID)
+
+    PRINTF("iposition=%lld npieces=%d nwhite=%d nblack=%d"
+           " (%dx%d) (%dx%d)\n",
+           iposition, npieces, nwhite, nblack,
+           nwhite_man, nblack_man,
+           nwhite_kings, nblack_kings);
+
+    double shape = weibull_shape(npieces);
+    double scale = weibull_scale(npieces);
+
+    PRINTF("shape=%.2f scale=%.2f\n", shape, scale);
+
+    int ntry = 0;
+
+    reset_my_timer(&timer);
+
+    while(TRUE)
+    {
+      if (return_my_timer(&timer, FALSE) > 2.0)
+      {
+        PRINTF("time limit ntry=%d\n", ntry);
+
+        break;
+      }
+
       char s[MY_LINE_MAX];
-      PRINTF("random %d %d\n", iwhite, iblack);
 
       if ((return_my_random(&temp_random) % 2) == 0)
         s[0] = 'w';
       else
         s[0] = 'b';
-
+  
       for (int i = 1; i <= 50; ++i) s[i] = *nn;
-      for (int i = 1; i <= iwhite; ++i)
+
+      for (int iwhite_man = 1; iwhite_man <= nwhite_man; ++iwhite_man)
       {
-        if ((return_my_random(&temp_random) % 4) == 0)
+        int i = INVALID;
+
+        while(TRUE)
         {
-          int j;
-          while(TRUE)
-          {
-            j = return_my_random(&temp_random) % 50 + 1;
-            if (s[j] == *nn) break;
-          }
-          s[j] = *wX;
+          probability =
+            return_my_random(&temp_random) / (double) ULL_MAX;
+
+          int irow = 9 - weibull_sample_row(probability, shape, scale);
+          int icol = return_my_random(&temp_random) % 5;
+
+          i = irow * 5 + icol + 1;
+
+          HARDBUG(i > 50)
+
+          if (s[i] == *nn) break;
         }
-        else
+ 
+        HARDBUG(i == INVALID)
+
+        s[i] = *wO;
+      }
+  
+      for (int iblack_man = 1; iblack_man <= nblack_man; ++iblack_man)
+      {
+        int i = INVALID;
+
+        while(TRUE)
         {
-          int j;
-          while(TRUE)
-          {
-            j = return_my_random(&temp_random) % 45 + 6;
-            if (s[j] == *nn) break;
-          }
-          s[j] = *wO;
+          probability =
+            (return_my_random(&temp_random) / (double) ULL_MAX);
+
+          int irow = weibull_sample_row(probability, shape, scale);
+          int icol = return_my_random(&temp_random) % 5;
+ 
+          i = irow * 5 + icol + 1;
+
+          HARDBUG(i > 50)
+
+          if (s[i] == *nn) break;
         }
+ 
+        HARDBUG(i == INVALID)
+
+        s[i] = *bO;
       }
 
-      for (int i = 1; i <= iblack; ++i)
+      for (int iwhite_king = 1; iwhite_king <= nwhite_kings; ++iwhite_king)
       {
-        if ((return_my_random(&temp_random) % 4) == 0)
+        int i = INVALID;
+
+        while(TRUE)
         {
-          int j;
-          while(TRUE)
-          {
-            j = return_my_random(&temp_random) % 50 + 1;
-            if (s[j] == *nn) break;
-          }
-          s[j] = *bX;
+          int irow = return_my_random(&temp_random) % 10;
+          int icol = return_my_random(&temp_random) % 5;
+ 
+          i = irow * 5 + icol + 1;
+
+          if (s[i] == *nn) break;
         }
-        else
+        s[i] = *wX;
+      }
+
+      for (int iblack_king = 1; iblack_king <= nblack_kings; ++iblack_king)
+      {
+        int i = INVALID;
+
+        while(TRUE)
         {
-          int j;
-          while(TRUE)
+          int irow = return_my_random(&temp_random) % 10;
+          int icol = return_my_random(&temp_random) % 5;
+ 
+          i = irow * 5 + icol + 1;
+
+          if (s[i] == *nn) break;
+        }
+        s[i] = *bX;
+      }
+
+#ifdef QUICK_CAPTURE_CHECK
+
+      //quick capture check
+
+      int ok = TRUE;
+
+      for (int i = 1; i <= 50; ++i)
+      {
+        char *nO = NULL;
+
+        if (s[i] == *wO)
+          nO = bO;
+        else if (s[i] == *bO)
+          nO = wO;
+ 
+        if (nO == NULL) continue;
+
+        int iboard = map[i];
+
+        int j = inverse_map[iboard - 6];
+
+        if ((j != INVALID) and (s[j + 1] == *nO))
+        {
+          j = inverse_map[iboard - 6 - 6];
+
+          if ((j != INVALID) and (s[j + 1] == *nn))
           {
-            j = return_my_random(&temp_random) % 45 + 1;
-            if (s[j] == *nn) break;
+            ok = FALSE;
+            break;
           }
-          s[j] = *bO;
+        }
+           
+        j = inverse_map[iboard - 5];
+
+        if ((j != INVALID) and (s[j + 1] == *nO))
+        {
+          j = inverse_map[iboard - 5 - 5];
+
+          if ((j != INVALID) and (s[j + 1] == *nn))
+          {
+            ok = FALSE;
+            break;
+          }
+        }
+
+        j = inverse_map[iboard + 5];
+
+        if ((j != INVALID) and (s[j + 1] == *nO))
+        {
+          j = inverse_map[iboard + 5 + 5];
+
+          if ((j != INVALID) and (s[j + 1] == *nn))
+          {
+            ok = FALSE;
+            break;
+          }
+        }
+
+        j = inverse_map[iboard + 6];
+
+        if ((j != INVALID) and (s[j + 1] == *nO))
+        {
+          j = inverse_map[iboard + 6 + 6];
+
+          if ((j != INVALID) and (s[j + 1] == *nn))
+          {
+            ok = FALSE;
+            break;
+          }
         }
       }
+      if (!ok) continue;
+#endif
+
       s[51] = '\0';
-
-      string2board(&(with->S_board), s);
-
-      print_board(&(with->S_board));
-
-      HARDBUG(compat_strcasecmp(s, board2string(&(with->S_board), FALSE)) != 0)
-
+  
+      string2board(&(with->S_board), s, FALSE);
+  
       moves_list_t moves_list;
-
+  
       construct_moves_list(&moves_list);
-
+  
       gen_moves(&(with->S_board), &moves_list, FALSE);
 
-      check_moves(&(with->S_board), &moves_list);
+      //HARDBUG(moves_list.ncaptx > 0)
 
-      if (moves_list.nmoves > 0)
+      if ((moves_list.ncaptx > 0) or (moves_list.nmoves <= 1))
       {
-        BSTRING(bfen)
+        if (ntry <= 10)
+        {
+          PRINTF("ntry=%d position rejected ncaptx=%d nmoves=%d\n",
+                 ntry, moves_list.ncaptx, moves_list.nmoves);
+        }
 
-        board2fen(with->S_board.board_colour2move,
-          with->S_board.board_white_man_bb,
-          with->S_board.board_black_man_bb,
-          with->S_board.board_white_king_bb,
-          with->S_board.board_black_king_bb,
-          bfen, FALSE);
+        ++ntry;
 
-        HARDBUG(fprintf(frandom, "%s\n", bdata(bfen)) < 0)
-
-        BDESTROY(bfen)
+        continue;
       }
+
+      int root_score = return_material_score(&(with->S_board));
+
+      reset_my_timer(&(with->S_timer));
+
+      int best_pv;
+
+      int best_score = mcts_search(with, root_score, 0, MCTS_PLY_MAX, 
+                                   &moves_list, &best_pv, FALSE);
+
+      if (abs(root_score - best_score) > (SCORE_MAN / 4))
+      {
+        if (ntry <= 10)
+        {
+          print_board(&(with->S_board));
+
+          PRINTF("ntry=%d position rejected root_score=%d best_score=%d\n",
+                 ntry, root_score, best_score);
+        }
+
+        ++ntry;
+
+        continue;
+      }
+      
+      print_board(&(with->S_board));
+
+      PRINTF("position accepted ntry=%d npieces=%d"
+             " root_score=%d best_score=%d\n",
+             ntry, npieces, root_score, best_score);
+
+      update_bucket(&bucket_root_score, root_score);
+
+      update_bucket(&bucket_npieces, npieces);
+
+      update_bucket(&bucket_ndelta, nwhite_man - nblack_man);
+
+      update_bucket(&bucket_nwhite_man,
+        BIT_COUNT(with->S_board.board_white_man_bb));
+
+      update_bucket(&bucket_nblack_man,
+        BIT_COUNT(with->S_board.board_black_man_bb));
+
+      update_bucket(&bucket_nwhite_kings,
+        BIT_COUNT(with->S_board.board_white_king_bb));
+
+      update_bucket(&bucket_nblack_kings,
+        BIT_COUNT(with->S_board.board_black_king_bb));
+
+      update_bucket(&bucket_nkings,
+        BIT_COUNT(with->S_board.board_white_king_bb) + 
+        BIT_COUNT(with->S_board.board_black_king_bb));
+
+      BSTRING(bfen)
+
+      board2fen(&(with->S_board), bfen, FALSE);
+  
+      append_fbuffer(&ffen, "%s {0.000000}\n", bdata(bfen));
+  
+      BDESTROY(bfen)
+
+      ++iposition;
+  
+      if ((iposition - iposition_prev) > 100)
+      {
+        iposition_prev = iposition;
+  
+        PRINTF("iposition=%lld time=%.2f (%.2f positions/second)\n",
+          iposition, return_my_timer(&position_timer, FALSE),
+          iposition / return_my_timer(&position_timer, FALSE));
+      }
+
+      break;
     }
   }
-  FCLOSE(frandom)
+
+  flush_fbuffer(&ffen, 0);
+
+  printf_bucket(&bucket_root_score);
+  printf_bucket(&bucket_npieces);
+  printf_bucket(&bucket_ndelta);
+  printf_bucket(&bucket_nwhite_man);
+  printf_bucket(&bucket_nblack_man);
+  printf_bucket(&bucket_nwhite_kings);
+  printf_bucket(&bucket_nblack_kings);
+  printf_bucket(&bucket_nkings);
+
+  my_mpi_barrier("after gen", my_mpi_globals.MY_MPIG_comm_slaves, TRUE);
+
+  my_mpi_allreduce(MPI_IN_PLACE, &iposition, 1, MPI_LONG_LONG_INT,
+    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+
+  PRINTF("iposition=%lld\n", iposition);
+
+  my_mpi_bucket_aggregate(&bucket_root_score,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_npieces,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_ndelta,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_nwhite_man,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_nblack_man,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_nwhite_kings,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_nblack_kings,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_nkings,
+    my_mpi_globals.MY_MPIG_comm_slaves);
+
+  printf_bucket(&bucket_root_score);
+
+  printf_bucket(&bucket_npieces);
+
+  printf_bucket(&bucket_ndelta);
+
+  printf_bucket(&bucket_nwhite_man);
+
+  printf_bucket(&bucket_nblack_man);
+
+  printf_bucket(&bucket_nwhite_kings);
+
+  printf_bucket(&bucket_nblack_kings);
+
+  printf_bucket(&bucket_nkings);
+
+  BDESTROY(bfen_name)
 }
 
 local void test_cJSON(void)
@@ -683,7 +1405,6 @@ local void test_cJSON(void)
   PRINTF("monitor=%s\n", string);
 }
 
-#define ARGV_MAX 16
 #define ARGS_TXT "args.txt"
 
 cJSON *gwd_json;
@@ -750,6 +1471,7 @@ local void load_gwd_json(void)
   options.reduction_max = 80;
   options.reduction_max = 50;
   options.reduction_min = 20;
+  options.nreductions = 2;
 
   options.use_single_reply_extensions = TRUE;
 
@@ -916,6 +1638,9 @@ local void parse_parameters(void)
 
       else if (compat_strcasecmp(parameter_name, "reduction_min") == 0)  
         options.reduction_min = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "nreductions") == 0)  
+        options.nreductions = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)  
         options.alpha_beta_cache_size = ivalue;
@@ -1187,7 +1912,7 @@ local void load_overrides(void)
   
         HARDBUG(!cJSON_IsString(cjson_value))
 
-        cJSON_SetStringValue(cjson_value, svalue);
+        cJSON_SetValuestring(cjson_value, svalue);
 
         nfound++;
       }
@@ -1283,7 +2008,7 @@ local void load_overrides(void)
   }
 }
 
-void results2csv(int nwon, int ndraw, int nlost, int nunknown)
+void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 {
   cJSON *cjson_csv =
     cJSON_GetObjectItem(overrides_json, CJSON_CSV_ID);
@@ -1485,7 +2210,7 @@ void results2csv(int nwon, int ndraw, int nlost, int nunknown)
       exit(EXIT_FAILURE);
     }
   }
-  fprintf(fcsv, ",%d,%d,%d,%d\n", nwon, ndraw, nlost, nunknown);
+  fprintf(fcsv, ",%d,%d,%d,%d\n", arg_nwon, arg_ndraw, arg_nlost, arg_nunknown);
 
   FCLOSE(fcsv)
 }
@@ -1670,7 +2395,7 @@ int main(int argc, char **argv)
   
           HARDBUG(!cJSON_IsString(cjson_value))
   
-          cJSON_SetStringValue(cjson_value, svalue);
+          cJSON_SetValuestring(cjson_value, svalue);
 
           cJSON_AddBoolToObject(parameter, "cli", TRUE);
   
@@ -1840,7 +2565,7 @@ int main(int argc, char **argv)
                     &my_mpi_globals.MY_MPIG_id_slave);
     }
 
-    MPI_Allreduce(&slave, &my_mpi_globals.MY_MPIG_nslaves, 1, MPI_INT, MPI_SUM,
+    my_mpi_allreduce(&slave, &my_mpi_globals.MY_MPIG_nslaves, 1, MPI_INT, MPI_SUM,
       MPI_COMM_WORLD);
   
     HARDBUG(my_mpi_globals.MY_MPIG_nslaves != (mpi_nworld - 1))
@@ -1986,6 +2711,7 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(reduction_strong);
   PRINTF_CFG_I(reduction_weak);
   PRINTF_CFG_I(reduction_min);
+  PRINTF_CFG_I(nreductions);
 
   PRINTF_CFG_B(use_single_reply_extensions);
 
@@ -2072,6 +2798,7 @@ int main(int argc, char **argv)
   HARDBUG(options.reduction_strong < 0)
   HARDBUG(options.reduction_weak < 0)
   HARDBUG(options.reduction_min < 0)
+  HARDBUG(options.nreductions < 1)
 
   INIT_PROFILE
   
@@ -2128,6 +2855,11 @@ int main(int argc, char **argv)
 
     test_caches();
 
+    //test_fbuffer();
+
+    //test_dbase();
+    //FATAL("test_dbase", EXIT_FAILURE)
+
     //test_network();
 
     //test_nmsimplex();
@@ -2181,6 +2913,41 @@ int main(int argc, char **argv)
 
     solve_problems(argv[iarg]);
   }
+  else if (compat_strcasecmp(argv[iarg], "solve_problems_mcts") == 0)
+  { 
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    char *name = argv[iarg];
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    int nshoot_outs;
+
+    HARDBUG(sscanf(argv[iarg], "%d", &nshoot_outs) != 1)
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    int mcts_depth;
+
+    HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    double mcts_time_limit;
+
+    HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
+
+    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
+        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+    {
+      solve_problems_mcts(name, nshoot_outs, mcts_depth, mcts_time_limit);
+    }
+  }
   else if (compat_strcasecmp(argv[iarg], "solve_problems_multi_threaded") == 0)
   {
     iarg++;
@@ -2203,6 +2970,13 @@ int main(int argc, char **argv)
       MESSAGE_EXIT_THREAD, "main/solve");
 
     join_threads();
+  }
+  else if (compat_strcasecmp(argv[iarg], "txt2fen") == 0)
+  { 
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+
+    txt2fen(argv[iarg]);
   }
   else if (compat_strcasecmp(argv[iarg], "hub_server") == 0)
   {
@@ -2356,7 +3130,45 @@ int main(int argc, char **argv)
   }
   else if (compat_strcasecmp(argv[iarg], "gen_random") == 0)
   {
-    gen_random("random.fen", 20, 20);
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    char *fen_name;
+
+    fen_name = argv[iarg];
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    i64_t npositions_max;
+
+    HARDBUG(sscanf(argv[iarg], "%lld", &npositions_max) != 1)
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    double mcts_time_limit;
+
+    HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
+
+    HARDBUG(mcts_time_limit <= 0.0)
+
+    i64_t memory_slaves = memory * options.nslaves;
+
+    HARDBUG(memory_slaves >= physical_memory)
+
+    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
+    //HARDBUG(nthreads_slaves > physical_cpus)
+
+    test_weibull();
+
+    for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
+      PRINTF("npieces=%d probability_one_king=%.6f\n",
+             npieces, probability_one_king(npieces));
+
+    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
+        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+      gen_random(fen_name, npositions_max, mcts_time_limit);
   }
   else if (compat_strcasecmp(argv[iarg], "gen_endgame") == 0)
   {
@@ -2427,8 +3239,15 @@ int main(int argc, char **argv)
 
     count_book(depth_limit);
   }
-  else if (compat_strcasecmp(argv[iarg], "gen_pos") == 0)
+  else if (compat_strcasecmp(argv[iarg], "gen_db") == 0)
   {
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    char *db_name;
+
+    db_name = argv[iarg];
+
     iarg++;
     HARDBUG(argv[iarg] == NULL)
  
@@ -2438,27 +3257,71 @@ int main(int argc, char **argv)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
+ 
+    int mcts_depth;
 
-    int npieces;
+    HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
-    HARDBUG(sscanf(argv[iarg], "%d", &npieces) != 1)
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    double mcts_time_limit;
 
-    if (my_mpi_globals.MY_MPIG_nslaves < 1)
-    {
-      PRINTF("gen_pos requires --nslaves >= 1\n");
-      FATAL("gen_pos", EXIT_FAILURE);
-    }
+    HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
+
+    HARDBUG(mcts_time_limit < 0.0)
 
     i64_t memory_slaves = memory * options.nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
-  
+    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if (my_mpi_globals.MY_MPIG_id_slave != INVALID)
-      gen_pos(npositions_max, npieces);
+    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
+        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+      gen_db(db_name, npositions_max, mcts_depth, mcts_time_limit);
+  }
+  else if (compat_strcasecmp(argv[iarg], "update_db") == 0)
+  {
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    char *db_name;
+
+    db_name = argv[iarg];
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    int nshoot_outs;
+
+    HARDBUG(sscanf(argv[iarg], "%d", &nshoot_outs) != 1)
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    int mcts_depth;
+
+    HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    double mcts_time_limit;
+
+    HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
+
+    i64_t memory_slaves = memory * options.nslaves;
+
+    HARDBUG(memory_slaves >= physical_memory)
+
+    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
+    //HARDBUG(nthreads_slaves > physical_cpus)
+
+    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
+        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+      update_db(db_name, nshoot_outs, mcts_depth, mcts_time_limit);
   }
   else if (compat_strcasecmp(argv[iarg], "play_game") == 0)
   {
@@ -2587,6 +3450,16 @@ int main(int argc, char **argv)
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
+    char *fen_name;
+
+    fen_name = argv[iarg];
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+
+    i64_t npositions;
+    HARDBUG(sscanf(argv[iarg], "%lld", &npositions) != 1)
+
     if (options.nslaves < 1)
     {
       PRINTF("fen2network requires --nslaves >= 1\n");
@@ -2597,32 +3470,29 @@ int main(int argc, char **argv)
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
-  
+    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2network(argv[iarg]);
+    if (my_mpi_globals.MY_MPIG_id_slave != INVALID)
+      fen2network(fen_name, npositions);
   }
-  else if (compat_strcasecmp(argv[iarg], "fen2bar") == 0)
+  else if (compat_strcasecmp(argv[iarg], "fen2csv") == 0)
   { 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
-    if (options.nslaves < 1)
-    {
-      PRINTF("fen2network requires --nslaves >= 1\n");
-      FATAL("fen2network", EXIT_FAILURE);
-    }
-
     i64_t memory_slaves = memory * options.nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
-  
+    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if (my_mpi_globals.MY_MPIG_id_slave != INVALID) fen2bar(argv[iarg]);
+    if ((options.nslaves == 0) or
+        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+    {
+      fen2csv(argv[iarg]);
+    }
   }
   else if (compat_strcasecmp(argv[iarg], "dxp_server") == 0)
   {

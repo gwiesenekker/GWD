@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef MyMallocH
 #define MyMallocH
 
@@ -6,7 +6,7 @@
 
 #define MY_MALLOC(P, T, N) HARDBUG(((P) = my_malloc(#P, __FILE__, __FUNC__, __LINE__, sizeof(T) * (N))) == NULL)
 
-#define MY_FREE_AND_NULL(P) {_mm_free(P); (P) = NULL;}
+#define MY_FREE_AND_NULL(P) {my_free(P); (P) = NULL;}
 
 #define PUSH_LEAK(P) push_leak(#P, __FILE__, __FUNC__, __LINE__);
 
@@ -24,8 +24,10 @@
 
 void register_pointer(char *, char *, const char *, int, void *, size_t,
   int, int);
+void *deregister_pointer(void *);
 
 void *my_malloc(char *, char *, const char *, int, size_t);
+void my_free(void *);
 
 void print_my_leaks(int);
 void push_leak(char *, char *, const char *, int);

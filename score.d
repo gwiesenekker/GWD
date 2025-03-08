@@ -1,5 +1,5 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
-int return_my_score(board_t *with, moves_list_t *moves_list)
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+int return_my_score(board_t *object, moves_list_t *arg_moves_list)
 {
   int result = 0;
 
@@ -7,13 +7,7 @@ int return_my_score(board_t *with, moves_list_t *moves_list)
 
   //DO NOT USE board_nmy_man as patterns flip
 
-  int nmy_man = BIT_COUNT(with->my_man_bb);
-  int nmy_king = BIT_COUNT(with->my_king_bb);
-  int nyour_man = BIT_COUNT(with->your_man_bb);
-  int nyour_king = BIT_COUNT(with->your_king_bb);
-    
-  int material_score = (nmy_man - nyour_man) * SCORE_MAN +
-                       (nmy_king - nyour_king) * SCORE_KING;
+  int material_score = return_material_score(object);
 
   if (options.material_only)
   {
@@ -25,161 +19,37 @@ int return_my_score(board_t *with, moves_list_t *moves_list)
   {
     //++(with->S_total_network_evaluations);
 
-    int colour2move = 
-      with->board_network.network_inputs[with->board_network
-                                       .colour2move_input_map];
+    int nwhite_king_delta = 
+      -object->board_network.network_inputs[object->board_network
+                                        .nwhite_king_input_map] +
+      BIT_COUNT(object->board_white_king_bb);
 
-    if (IS_WHITE(with->board_colour2move) and (colour2move == 0))
+    if (nwhite_king_delta != 0)
     {
-      update_layer0(&(with->board_network),
-                    with->board_network.colour2move_input_map, 1);
+      update_layer0(&(object->board_network),
+                    object->board_network.nwhite_king_input_map,
+                    nwhite_king_delta);
     }
 
-    if (IS_BLACK(with->board_colour2move) and (colour2move == 1))
+    int nblack_king_delta = 
+      -object->board_network.network_inputs[object->board_network
+                                        .nblack_king_input_map] +
+      BIT_COUNT(object->board_black_king_bb);
+
+    if (nblack_king_delta != 0)
     {
-      update_layer0(&(with->board_network),
-                    with->board_network.colour2move_input_map, -1);
-    }
-
-    int nmy_king_delta = 
-      -with->board_network.network_inputs[with->board_network
-                                        .nmy_king_input_map] +
-      BIT_COUNT(with->my_king_bb);
-
-    if (nmy_king_delta != 0)
-    {
-      update_layer0(&(with->board_network),
-                    with->board_network.nmy_king_input_map,
-                    nmy_king_delta);
-    }
-
-    int nyour_king_delta = 
-      -with->board_network.network_inputs[with->board_network
-                                        .nyour_king_input_map] +
-      BIT_COUNT(with->your_king_bb);
-
-    if (nyour_king_delta != 0)
-    {
-      update_layer0(&(with->board_network),
-                    with->board_network.nyour_king_input_map,
-                    nyour_king_delta);
-    }
-
-    if (with->board_network.network_wings > 0)
-    {
-      int nleft_wing_delta = 
-        -with->board_network.network_inputs[with->board_network
-                                          .nleft_wing_input_map] +
-        (BIT_COUNT(with->my_man_bb & left_wing_bb) - 
-         BIT_COUNT(with->your_man_bb & left_wing_bb)) * 
-        with->board_network.network_wings;
-  
-      if (nleft_wing_delta != 0)
-      {
-        update_layer0(&(with->board_network),
-                      with->board_network.nleft_wing_input_map,
-                      nleft_wing_delta);
-      }
-  
-      int ncenter_delta = 
-        -with->board_network.network_inputs[with->board_network
-                                          .ncenter_input_map] +
-        (BIT_COUNT(with->my_man_bb & center_bb) - 
-         BIT_COUNT(with->your_man_bb & center_bb)) *
-        with->board_network.network_wings;
-  
-      if (ncenter_delta != 0)
-      {
-        update_layer0(&(with->board_network),
-                      with->board_network.ncenter_input_map,
-                      ncenter_delta);
-      }
-  
-      int nright_wing_delta = 
-        -with->board_network.network_inputs[with->board_network
-                                          .nright_wing_input_map] +
-        (BIT_COUNT(with->my_man_bb & right_wing_bb) - 
-         BIT_COUNT(with->your_man_bb & right_wing_bb)) *
-        with->board_network.network_wings;
-  
-      if (nright_wing_delta != 0)
-      {
-        update_layer0(&(with->board_network),
-                      with->board_network.nright_wing_input_map,
-                      nright_wing_delta);
-      }
-    }
-
-    if (with->board_network.network_half > 0)
-    {
-      int nleft_half_delta = 
-        -with->board_network.network_inputs[with->board_network
-                                          .nleft_half_input_map] +
-        (BIT_COUNT(with->my_man_bb & left_half_bb) - 
-         BIT_COUNT(with->your_man_bb & left_half_bb)) * 
-        with->board_network.network_half;
-  
-      if (nleft_half_delta != 0)
-      {
-        update_layer0(&(with->board_network),
-                      with->board_network.nleft_half_input_map,
-                      nleft_half_delta);
-      }
-  
-      int nright_half_delta = 
-        -with->board_network.network_inputs[with->board_network
-                                          .nright_half_input_map] +
-        (BIT_COUNT(with->my_man_bb & right_half_bb) - 
-         BIT_COUNT(with->your_man_bb & right_half_bb)) * 
-        with->board_network.network_half;
-  
-      if (nright_half_delta != 0)
-      {
-        update_layer0(&(with->board_network),
-                      with->board_network.nright_half_input_map,
-                      nright_half_delta);
-      }
-    }
-
-    //blocked
-
-    if (with->board_network.network_blocked > 0)
-    {
-      int nblocked_delta = 0;
- 
-      if (with->board_network.network_blocked == 1)
-      {
-        nblocked_delta = 
-          -with->board_network.network_inputs[with->board_network
-                                            .nblocked_input_map] +
-        moves_list->nblocked;
-      }
-      else if (with->board_network.network_blocked == 2)
-      {
-        nblocked_delta = 
-          -with->board_network.network_inputs[with->board_network
-                                            .nblocked_input_map] +
-          2 * nmy_man - moves_list->nblocked;
-      }
-  
-      if (nblocked_delta != 0)
-      {
-        update_layer0(&(with->board_network),
-                      with->board_network.nblocked_input_map,
-                      nblocked_delta);
-
-        HARDBUG(with->board_network.network_inputs[with->board_network
-                                                 .nblocked_input_map] < 0)
-      }
+      update_layer0(&(object->board_network),
+                    object->board_network.nblack_king_input_map,
+                    nblack_king_delta);
     }
 
     double network_score =
-      return_network_score_scaled(&(with->board_network), FALSE, TRUE);
+      return_network_score_scaled(&(object->board_network), FALSE, TRUE);
 
 #ifdef DEBUG
 static int n = 0;
     double double_score =
-      return_network_score_double(&(with->board_network), FALSE);
+      return_network_score_double(&(object->board_network), FALSE);
   
 n++;
 if (n < 99) PRINTF("network_score=%.6f double_score=%.6f\n",
@@ -187,13 +57,27 @@ network_score, double_score);
 
     if (fabs(network_score - double_score) > (1.0 / sqrt(SCALED_DOUBLE_FACTOR)))
     {
-      my_printf(with->board_my_printf,
+      my_printf(object->board_my_printf,
         "WARNING network_score=%.6f double_score=%.6f\n",
         network_score, double_score);
     }
 #endif
 
-    result = round(network_score * with->board_network.network2material_score);
+    result = round(network_score * object->board_network.network2material_score);
+ 
+    if (IS_BLACK(object->board_colour2move)) result = -result;
+
+#ifdef GEN_CSV
+    if ((BIT_COUNT(with->board_black_king_bb) == 0) and
+        (BIT_COUNT(with->board_white_king_bb) == 0))
+    { 
+       static int ncsv = 0;
+
+       PRINTF("CSV %d,%d\n", material_score, result);
+       ncsv++;
+       HARDBUG(ncsv > 1000000) 
+    }
+#endif
   }
 
   SOFTBUG(result < (SCORE_LOST + NODE_MAX))

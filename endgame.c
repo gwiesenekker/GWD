@@ -1,4 +1,5 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+
 #include "globals.h"
 
 
@@ -66,11 +67,12 @@ typedef struct
 
   my_mutex_t endgame_fmutex;
 
+  FILE *fendgame;
+  FILE *fendgame_wdl;
 #ifdef USE_OPENMPI
   MPI_Win wendgame;
 #endif
   void *pendgame;
-  FILE *fendgame;
 
   i64_t endgame_nreads;
   i64_t endgame_nentry_hits;
@@ -85,9 +87,386 @@ local int egtb_level_warning = TRUE;
 
 //TODO: add endgame_hits
 
+local void convert2wdl(void)
+{
+  PRINTF("convert2wdl..\n");
+
+  HARDBUG(sizeof(entry_i8_t) != 2)
+  HARDBUG(sizeof(entry_i16_t) != 4)
+
+  HARDBUG((ARRAY_PAGE_SIZE % 2) != 0)
+
+  entry_i16_t page_i16[NPAGE_ENTRIES];
+  entry_i8_t page_i8[NPAGE_ENTRIES];
+
+  HARDBUG(sizeof(page_i16) != ARRAY_PAGE_SIZE)
+  HARDBUG(sizeof(page_i8) != (ARRAY_PAGE_SIZE / 2))
+
+  char path[MY_LINE_MAX];
+
+  if (compat_strcasecmp(options.egtb_dir, "NULL") != 0)
+  {
+    snprintf(path, MY_LINE_MAX, "%s/1wX-0wO-1bX-0bO", options.egtb_dir);
+
+    if (!fexists(path))
+    {
+      PRINTF("path=%s\n", path);
+
+      FATAL("path does not exist!", EXIT_FAILURE)
+    }
+  }
+
+  for (int nwk = 0; nwk < NENDGAME_MAX; nwk++)
+  {
+    for (int nwm = 0; nwm < NENDGAME_MAX; nwm++)
+    {
+      if ((nwk + nwm) == 0) continue;
+
+      for (int nbk = 0; nbk < NENDGAME_MAX; nbk++)
+      {
+        for (int nbm = 0; nbm < NENDGAME_MAX; nbm++)
+        {
+          if ((nbk + nbm) == 0) continue;
+
+          if ((nwk + nwm + nbk + nbm) >= NENDGAME_MAX) continue;
+
+          char endgame_name[MY_LINE_MAX];
+
+          snprintf(endgame_name, MY_LINE_MAX,
+                   "%dwX-%dwO-%dbX-%dbO", nwk, nwm, nbk, nbm);
+          
+          snprintf(path, MY_LINE_MAX, "%s/%s", options.egtb_dir, endgame_name);
+  
+          if (!fexists(path))
+          {
+            PRINTF("EGTB %s does not exist!\n", endgame_name);
+
+            continue;
+          }
+
+          FILE *fendgame;
+
+          HARDBUG((fendgame = fopen(path, "r+b")) == NULL)
+
+          i8_t version;
+          i16_t nblock_entries;
+          i64_t index_max;
+
+          HARDBUG(fread(&version, sizeof(i8_t), 1, fendgame) != 1)
+
+          HARDBUG(version != EGTB_COMPRESSED_VERSION)
+
+          HARDBUG(fread(&nblock_entries, sizeof(i16_t), 1, fendgame) != 1)
+
+          HARDBUG(nblock_entries != NPAGE_ENTRIES)
+
+          HARDBUG(fread(&index_max, sizeof(i64_t), 1, fendgame) != 1)
+ 
+          if (options.verbose > 1)
+            PRINTF("version=%d nblock_entries=%d index_max=%lld\n",
+              version, nblock_entries, index_max);
+
+          i64_t npages = (index_max + 1) / nblock_entries;
+
+          if ((npages * nblock_entries) < (index_max + 1)) npages++;
+
+          HARDBUG((npages * nblock_entries) < (index_max + 1))
+                
+          //not true because of last block
+          //i64_t uncompressed_size = 2 * (index_max + 1);
+
+          i64_t nentries = npages * nblock_entries;
+
+          i64_t uncompressed_size = sizeof(entry_i8_t)  * nentries;
+
+          if (options.verbose > 1)
+            PRINTF("npages=%lld nentries=%lld uncompressed_size=%lld\n",
+              npages, nentries, uncompressed_size);
+
+          char wdl[MY_LINE_MAX];
+
+          snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl", options.egtb_dir,
+                   endgame_name);
+
+          if (fexists(wdl))
+          {
+            PRINTF("WDL encoded EGTB %s already exists!\n", wdl);
+
+            FCLOSE(fendgame)
+
+            continue;
+          }
+
+          PRINTF("WDL encoding EGTB %s..\n", path);
+
+          //each entry consists of wtm_mate and btm_mate
+          //each encoded as 2 bits so 4 bits (1 byte) in total
+
+          HARDBUG((nentries % 2) != 0)
+  
+          i64_t nwdl = nentries / 2;
+              
+          i64_t wdl_size = nwdl * sizeof(wdl_t);
+  
+          if (options.verbose > 1)
+            PRINTF("nwdl=%lld wdl_size=%lld\n", nwdl, wdl_size);
+  
+          void *pendgame;
+  
+          MY_MALLOC(pendgame, wdl_t, nwdl)
+
+          wdl_t *pwdl_t = pendgame;
+            
+          for (i64_t iwdl = 0; iwdl < nwdl; iwdl++) pwdl_t[iwdl] = 0;
+
+          i64_t jentry = 0;
+             
+          for (i64_t ipage = 0; ipage < npages; ipage++)
+          {
+            i64_t seek =
+              sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) + 
+              ipage * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
+                
+            HARDBUG(compat_fseeko(fendgame, seek, SEEK_SET) != 0)
+                    
+            i64_t offset;
+
+            i16_t length;
+
+            ui32_t crc32;
+                  
+            HARDBUG(fread(&offset, sizeof(i64_t), 1, fendgame) != 1)
+
+            HARDBUG(fread(&length, sizeof(i16_t), 1, fendgame) != 1)
+
+            HARDBUG(fread(&crc32,  sizeof(ui32_t), 1, fendgame) != 1)
+                  
+            //some blocks may have offset INVALID
+                  
+            if (offset == INVALID)
+            {
+              HARDBUG(length != 0)
+                
+              HARDBUG(crc32 != 0xFFFFFFFF)
+               
+              continue;
+            }
+                  
+            HARDBUG(length <= 0)
+
+            HARDBUG(length > (2 * ARRAY_PAGE_SIZE))
+                  
+            i8_t source[2 * ARRAY_PAGE_SIZE];
+
+            size_t sourceLen = length;
+               
+            HARDBUG(compat_fseeko(fendgame, offset, SEEK_SET) != 0)
+                
+            HARDBUG(fread(source, sizeof(i8_t), sourceLen, fendgame) !=
+                    sourceLen)
+                
+            if (source[0] == ALL_DRAW)
+            {
+              crc32 = 0xFFFFFFFF;
+                    
+              crc32 = _mm_crc32_u8(crc32, source[0]);
+                  
+              HARDBUG(crc32 != crc32)
+                   
+              for (int ientry = 0; ientry < nblock_entries; ientry++)
+              {
+                ui8_t wdl_entry = (WDL_DRAW << 2) | WDL_DRAW;
+
+                HARDBUG(jentry >= nentries)
+   
+                i64_t iwdl = jentry / 2;
+
+                HARDBUG(iwdl >= nwdl)
+
+                int jwdl = jentry % 2;
+
+                pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
+
+                HARDBUG(pwdl_t[iwdl] == 0)
+
+                jentry++;
+              }
+            }
+            else if (source[0] == ALL_I8)
+            {
+              entry_i8_t dest[NPAGE_ENTRIES];
+
+              size_t destLen = sizeof(dest);
+                      
+              //exclude source[0]
+              --sourceLen;
+                    
+              destLen = ZSTD_decompress(dest, destLen,
+                                        source + 1, sourceLen);
+                  
+              HARDBUG(ZSTD_isError(destLen))
+                  
+              HARDBUG(destLen > sizeof(dest))
+                  
+              HARDBUG((destLen % sizeof(entry_i8_t)) != 0)
+                  
+              HARDBUG((destLen / sizeof(entry_i8_t)) != nblock_entries)
+#ifdef USE_HARDWARE_CRC32
+              crc32 = 0xFFFFFFFF;
+                 
+              crc32 = _mm_crc32_u8(crc32, source[0]);
+                  
+              for (int ientry = 0; ientry < nblock_entries; ientry++)
+              {
+                crc32 = _mm_crc32_u8(crc32, dest[ientry].entry_white_mate);
+                crc32 = _mm_crc32_u8(crc32, dest[ientry].entry_black_mate);
+              }
+#else
+
+#error NOT IMPLEMENTED YET
+
+#endif
+              HARDBUG(crc32 != crc32)
+                  
+              for (int ientry = 0; ientry < nblock_entries; ientry++)
+              {
+                ui8_t wdl_entry = 0;
+ 
+                if (dest[ientry].entry_black_mate == INVALID)
+                  wdl_entry = WDL_DRAW;
+                else if (dest[ientry].entry_black_mate > 0)
+                  wdl_entry = WDL_WON;
+                else
+                  wdl_entry = WDL_LOST;
+
+                if (dest[ientry].entry_white_mate == INVALID)
+                  wdl_entry = (wdl_entry << 2) | WDL_DRAW;
+                else if (dest[ientry].entry_white_mate > 0)
+                  wdl_entry = (wdl_entry << 2) | WDL_WON;
+                else
+                  wdl_entry = (wdl_entry << 2) | WDL_LOST;
+
+                HARDBUG(jentry >= nentries)
+
+                i64_t iwdl = jentry / 2;
+
+                HARDBUG(iwdl >= nwdl)
+
+                int jwdl = jentry % 2;
+
+                pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
+
+                HARDBUG(pwdl_t[iwdl] == 0)
+
+                jentry++;
+              }
+            }
+            else
+            {
+              entry_i16_t dest[NPAGE_ENTRIES];
+
+              size_t destLen = sizeof(dest);
+                      
+              //exclude source[0]
+              --sourceLen;
+                   
+              destLen = ZSTD_decompress(dest, destLen,
+                                        source + 1, sourceLen);
+                  
+              HARDBUG(ZSTD_isError(destLen))
+                    
+              HARDBUG(destLen > sizeof(dest))
+                  
+              HARDBUG((destLen % sizeof(entry_i16_t)) != 0)
+                  
+              HARDBUG((destLen / sizeof(entry_i16_t)) != nblock_entries)
+#ifdef USE_HARDWARE_CRC32
+              crc32 = 0xFFFFFFFF;
+                    
+              crc32 = _mm_crc32_u8(crc32, source[0]);
+                  
+              for (int ientry = 0; ientry < nblock_entries; ientry++)
+              {
+                crc32 = _mm_crc32_u16(crc32, dest[ientry].entry_white_mate);
+                crc32 = _mm_crc32_u16(crc32, dest[ientry].entry_black_mate);
+              }
+#else
+
+#error NOT IMPLEMENTED YET
+
+#endif
+              HARDBUG(crc32 != crc32)
+                  
+              for (int ientry = 0; ientry < nblock_entries; ientry++)
+              {
+                ui8_t wdl_entry = 0;
+
+                if (dest[ientry].entry_black_mate == INVALID)
+                  wdl_entry = WDL_DRAW;
+                else if (dest[ientry].entry_black_mate > 0)
+                  wdl_entry = WDL_WON;
+                else
+                  wdl_entry = WDL_LOST;
+
+                if (dest[ientry].entry_white_mate == INVALID)
+                  wdl_entry = (wdl_entry << 2) | WDL_DRAW;
+                else if (dest[ientry].entry_white_mate > 0)
+                  wdl_entry = (wdl_entry << 2) | WDL_WON;
+                else
+                  wdl_entry = (wdl_entry << 2) | WDL_LOST;
+
+                HARDBUG(jentry >= nentries)
+
+                i64_t iwdl = jentry / 2;
+
+                HARDBUG(iwdl >= nwdl)
+
+                int jwdl = jentry % 2;
+
+                pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
+
+                HARDBUG(pwdl_t[iwdl] == 0)
+
+                jentry++;
+              }
+            }
+          }//for (i64_t ipage = 0; ipage < npages; ipage++)
+
+          HARDBUG(jentry != nentries)
+
+          FCLOSE(fendgame)
+         
+          PRINTF("writing WDL encoded EGTB %s to disk..\n", path);
+
+          FILE *fwdl;
+ 
+          HARDBUG((fwdl = fopen(wdl, "wb")) == NULL)
+
+          i8_t wdl_version = EGTB_WDL_VERSION;
+
+          HARDBUG(fwrite(&wdl_version, sizeof(i8_t), 1, fwdl) != 1)
+
+          HARDBUG(fwrite(pendgame, sizeof(i8_t), wdl_size, fwdl) != wdl_size)
+  
+          FCLOSE(fwdl)
+
+          MY_FREE_AND_NULL(pendgame)
+
+          PRINTF("..done size is %lld\n", wdl_size);
+        }
+      }
+    }
+  }
+  PRINTF("..done\n");
+}
+
 void init_endgame(void)
 {
   PRINTF("init_endgame..\n");
+
+  if (my_mpi_globals.MY_MPIG_nglobal <= 1) convert2wdl();
+
+  my_mpi_barrier("convert2wdl", my_mpi_globals.MY_MPIG_comm_global, TRUE);
 
   HARDBUG(sizeof(entry_i8_t) != 2)
   HARDBUG(sizeof(entry_i16_t) != 4)
@@ -123,17 +502,17 @@ void init_endgame(void)
 #endif
   }
 
-  int nwc, nwm, nbc, nbm;
+  int nwk, nwm, nbk, nbm;
 
-  for (nwc = 0; nwc < NENDGAME_MAX; nwc++)
+  for (nwk = 0; nwk < NENDGAME_MAX; nwk++)
   {
     for (nwm = 0; nwm < NENDGAME_MAX; nwm++)
     {
-      for (nbc = 0; nbc < NENDGAME_MAX; nbc++)
+      for (nbk = 0; nbk < NENDGAME_MAX; nbk++)
       {
         for (nbm = 0; nbm < NENDGAME_MAX; nbm++)
         {
-          endgame_t *with = &(endgames[nwc][nwm][nbc][nbm]);
+          endgame_t *with = &(endgames[nwk][nwm][nbk][nbm]);
 
           with->endgame_status = INVALID;
 
@@ -144,6 +523,7 @@ void init_endgame(void)
           with->endgame_unavailable_warning = FALSE;
 
           with->fendgame = NULL;
+          with->fendgame_wdl = NULL;
           with->pendgame = NULL;
 
           with->endgame_nreads = 0;
@@ -156,20 +536,20 @@ void init_endgame(void)
 
   i64_t endgame_ram = 0;
 
-  for (nwc = 0; nwc < NENDGAME_MAX; nwc++)
+  for (nwk = 0; nwk < NENDGAME_MAX; nwk++)
   {
     for (nwm = 0; nwm < NENDGAME_MAX; nwm++)
     {
-      for (nbc = 0; nbc < NENDGAME_MAX; nbc++)
+      for (nbk = 0; nbk < NENDGAME_MAX; nbk++)
       {
         for (nbm = 0; nbm < NENDGAME_MAX; nbm++)
         {
-          endgame_t *with_endgame = &(endgames[nwc][nwm][nbc][nbm]);
+          endgame_t *with_endgame = &(endgames[nwk][nwm][nbk][nbm]);
 
           if (with_endgame->endgame_status != INVALID) continue;
 
           snprintf(with_endgame->endgame_name, MY_LINE_MAX,
-                   "%dwX-%dwO-%dbX-%dbO", nwc, nwm, nbc, nbm);
+                   "%dwX-%dwO-%dbX-%dbO", nwk, nwm, nbk, nbm);
           
           snprintf(path, MY_LINE_MAX, "%s/%s",
             options.egtb_dir, with_endgame->endgame_name);
@@ -228,7 +608,40 @@ void init_endgame(void)
             PRINTF("npages=%lld nentries=%lld uncompressed_size=%lld\n",
               npages, nentries, uncompressed_size);
 
-          //WDL
+          //always open WDL
+
+          char wdl[MY_LINE_MAX];
+
+          snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl",
+            options.egtb_dir, with_endgame->endgame_name);
+
+          HARDBUG(!fexists(wdl))
+  
+          HARDBUG((with_endgame->fendgame_wdl = fopen(wdl, "r+b")) == NULL)
+
+          i8_t wdl_version;
+  
+          HARDBUG(fread(&wdl_version, sizeof(i8_t), 1,
+                        with_endgame->fendgame_wdl) != 1)
+      
+          HARDBUG(wdl_version != EGTB_WDL_VERSION)
+      
+          if (options.verbose > 1)
+            PRINTF("wdl_version=%d\n", wdl_version);
+
+          //each entry consists of wtm_mate and btm_mate
+          //each encoded as 2 bits so 4 bits (1 byte) in total
+
+          HARDBUG((nentries % 2) != 0)
+
+          i64_t nwdl = nentries / 2;
+            
+          i64_t wdl_size = nwdl * sizeof(wdl_t);
+
+          if (options.verbose > 1)
+            PRINTF("nwdl=%lld wdl_size=%lld\n", nwdl, wdl_size);
+
+          //optionally load WDL in RAM
 
           cJSON *egtbs = NULL;
 
@@ -253,20 +666,6 @@ void init_endgame(void)
             if (compat_strcasecmp(with_endgame->endgame_name,
                               cJSON_GetStringValue(egtb)) != 0) continue;
 
-            //egtb should be WDL encoded
- 
-            //each entry consists of wtm_mate and btm_mate
-            //each encoded as 2 bits so 4 bits (1 byte) in total
-
-            HARDBUG((nentries % 2) != 0)
-
-            i64_t nwdl = nentries / 2;
-            
-            i64_t wdl_size = nwdl * sizeof(wdl_t);
-
-            if (options.verbose > 1)
-              PRINTF("nwdl=%lld wdl_size=%lld\n", nwdl, wdl_size);
-
             if (my_mpi_globals.MY_MPIG_nglobal <= 1)
             {
               MY_MALLOC(with_endgame->pendgame, wdl_t, nwdl)
@@ -280,7 +679,8 @@ void init_endgame(void)
                 my_mpi_globals.MY_MPIG_comm_global,
                 &(with_endgame->pendgame), &(with_endgame->wendgame));
 
-              MPI_Win_fence(0, with_endgame->wendgame);
+              my_mpi_win_fence(my_mpi_globals.MY_MPIG_comm_global,
+                               0, with_endgame->wendgame);
 
               int disp_unit;
               MPI_Aint ssize;
@@ -291,7 +691,8 @@ void init_endgame(void)
               PRINTF("ssize=%lld disp_unit=%d\n",
                 (long long) ssize, disp_unit);
 
-              MPI_Win_fence(0, with_endgame->wendgame);
+              my_mpi_win_fence(my_mpi_globals.MY_MPIG_comm_global,
+                               0, with_endgame->wendgame);
 #else
               FATAL("my_mpi_globals.MY_MPIG_nglobal > 1", EXIT_FAILURE)
 #endif
@@ -303,302 +704,27 @@ void init_endgame(void)
                 (my_mpi_globals.MY_MPIG_id_global == 0))
             {
               for (i64_t iwdl = 0; iwdl < nwdl; iwdl++) pwdl_t[iwdl] = 0;
-            }
 
-#ifdef USE_OPENMPI
-            if (my_mpi_globals.MY_MPIG_nglobal > 1)
-              MPI_Win_fence(0, with_endgame->wendgame);
-#endif
-            char wdl[MY_LINE_MAX];
+              if (options.verbose > 1)
+                PRINTF("loading wdl EGTB %s into RAM..\n", path);
 
-            snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl",
-              options.egtb_dir, with_endgame->endgame_name);
-
-            if (fexists(wdl))
-            {
-              if ((my_mpi_globals.MY_MPIG_id_global == INVALID) or
-                  (my_mpi_globals.MY_MPIG_id_global == 0))
-              {
-                if (options.verbose > 1)
-                  PRINTF("loading wdl EGTB %s into RAM..\n", path);
-
-                FILE *fwdl;
- 
-                HARDBUG((fwdl = fopen(wdl, "rb")) == NULL)
-
-                i8_t wdl_version;
-  
-                HARDBUG(fread(&wdl_version, sizeof(i8_t), 1, fwdl) != 1)
-      
-                HARDBUG(wdl_version != EGTB_WDL_VERSION)
-      
-                if (options.verbose > 1)
-                  PRINTF("wdl_version=%d\n", wdl_version);
-  
-                HARDBUG(fread(with_endgame->pendgame, sizeof(i8_t), wdl_size,
-                          fwdl) != wdl_size)
+              HARDBUG(fread(with_endgame->pendgame, sizeof(i8_t), wdl_size,
+                            with_endgame->fendgame_wdl) != wdl_size)
   
                 if (options.verbose > 1)
                   PRINTF("..done size in RAM=%lld\n", wdl_size);
-              }
-#ifdef USE_OPENMPI
-              if (my_mpi_globals.MY_MPIG_nglobal > 1)
-                MPI_Win_fence(0, with_endgame->wendgame);
-
-              if ((my_mpi_globals.MY_MPIG_id_global != INVALID) and
-                  (my_mpi_globals.MY_MPIG_id_global != 0))
-              {
-                PRINTF("sharing wdl EGTB %s in RAM\n", path);
-              }
-#endif
             }
-            else
+#ifdef USE_OPENMPI
+            if (my_mpi_globals.MY_MPIG_nglobal > 1)
+              my_mpi_win_fence(my_mpi_globals.MY_MPIG_comm_global,
+                                0, with_endgame->wendgame);
+
+            if ((my_mpi_globals.MY_MPIG_id_global != INVALID) and
+                (my_mpi_globals.MY_MPIG_id_global != 0))
             {
-              HARDBUG(my_mpi_globals.MY_MPIG_id_global != INVALID)
-
-              PRINTF("WDL encoding EGTB %s into RAM..\n", path);
-
-              i64_t jentry = 0;
-             
-              for (i64_t ipage = 0; ipage < npages; ipage++)
-              {
-                i64_t seek =
-                  sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) + 
-                  ipage * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
-                
-                HARDBUG(compat_fseeko(with_endgame->fendgame, seek, SEEK_SET) != 0)
-                    
-                i64_t offset;
-                i16_t length;
-                ui32_t crc32;
-                  
-                HARDBUG(fread(&offset, sizeof(i64_t), 1,
-                          with_endgame->fendgame) != 1)
-                HARDBUG(fread(&length, sizeof(i16_t), 1,
-                          with_endgame->fendgame) != 1)
-                HARDBUG(fread(&crc32,  sizeof(ui32_t), 1,
-                          with_endgame->fendgame) != 1)
-                  
-                //some blocks may have offset INVALID
-                  
-                if (offset == INVALID)
-                {
-                  HARDBUG(length != 0)
-                
-                  HARDBUG(crc32 != 0xFFFFFFFF)
-                
-                  continue;
-                }
-                  
-                HARDBUG(length <= 0)
-                HARDBUG(length > (2 * ARRAY_PAGE_SIZE))
-                  
-                i8_t source[2 * ARRAY_PAGE_SIZE];
-                size_t sourceLen = length;
-               
-                HARDBUG(compat_fseeko(with_endgame->fendgame, offset, SEEK_SET) !=
-                        0)
-                
-                HARDBUG(fread(source, sizeof(i8_t), sourceLen,
-                          with_endgame->fendgame) != sourceLen)
-                
-                if (source[0] == ALL_DRAW)
-                {
-                  crc32 = 0xFFFFFFFF;
-                    
-                  crc32 = _mm_crc32_u8(crc32, source[0]);
-                  
-                  HARDBUG(crc32 != crc32)
-                   
-                  for (int ientry = 0; ientry < nblock_entries; ientry++)
-                  {
-                    ui8_t wdl_entry = (WDL_DRAW << 2) | WDL_DRAW;
-
-                    HARDBUG(jentry >= nentries)
-   
-                    i64_t iwdl = jentry / 2;
-
-                    HARDBUG(iwdl >= nwdl)
-
-                    int jwdl = jentry % 2;
-
-                    pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
-
-                    HARDBUG(pwdl_t[iwdl] == 0)
-
-                    jentry++;
-                  }
-                }
-                else if (source[0] == ALL_I8)
-                {
-                  entry_i8_t dest[NPAGE_ENTRIES];
-                  size_t destLen = sizeof(dest);
-                      
-                  //exclude source[0]
-                  --sourceLen;
-                    
-                  destLen = ZSTD_decompress(dest, destLen,
-                                            source + 1, sourceLen);
-                  
-                  HARDBUG(ZSTD_isError(destLen))
-                    
-                  HARDBUG(destLen > sizeof(dest))
-                  
-                  HARDBUG((destLen % sizeof(entry_i8_t)) != 0)
-                  
-                  HARDBUG((destLen / sizeof(entry_i8_t)) != nblock_entries)
-
-#ifdef USE_HARDWARE_CRC32
-
-                  crc32 = 0xFFFFFFFF;
-                    
-                  crc32 = _mm_crc32_u8(crc32, source[0]);
-                  
-                  for (int ientry = 0; ientry < nblock_entries; ientry++)
-                  {
-                    crc32 = _mm_crc32_u8(crc32,
-                                         dest[ientry].entry_white_mate);
-                    crc32 = _mm_crc32_u8(crc32,
-                                         dest[ientry].entry_black_mate);
-                  }
-
-#else
-
-#error NOT IMPLEMENTED YET
-
+              PRINTF("sharing wdl EGTB %s in RAM\n", path);
+            }
 #endif
-
-                  HARDBUG(crc32 != crc32)
-                  
-                  for (int ientry = 0; ientry < nblock_entries; ientry++)
-                  {
-                    ui8_t wdl_entry = 0;
- 
-                    if (dest[ientry].entry_black_mate == INVALID)
-                      wdl_entry = WDL_DRAW;
-                    else if (dest[ientry].entry_black_mate > 0)
-                      wdl_entry = WDL_WON;
-                    else
-                      wdl_entry = WDL_LOST;
-
-                    if (dest[ientry].entry_white_mate == INVALID)
-                      wdl_entry = (wdl_entry << 2) | WDL_DRAW;
-                    else if (dest[ientry].entry_white_mate > 0)
-                      wdl_entry = (wdl_entry << 2) | WDL_WON;
-                    else
-                      wdl_entry = (wdl_entry << 2) | WDL_LOST;
-
-                    HARDBUG(jentry >= nentries)
-
-                    i64_t iwdl = jentry / 2;
-
-                    HARDBUG(iwdl >= nwdl)
-
-                    int jwdl = jentry % 2;
-
-                    pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
-
-                    HARDBUG(pwdl_t[iwdl] == 0)
-
-                    jentry++;
-                  }
-                }
-                else
-                {
-                  entry_i16_t dest[NPAGE_ENTRIES];
-                  size_t destLen = sizeof(dest);
-                      
-                  //exclude source[0]
-                  --sourceLen;
-                    
-                  destLen = ZSTD_decompress(dest, destLen,
-                                            source + 1, sourceLen);
-                  
-                  HARDBUG(ZSTD_isError(destLen))
-                    
-                  HARDBUG(destLen > sizeof(dest))
-                  
-                  HARDBUG((destLen % sizeof(entry_i16_t)) != 0)
-                  
-                  HARDBUG((destLen / sizeof(entry_i16_t)) != nblock_entries)
-
-#ifdef USE_HARDWARE_CRC32
-
-                  crc32 = 0xFFFFFFFF;
-                    
-                  crc32 = _mm_crc32_u8(crc32, source[0]);
-                  
-                  for (int ientry = 0; ientry < nblock_entries; ientry++)
-                  {
-                    crc32 = _mm_crc32_u16(crc32,
-                                          dest[ientry].entry_white_mate);
-                    crc32 = _mm_crc32_u16(crc32,
-                                          dest[ientry].entry_black_mate);
-                  }
-
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
-
-                  HARDBUG(crc32 != crc32)
-                  
-                  for (int ientry = 0; ientry < nblock_entries; ientry++)
-                  {
-                    ui8_t wdl_entry = 0;
- 
-                    if (dest[ientry].entry_black_mate == INVALID)
-                      wdl_entry = WDL_DRAW;
-                    else if (dest[ientry].entry_black_mate > 0)
-                      wdl_entry = WDL_WON;
-                    else
-                      wdl_entry = WDL_LOST;
-
-                    if (dest[ientry].entry_white_mate == INVALID)
-                      wdl_entry = (wdl_entry << 2) | WDL_DRAW;
-                    else if (dest[ientry].entry_white_mate > 0)
-                      wdl_entry = (wdl_entry << 2) | WDL_WON;
-                    else
-                      wdl_entry = (wdl_entry << 2) | WDL_LOST;
-
-                    HARDBUG(jentry >= nentries)
-
-                    i64_t iwdl = jentry / 2;
-
-                    HARDBUG(iwdl >= nwdl)
-
-                    int jwdl = jentry % 2;
-
-                    pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
-
-                    HARDBUG(pwdl_t[iwdl] == 0)
-
-                    jentry++;
-    
-                  }
-                }
-              }//for (i64_t ipage = 0; ipage < npages; ipage++)
-
-              HARDBUG(jentry != nentries)
-
-              PRINTF("..done size in RAM=%lld\n", wdl_size);
-
-              PRINTF("writing WDL encoded EGTB %s to disk..\n", path);
-
-              FILE *fwdl;
- 
-              HARDBUG((fwdl = fopen(wdl, "wb")) == NULL)
-
-              i8_t wdl_version = EGTB_WDL_VERSION;
-
-              HARDBUG(fwrite(&wdl_version, sizeof(i8_t), 1, fwdl) != 1)
-
-              HARDBUG(fwrite(with_endgame->pendgame, sizeof(i8_t), wdl_size,
-                         fwdl) != wdl_size)
-  
-              FCLOSE(fwdl)
-            }//if (fexists(wdl))
 
             endgame_ram += wdl_size;
 
@@ -657,9 +783,9 @@ void init_endgame(void)
         
           HARDBUG(with_endgame->endgame_status == INVALID)
 
-          if ((nwc != nbc) or (nwm != nbm))
+          if ((nwk != nbk) or (nwm != nbm))
           {
-            endgame_t *with_mirror = &(endgames[nbc][nbm][nwc][nwm]);
+            endgame_t *with_mirror = &(endgames[nbk][nbm][nwk][nwm]);
         
             HARDBUG(with_mirror->endgame_status == ENDGAME_ALPHA_BETA_WDL)
             HARDBUG(with_mirror->endgame_status ==
@@ -677,19 +803,19 @@ void init_endgame(void)
 
   PRINTF("endgame_ram=%lld MBYTE\n", endgame_ram / MBYTE + 1);
 
-  for (nwc = 0; nwc < NENDGAME_MAX; nwc++)
+  for (nwk = 0; nwk < NENDGAME_MAX; nwk++)
   {
     for (nwm = 0; nwm < NENDGAME_MAX; nwm++)
     {
-      for (nbc = 0; nbc < NENDGAME_MAX; nbc++)
+      for (nbk = 0; nbk < NENDGAME_MAX; nbk++)
       {
         for (nbm = 0; nbm < NENDGAME_MAX; nbm++)
         {
-          endgame_t *with_endgame = &(endgames[nwc][nwm][nbc][nbm]);
+          endgame_t *with_endgame = &(endgames[nwk][nwm][nbk][nbm]);
 
           if (with_endgame->endgame_status == ENDGAME_UNAVAILABLE) continue;
 
-          PRINTF("%d %d %d %d %s", nwc, nwm, nbc, nbm,
+          PRINTF("%d %d %d %d %s", nwk, nwm, nbk, nbm,
                  with_endgame->endgame_name);
 
           if (with_endgame->endgame_status ==
@@ -719,37 +845,37 @@ void init_endgame(void)
   PRINTF("..done\n");
 }
 
-void update_endgame_index(int nlist, int list[NENDGAME_MAX],
+void update_endgame_index(int arg_nlist, int arg_list[NENDGAME_MAX],
   i64_t *endgame_index)
 {
-  if (nlist == 0) return;
-  if (nlist == 1)
+  if (arg_nlist == 0) return;
+  if (arg_nlist == 1)
   {
     int list0;
 
-    list0 = list[0];
+    list0 = arg_list[0];
 
     *endgame_index = *endgame_index * 50 + list0;
   }
-  else if (nlist == 2)
+  else if (arg_nlist == 2)
   {
     int list0, list1;
 
-    list0 = list[0];
-    list1 = list[1];
+    list0 = arg_list[0];
+    list1 = arg_list[1];
       
     SOFTBUG(list0 > list1)
 
     *endgame_index = *endgame_index * SUM2(49) +
       SUM2(list0) + list1 - list0 - 1;
   }
-  else if (nlist == 3)
+  else if (arg_nlist == 3)
   {
     int list0, list1, list2;
 
-    list0 = list[0];
-    list1 = list[1];
-    list2 = list[2];
+    list0 = arg_list[0];
+    list1 = arg_list[1];
+    list2 = arg_list[2];
       
     SOFTBUG(list0 > list1)
     SOFTBUG(list1 > list2)
@@ -757,14 +883,14 @@ void update_endgame_index(int nlist, int list[NENDGAME_MAX],
     *endgame_index = *endgame_index * SUM3(49) + SUM3(list0) +
       SUM32(list0, list1) + list2 - list1 - 1;
   }  
-  else if (nlist == 4)
+  else if (arg_nlist == 4)
   {
     int list0, list1, list2, list3;
 
-    list0 = list[0];
-    list1 = list[1];
-    list2 = list[2];
-    list3 = list[3];
+    list0 = arg_list[0];
+    list1 = arg_list[1];
+    list2 = arg_list[2];
+    list3 = arg_list[3];
      
     SOFTBUG(list0 > list1)
     SOFTBUG(list1 > list2)
@@ -773,15 +899,15 @@ void update_endgame_index(int nlist, int list[NENDGAME_MAX],
     *endgame_index = *endgame_index * SUM4(49) + SUM4(list0) +
       SUM43(list0, list1) + SUM32(list1, list2) + list3 - list2 - 1;
   }
-  else if (nlist == 5)
+  else if (arg_nlist == 5)
   {
     int list0, list1, list2, list3, list4;
 
-    list0 = list[0];
-    list1 = list[1];
-    list2 = list[2];
-    list3 = list[3];
-    list4 = list[4];
+    list0 = arg_list[0];
+    list1 = arg_list[1];
+    list2 = arg_list[2];
+    list3 = arg_list[3];
+    list4 = arg_list[4];
       
     SOFTBUG(list0 > list1)
     SOFTBUG(list1 > list2)
@@ -804,76 +930,76 @@ void update_endgame_index(int nlist, int list[NENDGAME_MAX],
 #define ENCODE_8BIT      5
 
 #ifdef ENABLE_RECOMPRESSION
-local void decode(i8_t *flag, i16_t *shift, ui8_t code[ARRAY_PAGE_SIZE],
-  entry_i16_t *entries)
+local void decode(i8_t *arg_flag, i16_t *arg_shift, ui8_t arg_code[ARRAY_PAGE_SIZE],
+  entry_i16_t *arg_entries)
 {
   entry_i16_t entry_i16_default = {MATE_DRAW, MATE_DRAW};
 
-  if (*flag == ENCODE_DRAW)
+  if (*arg_flag == ENCODE_DRAW)
   {
     for (int ientry = 0; ientry < ARRAY_PAGE_SIZE / 4; ientry++)
     {
-      entry_i16_t *entry = entries + ientry;
+      entry_i16_t *entry = arg_entries + ientry;
 
       memcpy(entry, &entry_i16_default, sizeof(entry_i16_t));
     }
   }
-  else if (*flag == ENCODE_16BIT)
+  else if (*arg_flag == ENCODE_16BIT)
   {
-    memcpy(entries, code, ARRAY_PAGE_SIZE);
+    memcpy(arg_entries, arg_code, ARRAY_PAGE_SIZE);
   }
-  else if (*flag == ENCODE_8BIT_GT_0)
+  else if (*arg_flag == ENCODE_8BIT_GT_0)
   {
     int icode = 0;
 
     for (int ientry = 0; ientry < ARRAY_PAGE_SIZE / 4; ientry++)
     {
-      entry_i16_t *entry = entries + ientry;
+      entry_i16_t *entry = arg_entries + ientry;
 
       //code[icode++] = (entry->entry_white_mate - mate_min) / 2;
 
-      entry->entry_white_mate = 2 * (i16_t) code[icode++] + *shift;
+      entry->entry_white_mate = 2 * (i16_t) arg_code[icode++] + *arg_shift;
 
-      entry->entry_black_mate = 2 * (i16_t) code[icode++] + *shift;
+      entry->entry_black_mate = 2 * (i16_t) arg_code[icode++] + *arg_shift;
     } 
     SOFTBUG(icode != (ARRAY_PAGE_SIZE / 2))
   }
-  else if (*flag == ENCODE_8BIT_LE_0)
+  else if (*arg_flag == ENCODE_8BIT_LE_0)
   {
     int icode = 0;
 
     for (int ientry = 0; ientry < ARRAY_PAGE_SIZE / 4; ientry++)
     {
-      entry_i16_t *entry = entries + ientry;
+      entry_i16_t *entry = arg_entries + ientry;
 
       //if (entry->entry_white_mate == MATE_DRAW) 
       //  code[icode++] = 0;
       //else
       //  code[icode++] = (2 - entry->entry_white_mate) / 2;
 
-      if (code[icode] == 0)
+      if (arg_code[icode] == 0)
         entry->entry_white_mate = MATE_DRAW;
       else
-        entry->entry_white_mate = 2 - 2 * (i16_t) code[icode];
+        entry->entry_white_mate = 2 - 2 * (i16_t) arg_code[icode];
 
       icode++;
 
-      if (code[icode] == 0)
+      if (arg_code[icode] == 0)
         entry->entry_black_mate = MATE_DRAW;
       else
-        entry->entry_black_mate = 2 - 2 * (i16_t) code[icode];
+        entry->entry_black_mate = 2 - 2 * (i16_t) arg_code[icode];
 
       icode++;
     } 
     SOFTBUG(icode != (ARRAY_PAGE_SIZE / 2))
   }
-  else if (*flag == ENCODE_8BIT)
+  else if (*arg_flag == ENCODE_8BIT)
   {
     int icode = 0;
 
     for (int ientry = 0; ientry < ARRAY_PAGE_SIZE / 4; ientry++)
     {
-      entry_i16_t *entry = entries + ientry;
+      entry_i16_t *entry = arg_entries + ientry;
    
       //if (entry->entry_white_mate == MATE_DRAW) 
       //  code[icode++] = 0;
@@ -882,21 +1008,21 @@ local void decode(i8_t *flag, i16_t *shift, ui8_t code[ARRAY_PAGE_SIZE],
       //else
       //  code[icode++] = (mate_max + 3 - entry->entry_white_mate) / 2;
       
-      if (code[icode] == 0)
+      if (arg_code[icode] == 0)
         entry->entry_white_mate = MATE_DRAW;
-      else if (code[icode] >= ((*shift + 3) / 2))
-        entry->entry_white_mate = *shift + 3 - 2 * (i16_t) code[icode];
+      else if (arg_code[icode] >= ((*arg_shift + 3) / 2))
+        entry->entry_white_mate = *arg_shift + 3 - 2 * (i16_t) arg_code[icode];
       else
-        entry->entry_white_mate = 2 * (i16_t) code[icode] - 1;
+        entry->entry_white_mate = 2 * (i16_t) arg_code[icode] - 1;
 
       icode++;
 
-      if (code[icode] == 0)
+      if (arg_code[icode] == 0)
         entry->entry_black_mate = MATE_DRAW;
-      else if (code[icode] >= ((*shift + 3) / 2))
-        entry->entry_black_mate = *shift + 3 - 2 * (i16_t) code[icode];
+      else if (arg_code[icode] >= ((*arg_shift + 3) / 2))
+        entry->entry_black_mate = *arg_shift + 3 - 2 * (i16_t) arg_code[icode];
       else
-        entry->entry_black_mate = 2 * (i16_t) code[icode] - 1;
+        entry->entry_black_mate = 2 * (i16_t) arg_code[icode] - 1;
 
       icode++;
     }
@@ -904,25 +1030,25 @@ local void decode(i8_t *flag, i16_t *shift, ui8_t code[ARRAY_PAGE_SIZE],
   }
   else
   {
-    PRINTF("*flag=%d\n", *flag);
+    PRINTF("*flag=%d\n", *arg_flag);
     FATAL("invalid flag", EXIT_FAILURE)
   }
 }
 #endif
 
-int read_endgame(search_t *with, int colour2move, int root_only)
+int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
 {
   BEGIN_BLOCK(__FUNC__)
 
   int result = ENDGAME_UNKNOWN;
 
-  int nwc = BIT_COUNT(with->S_board.board_white_king_bb);
-  int nwm = BIT_COUNT(with->S_board.board_white_man_bb);
+  int nwk = BIT_COUNT(object->S_board.board_white_king_bb);
+  int nwm = BIT_COUNT(object->S_board.board_white_man_bb);
 
-  int nbc = BIT_COUNT(with->S_board.board_black_king_bb);
-  int nbm = BIT_COUNT(with->S_board.board_black_man_bb);
+  int nbk = BIT_COUNT(object->S_board.board_black_king_bb);
+  int nbm = BIT_COUNT(object->S_board.board_black_man_bb);
 
-  int npieces = nwc + nwm + nbc + nbm;
+  int npieces = nwk + nwm + nbk + nbm;
 
   if (npieces > NENDGAME_MAX)
   {
@@ -948,7 +1074,7 @@ int read_endgame(search_t *with, int colour2move, int root_only)
 
   //just in case
 
-  if (nwc >= NENDGAME_MAX)
+  if (nwk >= NENDGAME_MAX)
   {
     result = ENDGAME_UNKNOWN;
     goto label_return;
@@ -958,7 +1084,7 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     result = ENDGAME_UNKNOWN;
     goto label_return;
   }
-  if (nbc >= NENDGAME_MAX)
+  if (nbk >= NENDGAME_MAX)
   {
     result = ENDGAME_UNKNOWN;
     goto label_return;
@@ -969,11 +1095,12 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     goto label_return;
   }
 
-  if ((nwc + nwm) == 0)
+  if ((nwk + nwm) == 0)
   {
-    if (IS_WHITE(colour2move))
+    if (IS_WHITE(arg_colour2move))
     {
       result = 0;
+      if (arg_wdl != NULL) *arg_wdl = FALSE;
       goto label_return;
     }
     else
@@ -982,11 +1109,12 @@ int read_endgame(search_t *with, int colour2move, int root_only)
       goto label_return;
     }
   }
-  if ((nbc + nbm) == 0)
+  if ((nbk + nbm) == 0)
   {
-    if (IS_BLACK(colour2move))
+    if (IS_BLACK(arg_colour2move))
     {
       result = 0;
+      if (arg_wdl != NULL) *arg_wdl = FALSE;
       goto label_return;
     }
     else
@@ -996,13 +1124,13 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     }
   }
 
-  endgame_t *with_endgame = &(endgames[nwc][nwm][nbc][nbm]);
+  endgame_t *with_endgame = &(endgames[nwk][nwm][nbk][nbm]);
 
   if (with_endgame->endgame_status == ENDGAME_UNAVAILABLE)
   {
     if (with_endgame->endgame_unavailable_warning)
     {
-      my_printf(with->S_my_printf,
+      my_printf(object->S_my_printf,
         "WARNING: endgame database %s not available\n",
         with_endgame->endgame_name);
 
@@ -1023,9 +1151,13 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     HARDBUG(with_endgame == NULL)
   }
 
-  if ((!root_only) and (with_endgame->endgame_status == ENDGAME_ROOT_ONLY))
+  if ((arg_wdl != NULL) and
+      (with_endgame->endgame_status == ENDGAME_ROOT_ONLY))
   {
+    *arg_wdl = FALSE;
+
     result = ENDGAME_UNKNOWN;
+
     goto label_return;
   }
   
@@ -1042,18 +1174,18 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     ui64_t bb;
     int nbb;
 
-    bb = with->S_board.board_white_king_bb; 
+    bb = object->S_board.board_white_king_bb; 
     nbb = 0;
 
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      white_king_sort[nwc - 1 - nbb++] = 49 - inverse_map[lsb];
+      white_king_sort[nwk - 1 - nbb++] = 49 - inverse_map[lsb];
       bb &= ~BITULL(lsb);
     }
-    HARDBUG(nbb != nwc)
+    HARDBUG(nbb != nwk)
 
-    bb = with->S_board.board_white_man_bb; 
+    bb = object->S_board.board_white_man_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1064,18 +1196,18 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nwm)
 
-    bb = with->S_board.board_black_king_bb; 
+    bb = object->S_board.board_black_king_bb; 
     nbb = 0;
 
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      black_king_sort[nbc - 1 - nbb++] = 49 - inverse_map[lsb];
+      black_king_sort[nbk - 1 - nbb++] = 49 - inverse_map[lsb];
       bb &= ~BITULL(lsb);
     }
-    HARDBUG(nbb != nbc)
+    HARDBUG(nbb != nbk)
 
-    bb = with->S_board.board_black_man_bb; 
+    bb = object->S_board.board_black_man_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1091,7 +1223,7 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     ui64_t bb;
     int nbb;
 
-    bb = with->S_board.board_white_king_bb; 
+    bb = object->S_board.board_white_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1100,9 +1232,9 @@ int read_endgame(search_t *with, int colour2move, int root_only)
       white_king_sort[nbb++] = inverse_map[lsb];
       bb &= ~BITULL(lsb);
     }
-    HARDBUG(nbb != nwc)
+    HARDBUG(nbb != nwk)
 
-    bb = with->S_board.board_white_man_bb;
+    bb = object->S_board.board_white_man_bb;
     nbb = 0;
   
     while(bb != 0)
@@ -1113,7 +1245,7 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     }
     HARDBUG(nbb != nwm)
 
-    bb = with->S_board.board_black_king_bb; 
+    bb = object->S_board.board_black_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1122,9 +1254,9 @@ int read_endgame(search_t *with, int colour2move, int root_only)
       black_king_sort[nbb++] = inverse_map[lsb];
       bb &= ~BITULL(lsb);
     }
-    HARDBUG(nbb != nbc)
+    HARDBUG(nbb != nbk)
 
-    bb = with->S_board.board_black_man_bb;
+    bb = object->S_board.board_black_man_bb;
     nbb = 0;
   
     while(bb != 0)
@@ -1138,21 +1270,21 @@ int read_endgame(search_t *with, int colour2move, int root_only)
 
   if (mirror)
   {
-    update_endgame_index(nbc, black_king_sort, &endgame_index);
+    update_endgame_index(nbk, black_king_sort, &endgame_index);
 
     update_endgame_index(nbm, black_man_sort, &endgame_index);
 
-    update_endgame_index(nwc, white_king_sort, &endgame_index);
+    update_endgame_index(nwk, white_king_sort, &endgame_index);
 
     update_endgame_index(nwm, white_man_sort, &endgame_index);
   } 
   else
   {
-    update_endgame_index(nwc, white_king_sort, &endgame_index);
+    update_endgame_index(nwk, white_king_sort, &endgame_index);
 
     update_endgame_index(nwm, white_man_sort, &endgame_index);
 
-    update_endgame_index(nbc, black_king_sort, &endgame_index);
+    update_endgame_index(nbk, black_king_sort, &endgame_index);
 
     update_endgame_index(nbm, black_man_sort, &endgame_index);
   }
@@ -1168,9 +1300,11 @@ int read_endgame(search_t *with, int colour2move, int root_only)
 
   with_endgame->endgame_nreads++;
 
-  if (!root_only and
+  if ((arg_wdl != NULL) and
       (with_endgame->endgame_status == ENDGAME_ALPHA_BETA_WDL))
   {
+    *arg_wdl = TRUE;
+
     wdl_t *pwdl_t = with_endgame->pendgame;
 
     i64_t iwdl = endgame_index / 2;
@@ -1215,18 +1349,93 @@ int read_endgame(search_t *with, int colour2move, int root_only)
     else
       FATAL("unknown wdl_entry", EXIT_FAILURE)
   }
-  else
-  { 
-    //check if the entry is in the entry cache
+  else if (arg_wdl != NULL)
+  {
+    *arg_wdl = TRUE;
 
-    i64_t endgame_id = nwc * (NENDGAME_MAX * NENDGAME_MAX * NENDGAME_MAX) +
+    //check if the entry is in the WDL entry cache
+
+    i64_t endgame_id = nwk * (NENDGAME_MAX * NENDGAME_MAX * NENDGAME_MAX) +
                        nwm * (NENDGAME_MAX * NENDGAME_MAX) +
-                       nbc * (NENDGAME_MAX) +
+                       nbk * (NENDGAME_MAX) +
                        nbm;
   
     i64_t endgame_index_key = (endgame_index << 16) | endgame_id;
   
-    if (check_entry_in_cache(&(with->S_endgame_entry_cache),
+    if (check_entry_in_cache(&(object->S_endgame_wdl_entry_cache),
+                             &endgame_index_key, &entry))
+    {
+      with_endgame->endgame_nentry_hits++;
+
+      goto label_result;
+    }
+
+    wdl_t vwdl;
+
+    i64_t iwdl = endgame_index / 2;
+
+    int jwdl = endgame_index % 2;
+
+    HARDBUG(compat_fseeko(with_endgame->fendgame_wdl,
+                          sizeof(i8_t) + iwdl * sizeof(wdl_t), SEEK_SET) != 0)
+                    
+    HARDBUG(fread(&vwdl, sizeof(wdl_t), 1, with_endgame->fendgame_wdl) != 1)
+
+    HARDBUG(vwdl == 0)
+
+    ui8_t wdl_entry = vwdl >> (jwdl * 4);
+    
+    HARDBUG(wdl_entry == 0)
+     
+    if ((wdl_entry & 0x3) == WDL_DRAW)
+    {
+      entry.entry_white_mate = INVALID;
+    }
+    else if ((wdl_entry & 0x3) == WDL_WON)
+    {
+      entry.entry_white_mate = 1;
+    }
+    else if ((wdl_entry & 0x3) == WDL_LOST)
+    {
+      entry.entry_white_mate = -2;
+    }
+    else
+      FATAL("unknown wdl_entry", EXIT_FAILURE)
+
+    wdl_entry = (wdl_entry >> 2) & 0x3;
+
+    if ((wdl_entry & 0x3) == WDL_DRAW)
+    {
+      entry.entry_black_mate = INVALID;
+    }
+    else if ((wdl_entry & 0x3) == WDL_WON)
+    {
+      entry.entry_black_mate = 1;
+    }
+    else if ((wdl_entry & 0x3) == WDL_LOST)
+    {
+      entry.entry_black_mate = -2;
+    }
+    else
+      FATAL("unknown wdl_entry", EXIT_FAILURE)
+
+    store_entry_in_cache(&(object->S_endgame_wdl_entry_cache),
+                         &endgame_index_key, &entry);
+  }
+  else
+  { 
+    if (arg_wdl != NULL) *arg_wdl = FALSE;
+
+    //check if the entry is in the entry cache
+
+    i64_t endgame_id = nwk * (NENDGAME_MAX * NENDGAME_MAX * NENDGAME_MAX) +
+                       nwm * (NENDGAME_MAX * NENDGAME_MAX) +
+                       nbk * (NENDGAME_MAX) +
+                       nbm;
+  
+    i64_t endgame_index_key = (endgame_index << 16) | endgame_id;
+  
+    if (check_entry_in_cache(&(object->S_endgame_entry_cache),
                              &endgame_index_key, &entry))
     {
       with_endgame->endgame_nentry_hits++;
@@ -1472,7 +1681,7 @@ int read_endgame(search_t *with, int colour2move, int root_only)
       FATAL("eh", EXIT_FAILURE)
 #endif
 
-    store_entry_in_cache(&(with->S_endgame_entry_cache),
+    store_entry_in_cache(&(object->S_endgame_entry_cache),
                          &endgame_index_key, &entry);
   }
 
@@ -1480,14 +1689,14 @@ int read_endgame(search_t *with, int colour2move, int root_only)
 
   if (mirror)
   {
-    if (IS_WHITE(colour2move))
+    if (IS_WHITE(arg_colour2move))
       result = entry.entry_black_mate;
     else
       result = entry.entry_white_mate;
   }
   else
   {
-    if (IS_WHITE(colour2move))
+    if (IS_WHITE(arg_colour2move))
       result = entry.entry_white_mate;
     else
       result = entry.entry_black_mate;
@@ -1496,25 +1705,28 @@ int read_endgame(search_t *with, int colour2move, int root_only)
   label_return:
   END_BLOCK
 
+  if (arg_wdl != NULL)
+    HARDBUG((result != ENDGAME_UNKNOWN) and (*arg_wdl != 0) and (*arg_wdl != 1))
+
   return(result);
 }
 
 void fin_endgame(void)
 {
   PRINTF("fin_endgame\n");
-  for (int nwc = 0; nwc < NENDGAME_MAX; nwc++)
+  for (int nwk = 0; nwk < NENDGAME_MAX; nwk++)
   {
     for (int nwm = 0; nwm < NENDGAME_MAX; nwm++)
     {
-      for (int nbc = 0; nbc < NENDGAME_MAX; nbc++)
+      for (int nbk = 0; nbk < NENDGAME_MAX; nbk++)
       {
         for (int nbm = 0; nbm < NENDGAME_MAX; nbm++)
         {
-          endgame_t *with = &(endgames[nwc][nwm][nbc][nbm]);
+          endgame_t *with = &(endgames[nwk][nwm][nbk][nbm]);
 
           if (with->pendgame != NULL)
           {
-            PRINTF("ab %1d %1d %1d %1d %s", nwc, nwm, nbc, nbm, 
+            PRINTF("ab %1d %1d %1d %1d %s", nwk, nwm, nbk, nbm, 
               with->endgame_name);
             PRINTF("%10lld %10lld %10lld\n",
               with->endgame_nreads,
@@ -1523,7 +1735,7 @@ void fin_endgame(void)
           }
           else if (with->fendgame != NULL)
           {
-            PRINTF("ro %1d %1d %1d %1d %s", nwc, nwm, nbc, nbm, 
+            PRINTF("ro %1d %1d %1d %1d %s", nwk, nwm, nbk, nbm, 
               with->endgame_name);
             PRINTF("%10lld %10lld %10lld\n",
               with->endgame_nreads,
@@ -1539,24 +1751,24 @@ void fin_endgame(void)
 #define NSTATS 1024
 #define NBLOCK 4
 
-void recompress_endgame(char *name, int level, int nblock)
+void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
 {
 #ifdef ENABLE_RECOMPRESSION
-  HARDBUG((NPAGE_ENTRIES % nblock) != 0)
+  HARDBUG((NPAGE_ENTRIES % arg_nblock) != 0)
 
-  i16_t nblock_entries = NPAGE_ENTRIES / nblock;
+  i16_t nblock_entries = NPAGE_ENTRIES / arg_nblock;
  
-  HARDBUG((ARRAY_PAGE_SIZE % nblock) != 0)
+  HARDBUG((ARRAY_PAGE_SIZE % arg_nblock) != 0)
   
-  i16_t block_size = ARRAY_PAGE_SIZE / nblock;
+  i16_t block_size = ARRAY_PAGE_SIZE / arg_nblock;
   
   PRINTF("nblock_entries=%d block_size\n", nblock_entries, block_size);
 
-  PRINTF("recompressing %s with level %d\n", name, level);
+  PRINTF("recompressing %s with level %d\n", arg_name, arg_level);
 
   char name_new[MY_LINE_MAX];
 
-  snprintf(name_new, MY_LINE_MAX, "/tmp8/gwies/dbase5zstdencdec3/%s", name);
+  snprintf(name_new, MY_LINE_MAX, "/tmp8/gwies/dbase5zstdencdec3/%s", arg_name);
 
   i64_t compressed_size_old = 0;
   i64_t uncompressed_size_old = 0;
@@ -1578,7 +1790,7 @@ void recompress_endgame(char *name, int level, int nblock)
   FILE *fold;
   FILE *fnew;
 
-  HARDBUG((fold = fopen(name, "r+b")) == NULL)
+  HARDBUG((fold = fopen(arg_name, "r+b")) == NULL)
 
   i64_t index_max_old;
 
@@ -1609,7 +1821,7 @@ void recompress_endgame(char *name, int level, int nblock)
   //i64_t npage_new = (index_max_old + 1) / nblock_entries;
   //if ((npage_new * nblock_entries) < (index_max_old + 1)) npage_new++;
 
-  i64_t npage_new = npage_old * nblock;
+  i64_t npage_new = npage_old * arg_nblock;
 
   HARDBUG((npage_new * nblock_entries) < (index_max_old + 1))
 
@@ -1664,7 +1876,7 @@ void recompress_endgame(char *name, int level, int nblock)
       i16_t length_new = 0;
       ui32_t crc32 = 0xFFFFFFFF;
 
-      for (int iblock = 0; iblock < nblock; iblock++)
+      for (int iblock = 0; iblock < arg_nblock; iblock++)
       {
         HARDBUG(ipage_new >= npage_new)
 
@@ -1711,7 +1923,7 @@ void recompress_endgame(char *name, int level, int nblock)
                             source_old + 1, sourceLen_old)) != COMPRESS_OK)
       {
         PRINTF("err=%d\n", err);
-        PRINTF("name=%s\n", name);
+        PRINTF("name=%s\n", arg_name);
         FATAL("uncompress error", EXIT_FAILURE)
       }
   
@@ -1730,7 +1942,7 @@ void recompress_endgame(char *name, int level, int nblock)
   
     uncompressed_size_old += ARRAY_PAGE_SIZE;
 
-    for (int iblock = 0; iblock < nblock; iblock++)
+    for (int iblock = 0; iblock < arg_nblock; iblock++)
     {
       int jentry = iblock * nblock_entries;
 
@@ -1812,7 +2024,7 @@ void recompress_endgame(char *name, int level, int nblock)
         dest_new[0] = ALL_I8;
         
         destLen_new = ZSTD_compress(dest_new + 1, destLen_new - 1,
-          source_new, sourceLen_new, level);
+          source_new, sourceLen_new, arg_level);
   
         if (ZSTD_isError(destLen_new))
         {
@@ -1874,7 +2086,7 @@ void recompress_endgame(char *name, int level, int nblock)
         dest_new[0] = ALL_I16;
         
         destLen_new = ZSTD_compress(dest_new + 1, destLen_new,
-          page_i16 + jentry, sourceLen_new, level);
+          page_i16 + jentry, sourceLen_new, arg_level);
   
         HARDBUG(ZSTD_isError(destLen_new))
   
@@ -1982,7 +2194,7 @@ void recompress_endgame(char *name, int level, int nblock)
 
   HARDBUG(fread(&nblock_entries, sizeof(i16_t), 1, fnew) != 1)
 
-  HARDBUG(nblock_entries != (NPAGE_ENTRIES / nblock))
+  HARDBUG(nblock_entries != (NPAGE_ENTRIES / arg_nblock))
 
   i64_t index_max_new;
 

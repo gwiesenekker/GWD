@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0
@@ -147,69 +147,69 @@ void start_my_timer(void *self)
   object->MT_status = MY_TIMER_STARTED;
 }
 
-local double cdf(int game_time, int imove)
+local double cdf(int arg_game_time, int arg_imove)
 {
-  return(game_time / 2.0 *
-         (1.0 + erf((imove - options.time_control_mean)/
+  return(arg_game_time / 2.0 *
+         (1.0 + erf((arg_imove - options.time_control_mean)/
                     (sqrt(2.0) * options.time_control_sigma))));
 }
 
-void configure_time_control(int game_time, int ngame_moves,
-  time_control_t *time_control)
+void configure_time_control(int arg_game_time, int arg_ngame_moves,
+  time_control_t *object)
 {
-  time_control->TC_game_time = game_time;
+  object->TC_game_time = arg_game_time;
 
-  ngame_moves += options.time_control_ntrouble;
+  arg_ngame_moves += options.time_control_ntrouble;
 
-  time_control->TC_ngame_moves = ngame_moves;
+  object->TC_ngame_moves = arg_ngame_moves;
 
-  double game_time_left = game_time;
+  double game_time_left = arg_game_time;
 
   if (options.time_control_method == 0)
   {
     //gaussian distribution
   
-    for (int imove = 0; imove <= ngame_moves; ++imove)
+    for (int imove = 0; imove <= arg_ngame_moves; ++imove)
     {
       //(imove - 1) can be negative
 
-      time_control->TC_game_time_per_move[imove] =
-        cdf(game_time, imove) - cdf(game_time, imove - 1);
+      object->TC_game_time_per_move[imove] =
+        cdf(arg_game_time, imove) - cdf(arg_game_time, imove - 1);
   
-      game_time_left -= time_control->TC_game_time_per_move[imove];
+      game_time_left -= object->TC_game_time_per_move[imove];
     }
   }
   else
   {
-    double game_time_half = (double) game_time / 2.0;
+    double game_time_half = (double) arg_game_time / 2.0;
 
-    time_control->TC_game_time_per_move[options.time_control_mean] =
+    object->TC_game_time_per_move[options.time_control_mean] =
       game_time_half / options.time_control_sigma;
 
     game_time_left -=
-      time_control->TC_game_time_per_move[options.time_control_mean];
+      object->TC_game_time_per_move[options.time_control_mean];
 
-    for (int imove = options.time_control_mean + 1; imove <= ngame_moves;
+    for (int imove = options.time_control_mean + 1; imove <= arg_ngame_moves;
          ++imove)
     {
-      game_time_half -= time_control->TC_game_time_per_move[imove - 1];
+      game_time_half -= object->TC_game_time_per_move[imove - 1];
 
-      time_control->TC_game_time_per_move[imove] =
+      object->TC_game_time_per_move[imove] =
         game_time_half / options.time_control_sigma;
 
-      game_time_left -= time_control->TC_game_time_per_move[imove];
+      game_time_left -= object->TC_game_time_per_move[imove];
     }
 
-    game_time_half = (double) game_time / 2.0;
+    game_time_half = (double) arg_game_time / 2.0;
 
     for (int imove = options.time_control_mean - 1; imove >= 0; --imove)
     {
-      game_time_half -= time_control->TC_game_time_per_move[imove + 1];
+      game_time_half -= object->TC_game_time_per_move[imove + 1];
 
-      time_control->TC_game_time_per_move[imove] =
+      object->TC_game_time_per_move[imove] =
         game_time_half / options.time_control_sigma;
 
-      game_time_left -= time_control->TC_game_time_per_move[imove];
+      game_time_left -= object->TC_game_time_per_move[imove];
     }
   }
   
@@ -219,49 +219,49 @@ void configure_time_control(int game_time, int ngame_moves,
   
   double S_total_game_time = 0.0;
   
-  for (int imove = 0; imove <= ngame_moves; ++imove)
+  for (int imove = 0; imove <= arg_ngame_moves; ++imove)
   {
-    time_control->TC_game_time_per_move[imove] +=
-      game_time_left / ngame_moves;
+    object->TC_game_time_per_move[imove] +=
+      game_time_left / arg_ngame_moves;
      
     PRINTF("imove=%d time_per_move[imove]=%.2f\n",
-      imove, time_control->TC_game_time_per_move[imove]);
+      imove, object->TC_game_time_per_move[imove]);
   
-    S_total_game_time += time_control->TC_game_time_per_move[imove];
+    S_total_game_time += object->TC_game_time_per_move[imove];
   }
 
-  PRINTF("game_time=%d S_total_game_time=%.2f\n", game_time, S_total_game_time);
+  PRINTF("game_time=%d S_total_game_time=%.2f\n", arg_game_time, S_total_game_time);
 }
 
-void update_time_control(int jmove, double move_time,
-  time_control_t *time_control)
+void update_time_control(int arg_jmove, double arg_move_time,
+  time_control_t *object)
 {
-  double delta = (move_time - time_control->TC_game_time_per_move[jmove]);
+  double delta = (arg_move_time - object->TC_game_time_per_move[arg_jmove]);
 
-  PRINTF("jmove=%d delta=%.2f\n", jmove, delta);
+  PRINTF("jmove=%d delta=%.2f\n", arg_jmove, delta);
 
-  int moves2go = time_control->TC_ngame_moves - (jmove + 1);
+  int moves2go = object->TC_ngame_moves - (arg_jmove + 1);
 
   PRINTF("moves2go=%d\n", moves2go);
       
   if (moves2go > 0)
   {
-    for (int imove = jmove + 1; imove <= time_control->TC_ngame_moves;
+    for (int imove = arg_jmove + 1; imove <= object->TC_ngame_moves;
          ++imove)
     {
-      time_control->TC_game_time_per_move[imove] -= delta / moves2go;
+      object->TC_game_time_per_move[imove] -= delta / moves2go;
 
       PRINTF("imove=%d time_per_move[imove]=%.2f\n",
-        imove, time_control->TC_game_time_per_move[imove]);
+        imove, object->TC_game_time_per_move[imove]);
     }
   }
 }
 
-void set_time_limit(int jmove, time_control_t *time_control)
+void set_time_limit(int arg_jmove, time_control_t *object)
 {
-  HARDBUG(jmove > time_control->TC_ngame_moves);
+  HARDBUG(arg_jmove > object->TC_ngame_moves);
 
-  options.time_limit = time_control->TC_game_time_per_move[jmove];
+  options.time_limit = object->TC_game_time_per_move[arg_jmove];
 
   if (options.time_limit < 0.1) options.time_limit = 0.1;
 
@@ -270,10 +270,10 @@ void set_time_limit(int jmove, time_control_t *time_control)
   {
     options.time_trouble[itrouble] = 0.1;
 
-    if ((jmove + itrouble + 1) <= time_control->TC_ngame_moves)
+    if ((arg_jmove + itrouble + 1) <= object->TC_ngame_moves)
     {
       options.time_trouble[itrouble] =
-        time_control->TC_game_time_per_move[jmove + itrouble + 1];
+        object->TC_game_time_per_move[arg_jmove + itrouble + 1];
       if (options.time_trouble[itrouble] < 0.1)
         options.time_trouble[itrouble] = 0.1;
     }
@@ -309,7 +309,7 @@ void test_my_timers(void)
   {
     BSTRING(bname)
 
-    HARDBUG(bformata(bname, "-%d", itest) != BSTR_OK)
+    HARDBUG(bformata(bname, "-%d", itest) == BSTR_ERR)
 
     construct_my_timer(test + itest, bdata(bname),  STDOUT, FALSE);
 

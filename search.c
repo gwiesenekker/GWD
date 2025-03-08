@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 #define TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT BIT(0)
@@ -97,30 +97,27 @@ local void print_white_pv(search_t *, int, int, int, moves_list_t *, int,
 local void print_black_pv(search_t *, int, int, int, moves_list_t *, int,
   pv_t *, char *);
 
-int draw_by_repetition(board_t *with, int strict)
+int draw_by_repetition(board_t *object, int arg_strict)
 {
   int result = FALSE;
 
-  int npieces = BIT_COUNT(with->board_white_man_bb) +
-                BIT_COUNT(with->board_white_king_bb) +
-                BIT_COUNT(with->board_black_man_bb) +
-                BIT_COUNT(with->board_black_king_bb);
+  int npieces = return_npieces(object);
 
   int n = 1;
 
-  for (int istate = with->board_inode - 2; istate >= 0; istate -= 2)
+  for (int istate = object->board_inode - 2; istate >= 0; istate -= 2)
   {
-    if (with->board_states[istate + 1].BS_npieces != npieces)
+    if (object->board_states[istate + 1].BS_npieces != npieces)
       goto label_return;
 
-    if (with->board_states[istate].BS_npieces != npieces)
+    if (object->board_states[istate].BS_npieces != npieces)
       goto label_return;
 
-    if (HASH_KEY_EQ(with->board_states[istate].BS_key, with->board_key))
+    if (HASH_KEY_EQ(object->board_states[istate].BS_key, object->board_key))
     {
       ++n;
 
-      if (!strict or (n >= 3))
+      if (!arg_strict or (n >= 3))
       {
         result = TRUE;
 
@@ -134,19 +131,19 @@ int draw_by_repetition(board_t *with, int strict)
   return(result);
 }
 
-local int move_repetition(board_t *with)
+local int move_repetition(board_t *object)
 {
-  if ((with->board_inode - 2) < 0) return(FALSE);
+  if ((object->board_inode - 2) < 0) return(FALSE);
 
   int npieces;
 
-  if (IS_WHITE(with->board_colour2move))
+  if (IS_WHITE(object->board_colour2move))
   {
-    npieces = BIT_COUNT(with->board_white_man_bb | with->board_white_king_bb);
+    npieces = BIT_COUNT(object->board_white_man_bb | object->board_white_king_bb);
   }
   else
   {
-    npieces = BIT_COUNT(with->board_black_man_bb | with->board_black_king_bb);
+    npieces = BIT_COUNT(object->board_black_man_bb | object->board_black_king_bb);
   }
 
   if (npieces > 1) return(FALSE);
@@ -169,10 +166,10 @@ local int move_repetition(board_t *with)
 
   int n = 0;
 
-  for (int jnode = with->board_inode - 4; jnode >= 0; jnode -= 2)
+  for (int jnode = object->board_inode - 4; jnode >= 0; jnode -= 2)
   {
-    if (HASH_KEY_EQ(with->board_nodes[with->board_inode - 2].node_move_key, 
-                    with->board_nodes[jnode].node_move_key))
+    if (HASH_KEY_EQ(object->board_nodes[object->board_inode - 2].node_move_key, 
+                    object->board_nodes[jnode].node_move_key))
     {
       ++n;
 
@@ -192,60 +189,60 @@ local int move_repetition(board_t *with)
   return(FALSE);
 }
 
-void clear_totals(search_t *with)
+void clear_totals(search_t *object)
 {
-  with->S_total_move_repetitions = 0;
+  object->S_total_move_repetitions = 0;
 
-  with->S_total_quiescence_nodes = 0;
-  with->S_total_quiescence_all_moves_captures_only = 0;
-  with->S_total_quiescence_all_moves_le2_moves = 0;
-  with->S_total_quiescence_all_moves_extended = 0;
+  object->S_total_quiescence_nodes = 0;
+  object->S_total_quiescence_all_moves_captures_only = 0;
+  object->S_total_quiescence_all_moves_le2_moves = 0;
+  object->S_total_quiescence_all_moves_extended = 0;
 
-  with->S_total_nodes = 0;
-  with->S_total_alpha_beta_nodes = 0;
-  with->S_total_minimal_window_nodes = 0;
-  with->S_total_pv_nodes = 0;
+  object->S_total_nodes = 0;
+  object->S_total_alpha_beta_nodes = 0;
+  object->S_total_minimal_window_nodes = 0;
+  object->S_total_pv_nodes = 0;
 
-  with->S_total_quiescence_extension_searches = 0;
-  with->S_total_quiescence_extension_searches_le_alpha = 0;
-  with->S_total_quiescence_extension_searches_ge_beta = 0;
+  object->S_total_quiescence_extension_searches = 0;
+  object->S_total_quiescence_extension_searches_le_alpha = 0;
+  object->S_total_quiescence_extension_searches_ge_beta = 0;
 
-  with->S_total_pv_extension_searches = 0;
-  with->S_total_pv_extension_searches_le_alpha = 0;
-  with->S_total_pv_extension_searches_ge_beta = 0;
+  object->S_total_pv_extension_searches = 0;
+  object->S_total_pv_extension_searches_le_alpha = 0;
+  object->S_total_pv_extension_searches_ge_beta = 0;
 
-  with->S_total_reductions_delta = 0;
-  with->S_total_reductions_delta_lost = 0;
-  with->S_total_reductions_delta_le_alpha = 0;
-  with->S_total_reductions_delta_ge_beta = 0;
+  object->S_total_reductions_delta = 0;
+  object->S_total_reductions_delta_lost = 0;
+  object->S_total_reductions_delta_le_alpha = 0;
+  object->S_total_reductions_delta_ge_beta = 0;
 
-  with->S_total_reductions = 0;
-  with->S_total_reductions_le_alpha = 0;
-  with->S_total_reductions_ge_beta = 0;
+  object->S_total_reductions = 0;
+  object->S_total_reductions_le_alpha = 0;
+  object->S_total_reductions_ge_beta = 0;
 
-  with->S_total_single_reply_extensions = 0;
+  object->S_total_single_reply_extensions = 0;
 
-  with->S_total_evaluations = 0;
-  with->S_total_material_only_evaluations = 0;
-  with->S_total_network_evaluations = 0;
+  object->S_total_evaluations = 0;
+  object->S_total_material_only_evaluations = 0;
+  object->S_total_network_evaluations = 0;
 
-  with->S_total_alpha_beta_cache_hits = 0;
-  with->S_total_alpha_beta_cache_depth_hits = 0;
-  with->S_total_alpha_beta_cache_le_alpha_hits = 0;
-  with->S_total_alpha_beta_cache_le_alpha_cutoffs = 0;
-  with->S_total_alpha_beta_cache_ge_beta_hits = 0;
-  with->S_total_alpha_beta_cache_ge_beta_cutoffs = 0;
-  with->S_total_alpha_beta_cache_true_score_hits = 0;
-  with->S_total_alpha_beta_cache_le_alpha_stored = 0;
-  with->S_total_alpha_beta_cache_ge_beta_stored = 0;
-  with->S_total_alpha_beta_cache_true_score_stored = 0;
-  with->S_total_alpha_beta_cache_nmoves_errors = 0;
-  with->S_total_alpha_beta_cache_crc32_errors = 0;
+  object->S_total_alpha_beta_cache_hits = 0;
+  object->S_total_alpha_beta_cache_depth_hits = 0;
+  object->S_total_alpha_beta_cache_le_alpha_hits = 0;
+  object->S_total_alpha_beta_cache_le_alpha_cutoffs = 0;
+  object->S_total_alpha_beta_cache_ge_beta_hits = 0;
+  object->S_total_alpha_beta_cache_ge_beta_cutoffs = 0;
+  object->S_total_alpha_beta_cache_true_score_hits = 0;
+  object->S_total_alpha_beta_cache_le_alpha_stored = 0;
+  object->S_total_alpha_beta_cache_ge_beta_stored = 0;
+  object->S_total_alpha_beta_cache_true_score_stored = 0;
+  object->S_total_alpha_beta_cache_nmoves_errors = 0;
+  object->S_total_alpha_beta_cache_crc32_errors = 0;
 }
 
-#define PRINTF_TOTAL(X) my_printf(with->S_my_printf, #X "=%lld\n", with->X);
+#define PRINTF_TOTAL(X) my_printf(object->S_my_printf, #X "=%lld\n", object->X);
 
-void print_totals(search_t *with)
+void print_totals(search_t *object)
 {
   PRINTF_TOTAL(S_total_move_repetitions)
 
@@ -296,29 +293,29 @@ void print_totals(search_t *with)
   PRINTF_TOTAL(S_total_alpha_beta_cache_crc32_errors)
 }
 
-local int probe_alpha_beta_cache(search_t *with, int node_type, int pv_only,
-  alpha_beta_cache_entry_t *alpha_beta_cache,
-  alpha_beta_cache_entry_t *alpha_beta_cache_entry,
-  alpha_beta_cache_slot_t **alpha_beta_cache_slot)
+local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv_only,
+  alpha_beta_cache_entry_t *arg_alpha_beta_cache,
+  alpha_beta_cache_entry_t *arg_alpha_beta_cache_entry,
+  alpha_beta_cache_slot_t **arg_alpha_beta_cache_slot)
 {
   int result = FALSE;
 
-  if (IS_PV(node_type))
+  if (IS_PV(arg_node_type))
   {
-    *alpha_beta_cache_entry =
-      alpha_beta_cache[with->S_board.board_key % nalpha_beta_pv_cache_entries];
+    *arg_alpha_beta_cache_entry =
+      arg_alpha_beta_cache[object->S_board.board_key % nalpha_beta_pv_cache_entries];
 
 #ifdef DEBUG
     for (int idebug = 0; idebug < NSLOTS; idebug++)
     {
-      if (alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key == 0) continue;
+      if (arg_alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key == 0) continue;
 
       int ndebug = 0;
       
       for (int jdebug = 0; jdebug < NSLOTS; jdebug++)
       {
-        if (alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key ==
-            alpha_beta_cache_entry->ABCE_slots[jdebug].ABCS_key) ndebug++;
+        if (arg_alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key ==
+            arg_alpha_beta_cache_entry->ABCE_slots[jdebug].ABCS_key) ndebug++;
       }
       HARDBUG(ndebug != 1)
     }
@@ -328,20 +325,20 @@ local int probe_alpha_beta_cache(search_t *with, int node_type, int pv_only,
 
     for (islot = 0; islot < NSLOTS; islot++)
     {
-      *alpha_beta_cache_slot = alpha_beta_cache_entry->ABCE_slots + islot;
+      *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots + islot;
 
       ui32_t crc32 = 0xFFFFFFFF;
-      crc32 = _mm_crc32_u64(crc32, (*alpha_beta_cache_slot)->ABCS_key);
-      crc32 = _mm_crc32_u64(crc32, (*alpha_beta_cache_slot)->ABCS_data);
+      crc32 = _mm_crc32_u64(crc32, (*arg_alpha_beta_cache_slot)->ABCS_key);
+      crc32 = _mm_crc32_u64(crc32, (*arg_alpha_beta_cache_slot)->ABCS_data);
       crc32 = ~crc32;
     
-      if (crc32 != (*alpha_beta_cache_slot)->ABCS_crc32)
+      if (crc32 != (*arg_alpha_beta_cache_slot)->ABCS_crc32)
       {
-        with->S_total_alpha_beta_cache_crc32_errors++;
+        object->S_total_alpha_beta_cache_crc32_errors++;
  
-        **alpha_beta_cache_slot = alpha_beta_cache_slot_default;
+        **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
       }
-      else if ((*alpha_beta_cache_slot)->ABCS_key == with->S_board.board_key)
+      else if ((*arg_alpha_beta_cache_slot)->ABCS_key == object->S_board.board_key)
       {
         result = TRUE;
 
@@ -350,23 +347,23 @@ local int probe_alpha_beta_cache(search_t *with, int node_type, int pv_only,
     }
   }
 
-  if (!result and !pv_only)
+  if (!result and !arg_pv_only)
   {
-    *alpha_beta_cache_entry =
-      alpha_beta_cache[nalpha_beta_pv_cache_entries + 
-                       with->S_board.board_key % nalpha_beta_cache_entries];
+    *arg_alpha_beta_cache_entry =
+      arg_alpha_beta_cache[nalpha_beta_pv_cache_entries + 
+                       object->S_board.board_key % nalpha_beta_cache_entries];
 
 #ifdef DEBUG
     for (int idebug = 0; idebug < NSLOTS; idebug++)
     {
-      if (alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key == 0) continue;
+      if (arg_alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key == 0) continue;
 
       int ndebug = 0;
       
       for (int jdebug = 0; jdebug < NSLOTS; jdebug++)
       {
-        if (alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key ==
-            alpha_beta_cache_entry->ABCE_slots[jdebug].ABCS_key) ndebug++;
+        if (arg_alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key ==
+            arg_alpha_beta_cache_entry->ABCE_slots[jdebug].ABCS_key) ndebug++;
       }
       HARDBUG(ndebug != 1)
     }
@@ -376,20 +373,20 @@ local int probe_alpha_beta_cache(search_t *with, int node_type, int pv_only,
 
     for (islot = 0; islot < NSLOTS; islot++)
     {
-      *alpha_beta_cache_slot = alpha_beta_cache_entry->ABCE_slots + islot;
+      *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots + islot;
 
       ui32_t crc32 = 0xFFFFFFFF;
-      crc32 = _mm_crc32_u64(crc32, (*alpha_beta_cache_slot)->ABCS_key);
-      crc32 = _mm_crc32_u64(crc32, (*alpha_beta_cache_slot)->ABCS_data);
+      crc32 = _mm_crc32_u64(crc32, (*arg_alpha_beta_cache_slot)->ABCS_key);
+      crc32 = _mm_crc32_u64(crc32, (*arg_alpha_beta_cache_slot)->ABCS_data);
       crc32 = ~crc32;
     
-      if (crc32 != (*alpha_beta_cache_slot)->ABCS_crc32)
+      if (crc32 != (*arg_alpha_beta_cache_slot)->ABCS_crc32)
       {
-        with->S_total_alpha_beta_cache_crc32_errors++;
+        object->S_total_alpha_beta_cache_crc32_errors++;
   
-        **alpha_beta_cache_slot = alpha_beta_cache_slot_default;
+        **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
       }
-      else if ((*alpha_beta_cache_slot)->ABCS_key == with->S_board.board_key)
+      else if ((*arg_alpha_beta_cache_slot)->ABCS_key == object->S_board.board_key)
       {
         result = TRUE;
 
@@ -406,16 +403,16 @@ local int probe_alpha_beta_cache(search_t *with, int node_type, int pv_only,
 
     for (islot = 0; islot < NSLOTS; islot++)
     {
-      *alpha_beta_cache_slot = alpha_beta_cache_entry->ABCE_slots + islot;
+      *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots + islot;
 
-      if ((*alpha_beta_cache_slot)->ABCS_key == 0) break;
+      if ((*arg_alpha_beta_cache_slot)->ABCS_key == 0) break;
     }
     if (islot == NSLOTS)
     {
-      *alpha_beta_cache_slot = alpha_beta_cache_entry->ABCE_slots +
-                               with->S_board.board_key % NSLOTS;
+      *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots +
+                               object->S_board.board_key % NSLOTS;
 
-      **alpha_beta_cache_slot = alpha_beta_cache_slot_default;
+      **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
     }
   }
 
@@ -423,32 +420,32 @@ local int probe_alpha_beta_cache(search_t *with, int node_type, int pv_only,
 }
 
 local void update_alpha_beta_cache_slot_moves(
-  alpha_beta_cache_slot_t *alpha_beta_cache_slot, int jmove)
+  alpha_beta_cache_slot_t *arg_alpha_beta_cache_slot, int arg_jmove)
 {
   int kmove;
   
   for (kmove = 0; kmove < NMOVES; kmove++)
-    if (alpha_beta_cache_slot->ABCS_moves[kmove] == jmove) break;
+    if (arg_alpha_beta_cache_slot->ABCS_moves[kmove] == arg_jmove) break;
   
   if (kmove == NMOVES) kmove = NMOVES - 1;
   
   while (kmove > 0)
   {
-    alpha_beta_cache_slot->ABCS_moves[kmove] =
-      alpha_beta_cache_slot->ABCS_moves[kmove - 1];
+    arg_alpha_beta_cache_slot->ABCS_moves[kmove] =
+      arg_alpha_beta_cache_slot->ABCS_moves[kmove - 1];
   
     kmove--;
   }
   
-  alpha_beta_cache_slot->ABCS_moves[0] = jmove;
+  arg_alpha_beta_cache_slot->ABCS_moves[0] = arg_jmove;
 
 #ifdef DEBUG
   for (int idebug = 0; idebug < NMOVES; idebug++)
   {
-    if (alpha_beta_cache_slot->ABCS_moves[idebug] == INVALID)
+    if (arg_alpha_beta_cache_slot->ABCS_moves[idebug] == INVALID)
     {  
       for (int jdebug = idebug + 1; jdebug < NMOVES; jdebug++)
-        HARDBUG(alpha_beta_cache_slot->ABCS_moves[jdebug] != INVALID)
+        HARDBUG(arg_alpha_beta_cache_slot->ABCS_moves[jdebug] != INVALID)
 
       break;
     }
@@ -457,8 +454,8 @@ local void update_alpha_beta_cache_slot_moves(
     
     for (int jdebug = 0; jdebug < NMOVES; jdebug++)
     {
-      if (alpha_beta_cache_slot->ABCS_moves[jdebug] == 
-          alpha_beta_cache_slot->ABCS_moves[idebug]) ndebug++;
+      if (arg_alpha_beta_cache_slot->ABCS_moves[jdebug] == 
+          arg_alpha_beta_cache_slot->ABCS_moves[idebug]) ndebug++;
     }
     HARDBUG(ndebug != 1)
   }
@@ -519,10 +516,15 @@ void construct_search(void *self,
 
   object->S_thread = arg_thread;
 
-  construct_board(&(object->S_board), arg_my_printf);
+  construct_board(&(object->S_board), arg_my_printf, FALSE);
   
   construct_my_timer(&(object->S_timer), "board",
     object->S_my_printf, FALSE);
+
+  if (arg_thread == NULL)
+    construct_my_random(&(object->S_random), 0);
+  else
+    construct_my_random(&(object->S_random), INVALID);
 
   entry_i16_t entry_i16_default = {MATE_DRAW, MATE_DRAW};
             
@@ -532,10 +534,18 @@ void construct_search(void *self,
               
   BSTRING(bname)
 
-  HARDBUG(bformata(bname, "S_%p_entry_cache\n", object) !=
-          BSTR_OK)
+  HARDBUG(bformata(bname, "S_%p_entry_cache\n", object) == BSTR_ERR)
 
   construct_cache(&(object->S_endgame_entry_cache),
+                  bdata(bname), endgame_entry_cache_size,
+                  CACHE_ENTRY_KEY_TYPE_I64_T, &key_default,
+                  sizeof(entry_i16_t), &entry_i16_default);
+
+  HARDBUG(bassigncstr(bname, "") == BSTR_ERR)
+
+  HARDBUG(bformata(bname, "S_%p_wdl_entry_cache\n", object) == BSTR_ERR)
+
+  construct_cache(&(object->S_endgame_wdl_entry_cache),
                   bdata(bname), endgame_entry_cache_size,
                   CACHE_ENTRY_KEY_TYPE_I64_T, &key_default,
                   sizeof(entry_i16_t), &entry_i16_default);
@@ -552,50 +562,60 @@ void init_search(void)
 
   //alpha_beta cache
 
-  float alpha_beta_cache_size = options.alpha_beta_cache_size * MBYTE / 2;
+  white_alpha_beta_cache = NULL;
+  black_alpha_beta_cache = NULL;
 
-  nalpha_beta_pv_cache_entries = 
-    first_prime_below(roundf(alpha_beta_cache_size *
-                             (options.pv_cache_fraction / 100.0f) /
-                             sizeof(alpha_beta_cache_entry_t)));
+  nalpha_beta_pv_cache_entries = 0;
+  nalpha_beta_cache_entries = 0;
+
+  if (options.alpha_beta_cache_size > 0)
+  {
+    float alpha_beta_cache_size = options.alpha_beta_cache_size * MBYTE / 2;
+
+    nalpha_beta_pv_cache_entries = 
+      first_prime_below(roundf(alpha_beta_cache_size *
+                               (options.pv_cache_fraction / 100.0f) /
+                               sizeof(alpha_beta_cache_entry_t)));
+    
+    HARDBUG(nalpha_beta_pv_cache_entries < 3)
   
-  HARDBUG(nalpha_beta_pv_cache_entries < 3)
+    nalpha_beta_cache_entries = 
+      first_prime_below(roundf(alpha_beta_cache_size *
+                               ((100 - options.pv_cache_fraction) / 100.0f) /
+                               sizeof(alpha_beta_cache_entry_t)));
+  
+    HARDBUG(nalpha_beta_cache_entries < 3)
+  
+    PRINTF("nalpha_beta_pv_cache_entries=%lld nalpha_beta_cache_entries=%lld\n",
+      nalpha_beta_pv_cache_entries, nalpha_beta_cache_entries);
+  
+    alpha_beta_cache_slot_default.ABCS_key = 0;
+    alpha_beta_cache_slot_default.ABCS_score = SCORE_MINUS_INFINITY;
+    alpha_beta_cache_slot_default.ABCS_depth = INVALID;
+    alpha_beta_cache_slot_default.ABCS_flags = 0;
+    for (int imove = 0; imove < NMOVES; imove++) 
+      alpha_beta_cache_slot_default.ABCS_moves[imove] = INVALID;
+  
+    ui32_t crc32 = 0xFFFFFFFF;
+    crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot_default.ABCS_key);
+    crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot_default.ABCS_data);
+    alpha_beta_cache_slot_default.ABCS_crc32 = ~crc32;
+  
+    for (int islot = 0; islot < NSLOTS; islot++)
+      alpha_beta_cache_entry_default.ABCE_slots[islot] = 
+        alpha_beta_cache_slot_default;
+  
+    MY_MALLOC(white_alpha_beta_cache, alpha_beta_cache_entry_t,
+              nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
+  
+    MY_MALLOC(black_alpha_beta_cache, alpha_beta_cache_entry_t,
+              nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
 
-  nalpha_beta_cache_entries = 
-    first_prime_below(roundf(alpha_beta_cache_size *
-                             ((100 - options.pv_cache_fraction) / 100.0f) /
-                             sizeof(alpha_beta_cache_entry_t)));
+    clear_caches();
+  }
 
-  HARDBUG(nalpha_beta_cache_entries < 3)
-
-  PRINTF("nalpha_beta_pv_cache_entries=%lld nalpha_beta_cache_entries=%lld\n",
-    nalpha_beta_pv_cache_entries, nalpha_beta_cache_entries);
-
-  alpha_beta_cache_slot_default.ABCS_key = 0;
-  alpha_beta_cache_slot_default.ABCS_score = SCORE_MINUS_INFINITY;
-  alpha_beta_cache_slot_default.ABCS_depth = INVALID;
-  alpha_beta_cache_slot_default.ABCS_flags = 0;
-  for (int imove = 0; imove < NMOVES; imove++) 
-    alpha_beta_cache_slot_default.ABCS_moves[imove] = INVALID;
-
-  ui32_t crc32 = 0xFFFFFFFF;
-  crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot_default.ABCS_key);
-  crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot_default.ABCS_data);
-  alpha_beta_cache_slot_default.ABCS_crc32 = ~crc32;
-
-  for (int islot = 0; islot < NSLOTS; islot++)
-    alpha_beta_cache_entry_default.ABCE_slots[islot] = 
-      alpha_beta_cache_slot_default;
-
-  MY_MALLOC(white_alpha_beta_cache, alpha_beta_cache_entry_t,
-            nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
-
-  MY_MALLOC(black_alpha_beta_cache, alpha_beta_cache_entry_t,
-            nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
-
-  clear_caches();
-
-  construct_bucket(&bucket_depth, 1, 0, DEPTH_MAX, BUCKET_LINEAR);
+  construct_bucket(&bucket_depth, "bucket_depth",
+                   1, 0, DEPTH_MAX, BUCKET_LINEAR);
 }
 
 void fin_search(void)

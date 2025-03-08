@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #include "globals.h"
 
 //the game state is maintained in a cJSON object
@@ -18,11 +18,11 @@ local void printf_state(void *self)
   PRINTF("time=%d\n", object->get_time(object));
 }
 
-local void set_state(void *self, char *string)
+local void set_state(void *self, char *arg_string)
 {
   state_t *object = self;
 
-  object->cjson_object = cJSON_Parse(string);
+  object->cjson_object = cJSON_Parse(arg_string);
 
   if (object->cjson_object == NULL)
   { 
@@ -35,7 +35,7 @@ local void set_state(void *self, char *string)
   }
 }
 
-local void set_event(void *self, char *event)
+local void set_event(void *self, char *arg_event)
 {
   state_t *object = self;
 
@@ -44,10 +44,10 @@ local void set_event(void *self, char *event)
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
-  cJSON_SetStringValue(cjson_item, event);
+  cJSON_SetValuestring(cjson_item, arg_event);
 }
 
-local void set_date(void *self, char *date)
+local void set_date(void *self, char *arg_date)
 {
   state_t *object = self;
 
@@ -56,10 +56,10 @@ local void set_date(void *self, char *date)
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
-  cJSON_SetStringValue(cjson_item, date);
+  cJSON_SetValuestring(cjson_item, arg_date);
 }
 
-local void set_white(void *self, char *white)
+local void set_white(void *self, char *arg_white)
 {
   state_t *object = self;
 
@@ -68,10 +68,10 @@ local void set_white(void *self, char *white)
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
-  cJSON_SetStringValue(cjson_item, white);
+  cJSON_SetValuestring(cjson_item, arg_white);
 }
 
-local void set_black(void *self, char *black)
+local void set_black(void *self, char *arg_black)
 {
   state_t *object = self;
 
@@ -80,10 +80,10 @@ local void set_black(void *self, char *black)
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
-  cJSON_SetStringValue(cjson_item, black);
+  cJSON_SetValuestring(cjson_item, arg_black);
 }
 
-local void set_result(void *self, char *result)
+local void set_result(void *self, char *arg_result)
 {
   state_t *object = self;
 
@@ -92,10 +92,10 @@ local void set_result(void *self, char *result)
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
-  cJSON_SetStringValue(cjson_item, result);
+  cJSON_SetValuestring(cjson_item, arg_result);
 }
 
-local void set_starting_position(void *self, char *position)
+local void set_starting_position(void *self, char *arg_position)
 {
   state_t *object = self;
 
@@ -104,10 +104,10 @@ local void set_starting_position(void *self, char *position)
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
-  cJSON_SetStringValue(cjson_item, position);
+  cJSON_SetValuestring(cjson_item, arg_position);
 }
 
-local void push_move(void *self, char *move, char *comment)
+local void push_move(void *self, char *arg_move, char *arg_comment)
 {
   state_t *object = self;
 
@@ -121,11 +121,11 @@ local void push_move(void *self, char *move, char *comment)
   HARDBUG(cjson_move == NULL)
 
   HARDBUG(cJSON_AddStringToObject(cjson_move, CJSON_MOVE_STRING_ID,
-                                  move) == NULL)
+                                  arg_move) == NULL)
 
-  if (comment != NULL)
+  if (arg_comment != NULL)
     HARDBUG(cJSON_AddStringToObject(cjson_move, CJSON_COMMENT_STRING_ID,
-                                comment) == NULL)
+                                arg_comment) == NULL)
 
   cJSON_AddItemToArray(cjson_item, cjson_move);
 }
@@ -146,7 +146,7 @@ local int pop_move(void *self)
   return(n);
 }
 
-local void set_depth(void *self, int depth)
+local void set_depth(void *self, int arg_depth)
 {
   state_t *object = self;
 
@@ -155,10 +155,10 @@ local void set_depth(void *self, int depth)
 
   HARDBUG(!cJSON_IsNumber(cjson_item))
 
-  cJSON_SetNumberValue(cjson_item, depth);
+  cJSON_SetNumberValue(cjson_item, arg_depth);
 }
 
-local void set_time(void *self, int time)
+local void set_time(void *self, int arg_time)
 {
   state_t *object = self;
 
@@ -167,27 +167,27 @@ local void set_time(void *self, int time)
 
   HARDBUG(!cJSON_IsNumber(cjson_item))
 
-  cJSON_SetNumberValue(cjson_item, time);
+  cJSON_SetNumberValue(cjson_item, arg_time);
 }
 
-local void save(void *self, char *name)
+local void save(void *self, char *arg_name)
 {
   state_t *object = self;
 
   FILE *fsave;
 
-  HARDBUG((fsave = fopen(name, "w")) == NULL)
+  HARDBUG((fsave = fopen(arg_name, "w")) == NULL)
 
   fprintf(fsave, "%s\n", object->get_state(object));
 
   FCLOSE(fsave)
 }
 
-local void save2pdn(void *self, char *pdn)
+local void save2pdn(void *self, char *arg_pdn)
 {
   state_t *object = self;
 
-  int fd = compat_lock_file(pdn);
+  int fd = compat_lock_file(arg_pdn);
 
   HARDBUG(fd == -1)
 
@@ -350,13 +350,13 @@ local int get_time(void *self)
   return(round(cJSON_GetNumberValue(cjson_item)));
 }
 
-local void load(void *self, char *name)
+local void load(void *self, char *arg_name)
 {
   state_t *object = self;
 
   FILE *fload;
 
-  HARDBUG((fload = fopen(name, "r")) == NULL)
+  HARDBUG((fload = fopen(arg_name, "r")) == NULL)
 
   char string[MY_LINE_MAX];
 

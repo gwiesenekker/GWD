@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef MovesH
 #define MovesH
 
@@ -21,7 +21,6 @@ typedef struct
 typedef struct
 {
   int nmoves;
-  int nblocked;
   int ncaptx;
 
   move_t moves[MOVES_MAX];
@@ -48,14 +47,16 @@ typedef struct
 #define undo_my_move     undo_the_move(my_colour)
 #define undo_your_move   undo_the_move(your_colour)
 
+void update_patterns_and_layer0(board_t *, int, int, int);
+
 void gen_white_moves(board_t *, moves_list_t *, int);
 void gen_black_moves(board_t *, moves_list_t *, int);
 int white_can_capture(board_t *, int);
 int black_can_capture(board_t *, int);
-void do_white_move(board_t *, int, moves_list_t *);
-void do_black_move(board_t *, int, moves_list_t *);
-void undo_white_move(board_t *, int, moves_list_t *);
-void undo_black_move(board_t *, int, moves_list_t *);
+void do_white_move(board_t *, int, moves_list_t *, int);
+void do_black_move(board_t *, int, moves_list_t *, int);
+void undo_white_move(board_t *, int, moves_list_t *, int);
+void undo_black_move(board_t *, int, moves_list_t *, int);
 void check_white_moves(board_t *, moves_list_t *);
 void check_black_moves(board_t *, moves_list_t *);
 

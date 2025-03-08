@@ -1,4 +1,4 @@
-//SCU REVISION 7.750 vr  6 dec 2024  8:31:49 CET
+//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
 #ifndef CompatH
 #define CompatH
 
@@ -36,7 +36,7 @@
 #define ALIGN64(X) X __attribute__((aligned(64)))
 
 #define MALLOC(P, S) (P) = _mm_malloc(S, 64);
-#define FREE_AND_NULL(P) {_mm_free(P); (P) = NULL;}
+#define FREE(P) _mm_free(P);
 
 #define BIT_COUNT(ULL)   (int) __builtin_popcountll(ULL)
 #define BIT_CTZ(ULL)     __builtin_ctzll(ULL)
@@ -71,7 +71,7 @@ typedef int pipe_t;
 #define ALIGN64(X) __declspec(align(64)) X
 
 #define MALLOC(P, S) (P) = _aligned_malloc(S, 64);
-#define FREE_AND_NULL(P) {_aligned_free(P); (P) = NULL;}
+#define FREE(P) _aligned_free(P);
 
 #define BIT_COUNT(ULL)   (int) __popcnt64(ULL)
 #define BIT_CTZ(ULL)     _tzcnt_u64(ULL)
