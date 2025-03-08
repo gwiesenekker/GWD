@@ -9,14 +9,17 @@ OBJS=main.o\
   dbase.o\
   dxp.o\
   endgame.o\
+  fbuffer.o\
   hub.o\
   mcts.o\
   moves.o\
+  my_cjson.o\
   my_malloc.o\
   my_mpi.o\
   my_printf.o\
   my_random.o\
-  network.o\
+  networks.o\
+  patterns.o\
   profile.o\
   pdn.o\
   queues.o\
@@ -37,25 +40,16 @@ ifndef ARCH
 ARCH=znver3
 endif
 
-ifdef OS
 CC=clang
-ifdef MAKE_OPENMPI
-TARGET=a-$(ARCH)-mpi.exe
-else
-TARGET=a-$(ARCH).exe
-endif
-else
-CC=clang
-#CC=icx
 TARGET=a.out
 MAKE_VALGRIND=make_valgrind
 MAKE_OPENMPI=make_openmpi
-endif
 
 ifdef MAKE_DEBUG
+CC=gcc
 CFLAGS=-g -DDEBUG
 else
-CFLAGS=-O3 -march=$(ARCH)
+CFLAGS=-O3 -march=$(ARCH) -g
 endif
 
 ifdef MAKE_PROFILE
@@ -94,10 +88,10 @@ COPTS+=-Wall -pthread
 
 CFLAGS+=$(COPTS)
 
-LFLAGS=-L/usr/local/lib -lm -lzstd -lpthread -lsqlite3
+LFLAGS=-lm -lzstd -lpthread -lsqlite3
 
 ifdef MAKE_OPENMPI
-LFLAGS+=-lmpi
+LFLAGS+=-L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
 endif
 
 all: $(TARGET)
@@ -121,16 +115,19 @@ HEADERS=boards.h\
   dbase.h\
   dxp.h\
   endgame.h\
+  fbuffer.h\
   globals.h\
   hub.h\
   main.h\
   mcts.h\
   moves.h\
+  my_cjson.h\
   my_malloc.h\
   my_printf.h\
   my_mpi.h\
   my_random.h\
-  network.h\
+  networks.h\
+  patterns.h\
   pdn.h\
   profile.h\
   queues.h\
@@ -155,16 +152,19 @@ classes.o: Makefile classes.c $(HEADERS)
 dbase.o: Makefile dbase.c $(HEADERS)
 dxp.o: Makefile dxp.c $(HEADERS)
 endgame.o: Makefile endgame.c $(HEADERS)
+fbuffer.o: Makefile fbuffer.c $(HEADERS)
 hub.o: Makefile hub.c $(HEADERS)
 mcts.o: Makefile mcts.c mcts.d $(HEADERS)
 moves.o: Makefile moves.c moves.d $(HEADERS)
+my_cjson.o: Makefile my_cjson.c $(HEADERS)
 my_mpi.o: Makefile my_mpi.c $(HEADERS)
-my_printf.o: Makefile my_printf.c $(HEADERS)
 my_malloc.o: Makefile my_malloc.c $(HEADERS)
+my_printf.o: Makefile my_printf.c $(HEADERS)
 my_random.o: Makefile my_random.c $(HEADERS)
-network.o: Makefile network.c $(HEADERS)
+networks.o: Makefile networks.c $(HEADERS)
+patterns.o: Makefile patterns.c $(HEADERS)
 profile.o: Makefile profile.c profile.h 
-pdn.o: Makefile pdn.c pdn.d $(HEADERS)
+pdn.o: Makefile pdn.c $(HEADERS)
 queues.o: Makefile queues.c $(HEADERS)
 records.o: Makefile records.c $(HEADERS)
 score.o: Makefile score.c score.d $(HEADERS)
