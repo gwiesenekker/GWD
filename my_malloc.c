@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define NPAD (4 * 64)
@@ -51,7 +51,79 @@ local my_mutex_t my_malloc_mutex;
 
 local my_mutex_t my_leak_mutex;
 
-void register_pointer(char *arg_name,
+#include "xxhash.h"
+
+// Function to hash an array using XXH3_64bits
+ui64_t return_XXH3_64(const void *data, size_t len) {
+    // Allocate a state struct
+    XXH3_state_t* state = XXH3_createState();
+    if (state == NULL) {
+        fprintf(stderr, "XXH3_createState failed: Out of memory\n");
+        return 0;
+    }
+
+    // Reset the state to start hashing
+    if (XXH3_64bits_reset(state) == XXH_ERROR) {
+        fprintf(stderr, "XXH3_64bits_reset failed\n");
+        XXH3_freeState(state);
+        return 0;
+    }
+
+    // Process input in chunks (if needed)
+    size_t chunkSize = 4096; // Process in 4KB chunks like the file example
+    const char *ptr = (const char*)data;
+    size_t processed = 0;
+
+    while (processed < len) {
+        size_t toProcess = (len - processed < chunkSize) ? (len - processed) : chunkSize;
+        if (XXH3_64bits_update(state, ptr + processed, toProcess) == XXH_ERROR) {
+            fprintf(stderr, "XXH3_64bits_update failed\n");
+            XXH3_freeState(state);
+            return 0;
+        }
+        processed += toProcess;
+    }
+
+    // Finalize and retrieve the hash
+    XXH64_hash_t hash = XXH3_64bits_digest(state);
+
+    // Free the allocated state
+    XXH3_freeState(state);
+
+    return hash;
+}
+
+
+void mark_pointer_read_only(void *arg_pointer)
+{
+  HARDBUG(my_mallocs == NULL)
+
+  HARDBUG(compat_mutex_lock(&my_malloc_mutex) != 0)
+
+  HARDBUG(nmy_mallocs <= 0)
+
+  int imalloc;
+
+  for (imalloc = 0; imalloc < nmy_mallocs; imalloc++)
+  {
+    my_malloc_t *object = my_mallocs + imalloc;
+
+    if (object->MM_pointer == arg_pointer) break;
+  }
+
+  HARDBUG(imalloc >= nmy_mallocs)
+
+  my_malloc_t *object = my_mallocs + imalloc;
+
+  object->MM_read_only = TRUE;
+
+  object->MM_crc64 =
+    return_XXH3_64(object->MM_pointer, object->MM_size);
+
+  HARDBUG(compat_mutex_unlock(&my_malloc_mutex) != 0)
+}
+
+void register_heap(char *arg_name,
   char *arg_file, const char *arg_func, int arg_line,
   void *arg_heap, size_t arg_size, int arg_pad, int arg_read_only)
 {
@@ -103,7 +175,7 @@ void register_pointer(char *arg_name,
     for (int i = 0; i < NPAD; i++)
       object->MM_prefix[i] = return_my_random(&my_malloc_random) % 256;
 
-    object->MM_prefix_crc64 = return_crc64(object->MM_prefix, NPAD, TRUE);
+    object->MM_prefix_crc64 = return_XXH3_64(object->MM_prefix, NPAD);
 
     object->MM_pointer = (char *) arg_heap + NPAD;
 
@@ -112,7 +184,7 @@ void register_pointer(char *arg_name,
     for (int i = 0; i < NPAD; i++)
       object->MM_postfix[i] = return_my_random(&my_malloc_random) % 256;
 
-    object->MM_postfix_crc64 = return_crc64(object->MM_postfix, NPAD, TRUE);
+    object->MM_postfix_crc64 = return_XXH3_64(object->MM_postfix, NPAD);
   }
 
   object->MM_read_only = arg_read_only;
@@ -120,14 +192,14 @@ void register_pointer(char *arg_name,
   object->MM_crc64 = 0;
 
   if (arg_read_only)
-    object->MM_crc64 = return_crc64(arg_heap, arg_size, TRUE);
+    object->MM_crc64 = return_XXH3_64(object->MM_pointer, object->MM_size);
 
   nmy_mallocs++;
 
   HARDBUG(compat_mutex_unlock(&my_malloc_mutex) != 0)
 }
 
-void *deregister_pointer(void *arg_pointer)
+void *deregister_heap(void *arg_pointer)
 {
   HARDBUG(my_mallocs == NULL)
 
@@ -150,7 +222,7 @@ void *deregister_pointer(void *arg_pointer)
     if (object->MM_pad)
     {
       if (object->MM_prefix_crc64 !=
-          return_crc64(object->MM_prefix, NPAD, TRUE))
+          return_XXH3_64(object->MM_prefix, NPAD))
       {
         PRINTF("WARNING: PREFIX BLOCK %s CORRUPT!\n", bdata(object->MM_name));
 
@@ -164,7 +236,7 @@ void *deregister_pointer(void *arg_pointer)
       }
 
       if (object->MM_postfix_crc64 !=
-          return_crc64(object->MM_postfix, NPAD, TRUE))
+          return_XXH3_64(object->MM_postfix, NPAD))
       {
         PRINTF("WARNING: POSTFIX BLOCK %s CORRUPT!\n", bdata(object->MM_name));
  
@@ -181,7 +253,7 @@ void *deregister_pointer(void *arg_pointer)
     if (object->MM_read_only)
     {
       if (object->MM_crc64 !=
-          return_crc64(object->MM_pointer, object->MM_size, TRUE))
+          return_XXH3_64(object->MM_pointer, object->MM_size))
       {
         PRINTF("WARNING: READONLY BLOCK %s CORRUPT!\n",
                bdata(object->MM_name));
@@ -230,7 +302,7 @@ void *my_malloc(char *arg_name, char *arg_file, const char *arg_func,
     FATAL("MALLOC ERROR", EXIT_FAILURE)
   }
 
-  register_pointer(arg_name, arg_file, arg_func, arg_line,
+  register_heap(arg_name, arg_file, arg_func, arg_line,
     result, arg_size, TRUE, FALSE);
 
   return((char *) result + NPAD);
@@ -240,7 +312,7 @@ void my_free(void *arg_pointer)
 {
   void *heap;
 
-  HARDBUG((heap = deregister_pointer(arg_pointer)) == NULL)
+  HARDBUG((heap = deregister_heap(arg_pointer)) == NULL)
  
   FREE(heap)
 }
@@ -349,6 +421,17 @@ void init_my_malloc(void)
   HARDBUG(compat_mutex_init(&my_malloc_mutex) != 0)
 
   HARDBUG(compat_mutex_init(&my_leak_mutex) != 0)
+
+  char *f = "The quick brown fox jumps over the lazy dog";
+  char s[MY_LINE_MAX];
+
+  ui64_t c = return_XXH3_64(f, strlen(f));
+
+  (void) snprintf(s, MY_LINE_MAX, "%#llX", c);
+
+  PRINTF("the XXH3_64 of '%s' is %s hex\n", f, s);
+
+  HARDBUG(strcmp(s, "0XCE7D19A5418FB365") != 0)
 }
 
 local void heap_sort_i64(i64_t n, i64_t *p, i64_t *a)
@@ -401,6 +484,22 @@ local void heap_sort_i64(i64_t n, i64_t *p, i64_t *a)
   for (i = 0; i < m - 1; i++) HARDBUG(a[p[i]] < a[p[i + 1]])
 }
 
+local void printf_imalloc(int imalloc)
+{
+  HARDBUG(imalloc < 0)
+  HARDBUG(imalloc >= nmy_mallocs)
+
+  my_malloc_t *object = my_mallocs + imalloc;
+
+  PRINTF("imalloc=%d name=%s file=%s func=%s line=%d size=%lld\n",
+         imalloc,
+         bdata(object->MM_name),
+         bdata(object->MM_file),
+         bdata(object->MM_func),
+         object->MM_line,
+         object->MM_size);
+}
+
 void fin_my_malloc(int arg_verbose)
 {
   int corrupt = FALSE;
@@ -435,29 +534,24 @@ void fin_my_malloc(int arg_verbose)
 
     S_total_size += object->MM_size;
 
-    if (arg_verbose)
-      PRINTF("imalloc=%d name=%s file=%s func=%s line=%d size=%lld\n",
-             imalloc,
-             bdata(object->MM_name),
-             bdata(object->MM_file),
-             bdata(object->MM_func),
-             object->MM_line,
-             object->MM_size);
-
     if (object->MM_pad)
     {
       if (object->MM_prefix_crc64 !=
-          return_crc64(object->MM_prefix, NPAD, TRUE))
+          return_XXH3_64(object->MM_prefix, NPAD))
       {
-        PRINTF("WARNING: PREFIX BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+        printf_imalloc(imalloc);
+
+        PRINTF("WARNING: PREFIX BLOCK CORRUPT!\n");
  
         corrupt = TRUE;
       }
 
       if (object->MM_postfix_crc64 !=
-          return_crc64(object->MM_postfix, NPAD, TRUE))
+          return_XXH3_64(object->MM_postfix, NPAD))
       {
-        PRINTF("WARNING: POSTFIX BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+        printf_imalloc(imalloc);
+
+        PRINTF("WARNING: POSTFIX BLOCK CORRUPT!\n");
  
         corrupt = TRUE;
       }
@@ -466,13 +560,19 @@ void fin_my_malloc(int arg_verbose)
     if (object->MM_read_only)
     {
       if (object->MM_crc64 !=
-          return_crc64(object->MM_pointer, object->MM_size, TRUE))
+          return_XXH3_64(object->MM_pointer, object->MM_size))
       {
-        PRINTF("WARNING: READONLY BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+        printf_imalloc(imalloc);
+
+        PRINTF("WARNING: READONLY BLOCK CORRUPT!\n");
   
         corrupt = TRUE;
       }
-      PRINTF("READONLY BLOCK %s(%llX) OK!\n", bdata(object->MM_name), object->MM_crc64);
+      else
+      {
+        if (arg_verbose)
+          PRINTF("READONLY BLOCK %s(%llX) OK!\n", bdata(object->MM_name), object->MM_crc64);
+      }
     }
   }
 
@@ -487,13 +587,7 @@ void fin_my_malloc(int arg_verbose)
 
     S_total_size += object->MM_size;
 
-    PRINTF("imalloc=%d name=%s file=%s func=%s line=%d size=%lld\n",
-           imalloc,
-           bdata(object->MM_name),
-           bdata(object->MM_file),
-           bdata(object->MM_func),
-           object->MM_line,
-           object->MM_size);
+    printf_imalloc(imalloc);
 
     if (!arg_verbose and (object->MM_size < MBYTE)) break;
   }

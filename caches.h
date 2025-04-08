@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef CachesH
 #define CachesH
 
@@ -8,35 +8,33 @@
 
 typedef struct
 {
-  bstring cache_name;
+  bstring C_name;
 
-  int cache_entry_key_type;
+  int C_entry_key_type;
 
-  size_t cache_entry_key_size;
+  size_t C_entry_key_size;
 
-  int cache_entry_key_nalign;
+  int C_entry_key_nalign;
 
-  size_t cache_entry_value_size;
+  size_t C_entry_value_size;
 
-  int cache_entry_value_nalign;
+  int C_entry_value_nalign;
 
-  void *cache_entry_key_default;
+  void *C_entry_key_default;
 
-  void *cache_entry_values;
+  void *C_entry_values;
  
-  i64_t cache_nentries;
+  i64_t C_nentries;
 
-  i64_t cache_nhits;
+  i64_t C_nhits;
 
-  i64_t cache_nstored;
+  i64_t C_nstored;
 
-  i64_t cache_nupdates;
+  i64_t C_nupdates;
 
-  i64_t cache_noverwrites;
+  i64_t C_noverwrites;
 
-  pter_t printf_cache;
-
-  my_mutex_t cache_mutex;
+  my_mutex_t C_mutex;
 } cache_t;
 
 int check_entry_in_cache(void *, void *, void *);

@@ -1,10 +1,10 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0
 #define MY_TIMER_STARTED 1
 
-void construct_my_timer(void *self, char *arg_name,
+void construct_my_timer(my_timer_t *self, char *arg_name,
   my_printf_t *arg_my_printf, int arg_suppress_warnings)
 {
   my_timer_t *object = self;
@@ -25,7 +25,7 @@ void construct_my_timer(void *self, char *arg_name,
   object->MT_status = INVALID;
 }
 
-void reset_my_timer(void *self)
+void reset_my_timer(my_timer_t *self)
 {
   my_timer_t *object = self;
 
@@ -62,7 +62,7 @@ local void return_time_used(my_timer_t *object,
   }
 }
 
-double return_my_timer(void *self, int arg_wall)
+double return_my_timer(my_timer_t *self, int arg_wall)
 {
   my_timer_t *object = self;
 
@@ -111,7 +111,7 @@ double return_my_timer(void *self, int arg_wall)
   return(result);
 }
 
-void stop_my_timer(void *self)
+void stop_my_timer(my_timer_t *self)
 {
   my_timer_t *object = self;
 
@@ -134,7 +134,7 @@ void stop_my_timer(void *self)
     object->MT_cpu_time_used, object->MT_wall_time_used);
 }
 
-void start_my_timer(void *self)
+void start_my_timer(my_timer_t *self)
 {
   my_timer_t *object = self;
 

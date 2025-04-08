@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg_my_beta, 
   int arg_node_type, moves_list_t *arg_moves_list, int *arg_best_pv, int arg_all_moves)
 {
@@ -71,7 +71,7 @@ int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg
     arg_moves_list = &my_moves_list;
   }
 
-  if (arg_moves_list->nmoves == 0)
+  if (arg_moves_list->ML_nmoves == 0)
   {
     best_score = SCORE_LOST_ABSOLUTE;
 
@@ -80,11 +80,11 @@ int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg
 
   if (!arg_all_moves)
   {
-    if (arg_moves_list->ncaptx > 0)
+    if (arg_moves_list->ML_ncaptx > 0)
     {
       arg_all_moves = TRUE;
     } 
-    else if (arg_moves_list->nmoves <= 2)
+    else if (arg_moves_list->ML_nmoves <= 2)
     {
       arg_all_moves = TRUE;
     }
@@ -92,13 +92,13 @@ int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg
     {
       int nextend = 0;
   
-      for (int imove = 0; imove < arg_moves_list->nmoves; imove++)
+      for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
       {
-        if (MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->moves_flag[imove]))
+        if (MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[imove]))
           nextend++;
       }
 
-      if (nextend == arg_moves_list->nmoves)
+      if (nextend == arg_moves_list->ML_nmoves)
       {
         arg_all_moves = TRUE;
       }
@@ -116,16 +116,16 @@ int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg
 
   int moves_weight[MOVES_MAX];
 
-  for (int imove = 0; imove < arg_moves_list->nmoves; imove++)
-    moves_weight[imove] = arg_moves_list->moves_weight[imove];
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
+    moves_weight[imove] = arg_moves_list->ML_move_weights[imove];
 
   arg_nply++;
 
-  for (int imove = 0; imove < arg_moves_list->nmoves; imove++)
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
     int jmove = 0;
    
-    for (int kmove = 1; kmove < arg_moves_list->nmoves; kmove++)
+    for (int kmove = 1; kmove < arg_moves_list->ML_nmoves; kmove++)
     {
       if (moves_weight[kmove] == L_MIN) continue;
       
@@ -138,7 +138,7 @@ int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg
 
     if (!arg_all_moves)
     {
-      if (!MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->moves_flag[jmove])) continue;
+      if (!MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[jmove])) continue;
     }
 
     int temp_alpha;
@@ -311,7 +311,7 @@ int my_mcts_alpha_beta(search_t *object, int arg_nply,
     arg_moves_list = &my_moves_list;
   }
 
-  if (arg_moves_list->nmoves == 0)
+  if (arg_moves_list->ML_nmoves == 0)
   {
     best_score = SCORE_LOST_ABSOLUTE;
 
@@ -320,8 +320,8 @@ int my_mcts_alpha_beta(search_t *object, int arg_nply,
 
   int moves_weight[MOVES_MAX];
 
-  for (int imove = 0; imove < arg_moves_list->nmoves; imove++)
-    moves_weight[imove] = arg_moves_list->moves_weight[imove];
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
+    moves_weight[imove] = arg_moves_list->ML_move_weights[imove];
 
   best_score = SCORE_MINUS_INFINITY;
 
@@ -329,15 +329,15 @@ int my_mcts_alpha_beta(search_t *object, int arg_nply,
 
   int your_depth = arg_my_depth;
 
-  if (arg_moves_list->ncaptx == 0) your_depth = arg_my_depth - 1;
+  if (arg_moves_list->ML_ncaptx == 0) your_depth = arg_my_depth - 1;
 
   HARDBUG(your_depth < 0)
 
-  for (int imove = 0; imove < arg_moves_list->nmoves; imove++)
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
     int jmove = 0;
    
-    for (int kmove = 1; kmove < arg_moves_list->nmoves; kmove++)
+    for (int kmove = 1; kmove < arg_moves_list->ML_nmoves; kmove++)
     {
       if (moves_weight[kmove] == L_MIN) continue;
       

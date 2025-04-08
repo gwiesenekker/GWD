@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef MainH
 #define MainH
 
@@ -41,6 +41,8 @@ typedef struct
   int use_book;
   char book_name[MY_LINE_MAX];
   int book_randomness;
+  int book_evaluation_time;
+  int book_minimax;
 
   int ponder;
 
@@ -85,6 +87,7 @@ typedef struct
   char ipc_dir[MY_LINE_MAX];
  
   char egtb_dir[MY_LINE_MAX];
+  char egtb_dir_wdl[MY_LINE_MAX];
   char egtb_ram[MY_LINE_MAX];
   char egtb_ram_wdl[MY_LINE_MAX];
 
@@ -97,7 +100,6 @@ typedef struct
   int dxp_game_moves;
   int dxp_games;
   char dxp_ballot[MY_LINE_MAX];
-  int dxp_book;
   int dxp_annotate_level;
   int dxp_strict_gameend;
   char dxp_tag[MY_LINE_MAX];

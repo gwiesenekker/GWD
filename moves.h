@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef MovesH
 #define MovesH
 
@@ -13,20 +13,21 @@
 
 typedef struct
 {
-  int move_from;
-  int move_to;
-  ui64_t move_captures_bb;
+  int M_from;
+  int M_move_to;
+  ui64_t M_captures_bb;
 } move_t;
 
 typedef struct
 {
-  int nmoves;
-  int ncaptx;
+  int ML_nmoves;
+  int ML_ncaptx;
 
-  move_t moves[MOVES_MAX];
+  int ML_nblocked;
+  move_t ML_moves[MOVES_MAX];
 
-  int moves_weight[MOVES_MAX];
-  int moves_flag[MOVES_MAX];
+  int ML_move_weights[MOVES_MAX];
+  int ML_move_flags[MOVES_MAX];
 } moves_list_t;
 
 //moves.c

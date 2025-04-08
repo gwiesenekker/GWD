@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef StatsH
 #define StatsH
 
@@ -6,6 +6,7 @@
 
 typedef struct
 {
+  bstring S_name;
   i64_t S_n;
 
   double S_min;
@@ -49,8 +50,11 @@ inline local void update_stats(void *self, double x)
   object->S_sum2 += x * x ;
 }
 
-void construct_stats(void *);
+void construct_stats(void *, char *);
 void mean_sigma(void *);
+void printf_stats(void *);
+void my_stats_aggregate(void *, MPI_Comm);
+
 void test_stats();
 
 #endif

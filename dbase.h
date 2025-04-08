@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef DbaseH
 #define DbaseH
 
@@ -28,9 +28,9 @@ int insert_position(sqlite3 *, const char *, int);
 
 int query_move(sqlite3 *, int, const char *, int);
 
-int insert_move(sqlite3 *, int, const char *, int);
+int insert_move(sqlite3 *, int, const char *, int, int);
 
-int query_evaluation(sqlite3 *, int, int, int);
+int query_evaluation(sqlite3 *, int, int *, int);
 
 void increment_nwon_ndraw_nlost(sqlite3 *, int, int, int, int, int, int);
 

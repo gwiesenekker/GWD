@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define SA struct sockaddr
@@ -87,7 +87,7 @@ local void encode(char arg_type, dxp_t *object,
     strcpy(arg_buffer + i, "B");
     i++;
 
-    if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
+    if (IS_WHITE(object->DXP_search.S_board.B_colour2move))
     {
       strcpy(arg_buffer + i, "W");
       i++;
@@ -102,22 +102,22 @@ local void encode(char arg_type, dxp_t *object,
     {
       int jboard = map[j];
 
-      if (object->DXP_search.S_board.board_white_man_bb & BITULL(jboard))
+      if (object->DXP_search.S_board.B_white_man_bb & BITULL(jboard))
       {
         strcpy(arg_buffer + i, "w");
         i++;
       }
-      else if (object->DXP_search.S_board.board_white_king_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.B_white_king_bb & BITULL(jboard))
       {
         strcpy(arg_buffer + i, "W");
         i++;
       } 
-      else if (object->DXP_search.S_board.board_black_man_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.B_black_man_bb & BITULL(jboard))
       {
         strcpy(arg_buffer + i, "z");
         i++;
       }
-      else if (object->DXP_search.S_board.board_black_king_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.B_black_king_bb & BITULL(jboard))
       {
         strcpy(arg_buffer + i, "Z");
         i++;
@@ -431,19 +431,19 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
 
     gen_moves(&(object->DXP_search.S_board), &moves_list, FALSE);
 
-    HARDBUG(moves_list.nmoves == 0)
+    HARDBUG(moves_list.ML_nmoves == 0)
 
-    HARDBUG(n != moves_list.ncaptx)
+    HARDBUG(n != moves_list.ML_ncaptx)
 
     int jmove = INVALID;
 
-    for (int imove = 0; imove < moves_list.nmoves; imove++)
+    for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
     {
-      move_t *move = moves_list.moves + imove;
+      move_t *move = moves_list.ML_moves + imove;
 
-      int iboard = move->move_from;
-      int kboard = move->move_to;
-      ui64_t captures_bb = move->move_captures_bb;
+      int iboard = move->M_from;
+      int kboard = move->M_move_to;
+      ui64_t captures_bb = move->M_captures_bb;
 
       if (iboard != f) continue;
       if (kboard != t) continue;
@@ -633,7 +633,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
   BDESTROY(bfen)
 
-  if (IS_BLACK(object->DXP_search.S_board.board_colour2move))
+  if (IS_BLACK(object->DXP_search.S_board.B_colour2move))
     game_state.push_move(&game_state, "...", NULL);
 
   int nbuffer;
@@ -657,9 +657,9 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
     gen_moves(&(object->DXP_search.S_board), &moves_list, FALSE);
 
-    if (object->DXP_search.S_board.board_colour2move != object->DXP_game_colour)
+    if (object->DXP_search.S_board.B_colour2move != object->DXP_game_colour)
     {
-      if (moves_list.nmoves == 0)
+      if (moves_list.ML_nmoves == 0)
       {
         PRINTF("waiting for DXP_GAMEEND..\n");
 
@@ -681,7 +681,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
               INVALID) break;
         }
 
-        if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
+        if (IS_WHITE(object->DXP_search.S_board.B_colour2move))
           result = 0;
         else
           result = 2;
@@ -763,7 +763,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
         }
         if (object->DXP_game_code == DXP_IGIVEUP)
         {
-          if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
+          if (IS_WHITE(object->DXP_search.S_board.B_colour2move))
             result = 0;
           else
             result = 2;
@@ -774,7 +774,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
         }
         else if (object->DXP_game_code == DXP_IWIN)
         {
-          if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
+          if (IS_WHITE(object->DXP_search.S_board.B_colour2move))
             result = 2;
           else
             result = 0;
@@ -810,7 +810,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
     {  
       //my turn
 
-      if (moves_list.nmoves == 0)
+      if (moves_list.ML_nmoves == 0)
       {
         PRINTF("DXP game lost (nmoves == 0)\n");
         object->DXP_game_code = DXP_IGIVEUP;
@@ -837,7 +837,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
           HARDBUG(type != DXP_GAMEEND)
         }
   
-        if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
+        if (IS_WHITE(object->DXP_search.S_board.B_colour2move))
           result = 0;
         else
           result = 2;
@@ -848,7 +848,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
       //check for known endgame
 
       int egtb_mate = read_endgame(&(object->DXP_search),
-                                   object->DXP_search.S_board.board_colour2move,
+                                   object->DXP_search.S_board.B_colour2move,
                                    NULL);
     
       if (egtb_mate != ENDGAME_UNKNOWN)
@@ -869,7 +869,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
           object->DXP_game_code = DXP_IWIN;
 
-          if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
+          if (IS_WHITE(object->DXP_search.S_board.B_colour2move))
             result = 2;
           else
             result = 0;
@@ -880,7 +880,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
           object->DXP_game_code = DXP_IGIVEUP;
 
-          if (IS_WHITE(object->DXP_search.S_board.board_colour2move))
+          if (IS_WHITE(object->DXP_search.S_board.B_colour2move))
             result = 0;
           else
             result = 2;
@@ -945,7 +945,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
       //check for book
 
-      if (options.dxp_book)
+      if (options.use_book)
         return_book_move(&(object->DXP_search.S_board), &moves_list, bbest_move);
   
       if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
@@ -964,7 +964,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
         double t1 = compat_time();
   
-        if (moves_list.nmoves == 1)
+        if (moves_list.ML_nmoves == 1)
         {
           move2bstring(&moves_list, 0, bbest_move);
   

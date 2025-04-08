@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 
 #include "globals.h"
 
@@ -683,6 +683,22 @@ int construct_patterns(patterns_t *self, char *arg_shape)
           add_quincunx(object, irow, icol, 0, &ninputs);
         }
 
+        HARDBUG(bassigncstr(string, "quincunx-v2") == BSTR_ERR)
+
+        if (bstrcmp(string, btokens->entry[itoken]) == 0)
+        {
+          if ((irow != 2) and (irow != 5))
+            add_quincunx(object, irow, icol, 0, &ninputs);
+        }
+
+        HARDBUG(bassigncstr(string, "quincunx-v3") == BSTR_ERR)
+
+        if (bstrcmp(string, btokens->entry[itoken]) == 0)
+        {
+          if ((irow <= 2) or (irow >= 5))
+            add_quincunx(object, irow, icol, 0, &ninputs);
+        }
+
         HARDBUG(bassigncstr(string, "quincunx-man") == BSTR_ERR)
 
         if (bstrcmp(string, btokens->entry[itoken]) == 0)
@@ -698,6 +714,26 @@ int construct_patterns(patterns_t *self, char *arg_shape)
         if (bstrcmp(string, btokens->entry[itoken]) == 0)
         {
           add_diamond(object, irow, icol, 0, &ninputs);
+        }
+
+        HARDBUG(bassigncstr(string, "quincunx-row") == BSTR_ERR)
+
+        if (bstrcmp(string, btokens->entry[itoken]) == 0)
+        {
+          if ((irow == 0) or (irow == 1) or (irow == 6) or (irow == 7))
+            add_quincunx(object, irow, icol, 0, &ninputs);
+          else if ((irow == 4) or (irow == 5))
+            add_rectangle(object, 1, 5, irow, icol, 0, &ninputs);
+        }
+
+        HARDBUG(bassigncstr(string, "row-quincunx") == BSTR_ERR)
+
+        if (bstrcmp(string, btokens->entry[itoken]) == 0)
+        {
+          if ((irow == 0) or (irow == 1) or (irow == 8) or (irow == 9))
+            add_rectangle(object, 1, 5, irow, icol, 0, &ninputs);
+          else  if ((irow == 2) or (irow == 3) or (irow == 4) or (irow == 5))
+            add_quincunx(object, irow, icol, 0, &ninputs);
         }
       }
     }
@@ -788,20 +824,20 @@ void board2patterns(board_t *self)
 {
   board_t *object = self;
 
-  ui64_t empty_bb = object->board_white_man_bb | 
-                    object->board_white_king_bb | 
-                    object->board_black_man_bb | 
-                    object->board_black_king_bb;
+  ui64_t empty_bb = object->B_white_man_bb | 
+                    object->B_white_king_bb | 
+                    object->B_black_man_bb | 
+                    object->B_black_king_bb;
 
-  empty_bb = object->board_empty_bb & ~empty_bb;
+  empty_bb = object->B_valid_bb & ~empty_bb;
 
-  patterns_t *with_patterns = object->board_network.network_patterns;
+  patterns_t *with_patterns = object->B_network.N_patterns;
 
-  object->board_pattern_mask->PM_npatterns = with_patterns->npatterns;
-  object->board_pattern_mask->PM_nstates = 0;
+  object->B_pattern_mask->PM_npatterns = with_patterns->npatterns;
+  object->B_pattern_mask->PM_nstates = 0;
 
   for (int ipattern = 0; ipattern < with_patterns->npatterns; ipattern++)
-    object->board_pattern_mask->PM_mask[ipattern] = 0;
+    object->B_pattern_mask->PM_mask[ipattern] = 0;
 
   for (int i = 1; i <= 50; i++)
   {
@@ -813,7 +849,7 @@ void board2patterns(board_t *self)
 
       if (jpattern == INVALID) break;
 
-      int *mask = object->board_pattern_mask->PM_mask + jpattern;
+      int *mask = object->B_pattern_mask->PM_mask + jpattern;
 
       int nshift =
         (iboard - with_patterns->patterns[jpattern].P_root_square) * 4;
@@ -828,11 +864,11 @@ void board2patterns(board_t *self)
 
       HARDBUG(ilinear >= with_pattern->P_nlinear)
 
-      if (object->board_white_man_bb & BITULL(iboard))
+      if (object->B_white_man_bb & BITULL(iboard))
       {
         *mask |= (MASK_WHITE_MAN << (2 * ilinear));
       }
-      else if (object->board_black_man_bb & BITULL(iboard))
+      else if (object->B_black_man_bb & BITULL(iboard))
       {
         *mask |= (MASK_BLACK_MAN << (2 * ilinear));
       }
@@ -850,7 +886,7 @@ void check_board_patterns(board_t *self, char *arg_where)
 {
   board_t *object = self;
 
-  patterns_t *with_patterns = object->board_network.network_patterns;
+  patterns_t *with_patterns = object->B_network.N_patterns;
 
   int ok = TRUE;
 
@@ -860,7 +896,7 @@ void check_board_patterns(board_t *self, char *arg_where)
 
     //*mask is the current occupation
 
-    int *mask = object->board_pattern_mask->PM_mask + ipattern;
+    int *mask = object->B_pattern_mask->PM_mask + ipattern;
 
     //input is the input associated with the current occupation
 

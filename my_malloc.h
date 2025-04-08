@@ -1,8 +1,8 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef MyMallocH
 #define MyMallocH
 
-#define MARK_BLOCK_READ_ONLY(P, S) register_pointer(#P, __FILE__, __FUNC__, __LINE__, P, S, FALSE, TRUE);
+#define MARK_ARRAY_READ_ONLY(P, S) register_heap(#P, __FILE__, __FUNC__, __LINE__, P, S, FALSE, TRUE);
 
 #define MY_MALLOC(P, T, N) HARDBUG(((P) = my_malloc(#P, __FILE__, __FUNC__, __LINE__, sizeof(T) * (N))) == NULL)
 
@@ -22,9 +22,10 @@
 
 #define CDESTROY(C) POP_LEAK(#C) free(C); C = NULL;
 
-void register_pointer(char *, char *, const char *, int, void *, size_t,
+void mark_pointer_read_only(void *);
+void register_heap(char *, char *, const char *, int, void *, size_t,
   int, int);
-void *deregister_pointer(void *);
+void *deregister_heap(void *);
 
 void *my_malloc(char *, char *, const char *, int, size_t);
 void my_free(void *);

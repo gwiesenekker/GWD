@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -408,15 +408,17 @@ void hub(void)
 
       gen_moves(&(with->S_board), &moves_list, FALSE);
 
-      HARDBUG(moves_list.nmoves == 0)
+      HARDBUG(moves_list.ML_nmoves == 0)
 
       check_moves(&(with->S_board), &moves_list);
 
       BSTRING(bmove_string)
 
+      return_book_move(&(with->S_board), &moves_list, bmove_string);
+
       HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
 
-      if ((compat_strcasecmp(name, "think") == 0) and (moves_list.nmoves == 1))
+      if ((compat_strcasecmp(name, "think") == 0) and (moves_list.ML_nmoves == 1))
       {
         move2bstring(&moves_list, 0, bmove_string);
       }
@@ -827,11 +829,11 @@ local int play_game(search_t *object, int arg_my_colour,
     PRINTF("nmy_game_moves_done=%d nyour_game_moves_done=%d\n",
       nmy_game_moves_done, nyour_game_moves_done);
 
-    if (object->S_board.board_colour2move != arg_my_colour)
+    if (object->S_board.B_colour2move != arg_my_colour)
     {
-      if (moves_list.nmoves == 0)
+      if (moves_list.ML_nmoves == 0)
       {
-        if (IS_WHITE(object->S_board.board_colour2move))
+        if (IS_WHITE(object->S_board.B_colour2move))
           result = 0;
         else
           result = 2;
@@ -988,9 +990,9 @@ local int play_game(search_t *object, int arg_my_colour,
     {  
       //my turn
 
-      if (moves_list.nmoves == 0)
+      if (moves_list.ML_nmoves == 0)
       {
-        if (IS_WHITE(object->S_board.board_colour2move))
+        if (IS_WHITE(object->S_board.B_colour2move))
           result = 0;
         else
           result = 2;
@@ -1001,7 +1003,7 @@ local int play_game(search_t *object, int arg_my_colour,
       //check for known endgame
 
       int egtb_mate =
-        read_endgame(object, object->S_board.board_colour2move, NULL);
+        read_endgame(object, object->S_board.B_colour2move, NULL);
     
       if (egtb_mate != ENDGAME_UNKNOWN)
       {
@@ -1013,14 +1015,14 @@ local int play_game(search_t *object, int arg_my_colour,
         }
         else if (egtb_mate > 0)
         {
-          if (IS_WHITE(object->S_board.board_colour2move))
+          if (IS_WHITE(object->S_board.B_colour2move))
             result = 2;
           else
             result = 0;
         }
         else
         {
-          if (IS_WHITE(object->S_board.board_colour2move))
+          if (IS_WHITE(object->S_board.B_colour2move))
             result = 0;
           else
             result = 2;
@@ -1051,7 +1053,7 @@ local int play_game(search_t *object, int arg_my_colour,
 
       double t1 = compat_time();
 
-      if (moves_list.nmoves == 1)
+      if (moves_list.ML_nmoves == 1)
       {
         move2bstring(&moves_list, 0, bbest_move);
 
@@ -1151,7 +1153,7 @@ local int play_game(search_t *object, int arg_my_colour,
 
       //evaluate if needed
 
-      if ((moves_list.nmoves > 1) and
+      if ((moves_list.ML_nmoves > 1) and
           (options.network_evaluation_time > 0) and
           (best_score >= options.network_evaluation_min) and
           (best_score <= options.network_evaluation_max))

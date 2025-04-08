@@ -1,6 +1,8 @@
 OBJS=main.o\
-  boards.o\
   bstrlib.o\
+  cJSON.o\
+  xxhash.o\
+  boards.o\
   book.o\
   buckets.o\
   caches.o\
@@ -13,6 +15,7 @@ OBJS=main.o\
   hub.o\
   mcts.o\
   moves.o\
+  my_bstreams.o\
   my_cjson.o\
   my_malloc.o\
   my_mpi.o\
@@ -30,8 +33,7 @@ OBJS=main.o\
   stats.o\
   threads.o\
   timers.o\
-  utils.o\
-  cJSON.o
+  utils.o
 
 ifndef ARCH
 #ARCH=skylake
@@ -81,7 +83,7 @@ COPTS+=-D_GNU_SOURCE -mrdrnd
 ifeq ($(ARCH), nocona)
 COPTS+=-msse4.2
 else
-COPTS+=-DUSE_AVX2_INTRINSICS -msse4.2 -mavx2 -mfma
+COPTS+=-DUSE_AVX2_INTRINSICS -DXXH_VECTOR=XXH_AVX2 -msse4.2 -mavx2 -mfma
 #COPTS+=-msse4.2 -mavx2
 endif
 COPTS+=-Wall -pthread
@@ -105,11 +107,12 @@ $(TARGET): $(OBJS)
         cp $(TARGET) gwd.json overrides.json networks.json hub_client/$$REVISION
 
 HEADERS=boards.h\
-  book.h\
   bstrlib.h\
+  cJSON.h\
+  xxhash.h\
+  book.h\
   buckets.h\
   caches.h\
-  cJSON.h\
   classes.h\
   compat.h\
   dbase.h\
@@ -121,6 +124,7 @@ HEADERS=boards.h\
   main.h\
   mcts.h\
   moves.h\
+  my_bstreams.h\
   my_cjson.h\
   my_malloc.h\
   my_printf.h\
@@ -142,9 +146,12 @@ HEADERS=boards.h\
 
 main.o: Makefile main.c $(HEADERS)
 
+bstrlib.o: Makefile bstrlib.c $(HEADERS)
+cJSON.o: Makefile cJSON.c $(HEADERS)
+xxhash.o: Makefile xxhash.c $(HEADERS)
 boards.o: Makefile boards.d $(HEADERS)
 book.o: Makefile book.c $(HEADERS)
-bstrlib.o: Makefile bstrlib.c $(HEADERS)
+my_bstreams.o: Makefile my_bstreams.c $(HEADERS)
 buckets.o: Makefile buckets.c $(HEADERS)
 caches.o: Makefile caches.c $(HEADERS)
 compat.o: Makefile compat.c $(HEADERS)
@@ -174,7 +181,6 @@ stats.o: Makefile stats.c $(HEADERS)
 threads.o: Makefile threads.c $(HEADERS)
 timers.o: Makefile timers.c $(HEADERS)
 utils.o: Makefile utils.c $(HEADERS)
-cJSON.o: Makefile cJSON.c $(HEADERS)
 
 check:
 	cppcheck --enable=all .

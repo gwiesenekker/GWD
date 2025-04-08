@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 mcts_globals_t mcts_globals;
@@ -51,7 +51,7 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
   int arg_alpha, int arg_beta, int arg_depth,
   int arg_node_type, moves_list_t *arg_moves_list, int *arg_best_pv)
 {
-  if (IS_WHITE(object->S_board.board_colour2move))
+  if (IS_WHITE(object->S_board.B_colour2move))
   {
     return(white_mcts_alpha_beta(object, arg_nply,
       arg_alpha, arg_beta, arg_depth,
@@ -81,7 +81,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
 
   int wdl;
 
-  int temp_mate = read_endgame(object, object->S_board.board_colour2move, &wdl);
+  int temp_mate = read_endgame(object, object->S_board.B_colour2move, &wdl);
 
   if (temp_mate != ENDGAME_UNKNOWN)
   {
@@ -118,7 +118,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
     arg_moves_list = &temp_moves_list;
   }
 
-  if (arg_moves_list->nmoves == 0)
+  if (arg_moves_list->ML_nmoves == 0)
   {
     best_score = SCORE_LOST_ABSOLUTE;
 
@@ -127,7 +127,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
 
   int sort[MOVES_MAX];
 
-  shuffle(sort, arg_moves_list->nmoves, &mcts_random);
+  shuffle(sort, arg_moves_list->ML_nmoves, &mcts_random);
 
   best_score = arg_root_score;
   *arg_best_pv = sort[0];
@@ -270,7 +270,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
              depth, bdata(bmove_string), best_score);
     }
 
-    for (int imove = 1; imove < arg_moves_list->nmoves; imove++)
+    for (int imove = 1; imove < arg_moves_list->ML_nmoves; imove++)
     {
       jmove = sort[imove];
 
@@ -417,7 +417,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
 
 local int mcts_shoot_out(search_t *object, int arg_nply, int arg_mcts_depth)
 {
-  if (object->S_board.board_inode > 200)
+  if (object->S_board.B_inode > 200)
   {
     print_board(&(object->S_board));
 
@@ -443,7 +443,7 @@ local int mcts_shoot_out(search_t *object, int arg_nply, int arg_mcts_depth)
 
   if ((best_pv == INVALID) or (arg_nply >= MCTS_PLY_MAX)) goto label_return;
 
-  HARDBUG(best_pv >= moves_list.nmoves)
+  HARDBUG(best_pv >= moves_list.ML_nmoves)
 
   do_move(&(object->S_board), best_pv, &moves_list);
 

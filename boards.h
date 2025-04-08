@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef BoardsH
 #define BoardsH
 
@@ -38,11 +38,11 @@
 #define IS_MINE(X) ((X) & MY_BIT)
 #define IS_YOURS(X) ((X) & YOUR_BIT)
 
-#define the_man_bb(X) cat3(board_, X, _man_bb)
+#define the_man_bb(X) cat3(B_, X, _man_bb)
 #define my_man_bb     the_man_bb(my_colour)
 #define your_man_bb   the_man_bb(your_colour)
 
-#define the_king_bb(X) cat3(board_, X, _king_bb)
+#define the_king_bb(X) cat3(B_, X, _king_bb)
 #define my_king_bb     the_king_bb(my_colour)
 #define your_king_bb   the_king_bb(your_colour)
 
@@ -84,30 +84,30 @@ typedef struct
 
 typedef struct board
 {
-  my_printf_t *board_my_printf;
+  my_printf_t *B_my_printf;
 
-  ui64_t board_empty_bb;
-  ui64_t board_white_man_bb;
-  ui64_t board_white_king_bb;
-  ui64_t board_black_man_bb;
-  ui64_t board_black_king_bb;
+  ui64_t B_valid_bb;
+  ui64_t B_white_man_bb;
+  ui64_t B_white_king_bb;
+  ui64_t B_black_man_bb;
+  ui64_t B_black_king_bb;
 
-  int board_colour2move;
-  hash_key_t board_key;
+  int B_colour2move;
+  hash_key_t B_key;
 
-  int board_inode;
-  int board_root_inode;
+  int B_inode;
+  int B_root_inode;
 
-  node_t board_nodes[NODE_MAX];
+  node_t B_nodes[NODE_MAX];
 
-  pattern_mask_t *board_pattern_mask;
+  pattern_mask_t *B_pattern_mask;
 
-  network_t board_network;
+  network_t B_network;
 
-  char board_string[MY_LINE_MAX];
+  char B_string[MY_LINE_MAX];
 
-  int board_nstate;
-  board_state_t board_states[NODE_MAX];
+  int B_nstate;
+  board_state_t B_states[NODE_MAX];
 } board_t;
 
 extern int map[1 + 50];

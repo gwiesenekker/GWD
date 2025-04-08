@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define THREAD_ALPHA_BETA_MASTER 0
@@ -12,22 +12,21 @@ local void solve_problems(void *self, char *arg_name)
 { 
   thread_t *object = self;
 
-  FILE *fname, *ftmp;
+  FILE *ftmp;
   
-  HARDBUG((fname = fopen(arg_name, "r")) == NULL)
   HARDBUG((ftmp = fopen("tmp.fen", "w")) == NULL)
 
-  BSTRING(bline)
+  my_bstream_t my_bstream;
 
-  struct bStream* bfname;
-
-  HARDBUG((bfname = bsopen((bNread) fread, fname)) == NULL)
+  construct_my_bstream(&my_bstream, arg_name);
 
   int nproblems = 0;
   int nsolved = 0;
 
-  while(bsreadln(bline, bfname, (char) '\n') == BSTR_OK)
+  while(my_bstream_readln(&my_bstream, TRUE) == BSTR_OK)
   {
+    bstring bline = my_bstream.BS_bline;
+
     if (bchar(bline, 0) == '*') break;
     if (bchar(bline, 0) == '#') continue;
 
@@ -80,7 +79,7 @@ local void solve_problems(void *self, char *arg_name)
 
     check_moves(with_board, &moves_list);
 
-    if (moves_list.nmoves > 0)
+    if (moves_list.ML_nmoves > 0)
     {
       do_search(&(object->thread_search), &moves_list,
              INVALID, INVALID, SCORE_MINUS_INFINITY, FALSE);
@@ -110,13 +109,9 @@ local void solve_problems(void *self, char *arg_name)
     BDESTROY(bfen)
   }
 
-  HARDBUG(bsclose(bfname) == NULL)
-
-  FCLOSE(fname)
+  destroy_my_bstream(&my_bstream);
 
   FCLOSE(ftmp)
-
-  BDESTROY(bline)
 
   BSTRING(btext)
 
@@ -239,7 +234,7 @@ local void thread_func_alpha_beta_master(void *self)
 
         gen_moves(with_board, &moves_list, FALSE);
 
-        HARDBUG(moves_list.nmoves == 0)
+        HARDBUG(moves_list.ML_nmoves == 0)
 
         check_moves(with_board, &moves_list);
 
@@ -391,7 +386,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
           gen_moves(with_board, &moves_list, FALSE);
 
-          HARDBUG(moves_list.nmoves == 0)
+          HARDBUG(moves_list.ML_nmoves == 0)
     
           check_moves(with_board, &moves_list);
     
@@ -450,7 +445,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
   
             gen_moves(with_board, &your_moves_list, FALSE);
   
-            if (your_moves_list.nmoves > 0)
+            if (your_moves_list.ML_nmoves > 0)
             {
               clear_totals(&(object->thread_search));
 
@@ -477,14 +472,14 @@ local void thread_func_alpha_beta_slave(thread_t *object)
               bdata(bmove_string), depth_min, depth_max,
               root_score, minimal_window);
 
-            if (moves_list.nmoves > 1)
+            if (moves_list.ML_nmoves > 1)
             {
               //remove 
 
-              for (int jmove = imove; jmove < (moves_list.nmoves - 1); jmove++)
-                moves_list.moves[jmove] = moves_list.moves[jmove + 1];
+              for (int jmove = imove; jmove < (moves_list.ML_nmoves - 1); jmove++)
+                moves_list.ML_moves[jmove] = moves_list.ML_moves[jmove + 1];
 
-              moves_list.nmoves--;
+              moves_list.ML_nmoves--;
             }
 
             clear_totals(&(object->thread_search));

@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define the_dir(X) cat2(X, _dir)
@@ -30,7 +30,7 @@ void update_patterns_and_layer0(board_t *self,
 
   //loop over all patterns in which iboard occurs
 
-  patterns_t *with_patterns = object->board_network.network_patterns;
+  patterns_t *with_patterns = object->B_network.N_patterns;
 
   for (int ipattern = 0; ipattern < with_patterns->npatterns; ipattern++)
   {
@@ -51,7 +51,7 @@ void update_patterns_and_layer0(board_t *self,
     //if delta < 0 a white man or black man will be removed and
     //an empty square will be added
 
-    int *mask = object->board_pattern_mask->PM_mask + jpattern;
+    int *mask = object->B_pattern_mask->PM_mask + jpattern;
 
     //we only have to update the associated input if
     //the current and/or the next occupation are valid
@@ -75,9 +75,9 @@ void update_patterns_and_layer0(board_t *self,
 
       if (input != NINPUTS_MAX)
       {
-        if (object->board_network.network_inputs[input] == 1)
+        if (object->B_network.N_inputs[input] == 1)
         {
-          update_layer0(&(object->board_network), input, -1);
+          update_layer0(&(object->B_network), input, -1);
         }
       }
     }
@@ -142,9 +142,9 @@ void update_patterns_and_layer0(board_t *self,
 
       if (input != NINPUTS_MAX)
       {
-        HARDBUG(object->board_network.network_inputs[input] != 0)
+        HARDBUG(object->B_network.N_inputs[input] != 0)
 
-        update_layer0(&(object->board_network), input, 1);
+        update_layer0(&(object->B_network), input, 1);
       }
     }
     else
@@ -184,16 +184,16 @@ void move2bstring(void *self, int arg_imove, bstring arg_bmove_string)
 
   HARDBUG(arg_imove < 0)
 
-  HARDBUG(arg_imove >= object->nmoves)
+  HARDBUG(arg_imove >= object->ML_nmoves)
 
-  move_t *move = object->moves + arg_imove;
+  move_t *move = object->ML_moves + arg_imove;
    
-  int iboard = move->move_from;
-  int kboard = move->move_to;
+  int iboard = move->M_from;
+  int kboard = move->M_move_to;
 
   btrunc(arg_bmove_string, 0);
 
-  ui64_t captures_bb = move->move_captures_bb;
+  ui64_t captures_bb = move->M_captures_bb;
 
   if (captures_bb == 0)
     HARDBUG(bformata(arg_bmove_string, "%s-%s",
@@ -264,7 +264,7 @@ int search_move(void *self, bstring arg_bmove)
 
   BSTRING(bmove_string)
  
-  for (int imove = 0; imove < object->nmoves; imove++)
+  for (int imove = 0; imove < object->ML_nmoves; imove++)
   {
     int m2[50];
 
@@ -308,7 +308,7 @@ int search_move(void *self, bstring arg_bmove)
 
 void gen_moves(board_t *object, moves_list_t *arg_moves_list, int arg_quiescence)
 {
-  if (IS_WHITE(object->board_colour2move))
+  if (IS_WHITE(object->B_colour2move))
     gen_white_moves(object, arg_moves_list, arg_quiescence);
   else
     gen_black_moves(object, arg_moves_list, arg_quiescence);
@@ -316,7 +316,7 @@ void gen_moves(board_t *object, moves_list_t *arg_moves_list, int arg_quiescence
 
 void do_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list)
 {
-  if (IS_WHITE(object->board_colour2move))
+  if (IS_WHITE(object->B_colour2move))
     do_white_move(object, arg_imove, arg_moves_list, FALSE);
   else
     do_black_move(object, arg_imove, arg_moves_list, FALSE);
@@ -324,7 +324,7 @@ void do_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list)
 
 void undo_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list)
 {
-  if (IS_WHITE(object->board_colour2move))
+  if (IS_WHITE(object->B_colour2move))
     undo_black_move(object, arg_imove, arg_moves_list, FALSE);
   else
     undo_white_move(object, arg_imove, arg_moves_list, FALSE);
@@ -332,7 +332,7 @@ void undo_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list)
 
 void check_moves(board_t *object, moves_list_t *arg_moves_list)
 {
-  if (IS_WHITE(object->board_colour2move))
+  if (IS_WHITE(object->B_colour2move))
     check_white_moves(object, arg_moves_list);
   else
     check_black_moves(object, arg_moves_list);
@@ -342,7 +342,7 @@ void construct_moves_list(void *self)
 {
   moves_list_t *object = self;
 
-  object->nmoves = 0;
+  object->ML_nmoves = 0;
 }
 
 void fprintf_moves_list(void *self, my_printf_t *arg_my_printf,
@@ -354,7 +354,7 @@ void fprintf_moves_list(void *self, my_printf_t *arg_my_printf,
 
   if (verbose == 0)
   {
-    for (int imove = 0; imove < object->nmoves; imove++) 
+    for (int imove = 0; imove < object->ML_nmoves; imove++) 
     {
       move2bstring(object, imove, bmove_string);
 
@@ -363,7 +363,7 @@ void fprintf_moves_list(void *self, my_printf_t *arg_my_printf,
   }
   else
   {
-    for (int imove = 0; imove < object->nmoves; imove++)
+    for (int imove = 0; imove < object->ML_nmoves; imove++)
     {
       move2bstring(object, imove, bmove_string);
 

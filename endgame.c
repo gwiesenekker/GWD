@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 
 #include "globals.h"
 
@@ -185,7 +185,7 @@ local void convert2wdl(void)
 
           char wdl[MY_LINE_MAX];
 
-          snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl", options.egtb_dir,
+          snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl", options.egtb_dir_wdl,
                    endgame_name);
 
           if (fexists(wdl))
@@ -488,6 +488,7 @@ void init_endgame(void)
     if (!fexists(path))
     {
       PRINTF("path=%s\n", path);
+
       FATAL("path does not exist!", EXIT_FAILURE)
     }
 
@@ -613,7 +614,7 @@ void init_endgame(void)
           char wdl[MY_LINE_MAX];
 
           snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl",
-            options.egtb_dir, with_endgame->endgame_name);
+            options.egtb_dir_wdl, with_endgame->endgame_name);
 
           HARDBUG(!fexists(wdl))
   
@@ -711,8 +712,10 @@ void init_endgame(void)
               HARDBUG(fread(with_endgame->pendgame, sizeof(i8_t), wdl_size,
                             with_endgame->fendgame_wdl) != wdl_size)
   
-                if (options.verbose > 1)
-                  PRINTF("..done size in RAM=%lld\n", wdl_size);
+              if (options.verbose > 1)
+                PRINTF("..done size in RAM=%lld\n", wdl_size);
+
+              MARK_ARRAY_READ_ONLY(with_endgame->pendgame, wdl_size);
             }
 #ifdef USE_OPENMPI
             if (my_mpi_globals.MY_MPIG_nglobal > 1)
@@ -755,6 +758,10 @@ void init_endgame(void)
               if (compat_strcasecmp(with_endgame->endgame_name,
                                 cJSON_GetStringValue(egtb)) != 0) continue;
 
+#ifdef USE_OPENMPI
+              //not implemented yet
+              HARDBUG(my_mpi_globals.MY_MPIG_nglobal > 1)
+#endif
               MY_MALLOC(with_endgame->pendgame, i8_t, st.st_size)
 
               PRINTF("loading compressed EGTB %s into RAM..\n", path);
@@ -1042,11 +1049,11 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
 
   int result = ENDGAME_UNKNOWN;
 
-  int nwk = BIT_COUNT(object->S_board.board_white_king_bb);
-  int nwm = BIT_COUNT(object->S_board.board_white_man_bb);
+  int nwk = BIT_COUNT(object->S_board.B_white_king_bb);
+  int nwm = BIT_COUNT(object->S_board.B_white_man_bb);
 
-  int nbk = BIT_COUNT(object->S_board.board_black_king_bb);
-  int nbm = BIT_COUNT(object->S_board.board_black_man_bb);
+  int nbk = BIT_COUNT(object->S_board.B_black_king_bb);
+  int nbm = BIT_COUNT(object->S_board.B_black_man_bb);
 
   int npieces = nwk + nwm + nbk + nbm;
 
@@ -1174,7 +1181,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     ui64_t bb;
     int nbb;
 
-    bb = object->S_board.board_white_king_bb; 
+    bb = object->S_board.B_white_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1185,7 +1192,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nwk)
 
-    bb = object->S_board.board_white_man_bb; 
+    bb = object->S_board.B_white_man_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1196,7 +1203,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nwm)
 
-    bb = object->S_board.board_black_king_bb; 
+    bb = object->S_board.B_black_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1207,7 +1214,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nbk)
 
-    bb = object->S_board.board_black_man_bb; 
+    bb = object->S_board.B_black_man_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1223,7 +1230,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     ui64_t bb;
     int nbb;
 
-    bb = object->S_board.board_white_king_bb; 
+    bb = object->S_board.B_white_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1234,7 +1241,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nwk)
 
-    bb = object->S_board.board_white_man_bb;
+    bb = object->S_board.B_white_man_bb;
     nbb = 0;
   
     while(bb != 0)
@@ -1245,7 +1252,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nwm)
 
-    bb = object->S_board.board_black_king_bb; 
+    bb = object->S_board.B_black_king_bb; 
     nbb = 0;
 
     while(bb != 0)
@@ -1256,7 +1263,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nbk)
 
-    bb = object->S_board.board_black_man_bb;
+    bb = object->S_board.B_black_man_bb;
     nbb = 0;
   
     while(bb != 0)

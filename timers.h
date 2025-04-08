@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef TimersH
 #define TimersH
 
@@ -26,11 +26,11 @@ typedef struct
   double TC_game_time_per_move[NODE_MAX];
 } time_control_t;
 
-void construct_my_timer(void *, char *, my_printf_t *, int);
-void reset_my_timer(void *);
-double return_my_timer(void *, int);
-void stop_my_timer(void *);
-void start_my_timer(void *);
+void construct_my_timer(my_timer_t *, char *, my_printf_t *, int);
+void reset_my_timer(my_timer_t *);
+double return_my_timer(my_timer_t *, int);
+void stop_my_timer(my_timer_t *);
+void start_my_timer(my_timer_t *);
 
 void configure_time_control(int, int, time_control_t *);
 void update_time_control(int, double, time_control_t *);

@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define NRETRIES 5
@@ -177,6 +177,10 @@ void read_games(char *arg_name)
 
   bucket_t bucket_kings[NPIECES_MAX + 1];
 
+  bucket_t bucket_nmoves[NPIECES_MAX + 1];
+
+  bucket_t bucket_nblocked[NPIECES_MAX + 1];
+
   construct_bucket(&bucket_nman, "bucket_nman",
                    1, 0, NPIECES_MAX, BUCKET_LINEAR);
 
@@ -187,6 +191,14 @@ void read_games(char *arg_name)
   for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
     construct_bucket(bucket_kings + npieces, "bucket_kings",
                      1, 0, NPIECES_MAX, BUCKET_LINEAR);
+
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+    construct_bucket(bucket_nmoves + npieces, "bucket_nmoves",
+                     1, 0, MOVES_MAX, BUCKET_LINEAR);
+
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+    construct_bucket(bucket_nblocked + npieces, "bucket_nblocked",
+                     1, 0, MOVES_MAX, BUCKET_LINEAR);
 
   i64_t ngames = 0;
   i64_t nerrors = 0;
@@ -288,31 +300,48 @@ void read_games(char *arg_name)
 
       //update statistics
 
-      update_bucket(&bucket_nman, BIT_COUNT(with->board_black_man_bb));
+      update_bucket(&bucket_nman, BIT_COUNT(with->B_black_man_bb));
 
       for (int i = 1; i <= 50; ++i)
       {
         int iboard = map[i];
 
-        if (with->board_black_man_bb & BITULL(iboard))
+        if (with->B_black_man_bb & BITULL(iboard))
         {
-          update_bucket(bucket_rows + BIT_COUNT(with->board_black_man_bb),
+          update_bucket(bucket_rows + BIT_COUNT(with->B_black_man_bb),
             (i - 1) / 5);
         }
       }
 
-      update_bucket(bucket_kings + BIT_COUNT(with->board_black_man_bb),
-        BIT_COUNT(with->board_black_king_bb));
+      update_bucket(bucket_kings + BIT_COUNT(with->B_black_man_bb),
+        BIT_COUNT(with->B_black_king_bb));
+
+      if (IS_WHITE(with->B_colour2move))
+      {
+        update_bucket(bucket_nmoves + BIT_COUNT(with->B_white_man_bb),
+                      moves_list.ML_nmoves);
+
+        update_bucket(bucket_nblocked + BIT_COUNT(with->B_white_man_bb),
+                      moves_list.ML_nblocked);
+      }
+      else
+      {
+        update_bucket(bucket_nmoves + BIT_COUNT(with->B_black_man_bb),
+                      moves_list.ML_nmoves);
+
+        update_bucket(bucket_nblocked + BIT_COUNT(with->B_black_man_bb),
+                      moves_list.ML_nblocked);
+      }
 
       //update book
 
-      if (moves_list.nmoves > 0)
+      if (moves_list.ML_nmoves > 0)
       {
         move2bstring(&moves_list, imove, bmove_string);
    
         int result = game_result;
 
-        if (IS_BLACK(with->board_colour2move)) result = 2 - result;
+        if (IS_BLACK(with->B_colour2move)) result = 2 - result;
 
         board2fen(with, bfen, FALSE);
 
@@ -324,7 +353,7 @@ void read_games(char *arg_name)
         int move_id = query_move(db, position_id, bdata(bmove_string), 0);
 
         if (move_id == INVALID)
-          move_id = insert_move(db, position_id, bdata(bmove_string), 0);
+          move_id = insert_move(db, position_id, bdata(bmove_string), 1, 0);
   
         if (result == 2)
           increment_nwon_ndraw_nlost(db, position_id, move_id, 1, 0, 0, 0);
@@ -398,6 +427,20 @@ void read_games(char *arg_name)
     PRINTF("npieces=%d\n", npieces);
 
     printf_bucket(bucket_kings + npieces);
+  }
+
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+  {
+    PRINTF("npieces=%d\n", npieces);
+
+    printf_bucket(bucket_nmoves + npieces);
+  }
+
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+  {
+    PRINTF("npieces=%d\n", npieces);
+
+    printf_bucket(bucket_nblocked + npieces);
   }
 
   PRINTF("ngames=%lld nerrors=%lld\n", ngames, nerrors);
@@ -560,7 +603,7 @@ void gen_db(char *arg_db_name,
 
       gen_moves(&(with->S_board), &moves_list, FALSE);
 
-      if (moves_list.nmoves == 0) break;
+      if (moves_list.ML_nmoves == 0) break;
 
       int best_pv;
 
@@ -601,7 +644,7 @@ void gen_db(char *arg_db_name,
 
     int wdl;
 
-    int egtb_mate = read_endgame(with, with->S_board.board_colour2move, &wdl);
+    int egtb_mate = read_endgame(with, with->S_board.B_colour2move, &wdl);
 
     if (egtb_mate == ENDGAME_UNKNOWN)
     {
@@ -624,7 +667,7 @@ void gen_db(char *arg_db_name,
 
     //result as seen from white
 
-    if (IS_BLACK(with->S_board.board_colour2move)) result = 2 - result;
+    if (IS_BLACK(with->S_board.B_colour2move)) result = 2 - result;
 
     PRINTF("replay\n");
 
@@ -660,7 +703,7 @@ void gen_db(char *arg_db_name,
 
       gen_moves(&(with->S_board), &moves_list, FALSE);
 
-      HARDBUG(moves_list.nmoves < 1)
+      HARDBUG(moves_list.ML_nmoves < 1)
      
       int best_pv;
 
@@ -668,10 +711,10 @@ void gen_db(char *arg_db_name,
 
       print_board(&(with->S_board));
  
-      if ((moves_list.nmoves <= 1) or (moves_list.ncaptx > 0))
+      if ((moves_list.ML_nmoves <= 1) or (moves_list.ML_ncaptx > 0))
       {
         PRINTF("position rejected nmoves=%d ncaptx=%d\n",
-               moves_list.nmoves, moves_list.ncaptx);
+               moves_list.ML_nmoves, moves_list.ML_ncaptx);
 
         do_move(&(with->S_board), best_pv, &moves_list);
 
@@ -724,11 +767,11 @@ void gen_db(char *arg_db_name,
     
           BSTRING(bmove)
     
-          for (int imove = 0; imove < moves_list.nmoves; imove++)
+          for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
           {
             move2bstring(&moves_list, imove, bmove);
                  
-            (void) insert_move(db, position_id, bdata(bmove), 0);
+            (void) insert_move(db, position_id, bdata(bmove), 1, 0);
           }
     
           BDESTROY(bmove)
@@ -738,7 +781,7 @@ void gen_db(char *arg_db_name,
   
         HARDBUG(move_id == INVALID)
     
-        if (IS_WHITE(with->S_board.board_colour2move))
+        if (IS_WHITE(with->S_board.B_colour2move))
         {
           if (result == 2)
             increment_nwon_ndraw_nlost(db, position_id, move_id, 1, 0, 0, 0);
@@ -998,7 +1041,7 @@ void update_db(char *arg_db_name, int arg_nshoot_outs,
 
     gen_moves(&(with->S_board), &moves_list, FALSE);
 
-    HARDBUG(moves_list.nmoves < 1)
+    HARDBUG(moves_list.ML_nmoves < 1)
 
     sql =
      "SELECT id, move, nwon, ndraw, nlost from moves WHERE position_id = ?;";
@@ -1019,7 +1062,7 @@ void update_db(char *arg_db_name, int arg_nshoot_outs,
     int ndraw[MOVES_MAX];
     int nlost[MOVES_MAX];
 
-    for (int imove = 0; imove < moves_list.nmoves; imove++)
+    for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
       move_id[imove] = nwon[imove] = ndraw[imove] = nlost[imove] = INVALID;
   
     while ((rc = execute_sql(db, stmt, TRUE, NRETRIES)) == SQLITE_ROW)
@@ -1051,7 +1094,7 @@ void update_db(char *arg_db_name, int arg_nshoot_outs,
 
     HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-    for (int imove = 0; imove < moves_list.nmoves; imove++)
+    for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
     {
       HARDBUG(move_id[imove] == INVALID)
       HARDBUG(nwon[imove] == INVALID)
@@ -1059,7 +1102,7 @@ void update_db(char *arg_db_name, int arg_nshoot_outs,
       HARDBUG(nlost[imove] == INVALID)
     }
 
-    for (int imove = 0; imove < moves_list.nmoves; imove++)
+    for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
     {
       move2bstring(&moves_list, imove, bmove_string);
 

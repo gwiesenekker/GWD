@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT BIT(0)
@@ -105,15 +105,15 @@ int draw_by_repetition(board_t *object, int arg_strict)
 
   int n = 1;
 
-  for (int istate = object->board_inode - 2; istate >= 0; istate -= 2)
+  for (int istate = object->B_inode - 2; istate >= 0; istate -= 2)
   {
-    if (object->board_states[istate + 1].BS_npieces != npieces)
+    if (object->B_states[istate + 1].BS_npieces != npieces)
       goto label_return;
 
-    if (object->board_states[istate].BS_npieces != npieces)
+    if (object->B_states[istate].BS_npieces != npieces)
       goto label_return;
 
-    if (HASH_KEY_EQ(object->board_states[istate].BS_key, object->board_key))
+    if (HASH_KEY_EQ(object->B_states[istate].BS_key, object->B_key))
     {
       ++n;
 
@@ -133,17 +133,17 @@ int draw_by_repetition(board_t *object, int arg_strict)
 
 local int move_repetition(board_t *object)
 {
-  if ((object->board_inode - 2) < 0) return(FALSE);
+  if ((object->B_inode - 2) < 0) return(FALSE);
 
   int npieces;
 
-  if (IS_WHITE(object->board_colour2move))
+  if (IS_WHITE(object->B_colour2move))
   {
-    npieces = BIT_COUNT(object->board_white_man_bb | object->board_white_king_bb);
+    npieces = BIT_COUNT(object->B_white_man_bb | object->B_white_king_bb);
   }
   else
   {
-    npieces = BIT_COUNT(object->board_black_man_bb | object->board_black_king_bb);
+    npieces = BIT_COUNT(object->B_black_man_bb | object->B_black_king_bb);
   }
 
   if (npieces > 1) return(FALSE);
@@ -166,10 +166,10 @@ local int move_repetition(board_t *object)
 
   int n = 0;
 
-  for (int jnode = object->board_inode - 4; jnode >= 0; jnode -= 2)
+  for (int jnode = object->B_inode - 4; jnode >= 0; jnode -= 2)
   {
-    if (HASH_KEY_EQ(object->board_nodes[object->board_inode - 2].node_move_key, 
-                    object->board_nodes[jnode].node_move_key))
+    if (HASH_KEY_EQ(object->B_nodes[object->B_inode - 2].node_move_key, 
+                    object->B_nodes[jnode].node_move_key))
     {
       ++n;
 
@@ -303,7 +303,7 @@ local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv
   if (IS_PV(arg_node_type))
   {
     *arg_alpha_beta_cache_entry =
-      arg_alpha_beta_cache[object->S_board.board_key % nalpha_beta_pv_cache_entries];
+      arg_alpha_beta_cache[object->S_board.B_key % nalpha_beta_pv_cache_entries];
 
 #ifdef DEBUG
     for (int idebug = 0; idebug < NSLOTS; idebug++)
@@ -338,7 +338,7 @@ local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv
  
         **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
       }
-      else if ((*arg_alpha_beta_cache_slot)->ABCS_key == object->S_board.board_key)
+      else if ((*arg_alpha_beta_cache_slot)->ABCS_key == object->S_board.B_key)
       {
         result = TRUE;
 
@@ -351,7 +351,7 @@ local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv
   {
     *arg_alpha_beta_cache_entry =
       arg_alpha_beta_cache[nalpha_beta_pv_cache_entries + 
-                       object->S_board.board_key % nalpha_beta_cache_entries];
+                       object->S_board.B_key % nalpha_beta_cache_entries];
 
 #ifdef DEBUG
     for (int idebug = 0; idebug < NSLOTS; idebug++)
@@ -386,7 +386,7 @@ local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv
   
         **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
       }
-      else if ((*arg_alpha_beta_cache_slot)->ABCS_key == object->S_board.board_key)
+      else if ((*arg_alpha_beta_cache_slot)->ABCS_key == object->S_board.B_key)
       {
         result = TRUE;
 
@@ -410,7 +410,7 @@ local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv
     if (islot == NSLOTS)
     {
       *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots +
-                               object->S_board.board_key % NSLOTS;
+                               object->S_board.B_key % NSLOTS;
 
       **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
     }
@@ -626,7 +626,7 @@ void do_search(search_t *with, moves_list_t *moves_list,
   int depth_min, int depth_max, int root_score,
   my_random_t *shuffle)
 {
-  if (IS_WHITE(with->S_board.board_colour2move))
+  if (IS_WHITE(with->S_board.B_colour2move))
     white_search(with, moves_list, depth_min, depth_max, root_score,
       shuffle);
   else

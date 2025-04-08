@@ -1,9 +1,9 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM  gwd7
-#define REVISION "7.809"
+#define REVISION "7.851"
 
 //generic includes
 
@@ -73,11 +73,10 @@ typedef long long  i64_t;
 #define CJSON_PARAMETERS_ID        "parameters"
 #define CJSON_TWEAKS_ID            "tweaks"
 #define CJSON_NEURAL2MATERIAL_SCORE_ID "network2material_score"
+#define CJSON_KING_WEIGHT_ID       "king_weight"
 #define CJSON_SHAPE_ID             "shape"
 #define CJSON_CLIP_ID              "clip"
 #define CJSON_ACTIVATION_LAST_ID   "activation_last"
-#define CJSON_NPIECES_MIN_ID       "npieces_min"
-#define CJSON_NPIECES_MAX_ID       "npieces_max"
 #define CJSON_EVENT_ID             "event"
 #define CJSON_DATE_ID              "date"
 #define CJSON_WHITE_ID             "white"
@@ -97,7 +96,7 @@ typedef long long  i64_t;
 
 #define CJSON_POSITIONS_ID         "positions"
 #define CJSON_POSITION_ID          "position"
-#define CJSON_BOARD_STRING_ID      "board_string"
+#define CJSON_BOARD_STRING_ID      "B_string"
 #define CJSON_MOVE_SCORE_ID        "move_score"
 #define CJSON_WON_ID               "won"
 #define CJSON_DRAW_ID              "draw"
@@ -207,6 +206,7 @@ extern void *STDOUT;
 #include "cJSON.h"
 #include "classes.h"
 #include "my_printf.h"
+#include "my_bstreams.h"
 #include "my_cjson.h"
 #include "my_malloc.h"
 #include "my_mpi.h"

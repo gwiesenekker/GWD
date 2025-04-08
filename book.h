@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #ifndef BookH
 #define BookH
 
@@ -8,11 +8,9 @@ void open_book(void);
 
 void return_book_move(board_t *with, moves_list_t *, bstring);
 
-void gen_book(int, int);
+void gen_book(char *, char *);
 
-void walk_book(int);
-
-void count_book(int);
+void walk_book(char *);
 
 #endif
 

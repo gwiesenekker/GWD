@@ -1,20 +1,30 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define NSQL_BUFFER (MBYTE)
-#undef SPLIT_SQL 
+#undef SPLIT_SQL_BUFFER
 
-int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step, int arg_nretries)
+#define SQL_PRINTF_WIDTH 1024
+
+int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step,
+  int arg_nretries)
 {
   static my_random_t retry_random;
   static int retry_random_init = FALSE;
 
   BSTRING(bsql)
 
+  int nsemicolons = 0;
+
   if (arg_step)
     HARDBUG(bassigncstr(bsql, sqlite3_sql((sqlite3_stmt *)arg_sql)) == BSTR_ERR)
   else
+  {
     HARDBUG(bassigncstr(bsql, (char *) arg_sql) == BSTR_ERR)
+    
+    for (int ichar = 0; ichar < blength(bsql); ichar++)
+      if (bchar(bsql, ichar) == ';') nsemicolons++;
+  }
 
   if (!retry_random_init)
   {
@@ -33,7 +43,11 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step, int arg_nret
 
   int iretry = 0;
 
-  while((arg_nretries == INVALID) or (iretry <= arg_nretries))
+  int nretries = arg_nretries;
+
+  if (arg_nretries == INVALID) nretries = 1000000;
+
+  while(iretry <= nretries)
   {
     if (arg_step)
       rc = sqlite3_step((sqlite3_stmt *) arg_sql);
@@ -44,8 +58,11 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step, int arg_nret
 
     if (arg_step)
     {
-      PRINTF("busy or locked step=%s iretry=%d delay=%.6f\n", 
-             bdata(bsql), iretry, delay);
+      if ((iretry % 1000) == 0)
+      {
+        PRINTF("busy or locked step=%s iretry=%d delay=%.6f\n", 
+               bdata(bsql), iretry, delay);
+      }
     }
     else
     {
@@ -53,11 +70,35 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step, int arg_nret
 
       err_msg = NULL;
 
-      PRINTF("busy or locked sql=%s iretry=%d delay=%.6f\n", 
-             bdata(bsql), iretry, delay);
+      if ((iretry % 1000) == 0)
+      {
+        if (blength(bsql) <= (2 * SQL_PRINTF_WIDTH))
+        {
+          PRINTF("busy or locked sql=%s iretry=%d delay=%.6f\n", 
+                 bdata(bsql), iretry, delay);
+        }
+        else
+        {
+          PRINTF("busy or locked sql=%.*s...%.*s iretry=%d delay=%.6f\n", 
+                 SQL_PRINTF_WIDTH, bdata(bsql),
+                 SQL_PRINTF_WIDTH, bdata(bsql) + blength(bsql) - SQL_PRINTF_WIDTH,
+                 iretry, delay);
+        }
+      }
     }
 
-    if (arg_nretries > 1)
+    if (arg_nretries == INVALID)
+    {
+      if ((nsemicolons > 1) or (iretry >= 1000))
+        delay = (1.0 + return_my_random(&retry_random) % 1000) * MILLI_SECOND;
+      else
+        delay = (1.0 + return_my_random(&retry_random) % 1000) * MICRO_SECOND;
+
+      if ((iretry % 1000) == 0) PRINTF("delay=%.6f\n", delay);
+
+      compat_sleep(delay);
+    }
+    else if (arg_nretries > 1)
     {
       if ((iretry % arg_nretries) == 0)
       {
@@ -73,7 +114,7 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step, int arg_nret
         delay *= backoff;
       }
 
-      PRINTF("delay=%.6f\n", delay);
+      if ((iretry % 1000) == 0) PRINTF("delay=%.6f\n", delay);
 
       compat_sleep(delay);
     }
@@ -87,7 +128,7 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step, int arg_nret
     {
       if (arg_step)
       {
-        PRINTF("OK or DONE or ROW step=%s iretry=%d delay=%.2f\n", 
+        PRINTF("OK or DONE or ROW step=%s iretry=%d delay=%.6f\n", 
                bdata(bsql), iretry, delay);
       }
       else
@@ -109,8 +150,18 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step, int arg_nret
   }
   else
   {
-    PRINTF("FAILED sql=%s rc=%d err_msg=%s\n",
-           bdata(bsql), rc, err_msg);
+    if (blength(bsql) <= (2 * SQL_PRINTF_WIDTH))
+    {
+      PRINTF("FAILED sql=%s iretry=%d delay=%.6f\n", 
+             bdata(bsql), iretry, delay);
+    }
+    else
+    {
+      PRINTF("FAILED sql=%.*s...%.*s iretry=%d delay=%.6f\n", 
+             SQL_PRINTF_WIDTH, bdata(bsql),
+             SQL_PRINTF_WIDTH, bdata(bsql) + blength(bsql) - SQL_PRINTF_WIDTH,
+             iretry, delay);
+    }
   }
 
   FATAL("sqlite3", EXIT_FAILURE)
@@ -122,7 +173,8 @@ void create_tables(sqlite3 *arg_db, int arg_nretries)
 {
   const char *create_positions_table_sql =
     "CREATE TABLE IF NOT EXISTS positions"
-    " (id INTEGER PRIMARY KEY AUTOINCREMENT, position TEXT UNIQUE);";
+    " (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+    " fen TEXT UNIQUE);";
 
   const char *create_moves_table_sql =
     "CREATE TABLE IF NOT EXISTS moves (id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -131,6 +183,7 @@ void create_tables(sqlite3 *arg_db, int arg_nretries)
     " nwon INTEGER DEFAULT 0,"
     " ndraw INTEGER DEFAULT 0,"
     " nlost INTEGER DEFAULT 0,"
+    " centi_seconds INTEGER DEFAULT 1,"
     " FOREIGN KEY (position_id) REFERENCES positions (id),"
     " UNIQUE (position_id, move));";
 
@@ -138,10 +191,10 @@ void create_tables(sqlite3 *arg_db, int arg_nretries)
     "CREATE TABLE IF NOT EXISTS evaluations ("
     "id INTEGER PRIMARY KEY AUTOINCREMENT,"
     " move_id INTEGER,"
-    " eval_time INTEGER,"
+    " centi_seconds INTEGER,"
     " evaluation INTEGER,"
     " FOREIGN KEY (move_id) REFERENCES moves (id),"
-    " UNIQUE (move_id, eval_time));";
+    " UNIQUE (move_id, centi_seconds));";
 
   HARDBUG(execute_sql(arg_db, create_positions_table_sql, FALSE, arg_nretries) !=
           SQLITE_OK)
@@ -153,9 +206,9 @@ void create_tables(sqlite3 *arg_db, int arg_nretries)
           SQLITE_OK)
 }
 
-int query_position(sqlite3 *arg_db, const char *arg_position, int arg_nretries)
+int query_position(sqlite3 *arg_db, const char *arg_fen, int arg_nretries)
 {
-  const char *sql = "SELECT id FROM positions WHERE position = ?;";
+  const char *sql = "SELECT id FROM positions WHERE fen = ?;";
 
   sqlite3_stmt *stmt;
 
@@ -169,16 +222,14 @@ int query_position(sqlite3 *arg_db, const char *arg_position, int arg_nretries)
     FATAL("sqlite3", EXIT_FAILURE)
   }
 
-  HARDBUG(sqlite3_bind_text(stmt, 1, arg_position, -1, SQLITE_STATIC) != SQLITE_OK)
+  HARDBUG(sqlite3_bind_text(stmt, 1, arg_fen, -1, SQLITE_STATIC) != SQLITE_OK)
 
-  if ((rc = execute_sql(arg_db, stmt, TRUE, arg_nretries)) == SQLITE_DONE)
+  if ((rc = execute_sql(arg_db, stmt, TRUE, arg_nretries)) != SQLITE_ROW)
   {
     HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
     return(INVALID);
   }
-
-  HARDBUG(rc != SQLITE_ROW)
 
   int id = sqlite3_column_int(stmt, 0);
 
@@ -187,10 +238,10 @@ int query_position(sqlite3 *arg_db, const char *arg_position, int arg_nretries)
   return(id);
 }
 
-int insert_position(sqlite3 *arg_db, const char *arg_position, int arg_nreties)
+int insert_position(sqlite3 *arg_db, const char *arg_fen, int arg_nreties)
 {
   const char *sql =
-    "INSERT OR IGNORE INTO positions (position) VALUES (?);";
+    "INSERT OR IGNORE INTO positions (fen) VALUES (?);";
 
   sqlite3_stmt *stmt;
 
@@ -204,23 +255,25 @@ int insert_position(sqlite3 *arg_db, const char *arg_position, int arg_nreties)
     FATAL("sqlite3", EXIT_FAILURE)
   }
 
-  HARDBUG(sqlite3_bind_text(stmt, 1, arg_position, -1, SQLITE_STATIC) != SQLITE_OK)
+  HARDBUG(sqlite3_bind_text(stmt, 1, arg_fen, -1, SQLITE_STATIC) !=
+          SQLITE_OK)
 
   HARDBUG(execute_sql(arg_db, stmt, TRUE, arg_nreties) != SQLITE_DONE)
 
   HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-  int id = query_position(arg_db, arg_position, arg_nreties);
+  int id = query_position(arg_db, arg_fen, arg_nreties);
 
   HARDBUG(id == INVALID)
 
   return(id);
 }
 
-int query_move(sqlite3 *arg_db, int arg_position_id, const char *arg_move, int arg_nretries)
+int query_move(sqlite3 *arg_db, int arg_position_id, const char *arg_move,
+               int arg_nretries)
 {
   const char *sql =
-    "SELECT id FROM moves WHERE position_id = ? and move = ?;";
+    "SELECT id FROM moves WHERE position_id = ? AND move = ?;";
 
   sqlite3_stmt *stmt;
 
@@ -252,12 +305,15 @@ int query_move(sqlite3 *arg_db, int arg_position_id, const char *arg_move, int a
   return(id);
 }
 
-int insert_move(sqlite3 *arg_db, int arg_position_id, const char *arg_move, int arg_nretries)
+int insert_move(sqlite3 *arg_db, int arg_position_id, const char *arg_move,
+                int arg_centi_seconds, int arg_nretries)
 {
   const char *sql =
-   "INSERT INTO moves"
-   " (position_id, move, nwon, ndraw, nlost)"
-   " VALUES (?, ?, 0, 0, 0);";
+    "INSERT INTO moves (position_id, move, nwon, ndraw, nlost, centi_seconds)"
+    " VALUES (?, ?, 0, 0, 0, ?)"
+    " ON CONFLICT(position_id, move) DO UPDATE SET"
+    "  centi_seconds = excluded.centi_seconds" 
+    " WHERE excluded.centi_seconds > moves.centi_seconds;";
 
   sqlite3_stmt *stmt;
 
@@ -275,6 +331,8 @@ int insert_move(sqlite3 *arg_db, int arg_position_id, const char *arg_move, int 
 
   HARDBUG(sqlite3_bind_text(stmt, 2, arg_move, -1, SQLITE_STATIC) != SQLITE_OK)
 
+  HARDBUG(sqlite3_bind_int(stmt, 3, arg_centi_seconds) != SQLITE_OK)
+
   HARDBUG(execute_sql(arg_db, stmt, TRUE, arg_nretries) != SQLITE_DONE)
 
   HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
@@ -286,10 +344,16 @@ int insert_move(sqlite3 *arg_db, int arg_position_id, const char *arg_move, int 
   return(id);
 }
 
-int query_evaluation(sqlite3 *arg_db, int arg_move_id, int arg_eval_time, int arg_nretries)
+int query_evaluation(sqlite3 *arg_db,
+  int arg_move_id, int *arg_centi_seconds, int arg_nretries)
 {
   const char *sql =
-   "SELECT evaluation FROM evaluations WHERE move_id = ? and eval_time = ?;";
+    "SELECT centi_seconds, evaluation FROM evaluations"
+    " WHERE move_id = ? AND centi_seconds = ("
+    "  SELECT MAX(centi_seconds)"
+    "  FROM evaluations"
+    "  WHERE move_id = ?"
+    " );";
 
   sqlite3_stmt *stmt;
 
@@ -305,8 +369,6 @@ int query_evaluation(sqlite3 *arg_db, int arg_move_id, int arg_eval_time, int ar
 
   HARDBUG(sqlite3_bind_int(stmt, 1, arg_move_id) != SQLITE_OK)
 
-  HARDBUG(sqlite3_bind_int(stmt, 2, arg_eval_time) != SQLITE_OK)
-
   if (execute_sql(arg_db, stmt, TRUE, arg_nretries) != SQLITE_ROW)
   {
     HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
@@ -314,7 +376,9 @@ int query_evaluation(sqlite3 *arg_db, int arg_move_id, int arg_eval_time, int ar
     return(SCORE_PLUS_INFINITY);
   }
 
-  int evaluation = sqlite3_column_int(stmt, 0);
+  *arg_centi_seconds = sqlite3_column_int(stmt, 0);
+
+  int evaluation = sqlite3_column_int(stmt, 1);
 
   HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
@@ -475,12 +539,12 @@ void wal_checkpoint(sqlite3 *arg_db)
   HARDBUG((rc = execute_sql(arg_db, stmt, TRUE, INVALID)) != SQLITE_ROW)
   
   int checkpoint_result = sqlite3_column_int(stmt, 0);
-  int pages_checkpointed = sqlite3_column_int(stmt, 1);
-  int pages_remaining = sqlite3_column_int(stmt, 2);
+  int pages_in_wal = sqlite3_column_int(stmt, 1);
+  int pages_checkpointed = sqlite3_column_int(stmt, 2);
   
   PRINTF("checkpoint_result=%d\n", checkpoint_result);
+  PRINTF("pages_in_wal=%d\n", pages_in_wal);
   PRINTF("pages_checkpointed=%d\n", pages_checkpointed);
-  PRINTF("pages_remaining=%d\n", pages_remaining);
   
   HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 }
@@ -491,12 +555,21 @@ void flush_sql_buffer(sql_buffer_t *self, int nsql_buffer)
 
   if (blength(object->SB_bbuffer) > nsql_buffer)
   {
-    my_mpi_acquire_semaphore(object->SB_comm, object->SB_win);
+    PRINTF("blength(object->SB_bbuffer)=%d\n", blength(object->SB_bbuffer));
+
+    if (object->SB_win != MPI_WIN_NULL)
+    {
+      PRINTF("acquiring semaphore..\n");
+
+      my_mpi_acquire_semaphore(object->SB_comm, object->SB_win);
+    }
+
+    PRINTF("executing BEGIN TRANSACTION..\n");
 
     HARDBUG(execute_sql(object->SB_db, "BEGIN TRANSACTION;", FALSE,
                         object->SB_nretries) != SQLITE_OK)
 
-#ifdef SPLIT_SQL
+#ifdef SPLIT_SQL_BUFFER
     BSTRING(bsplit)
 
     bassigncstr(bsplit, ";");
@@ -515,14 +588,25 @@ void flush_sql_buffer(sql_buffer_t *self, int nsql_buffer)
 
     BDESTROY(bsplit)
 #else
+    PRINTF("executing SQL\n");
+
     HARDBUG(execute_sql(object->SB_db, bdata(object->SB_bbuffer),
                         FALSE, object->SB_nretries) != SQLITE_OK)
 #endif
 
+    PRINTF("executing COMMIT..\n");
+
     HARDBUG(execute_sql(object->SB_db, "COMMIT;",
                         FALSE, object->SB_nretries) != SQLITE_OK)
 
-    my_mpi_release_semaphore(object->SB_comm, object->SB_win);
+    if (object->SB_win != MPI_WIN_NULL)
+    {
+      PRINTF("releasing semaphore..\n");
+
+      my_mpi_release_semaphore(object->SB_comm, object->SB_win);
+    }
+
+    PRINTF("done\n");
 
     HARDBUG(bassigncstr(object->SB_bbuffer, "") == BSTR_ERR)
   }
@@ -587,17 +671,17 @@ void test_dbase(void)
   int move_id = query_move(db, position_id, "move1", NRETRIES);
 
   if (move_id == INVALID)
-    move_id = insert_move(db, position_id, "move1", NRETRIES);
+    move_id = insert_move(db, position_id, "move1", 1, NRETRIES);
 
   move_id = query_move(db, position_id, "move2", NRETRIES);
 
   if (move_id == INVALID)
-    move_id = insert_move(db, position_id, "move2", NRETRIES);
+    move_id = insert_move(db, position_id, "move2", 2, NRETRIES);
 
   move_id = query_move(db, position_id, "move3", NRETRIES);
 
   if (move_id == INVALID)
-    move_id = insert_move(db, position_id, "move3", NRETRIES);
+    move_id = insert_move(db, position_id, "move3", 3, NRETRIES);
 
   PRINTF("first query\n");
 

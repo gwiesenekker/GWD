@@ -1,6 +1,6 @@
 #include "globals.h"
 
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 
 my_mpi_globals_t my_mpi_globals =
 {
@@ -22,8 +22,8 @@ my_mpi_globals_t my_mpi_globals =
 
 #ifdef USE_OPENMPI
 
-local const double BARRIER_POLL = DECI_SECOND;
-local const double PROBE_POLL = DECI_SECOND;
+local const double BARRIER_POLL = CENTI_SECOND;
+local const double PROBE_POLL = CENTI_SECOND;
 
 void my_mpi_barrier(char *arg_info, MPI_Comm arg_comm, int arg_verbose)
 {
@@ -212,7 +212,7 @@ void my_mpi_acquire_semaphore(MPI_Comm arg_comm, MPI_Win arg_win)
 
     MPI_Win_unlock(0, arg_win);
 
-    compat_sleep(0.1);
+    compat_sleep(MILLI_SECOND);
   }
 }
 

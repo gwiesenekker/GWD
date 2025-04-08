@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 /*
@@ -69,7 +69,7 @@ void shuffle(int *s, int n, my_random_t *r)
   }
 }
 
-void construct_my_random(void *self, i64_t arg_seed)
+void construct_my_random(my_random_t *self, i64_t arg_seed)
 {
   my_random_t *object = self;
 
@@ -109,7 +109,7 @@ uint64_t xoshiro256pp(void) {
 }
 */
 
-ui64_t return_my_random(void *self)
+ui64_t return_my_random(my_random_t *self)
 {
   my_random_t *object = self;
 
@@ -151,7 +151,7 @@ void test_my_random(void)
     construct_my_random(&test_random, 0);
   
     stats_t stats;
-    construct_stats(&stats);
+    construct_stats(&stats, "test_random");
   
     int nsamples = TEST_NBUCKETS * TEST_NFILL;
 

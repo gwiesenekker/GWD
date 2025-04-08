@@ -1,4 +1,4 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 #include "globals.h"
 
 #define LOG_PREFIX_ID "LOG_prefix_id"
@@ -21,8 +21,6 @@ local my_mutex_t my_printf_mutex;
 void my_printf(void *self, char *arg_format, ...)
 {
   my_printf_t *object = self;
-
-  if (object->my_printf_verbose == 0) return;
 
   if (object == NULL)
   {
@@ -335,8 +333,6 @@ void construct_my_printf(void *self, char *arg_prefix, int arg2stdout)
   object_id++;
 
   set_field(with_record, LOG_OBJECT_ID, &object_id);
-
-  object->my_printf_verbose = 1;
 
   HARDBUG(compat_mutex_init(&(object->my_printf_mutex)) != 0)
 }

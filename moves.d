@@ -1,22 +1,23 @@
-//SCU REVISION 7.809 za  8 mrt 2025  5:23:19 CET
+//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
 void gen_my_moves(board_t *object, moves_list_t *arg_moves_list, int arg_quiescence)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  SOFTBUG(object->board_colour2move != MY_BIT)
+  SOFTBUG(object->B_colour2move != MY_BIT)
 
-  arg_moves_list->nmoves = 0;
-  arg_moves_list->ncaptx = 0;
+  arg_moves_list->ML_nmoves = 0;
+  arg_moves_list->ML_ncaptx = 0;
+  arg_moves_list->ML_nblocked = 0;
 
   ui64_t my_bb = (object->my_man_bb | object->my_king_bb);
   ui64_t your_bb = (object->your_man_bb | object->your_king_bb);
-  ui64_t empty_bb = object->board_empty_bb & ~(my_bb | your_bb);
+  ui64_t empty_bb = object->B_valid_bb & ~(my_bb | your_bb);
 
   while(my_bb != 0)
   {
     int iboard1;
 
-    if (IS_WHITE(object->board_colour2move))
+    if (IS_WHITE(object->B_colour2move))
       iboard1 = BIT_CTZ(my_bb);
     else
       iboard1 = 63 - BIT_CLZ(my_bb);
@@ -29,19 +30,23 @@ void gen_my_moves(board_t *object, moves_list_t *arg_moves_list, int arg_quiesce
 
       if (object->my_man_bb & BITULL(iboard1))
       {
-        if ((i < 2) and (arg_moves_list->ncaptx == 0))
+        if ((i < 2) and (arg_moves_list->ML_ncaptx == 0))
         {
           if (empty_bb & BITULL(jboard1))
           {
-            SOFTBUG(arg_moves_list->nmoves >= MOVES_MAX)
+            SOFTBUG(arg_moves_list->ML_nmoves >= MOVES_MAX)
 
-            move_t *move = arg_moves_list->moves + arg_moves_list->nmoves;
+            move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
             
-            move->move_from = iboard1;
-            move->move_to = jboard1;
-            move->move_captures_bb = 0;
+            move->M_from = iboard1;
+            move->M_move_to = jboard1;
+            move->M_captures_bb = 0;
        
-            arg_moves_list->nmoves++;
+            arg_moves_list->ML_nmoves++;
+          }  
+          else if (inverse_map[jboard1] != INVALID)
+          {
+            arg_moves_list->ML_nblocked++;
           }
         }
       }
@@ -49,17 +54,17 @@ void gen_my_moves(board_t *object, moves_list_t *arg_moves_list, int arg_quiesce
       {
         while (empty_bb & BITULL(jboard1))
         {
-          if (arg_moves_list->ncaptx == 0)
+          if (arg_moves_list->ML_ncaptx == 0)
           {
-            SOFTBUG(arg_moves_list->nmoves >= MOVES_MAX)
+            SOFTBUG(arg_moves_list->ML_nmoves >= MOVES_MAX)
 
-            move_t *move = arg_moves_list->moves + arg_moves_list->nmoves;
+            move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
             
-            move->move_from = iboard1;
-            move->move_to = jboard1;
-            move->move_captures_bb = 0;
+            move->M_from = iboard1;
+            move->M_move_to = jboard1;
+            move->M_captures_bb = 0;
        
-            arg_moves_list->nmoves++;
+            arg_moves_list->ML_nmoves++;
           }
           jboard1 += my_dir[i];
         }
@@ -98,27 +103,28 @@ void gen_my_moves(board_t *object, moves_list_t *arg_moves_list, int arg_quiesce
 
           label_king:
 
-          if (ncapt > arg_moves_list->ncaptx)
+          if (ncapt > arg_moves_list->ML_ncaptx)
           {
-            arg_moves_list->ncaptx = ncapt;
+            arg_moves_list->ML_ncaptx = ncapt;
 
-            arg_moves_list->nmoves = 0;
+            arg_moves_list->ML_nmoves = 0;
+            arg_moves_list->ML_nblocked = 0;
           }
-          if (ncapt == arg_moves_list->ncaptx)
+          if (ncapt == arg_moves_list->ML_ncaptx)
           {
-if (arg_moves_list->nmoves >= MOVES_MAX)
+if (arg_moves_list->ML_nmoves >= MOVES_MAX)
 {
 print_board(object);
 }
-            SOFTBUG(arg_moves_list->nmoves >= MOVES_MAX)
+            SOFTBUG(arg_moves_list->ML_nmoves >= MOVES_MAX)
 
-            move_t *move = arg_moves_list->moves + arg_moves_list->nmoves;
+            move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
             
-            move->move_from = iboard1;
-            move->move_to = kboard1;
-            move->move_captures_bb = captures_bb;
+            move->M_from = iboard1;
+            move->M_move_to = kboard1;
+            move->M_captures_bb = captures_bb;
        
-            arg_moves_list->nmoves++;
+            arg_moves_list->ML_nmoves++;
           }
           if (idir[ncapt] > 0)
             jdir[ncapt] = 11 - idir[ncapt];
@@ -213,16 +219,16 @@ print_board(object);
     }
   }
 
-  for (int imove = 0; imove < arg_moves_list->nmoves; imove++)
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {   
-    move_t *move = arg_moves_list->moves + imove;
+    move_t *move = arg_moves_list->ML_moves + imove;
      
-    int iboard = move->move_from;
-    int kboard = move->move_to;
+    int iboard = move->M_from;
+    int kboard = move->M_move_to;
 
     int move_score_delta = 0;
 
-    ui64_t captures_bb = move->move_captures_bb;
+    ui64_t captures_bb = move->M_captures_bb;
 
     while(captures_bb != 0)
     {
@@ -266,12 +272,12 @@ print_board(object);
       }
     }
 
-    arg_moves_list->moves_weight[imove] = move_weight;
+    arg_moves_list->ML_move_weights[imove] = move_weight;
 
-    arg_moves_list->moves_flag[imove] = move_flag;
+    arg_moves_list->ML_move_flags[imove] = move_flag;
   }
 
-  object->board_nodes[object->board_inode].node_ncaptx = arg_moves_list->ncaptx;
+  object->B_nodes[object->B_inode].node_ncaptx = arg_moves_list->ML_ncaptx;
 
   //PRINTF("use case ntempo=%d\n", moves_list->ntempo);
 
@@ -288,13 +294,13 @@ int i_can_capture(board_t *object, int arg_kings)
 
   ui64_t my_bb = (object->my_man_bb | object->my_king_bb);
   ui64_t your_bb = (object->your_man_bb | object->your_king_bb);
-  ui64_t empty_bb = object->board_empty_bb & ~(my_bb | your_bb);
+  ui64_t empty_bb = object->B_valid_bb & ~(my_bb | your_bb);
 
   while(my_bb != 0)
   {
     int iboard;
 
-    if (IS_WHITE(object->board_colour2move))
+    if (IS_WHITE(object->B_colour2move))
       iboard = BIT_CTZ(my_bb);
     else
       iboard = 63 - BIT_CLZ(my_bb);
@@ -385,30 +391,30 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
 {
   BEGIN_BLOCK(__FUNC__)
 
-  SOFTBUG(object->board_colour2move != MY_BIT)
+  SOFTBUG(object->B_colour2move != MY_BIT)
 
-  HARDBUG(arg_imove >= arg_moves_list->nmoves);
+  HARDBUG(arg_imove >= arg_moves_list->ML_nmoves);
 
   if (options.material_only) arg_quick = TRUE;
 
   push_board_state(object);
 
-  node_t *node = object->board_nodes + object->board_inode;
+  node_t *node = object->B_nodes + object->B_inode;
 
   ui64_t move_key = 0;
 
   if (!arg_quick)
   {
-    push_pattern_mask_state(object->board_pattern_mask);
-    push_network_state(&(object->board_network));
+    push_pattern_mask_state(object->B_pattern_mask);
+    push_network_state(&(object->B_network));
   }
  
   if (arg_moves_list == NULL) goto label_null;
 
-  move_t *move = arg_moves_list->moves + arg_imove;
+  move_t *move = arg_moves_list->ML_moves + arg_imove;
 
-  int iboard = move->move_from;
-  int kboard = move->move_to;
+  int iboard = move->M_from;
+  int kboard = move->M_move_to;
 
   if (iboard != kboard)
   {
@@ -416,7 +422,7 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
     {
       move_key = my_man_key[iboard];
 
-      XOR_HASH_KEY(object->board_key, my_man_key[iboard])
+      XOR_HASH_KEY(object->B_key, my_man_key[iboard])
 
 
       if (!arg_quick)
@@ -433,7 +439,7 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
     {
       move_key = my_king_key[iboard];
 
-      XOR_HASH_KEY(object->board_key, my_king_key[iboard]);
+      XOR_HASH_KEY(object->B_key, my_king_key[iboard]);
 
       object->my_king_bb &= ~BITULL(iboard);
 
@@ -444,7 +450,7 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
     {
       move_key ^= my_man_key[kboard];
 
-      XOR_HASH_KEY(object->board_key, my_man_key[kboard])
+      XOR_HASH_KEY(object->B_key, my_man_key[kboard])
 
       if (!arg_quick)
         update_patterns_and_layer0(object, MY_BIT, kboard, 1);
@@ -453,11 +459,11 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
     {
       move_key ^= my_king_key[kboard];
 
-      XOR_HASH_KEY(object->board_key, my_king_key[kboard])
+      XOR_HASH_KEY(object->B_key, my_king_key[kboard])
     }
   }
 
-  ui64_t captures_bb = move->move_captures_bb;
+  ui64_t captures_bb = move->M_captures_bb;
 
   while(captures_bb != 0)
   {
@@ -469,7 +475,7 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
     {
       move_key ^= your_man_key[jboard];
 
-      XOR_HASH_KEY(object->board_key, your_man_key[jboard])
+      XOR_HASH_KEY(object->B_key, your_man_key[jboard])
 
       if (!arg_quick)
         update_patterns_and_layer0(object, YOUR_BIT, jboard, -1);
@@ -480,7 +486,7 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
     {
       move_key ^= your_king_key[jboard];
 
-      XOR_HASH_KEY(object->board_key, your_king_key[jboard])
+      XOR_HASH_KEY(object->B_key, your_king_key[jboard])
 
       object->your_king_bb &= ~BITULL(jboard);
     }
@@ -490,23 +496,23 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
 
   node->node_move_key = move_key;
 
-  object->board_inode++;
+  object->B_inode++;
 
-  SOFTBUG(object->board_inode >= NODE_MAX)
+  SOFTBUG(object->B_inode >= NODE_MAX)
 
-  node = object->board_nodes + object->board_inode;
+  node = object->B_nodes + object->B_inode;
 
   node->node_ncaptx = INVALID;
   node->node_move_key = 0;
 
-  object->board_colour2move = YOUR_BIT;
+  object->B_colour2move = YOUR_BIT;
 
 #ifdef DEBUG
   hash_key_t temp_key;
   
   temp_key = return_key_from_bb(object);
 
-  HARDBUG(!HASH_KEY_EQ(temp_key, object->board_key))
+  HARDBUG(!HASH_KEY_EQ(temp_key, object->B_key))
 
   if (!arg_quick)
   {
@@ -514,7 +520,7 @@ void do_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
 
     //check fails due to roundoff accumulation?
  
-    check_layer0(&(object->board_network));
+    check_layer0(&(object->B_network));
   }
 #endif
 
@@ -526,28 +532,28 @@ void undo_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
 {
   BEGIN_BLOCK(__FUNC__)
 
-  SOFTBUG(object->board_colour2move != YOUR_BIT)
+  SOFTBUG(object->B_colour2move != YOUR_BIT)
 
-  HARDBUG(arg_imove >= arg_moves_list->nmoves);
+  HARDBUG(arg_imove >= arg_moves_list->ML_nmoves);
 
   if (options.material_only) arg_quick = TRUE;
 
   pop_board_state(object);
 
-  object->board_inode--;
+  object->B_inode--;
  
-  SOFTBUG(object->board_inode < 0)
+  SOFTBUG(object->B_inode < 0)
 
-  node_t *node = object->board_nodes + object->board_inode;
+  node_t *node = object->B_nodes + object->B_inode;
 
   node->node_move_key = 0;
 
-  object->board_colour2move = MY_BIT;
+  object->B_colour2move = MY_BIT;
 
   if (!arg_quick)
   {
-    pop_pattern_mask_state(object->board_pattern_mask);
-    pop_network_state(&(object->board_network));
+    pop_pattern_mask_state(object->B_pattern_mask);
+    pop_network_state(&(object->B_network));
   }
 
 #ifdef DEBUG
@@ -555,7 +561,7 @@ void undo_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
   
   temp_key = return_key_from_bb(object);
 
-  HARDBUG(!HASH_KEY_EQ(temp_key, object->board_key))
+  HARDBUG(!HASH_KEY_EQ(temp_key, object->B_key))
 
   if (!arg_quick)
   {
@@ -563,7 +569,7 @@ void undo_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
 
     //check fails due to roundoff accumulation?
 
-    check_layer0(&(object->board_network));
+    check_layer0(&(object->B_network));
   }
 
 #endif
@@ -574,19 +580,19 @@ void undo_my_move(board_t *object, int arg_imove, moves_list_t *arg_moves_list,
 void check_my_moves(board_t *object, moves_list_t *arg_moves_list)
 {
   BEGIN_BLOCK(__FUNC__)
-  for (int imove = 0; imove < arg_moves_list->nmoves; imove++)
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
     do_my_move(object, imove, arg_moves_list, FALSE);
 
     hash_key_t temp_key;
   
     temp_key = return_key_from_bb(object);
-    HARDBUG(!HASH_KEY_EQ(temp_key, object->board_key))
+    HARDBUG(!HASH_KEY_EQ(temp_key, object->B_key))
 
     undo_my_move(object, imove, arg_moves_list, FALSE);
 
     temp_key = return_key_from_bb(object);
-    HARDBUG(!HASH_KEY_EQ(temp_key, object->board_key))
+    HARDBUG(!HASH_KEY_EQ(temp_key, object->B_key))
   }
 
   END_BLOCK
