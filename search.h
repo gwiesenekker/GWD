@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef SearchH
 #define SearchH
 
@@ -38,6 +38,8 @@ typedef struct
   int S_best_depth;
   pv_t S_best_pv[PV_MAX];
 
+  int S_best_score_by_depth[DEPTH_MAX];
+
   int S_interrupt;
 
   i64_t S_total_move_repetitions;
@@ -60,18 +62,16 @@ typedef struct
   i64_t S_total_pv_extension_searches_le_alpha;
   i64_t S_total_pv_extension_searches_ge_beta;
 
-  i64_t S_total_reductions_delta;
-  i64_t S_total_reductions_delta_lost;
-  i64_t S_total_reductions_delta_le_alpha;
-  i64_t S_total_reductions_delta_ge_beta;
-
   i64_t S_total_reductions;
+  i64_t S_total_reductions_lost;
   i64_t S_total_reductions_le_alpha;
   i64_t S_total_reductions_ge_beta;
 
   i64_t S_total_single_reply_extensions;
 
   i64_t S_total_evaluations;
+  i64_t S_total_lazy_alpha_evaluations;
+  i64_t S_total_lazy_beta_evaluations;
   i64_t S_total_material_only_evaluations;
   i64_t S_total_network_evaluations;
 
@@ -87,6 +87,9 @@ typedef struct
   i64_t S_total_alpha_beta_cache_true_score_stored;
   i64_t S_total_alpha_beta_cache_nmoves_errors;
   i64_t S_total_alpha_beta_cache_crc32_errors;
+
+  i64_t S_total_score_cache_hits;
+  i64_t S_total_score_cache_crc32_errors;
 } search_t;
 
 int draw_by_repetition(board_t *, int);

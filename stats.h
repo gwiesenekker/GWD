@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef StatsH
 #define StatsH
 
@@ -11,11 +11,16 @@ typedef struct
 
   double S_min;
   double S_max;
-  double S_mean;
-  double S_sigma;
+
+  double S_mean_welford;
+  double S_sigma_welford;
 
   double S_sum;
   double S_sum2;
+
+  double S_mean;
+  double S_sigma;
+
   double S_mean_sum;
   double S_sigma_sum2;
 } stats_t;
@@ -39,12 +44,12 @@ inline local void update_stats(void *self, double x)
     if (x < object->S_min) object->S_min = x;
   }
   
-  double mnm1 = object->S_mean;
-  double snm1 = object->S_sigma;
+  double mnm1 = object->S_mean_welford;
+  double snm1 = object->S_sigma_welford;
 
-  object->S_mean = mnm1 + (x - mnm1) / object->S_n;
+  object->S_mean_welford = mnm1 + (x - mnm1) / object->S_n;
    
-  object->S_sigma = snm1 + (x - mnm1) * (x - object->S_mean);
+  object->S_sigma_welford = snm1 + (x - mnm1) * (x - object->S_mean_welford);
 
   object->S_sum += x;
   object->S_sum2 += x * x ;

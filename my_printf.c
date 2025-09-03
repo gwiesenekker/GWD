@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define LOG_PREFIX_ID "LOG_prefix_id"
@@ -11,14 +11,17 @@
 #define MAX_SIZE (4 * MBYTE)
 
 #define LOGS_DIR "logs"
+#define WINEPREFIX "WINEPREFIX"
+
+bstring my_printf_logs_dir;
 
 //this is more a test for my dynamic cJSON record_t
 local int nlogs = INVALID;
 record_t logs[NLOGS];
 
-local my_mutex_t my_printf_mutex;
+local my_mutex_t MP_mutex;
 
-void my_printf(void *self, char *arg_format, ...)
+void my_printf(my_printf_t *self, char *arg_format, ...)
 {
   my_printf_t *object = self;
 
@@ -42,68 +45,62 @@ void my_printf(void *self, char *arg_format, ...)
     return;
   }
 
-  //flush 
+  if (object->MP_paused) return;
 
-  if (compat_strcasecmp(arg_format, "") == 0)
+  HARDBUG(compat_mutex_lock(&(object->MP_mutex)) != 0)
+
+  int flush = FALSE;
+
+  //if (compat_strcasecmp(arg_format, "") == 0) flush = TRUE;
+
+  HARDBUG(bassigncstr(object->MP_bformat, arg_format) == BSTR_ERR)
+
+  if (bchar(object->MP_bformat, blength(object->MP_bformat) - 1) == '$')
   {
-    HARDBUG(compat_mutex_lock(&(object->my_printf_mutex)) != 0)
+    flush = TRUE;
 
-    if (fflush(object->my_printf_flog) != 0)
-    {
-      fprintf(stderr, "fflush(%s) != 0\n",
-                      bdata(object->my_printf_bname));
-
-      exit(EXIT_FAILURE);
-    }
-
-    HARDBUG(compat_mutex_unlock(&(object->my_printf_mutex)) != 0)
-
-    return;
+    bdelete(object->MP_bformat, blength(object->MP_bformat) - 1, 1);
   }
-
-  HARDBUG(compat_mutex_lock(&(object->my_printf_mutex)) != 0)
 
   int ret;
 
-  bvformata(ret, object->my_printf_bbuffer, arg_format, arg_format);
+  bvformata(ret, object->MP_bbuffer, bdata(object->MP_bformat), arg_format);
 
   HARDBUG(ret == BSTR_ERR)
 
-  bstring bline;
-
-  HARDBUG((bline = bfromcstr("")) == NULL)
+  HARDBUG(bassigncstr(object->MP_bline, "") == BSTR_ERR)
 
   int ichar = 0;
 
-  while(ichar < blength(object->my_printf_bbuffer))
+  while(ichar < blength(object->MP_bbuffer))
   {
-    if (bchare(object->my_printf_bbuffer, ichar, '\0') != '\n')
+    if (bchare(object->MP_bbuffer, ichar, '\0') != '\n')
     {
       ichar++;
 
       continue;
     }
 
-    //timestamp
-
     char time_stamp[MY_LINE_MAX];
-    
+
     time_t t = time(NULL);
 
     HARDBUG(strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y",
                      localtime(&t)) == 0)
    
-    if (object->my_printf_fsize > MAX_SIZE)
+    i64_t pid = compat_getpid();
+
+    if (object->MP_fsize > MAX_SIZE)
     {
-      fprintf(object->my_printf_flog,
-              "\n%s@ PTHREAD_SELF=%#lX"
+      fprintf(object->MP_flog,
+              "\n%s|%lld@ PTHREAD_SELF=%#lX"
               " LOG FILE EXCEEDS MAXIMUM SIZE AND WILL BE ROTATED\n",
-              time_stamp, compat_pthread_self());
+              time_stamp, pid, compat_pthread_self());
   
-      if (fclose(object->my_printf_flog) != 0)
+      if (fclose(object->MP_flog) != 0)
       {
         fprintf(stderr, "fclose(%s) != 0\n",
-                        bdata(object->my_printf_bname));
+                        bdata(object->MP_bname));
 
         exit(EXIT_FAILURE);
       }
@@ -123,19 +120,19 @@ void my_printf(void *self, char *arg_format, ...)
         if (irotate > 1)
         {
           HARDBUG(bformata(bold_path, "%s-%d",
-                           bdata(object->my_printf_bname),
+                           bdata(object->MP_bname),
                            irotate - 1) == BSTR_ERR)
         }
         else
         {
           HARDBUG(bformata(bold_path, "%s",
-                           bdata(object->my_printf_bname)) == BSTR_ERR)
+                           bdata(object->MP_bname)) == BSTR_ERR)
         }
 
         btrunc(bnew_path, 0);
 
         HARDBUG(bformata(bnew_path, "%s-%d",
-                         bdata(object->my_printf_bname),
+                         bdata(object->MP_bname),
                          irotate) == BSTR_ERR)
   
         //ignore return value of remove as file might not exist
@@ -151,77 +148,71 @@ void my_printf(void *self, char *arg_format, ...)
 
       HARDBUG(bdestroy(bold_path) == BSTR_ERR)
     
-      if ((object->my_printf_flog =
-           fopen(bdata(object->my_printf_bname), "w")) == NULL)
+      if ((object->MP_flog =
+           fopen(bdata(object->MP_bname), "w")) == NULL)
       {
         fprintf(stderr, "fopen(%s, 'w') == NULL\n",
-                        bdata(object->my_printf_bname));
+                        bdata(object->MP_bname));
   
         exit(EXIT_FAILURE);
       }
 
-      int nchar = fprintf(object->my_printf_flog,
-                          "%s@ PTHREAD_SELF=%#lX"
+      int nchar = fprintf(object->MP_flog,
+                          "%s|%lld@ PTHREAD_SELF=%#lX"
                           " LOG FILE ROTATED AND RE-OPENED\n\n",
-                          time_stamp, compat_pthread_self());
+                          time_stamp, pid, compat_pthread_self());
     
       if (nchar < 0)
       {
         fprintf(stderr, "fprintf(%s, ...) < 0\n",
-                        bdata(object->my_printf_bname));
+                        bdata(object->MP_bname));
 
         exit(EXIT_FAILURE);
       }
   
-      object->my_printf_fsize = nchar;
+      object->MP_fsize = nchar;
     }
 
-    HARDBUG(bassignmidstr(bline, object->my_printf_bbuffer, 0, ichar + 1) ==
-            BSTR_ERR)
+    HARDBUG(bassignmidstr(object->MP_bline, object->MP_bbuffer,
+                          0, ichar + 1) == BSTR_ERR)
 
-    int nchar = fprintf(object->my_printf_flog, "%s@ %s",
-                        time_stamp, bdata(bline));
+    int nchar = fprintf(object->MP_flog, "%s|%lld@ %s",
+                        time_stamp, pid, bdata(object->MP_bline));
 
     if (nchar < 0)
     {
       fprintf(stderr, "fprintf(%s, ...) < 0\n",
-                      bdata(object->my_printf_bname));
+                      bdata(object->MP_bname));
 
       exit(EXIT_FAILURE);
     }
 
 #ifdef DEBUG
-    if (fflush(object->my_printf_flog) != 0)
-    {
-      fprintf(stderr, "fflush(%s) != 0\n", 
-                      bdata(object->my_printf_bname));
-
-      exit(EXIT_FAILURE);
-    }
+    flush = TRUE;
 #else
-    if ((my_mpi_globals.MY_MPIG_id_global == 0) or
-        (my_mpi_globals.MY_MPIG_id_global == INVALID) or 
-        (my_mpi_globals.MY_MPIG_id_slave == 0))
+    if ((my_mpi_globals.MMG_id_global <= 0) or
+        (my_mpi_globals.MMG_id_slave == 0)) flush = TRUE;
+#endif
+
+    if (flush)
     {
-      if (fflush(object->my_printf_flog) != 0)
+      if (fflush(object->MP_flog) != 0)
       {
         fprintf(stderr, "fflush(%s) != 0\n", 
-                        bdata(object->my_printf_bname));
+                        bdata(object->MP_bname));
 
         exit(EXIT_FAILURE);
       }
     }
-#endif
 
-    object->my_printf_fsize += nchar;
+    object->MP_fsize += nchar;
   
     //also print to stdout if needed
 
-    if (!options.hub and object->my_printf2stdout and
-        ((my_mpi_globals.MY_MPIG_id_global == 0) or
-         (my_mpi_globals.MY_MPIG_id_global == INVALID)))
+    if (!options.hub and object->MP2stdout and
+        (my_mpi_globals.MMG_id_global <= 0))
     {
-      nchar = fprintf(stdout, "%s", bdata(bline));
+      nchar = fprintf(stdout, "%s", bdata(object->MP_bline));
 
       if (nchar < 0)
       {
@@ -238,21 +229,19 @@ void my_printf(void *self, char *arg_format, ...)
       }
     }
   
-    bdelete(object->my_printf_bbuffer, 0, ichar + 1);
+    bdelete(object->MP_bbuffer, 0, ichar + 1);
 
     ichar = 0;
   }
 
-  HARDBUG(bdestroy(bline) == BSTR_ERR)
-
-  HARDBUG(compat_mutex_unlock(&(object->my_printf_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(object->MP_mutex)) != 0)
 }
 
-void construct_my_printf(void *self, char *arg_prefix, int arg2stdout)
+void construct_my_printf(my_printf_t *self, char *arg_prefix, int arg2stdout)
 {
   my_printf_t *object = self;
 
-  object->my_printf2stdout = arg2stdout;
+  object->MP2stdout = arg2stdout;
 
   record_t *with_record = NULL;
 
@@ -286,26 +275,28 @@ void construct_my_printf(void *self, char *arg_prefix, int arg2stdout)
 
   get_field(with_record, LOG_OBJECT_ID, &object_id);
 
-  HARDBUG((object->my_printf_bname = bfromcstr("")) == NULL)
+  HARDBUG((object->MP_bname = bfromcstr("")) == NULL)
 
-  if (my_mpi_globals.MY_MPIG_nglobal <= 1)
-    HARDBUG(bformata(object->my_printf_bname,
-                     LOGS_DIR "/%s%d.txt", arg_prefix, object_id) == BSTR_ERR)
+  if (my_mpi_globals.MMG_nglobal <= 1)
+    HARDBUG(bformata(object->MP_bname, "%s/%s%d.txt",
+                     bdata(my_printf_logs_dir),
+                     arg_prefix, object_id) == BSTR_ERR)
   else
-    HARDBUG(bformata(object->my_printf_bname,
-                     LOGS_DIR "/%s%d-%d-%d.txt", arg_prefix, object_id,
-                     my_mpi_globals.MY_MPIG_id_global,
-                     my_mpi_globals.MY_MPIG_nglobal) == BSTR_ERR)
+    HARDBUG(bformata(object->MP_bname,
+                     "%s/%s%d-%d-%d.txt",
+                     bdata(my_printf_logs_dir),
+                     arg_prefix, object_id,
+                     my_mpi_globals.MMG_id_global,
+                     my_mpi_globals.MMG_nglobal) == BSTR_ERR)
 
-  if ((object->my_printf_flog =
-       fopen(bdata(object->my_printf_bname), "w")) == NULL)
+  if ((object->MP_flog =
+       fopen(bdata(object->MP_bname), "w")) == NULL)
   {
     fprintf(stderr, "fopen(%s, 'w') == NULL\n",
-                    bdata(object->my_printf_bname));
+                    bdata(object->MP_bname));
 
     exit(EXIT_FAILURE);
   }
-
 
   char time_stamp[MY_LINE_MAX];
     
@@ -314,40 +305,82 @@ void construct_my_printf(void *self, char *arg_prefix, int arg2stdout)
   HARDBUG(strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y",
                    localtime(&t)) == 0)
 
-  int nchar = fprintf(object->my_printf_flog,
-                      "%s@ PTHREAD_SELF=%#lX LOG FILE OPENED\n\n",
-                      time_stamp, compat_pthread_self());
+  i64_t pid = compat_getpid();
+
+  int nchar = fprintf(object->MP_flog,
+                      "%s|%lld@ PTHREAD_SELF=%#lX LOG FILE OPENED\n\n",
+                      time_stamp, pid, compat_pthread_self());
 
   if (nchar < 0)
   {
     fprintf(stderr, "fprintf(%s, ...) < 0\n",
-                    bdata(object->my_printf_bname));
+                    bdata(object->MP_bname));
 
     exit(EXIT_FAILURE);
   }
 
-  object->my_printf_fsize = nchar;
+  object->MP_fsize = nchar;
 
-  HARDBUG((object->my_printf_bbuffer = bfromcstr("")) == NULL)
+  HARDBUG((object->MP_bformat = bfromcstr("")) == NULL)
+  HARDBUG((object->MP_bbuffer = bfromcstr("")) == NULL)
+
+  HARDBUG((object->MP_bline = bfromcstr("")) == NULL)
+  HARDBUG((object->MP_bstamp = bfromcstr("")) == NULL)
 
   object_id++;
 
   set_field(with_record, LOG_OBJECT_ID, &object_id);
 
-  HARDBUG(compat_mutex_init(&(object->my_printf_mutex)) != 0)
+  HARDBUG(compat_mutex_init(&(object->MP_mutex)) != 0)
+
+  object->MP_paused = FALSE;
+}
+
+void pause_my_printf(my_printf_t *self)
+{
+  my_printf_t *object = self;
+
+  my_printf(object, "MY_PRINTF PAUSED..\n");
+
+  HARDBUG(compat_mutex_lock(&(object->MP_mutex)) != 0)
+
+  object->MP_paused = TRUE;
+
+  HARDBUG(compat_mutex_unlock(&(object->MP_mutex)) != 0)
+}
+
+void resume_my_printf(my_printf_t *self)
+{
+  my_printf_t *object = self;
+
+  HARDBUG(compat_mutex_lock(&(object->MP_mutex)) != 0)
+
+  object->MP_paused = FALSE;
+
+  HARDBUG(compat_mutex_unlock(&(object->MP_mutex)) != 0)
+
+  my_printf(object, "..MY_PRINTF RESUMED\n");
 }
 
 void init_my_printf(void)
 {
-  if (opendir(LOGS_DIR) == NULL)
+  HARDBUG((my_printf_logs_dir = bfromcstr("")) == NULL)
+
+  if (getenv(WINEPREFIX) == NULL)
+    HARDBUG(bformata(my_printf_logs_dir, "%s", LOGS_DIR) == BSTR_ERR)
+  else
+    HARDBUG(bformata(my_printf_logs_dir, "%s_%s",
+                     getenv(WINEPREFIX), LOGS_DIR) == BSTR_ERR)
+
+  if (opendir(bdata(my_printf_logs_dir)) == NULL)
   {
-    HARDBUG(compat_mkdir(LOGS_DIR) != 0)
-    HARDBUG(opendir(LOGS_DIR) == NULL)
+    HARDBUG(compat_mkdir(bdata(my_printf_logs_dir)) != 0)
+    HARDBUG(opendir(bdata(my_printf_logs_dir)) == NULL)
   }
 
   nlogs = 0;
 
-  HARDBUG(compat_mutex_init(&my_printf_mutex) != 0)
+  HARDBUG(compat_mutex_init(&MP_mutex) != 0)
 }
 
 #define NTEST 4
@@ -369,18 +402,18 @@ void test_my_printf(void)
     snprintf(line, MY_LINE_MAX, "%d:", iline);
 
     for (int itest = 0; itest < NTEST; itest++)
-      my_printf(test + itest, line);
+      my_printf(test + itest, "%s", line);
 
     for (int ichar = 1; ichar <= nchar; ichar++)
     {
       snprintf(line, MY_LINE_MAX, " %d", ichar);
 
       for (int itest = 0; itest < NTEST; itest++)
-        my_printf(test + itest, line);
+        my_printf(test + itest, "%s", line);
     }
     for (int itest = 0; itest < NTEST; itest++)
       my_printf(test + itest, "\n");
   }
   for (int itest = 0; itest < NTEST; itest++)
-    my_printf(test + itest, "");
+    my_printf(test + itest, "$");
 }

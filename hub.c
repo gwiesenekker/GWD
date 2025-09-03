@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -172,11 +172,11 @@ void hub(void)
 
   search_t *with = &search;
 
-  string2board(&(with->S_board), STARTING_POSITION, TRUE);
+  string2board(&(with->S_board), STARTING_POSITION);
 
-  state_t game_state;
+  game_state_t game_state;
   
-  construct_state(&game_state);
+  construct_game_state(&game_state);
 
   while(TRUE)
   {
@@ -206,7 +206,7 @@ void hub(void)
 
       HARDBUG(compat_strcasecmp(name, "pos") != 0)
 
-      string2board(&(with->S_board), start_board, TRUE);
+      string2board(&(with->S_board), start_board);
 
       print_board(&(with->S_board));
 
@@ -414,7 +414,8 @@ void hub(void)
 
       BSTRING(bmove_string)
 
-      return_book_move(&(with->S_board), &moves_list, bmove_string);
+      if (options.use_book)
+        return_book_move(&(with->S_board), &moves_list, bmove_string);
 
       HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
 
@@ -430,7 +431,7 @@ void hub(void)
         if (compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
         {
           enqueue(return_thread_queue(thread_alpha_beta_master),
-            MESSAGE_STATE, game_state.get_state(&game_state));
+            MESSAGE_STATE, game_state.get_game_state(&game_state));
 
           enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_GO, "hub/hub");
@@ -508,7 +509,7 @@ void hub(void)
       PRINTF("ignoring command %s\n", command.command);
     }
   }
-  destroy_state(&game_state);
+  destroy_game_state(&game_state);
 }
 
 void init_hub(void)
@@ -774,9 +775,9 @@ local int play_game(search_t *object, int arg_my_colour,
 {
   int result = INVALID;
 
-  state_t game_state;
+  game_state_t game_state;
 
-  construct_state(&game_state);
+  construct_game_state(&game_state);
 
   game_state.set_event(&game_state, event);
 
@@ -858,7 +859,7 @@ local int play_game(search_t *object, int arg_my_colour,
         PRINTF("\nPondering..\n");
   
         enqueue(return_thread_queue(thread_alpha_beta_master),
-          MESSAGE_STATE, game_state.get_state(&game_state));
+          MESSAGE_STATE, game_state.get_game_state(&game_state));
 
         enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_GO, "hub/play_game");
@@ -1083,7 +1084,7 @@ local int play_game(search_t *object, int arg_my_colour,
           set_time_limit(nmy_game_moves_done, &time_control);
 
           enqueue(return_thread_queue(thread_alpha_beta_master),
-            MESSAGE_STATE, game_state.get_state(&game_state));
+            MESSAGE_STATE, game_state.get_game_state(&game_state));
   
           enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_GO, "hub/play_game");
@@ -1246,7 +1247,7 @@ local int play_game(search_t *object, int arg_my_colour,
 
   game_state.save2pdn(&game_state, "hub.pdn");
 
-  destroy_state(&game_state);
+  destroy_game_state(&game_state);
 
   BDESTROY(bfen)
 
@@ -1335,9 +1336,9 @@ local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2p
 
     if (ifen > options.hub_server_games) break;
 
-    if ((my_mpi_globals.MY_MPIG_id_slave != INVALID) and
-        (((ifen - 1) % my_mpi_globals.MY_MPIG_nslaves) !=
-         my_mpi_globals.MY_MPIG_id_slave)) continue;
+    if ((my_mpi_globals.MMG_id_slave != INVALID) and
+        (((ifen - 1) % my_mpi_globals.MMG_nslaves) !=
+         my_mpi_globals.MMG_id_slave)) continue;
 
     ++nfen_mpi;
 
@@ -1351,8 +1352,8 @@ local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2p
 
       snprintf(event, MY_LINE_MAX,
                "Game %d, Opening %s, MPI %d;%d", igame, opening,
-               my_mpi_globals.MY_MPIG_nglobal,
-               my_mpi_globals.MY_MPIG_id_global);
+               my_mpi_globals.MMG_nglobal,
+               my_mpi_globals.MMG_id_global);
 
       PRINTF("event=%s\n", event);
 
@@ -1365,7 +1366,7 @@ local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2p
 
       PRINTF("game=%d opening=%s\n", igame, opening);
 
-      fen2board(&(with->S_board), fen, TRUE);
+      fen2board(&(with->S_board), fen);
 
       print_board(&(with->S_board));
 
@@ -1399,11 +1400,10 @@ local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2p
 
   label_break:
 
-#ifdef USE_OPENMPI
-  if (my_mpi_globals.MY_MPIG_id_slave != INVALID)
+  if (my_mpi_globals.MMG_id_slave != INVALID)
   {
     my_mpi_allreduce(MPI_IN_PLACE, &nfen_mpi, 1, MPI_INT,
-      MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+      MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
     PRINTF("nfen=%d nfen_mpi=%d\n", nfen, nfen_mpi);
 
@@ -1411,20 +1411,20 @@ local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2p
     //HARDBUG(nfen_mpi != nfen)
 
     my_mpi_allreduce(MPI_IN_PLACE, &nwon, 1, MPI_INT,
-      MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+      MPI_SUM, my_mpi_globals.MMG_comm_slaves);
     my_mpi_allreduce(MPI_IN_PLACE, &ndraw, 1, MPI_INT,
-      MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+      MPI_SUM, my_mpi_globals.MMG_comm_slaves);
     my_mpi_allreduce(MPI_IN_PLACE, &nlost, 1, MPI_INT,
-      MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+      MPI_SUM, my_mpi_globals.MMG_comm_slaves);
     my_mpi_allreduce(MPI_IN_PLACE, &nunknown, 1, MPI_INT,
-      MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+      MPI_SUM, my_mpi_globals.MMG_comm_slaves);
   }
-#endif
+
   PRINTF("HUB nwon=%d ndraw=%d nlost=%d nunknown=%d\n",
     nwon, ndraw, nlost, nunknown);
 
-  if ((my_mpi_globals.MY_MPIG_id_slave == INVALID) or
-      (my_mpi_globals.MY_MPIG_id_slave == 0))
+  if ((my_mpi_globals.MMG_id_slave == INVALID) or
+      (my_mpi_globals.MMG_id_slave == 0))
     results2csv(nwon, ndraw, nlost, nunknown);
 }
 

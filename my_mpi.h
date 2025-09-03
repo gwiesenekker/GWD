@@ -1,45 +1,110 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef MpiH
 #define MpiH
 
+#define MY_MPI_NGLOBAL_MAX 128
+
+#define SEMKEY_GEN_BOOK_BARRIER             1
+#define SEMKEY_INIT_ENDGAME_BARRIER         2
+#define SEMKEY_GEN_RANDOM_BARRIER           3
+#define SEMKEY_MAIN_BARRIER                 4
+#define SEMKEY_TEST_MY_MPI                  5
+#define SEMKEY_TEST_MY_MPI_BARRIER          6
+#define SEMKEY_FLUSH_SQL_BUFFER             7
+#define SEMKEY_CONSTRUCT_MY_SQLITE3_BARRIER 8
+#define SEMKEY_CLOSE_MY_SQLITE3             9
+#define SEMKEY_CLOSE_MY_SQLITE3_BARRIER     10
+#define SEMKEY_GEN_DB_BARRIER               11
+#define SEMKEY_UPDATE_DB_BARRIER            12
+
 #ifdef USE_OPENMPI
+
 #include <mpi.h>
+//#include <sys/ipc.h>
+#include <sys/sem.h>
+
+#define BARRIER_POLL CENTI_SECOND
+
+#else
+
+typedef void *MPI_Comm;
+typedef void *MPI_Info;
+typedef void *MPI_Datatype;
+typedef void *MPI_Op;
+typedef int  MPI_Aint;
+typedef void *MPI_Win;
+
+#define MPI_SUCCESS         0
+#define MPI_ERRCODES_IGNORE NULL
+
+#define MPI_COMM_WORLD      NULL
+#define MPI_COMM_NULL       NULL
+#define MPI_COMM_SELF       NULL
+
+#define MPI_INFO_NULL       NULL
+
+#define MPI_IN_PLACE        NULL
+#define MPI_INT             NULL
+#define MPI_DOUBLE          NULL
+#define MPI_LONG_LONG_INT   NULL
+#define MPI_SUM             NULL
+#define MPI_MAX             NULL
+
+#define MPI_WIN_NULL        NULL
+
 #endif
 
 typedef struct
 {
-  const int MY_MPIG_NGLOBAL_MAX;
-  const int MY_MPIG_BARRIER_TAG;
+  const int MMG_NGLOBAL_MAX;
+  const int MMG_BARRIER_TAG;
 
-  int MY_MPIG_init;
-  int MY_MPIG_nglobal;
-  int MY_MPIG_id_global;
-  int MY_MPIG_nslaves;
-  int MY_MPIG_id_slave;
+  int MMG_init;
+  int MMG_nglobal;
+  int MMG_id_global;
+  int MMG_nslaves;
+  int MMG_id_slave;
 
-#ifdef USE_OPENMPI
-  MPI_Comm MY_MPIG_comm_global;
-  MPI_Comm MY_MPIG_comm_slaves;
-#endif
+  MPI_Comm MMG_comm_global;
+  MPI_Comm MMG_comm_slaves;
 } my_mpi_globals_t;
 
 extern my_mpi_globals_t my_mpi_globals;
 
-#ifdef USE_OPENMPI
+void my_mpi_init(int *, char ***, int);
+int my_mpi_comm_size(MPI_Comm, int *);
+int my_mpi_comm_rank(MPI_Comm, int *);
+
+int my_mpi_allreduce(const void *, void *, int, MPI_Datatype, MPI_Op,
+  MPI_Comm);
+
+int my_mpi_win_allocate_shared(MPI_Aint, int, MPI_Info, MPI_Comm, void *,
+  MPI_Win *);
+int my_mpi_win_shared_query(MPI_Win, int, MPI_Aint *, int *, void *);
+
+void my_mpi_win_allocate(MPI_Aint, int, MPI_Info, MPI_Comm, void *, MPI_Win *);
+int my_mpi_win_fence(MPI_Comm, int assert, MPI_Win);
+int my_mpi_win_free(MPI_Win *);
+
+int my_mpi_finalize(void);
+int my_mpi_abort(MPI_Comm, int);
+
 void my_mpi_barrier(char *, MPI_Comm, int);
-void my_mpi_probe(MPI_Comm);
 
 void my_mpi_acquire_semaphore(MPI_Comm, MPI_Win);
 void my_mpi_release_semaphore(MPI_Comm, MPI_Win);
 
-int my_mpi_allreduce(const void *sendbuf, void *recvbuf, int count,
-                     MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
+void my_mpi_acquire_semaphore_v2(MPI_Comm);
+void my_mpi_release_semaphore_v2(MPI_Comm);
+void my_mpi_flush_semaphore_v2(MPI_Comm);
+void my_mpi_semaphore_server_v2(MPI_Comm);
 
-int my_mpi_win_allocate(MPI_Aint size, int disp_unit, MPI_Info info,
-                        MPI_Comm comm, void *baseptr, MPI_Win *win);
-int my_mpi_win_fence(MPI_Comm comm, int assert, MPI_Win win);
+int my_mpi_construct_semaphore_v3(MPI_Comm, int);
+void my_mpi_acquire_semaphore_v3(MPI_Comm, int);
+void my_mpi_release_semaphore_v3(MPI_Comm, int);
 
-void test_mpi(void);
-#endif
+void my_mpi_barrier_v3(char *, MPI_Comm, int, int);
+
+void test_my_mpi(void);
 
 #endif

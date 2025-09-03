@@ -1,12 +1,78 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
-local int ares = INVALID;
+#undef USE_RECIPROCAL
 
-local void add2_64(int n, scaled_double_t *s,
-  i64_t *a, i64_t *b)
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+
+#define DOUBLE2SCALED(D) ((scaled_double_t) (D))
+#define SCALED2DOUBLE(S) ((double) (S))
+
+#elif SCALED_DOUBLE_T == SCALED_DOUBLE_I32
+
+#define SCALED_DOUBLE_FACTOR 10000
+
+#define FLOAT2SCALED(D)      (round((D) * SCALED_DOUBLE_FACTOR))
+#define SCALED2FLOAT(S)      ((float) (S) / SCALED_DOUBLE_FACTOR)
+
+#define DOUBLE2SCALED(D)     (round((D) * SCALED_DOUBLE_FACTOR))
+#define SCALED2DOUBLE(S)     ((double) (S) / SCALED_DOUBLE_FACTOR)
+
+#else
+
+#error unknown SCALED_DOUBLE_T
+
+#endif
+
+int load_network = TRUE;
+network_shared_t network_shared;
+
+//for binary fen
+
+typedef i32_t bin_t;
+
+local i8_t base64_table[256];
+
+void init_base64_table(void)
 {
-  for (int i = 0; i < n; i++) s[i] = (a[i] + b[i]) / SCALED_DOUBLE_FACTOR;
+  const char *base64_chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    
+  for (int i = 0; i < 256; i++) base64_table[i] = INVALID;
+
+  for (int i = 0; base64_chars[i]; i++)
+    base64_table[(unsigned char) base64_chars[i]] = i;
+}
+
+void decode_base64(size_t ns, unsigned char *s,
+                   size_t nt, unsigned char *t)
+{
+  ui32_t v = 0;
+  int nb = -8;
+
+  size_t j = 0;
+
+  for (size_t i = 0; (i < ns) and (s[i] != '='); i++)
+  {
+    i8_t c = base64_table[(unsigned char)s[i]];
+
+    HARDBUG(c == INVALID)
+
+    v = (v << 6) | c;
+
+    nb += 6;
+
+    if (nb >= 0)
+    {
+      HARDBUG(j >= nt)
+
+      t[j++] = (v >> nb) & 0xFF;
+
+      nb -= 8;
+    }
+  }
+
+  HARDBUG(j != nt)
 }
 
 local cJSON *open_cjson_file(cJSON *arg_directory, char *arg_name)
@@ -38,61 +104,44 @@ local cJSON *open_cjson_file(cJSON *arg_directory, char *arg_name)
   return(result);
 }
 
-local void read_1d_csv(cJSON *arg_csv, int *arg_nrows,
-  scaled_double_t **arg_cells, double **arg_cells_double)
+local void read_1d_csv_base64(cJSON *arg_csv, int *arg_nrows,
+  scaled_double_t **arg_cells)
 {  
   *arg_cells = NULL;
-  *arg_cells_double = NULL;
-
-  cJSON *lines = cJSON_GetObjectItem(arg_csv, CJSON_FILE_LINES_ID);
-
-  HARDBUG(!cJSON_IsArray(lines))
-
-  int nrows = 0;
-
-  cJSON *line;
-
-  cJSON_ArrayForEach(line, lines)
-  {
-    char *string = cJSON_GetStringValue(line);
   
-    HARDBUG(string == NULL)
+  cJSON *cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_ROWS_ID);
 
-    double f;
+  HARDBUG(!cJSON_IsNumber(cjson_value))
 
-    HARDBUG(sscanf(string, "%lf", &f) != 1)
-       
-    nrows++;
-  }
+  int nrows = round(cJSON_GetNumberValue(cjson_value));
 
-  HARDBUG(nrows == 0)
+  HARDBUG(nrows < 1)
+
+  cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_DATA_ID);
+
+  HARDBUG(!cJSON_IsString(cjson_value));
+
+  char *data = cJSON_GetStringValue(cjson_value);
+
+  float *cells_float;
+
+  MY_MALLOC_BY_TYPE(cells_float, float, nrows)
+
+  decode_base64(strlen(data), (unsigned char *) data,
+                nrows * sizeof(float), (unsigned char *) cells_float);
 
   scaled_double_t *cells;
-  double *cells_double;
 
-  MY_MALLOC(cells, scaled_double_t, nrows)
-  MY_MALLOC(cells_double, double, nrows)
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+  cells = cells_float;
+#else
+  MY_MALLOC_BY_TYPE(cells, scaled_double_t, nrows)
 
-  int irow = 0;
+  for (int irow = 0; irow < nrows; irow++)
+    cells[irow] = FLOAT2SCALED(cells_float[irow]);
 
-  cJSON_ArrayForEach(line, lines)
-  {
-    char *string = cJSON_GetStringValue(line);
-
-    HARDBUG(string == NULL)
-
-    HARDBUG(irow >= nrows)
-
-    double f;
-
-    HARDBUG(sscanf(string, "%lf", &f) != 1)
-
-    cells_double[irow] = f;
-
-    irow++;
-  }
-
-  HARDBUG(irow != nrows)
+  my_free(cells_float);
+#endif
 
   if (*arg_nrows != INVALID)
     HARDBUG(nrows != *arg_nrows)
@@ -100,169 +149,80 @@ local void read_1d_csv(cJSON *arg_csv, int *arg_nrows,
     *arg_nrows = nrows;
 
   *arg_cells = cells;
-  *arg_cells_double = cells_double;
 }
 
-local void read_2d_csv(cJSON *arg_csv, const int arg_by_row,
-  int *arg_nrows, int *arg_ncols,
-  scaled_double_t ***arg_cells, scaled_double_t ***arg_cells_transposed,
-  double ***arg_cells_double, double ***arg_cells_transposed_double)
+local void read_2d_csv_base64(cJSON *arg_csv, int *arg_nrows, int *arg_ncols,
+  scaled_double_t ***arg_cells_nrowsxncols, 
+  scaled_double_t ***arg_cells_ncolsxnrows)
 {
-  *arg_cells = NULL;
-  *arg_cells_transposed = NULL;
+  cJSON *cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_ROWS_ID);
 
-  *arg_cells_double = NULL;
-  *arg_cells_transposed_double = NULL;
+  HARDBUG(!cJSON_IsNumber(cjson_value))
 
-  cJSON *lines = cJSON_GetObjectItem(arg_csv, CJSON_FILE_LINES_ID);
+  int nrows = round(cJSON_GetNumberValue(cjson_value));
 
-  HARDBUG(!cJSON_IsArray(lines))
+  HARDBUG(nrows < 1)
 
-  int ncols = INVALID;
-  int nrows = 0;
+  cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_COLS_ID);
 
-  cJSON *line;
+  HARDBUG(!cJSON_IsNumber(cjson_value))
 
-  cJSON_ArrayForEach(line, lines)
+  int ncols = round(cJSON_GetNumberValue(cjson_value));
+
+  HARDBUG(ncols < 1)
+
+  cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_DATA_ID);
+
+  HARDBUG(!cJSON_IsString(cjson_value));
+
+  char *data = cJSON_GetStringValue(cjson_value);
+
+  float *cells_float;
+
+  MY_MALLOC_BY_TYPE(cells_float, float, nrows * ncols);
+
+  decode_base64(strlen(data), (unsigned char *) data,
+                nrows * ncols * sizeof(float),
+                (unsigned char *) cells_float);
+
+  scaled_double_t *cells_nrowsxncols;
+
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+  cells_nrowsxncols = cells_float;
+#else
+  MY_MALLOC_BY_TYPE(cells_nrowsxncols, scaled_double_t, nrows * ncols);
+
+  for (int ifloat = 0; ifloat < nrows * ncols; ifloat++)
+    cells_nrowsxncols[ifloat] = FLOAT2SCALED(cells_float[ifloat]);
+
+  my_free(cells_float);
+#endif
+
+  MY_MALLOC_BY_TYPE(*arg_cells_nrowsxncols, scaled_double_t *, nrows);
+
+  for (int irow = 0; irow < nrows; irow++)
+    (*arg_cells_nrowsxncols)[irow] = cells_nrowsxncols + irow * ncols;
+
+  if (arg_cells_ncolsxnrows != NULL)
   {
-    HARDBUG(!cJSON_IsString(line))
+    scaled_double_t *cells_ncolsxnrows;
 
-    BSTRING(bline)
-
-    HARDBUG(bassigncstr(bline, cJSON_GetStringValue(line)) == BSTR_ERR)
-
-    struct bstrList *btokens;
-
-    HARDBUG((btokens = bsplit(bline, ',')) == NULL)
-
-    PUSH_LEAK(btokens)
-
-    if (ncols == INVALID)
-      ncols = btokens->qty;
-    else
-      HARDBUG(btokens->qty != ncols)
-
+    MY_MALLOC_BY_TYPE(cells_ncolsxnrows, scaled_double_t, ncols * nrows);
+  
+    MY_MALLOC_BY_TYPE(*arg_cells_ncolsxnrows, scaled_double_t *, ncols);
+  
     for (int icol = 0; icol < ncols; icol++)
+      (*arg_cells_ncolsxnrows)[icol] = cells_ncolsxnrows + icol * nrows;
+
+    for (int irow = 0; irow < nrows; irow++)
     {
-      double f;
-
-      HARDBUG(sscanf(bdata(btokens->entry[icol]), "%lf", &f) != 1)
-    }
-
-    nrows++;
-
-    HARDBUG(bstrListDestroy(btokens) == BSTR_ERR)
-
-    POP_LEAK(btokens)
-
-    BDESTROY(bline)
-  }
-
-  HARDBUG(nrows == 0)
-
-  scaled_double_t **cells;
-  scaled_double_t **cells_transposed;
-
-  double **cells_double;
-  double **cells_transposed_double;
-
-  if (arg_by_row)
-  {
-    MY_MALLOC(cells, scaled_double_t *, nrows)
-
-    for (int irow = 0; irow < nrows; irow++)
-      MY_MALLOC(cells[irow], scaled_double_t, ncols)
-
-    MY_MALLOC(cells_transposed, scaled_double_t *, ncols)
-
-    for (int icol = 0; icol < ncols; icol++)
-      MY_MALLOC(cells_transposed[icol], scaled_double_t, nrows)
-
-    //
-
-    MY_MALLOC(cells_double, double *, nrows)
-
-    for (int irow = 0; irow < nrows; irow++)
-      MY_MALLOC(cells_double[irow], double, ncols)
-
-    MY_MALLOC(cells_transposed_double, double *, ncols)
-
-    for (int icol = 0; icol < ncols; icol++)
-      MY_MALLOC(cells_transposed_double[icol], double, nrows)
-  }
-  else
-  {
-    MY_MALLOC(cells, scaled_double_t *, ncols)
-
-    for (int icol = 0; icol < ncols; icol++)
-      MY_MALLOC(cells[icol], scaled_double_t, nrows)
-
-    MY_MALLOC(cells_transposed, scaled_double_t *, nrows)
-
-    for (int irow = 0; irow < nrows; irow++)
-      MY_MALLOC(cells_transposed[irow], scaled_double_t, ncols)
-
-    //
-
-    MY_MALLOC(cells_double, double *, ncols)
-
-    for (int icol = 0; icol < ncols; icol++)
-      MY_MALLOC(cells_double[icol], double, nrows)
-
-    MY_MALLOC(cells_transposed_double, double *, nrows)
-
-    for (int irow = 0; irow < nrows; irow++)
-      MY_MALLOC(cells_transposed_double[irow], double, ncols)
-  }
-
-  //now read csv
-
-  int irow = 0;
-
-  cJSON_ArrayForEach(line, lines)
-  {
-    HARDBUG(!cJSON_IsString(line))
-
-    BSTRING(bline)
-
-    HARDBUG(bassigncstr(bline, cJSON_GetStringValue(line)) == BSTR_ERR)
-
-    HARDBUG(irow >= nrows)
-
-    struct bstrList *btokens;
-
-    HARDBUG((btokens = bsplit(bline, ',')) == NULL)
-
-    PUSH_LEAK(btokens)
-
-    HARDBUG(btokens->qty != ncols)
-
-    for (int icol = 0; icol < ncols; icol++)
-    {
-      double f;
-
-      HARDBUG(sscanf(bdata(btokens->entry[icol]), "%lf", &f) != 1)
-
-      if (arg_by_row)
+      for (int icol = 0; icol < ncols; icol++)
       {
-        cells_transposed_double[icol][irow]= cells_double[irow][icol] = f;
-      }
-      else
-      {
-        cells_transposed_double[irow][icol] = cells_double[icol][irow] = f;
+        cells_ncolsxnrows[icol * nrows + irow] =
+          cells_nrowsxncols[irow * ncols + icol];
       }
     }
-
-    HARDBUG(bstrListDestroy(btokens) == BSTR_ERR)
-
-    POP_LEAK(btokens)
-
-    BDESTROY(bline)
-
-    irow++;
   }
-
-  HARDBUG(irow != nrows)
 
   if (*arg_nrows != INVALID)
     HARDBUG(nrows != *arg_nrows)
@@ -273,17 +233,88 @@ local void read_2d_csv(cJSON *arg_csv, const int arg_by_row,
     HARDBUG(ncols != *arg_ncols)
   else
     *arg_ncols = ncols;
-
-  *arg_cells = cells;
-  *arg_cells_transposed = cells_transposed;
-
-  *arg_cells_double = cells_double;
-  *arg_cells_transposed_double = cells_transposed_double;
 }
 
-void construct_network(network_t *self, int arg_skip_load, int arg_verbose)
+local scaled_double_t dot_scaled(int n, scaled_double_t *restrict a,
+  scaled_double_t *restrict b)
 {
-  network_t *network = self;
+  BEGIN_BLOCK(__FUNC__)
+
+  scaled_double_t s = 0;
+
+#ifdef USE_AVX2_INTRINSICS
+  if (n < 8)
+#endif
+  {
+    for (int i = 0; i < n; i++)
+      s += a[i] * b[i];
+  }
+
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+    SOFTBUG((n % 8) != 0)
+
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    __m256 vs = _mm256_setzero_ps();
+  
+    for (const float *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256 va = _mm256_load_ps(a);
+      __m256 vb = _mm256_load_ps(b);
+  
+      vs = _mm256_add_ps(vs, _mm256_mul_ps(va, vb));
+      //vs = _mm256_fmadd_ps(va, vb, vs);
+
+    }
+  
+    ALIGN64(float t[8]);
+  
+    _mm256_store_ps(t, vs);
+
+    s = t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7];
+#else
+
+  __m256i s64_lo = _mm256_setzero_si256();
+  __m256i s64_hi = _mm256_setzero_si256();
+
+  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+  {
+    __m256i ta = _mm256_load_si256((__m256i*)a);
+    __m256i tb = _mm256_load_si256((__m256i*)b);
+
+    __m256i ta_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(ta));
+    __m256i ta_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(ta, 1));
+
+    __m256i tb_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(tb));
+    __m256i tb_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(tb, 1));
+
+    s64_lo = _mm256_add_epi64(s64_lo, _mm256_mul_epi32(ta_lo, tb_lo));
+    s64_hi = _mm256_add_epi64(s64_hi, _mm256_mul_epi32(ta_hi, tb_hi));
+  }
+
+  ALIGN64(i64_t r64_lo[4]);
+  ALIGN64(i64_t r64_hi[4]);
+
+  _mm256_store_si256((__m256i*)r64_lo, s64_lo);
+  _mm256_store_si256((__m256i*)r64_hi, s64_hi);
+
+  i64_t s64 = r64_lo[0] + r64_lo[1] + r64_lo[2] + r64_lo[3] +
+              r64_hi[0] + r64_hi[1] + r64_hi[2] + r64_hi[3];
+
+  s = s64 / SCALED_DOUBLE_FACTOR;
+#endif
+  }
+#endif
+
+  END_BLOCK
+
+  return(s);
+}
+
+void construct_network_shared(network_shared_t *self, int arg_verbose)
+{
+  network_shared_t *network = self;
 
   cJSON *networks_json;
 
@@ -342,11 +373,12 @@ void construct_network(network_t *self, int arg_skip_load, int arg_verbose)
 
   HARDBUG(!cJSON_IsNumber(network2material_score_cjson))
 
-  network->N_network2material_score =
+  network->NS_network2material_score =
    cJSON_GetNumberValue(network2material_score_cjson);
 
   if (arg_verbose)
-    PRINTF("N_network2material_score=%.2f\n", network->N_network2material_score);
+    PRINTF("network->NS_network2material_score=%.2f\n",
+           network->NS_network2material_score);
 
   cJSON *value_cjson = cJSON_GetObjectItem(directory, CJSON_SHAPE_ID);
 
@@ -354,53 +386,66 @@ void construct_network(network_t *self, int arg_skip_load, int arg_verbose)
 
   char *svalue = cJSON_GetStringValue(value_cjson);
 
-  network->N_bshape = bfromcstr(svalue);
+  network->NS_bshape = bfromcstr(svalue);
 
-  if (arg_verbose) PRINTF("shape=%d\n", bdata(network->N_bshape));
+  if (arg_verbose) PRINTF("shape=%s\n", bdata(network->NS_bshape));
+ 
+  //embedding
 
-  //king weight
-
-  value_cjson = cJSON_GetObjectItem(directory, CJSON_KING_WEIGHT_ID);
+  value_cjson = cJSON_GetObjectItem(directory, CJSON_EMBEDDING_ID);
 
   HARDBUG(!cJSON_IsString(value_cjson));
 
   svalue = cJSON_GetStringValue(value_cjson);
 
-  if (compat_strcasecmp(svalue, "ares") == 0)
-    network->N__king_weight = NETWORK_KING_WEIGHT_ARES;
-  else if (compat_strcasecmp(svalue, "gwd") == 0)
-    network->N__king_weight = NETWORK_KING_WEIGHT_GWD;
+  if (compat_strcasecmp(svalue, "sum") == 0)
+    network->NS_embedding = NETWORK_EMBEDDING_SUM;
+  else if (compat_strcasecmp(svalue, "sum2") == 0)
+    network->NS_embedding = NETWORK_EMBEDDING_SUM2;
+  else if (compat_strcasecmp(svalue, "concat") == 0)
+    network->NS_embedding = NETWORK_EMBEDDING_CONCAT;
   else
-  {
-    HARDBUG(sscanf(svalue, "%d", &(network->N__king_weight)) != 1)
-
-    HARDBUG(network->N__king_weight < 1)
-  }
+    FATAL("unknown embedding option", EXIT_FAILURE)
 
   if (arg_verbose)
   {
-    if (network->N__king_weight == NETWORK_KING_WEIGHT_ARES)
-      PRINTF("king_weight=ARES\n");
-    else if (network->N__king_weight == NETWORK_KING_WEIGHT_GWD)
-      PRINTF("king_weight=GWD\n");
-    else 
-      PRINTF("king_weight=%d\n", network->N__king_weight);
+    if (network->NS_embedding == NETWORK_EMBEDDING_SUM)
+      PRINTF("embedding=SUM\n");
+    else if (network->NS_embedding == NETWORK_EMBEDDING_SUM2)
+      PRINTF("embedding=SUM2\n");
+    else if (network->NS_embedding == NETWORK_EMBEDDING_CONCAT)
+      PRINTF("embedding=CONCAT\n");
+    else
+      FATAL("unknown embedding option", EXIT_FAILURE)
   }
 
+  //activation
 
-  //clip
+  value_cjson = cJSON_GetObjectItem(directory, CJSON_ACTIVATION_ID);
 
-  value_cjson = cJSON_GetObjectItem(directory, CJSON_CLIP_ID);
+  HARDBUG(!cJSON_IsString(value_cjson));
 
-  HARDBUG(!cJSON_IsNumber(value_cjson));
+  svalue = cJSON_GetStringValue(value_cjson);
 
-  int ivalue = cJSON_GetNumberValue(value_cjson);
-
-  network->N_clip_value = ivalue;
+  if (compat_strcasecmp(svalue, "relu6") == 0)
+    network->NS_activation = NETWORK_ACTIVATION_RELU6;
+  else if (compat_strcasecmp(svalue, "tanh") == 0)
+    network->NS_activation = NETWORK_ACTIVATION_TANH;
+  else if (compat_strcasecmp(svalue, "rsqrt") == 0)
+    network->NS_activation = NETWORK_ACTIVATION_RSQRT;
+  else
+    FATAL("unknown activation option", EXIT_FAILURE)
 
   if (arg_verbose)
   {
-    PRINTF("clip=%d\n", network->N_clip_value);
+    if (network->NS_activation == NETWORK_ACTIVATION_RELU6)
+      PRINTF("activation=RELU6\n");
+    else if (network->NS_activation == NETWORK_ACTIVATION_TANH)
+      PRINTF("activation=TANH\n");
+    else if (network->NS_activation == NETWORK_ACTIVATION_RSQRT)
+      PRINTF("activation=RSQRT\n");
+    else
+      FATAL("unknown activation option", EXIT_FAILURE)
   }
 
   //activation_last
@@ -412,71 +457,212 @@ void construct_network(network_t *self, int arg_skip_load, int arg_verbose)
   svalue = cJSON_GetStringValue(value_cjson);
 
   if (compat_strcasecmp(svalue, "linear") == 0)
-    network->N_activation_last = NETWORK_ACTIVATION_LINEAR;
+    network->NS_activation_last = NETWORK_ACTIVATION_LINEAR;
   else if (compat_strcasecmp(svalue, "sigmoid") == 0)
-    network->N_activation_last = NETWORK_ACTIVATION_SIGMOID;
+    network->NS_activation_last = NETWORK_ACTIVATION_SIGMOID;
   else
     FATAL("unknown activation_last option", EXIT_FAILURE)
 
   if (arg_verbose)
   {
-    if (network->N_activation_last == NETWORK_ACTIVATION_LINEAR)
+    if (network->NS_activation_last == NETWORK_ACTIVATION_LINEAR)
       PRINTF("activation_last=LINEAR\n");
-    else if (network->N_activation_last == NETWORK_ACTIVATION_SIGMOID)
+    else if (network->NS_activation_last == NETWORK_ACTIVATION_SIGMOID)
       PRINTF("activation_last=SIGMOID\n");
     else
       FATAL("unknown activation_last option", EXIT_FAILURE)
   }
 
-  MY_MALLOC(network->N_patterns, patterns_t, 1)
+  //nman_min
 
-  network->N_ninputs =
-    construct_patterns(network->N_patterns,
-                       bdata(network->N_bshape));
+  network->NS_nman_min = 0;
 
-  HARDBUG(network->N_ninputs >= NINPUTS_MAX)
+  value_cjson = cJSON_GetObjectItem(directory, CJSON_NMAN_MIN_ID);
 
-  network->N_nwhite_king_input_map = network->N_ninputs++;
-  network->N_nblack_king_input_map = network->N_ninputs++;
-  
-  HARDBUG(network->N_ninputs >= NINPUTS_MAX)
-
-  PRINTF("N_nwhite_king_input_map=%d\n", network->N_nwhite_king_input_map);
-  PRINTF("N_nblack_king_input_map=%d\n", network->N_nblack_king_input_map);
-
-  PRINTF("network->N_ninputs=%d\n", network->N_ninputs);
-
-  int nleft = network->N_ninputs % 16;
- 
-  if (nleft > 0) network->N_ninputs += 16 - nleft;
-
-  PRINTF("network->N_ninputs=%d\n", network->N_ninputs);
-    
-  network->N_nlayers = 0;
-  network->N_loaded = FALSE;
-
-  network->N_nstate = 0;
-
-  for (int istate = 0; istate < NODE_MAX; istate++)
+  if (cJSON_IsNumber(value_cjson))   
   {
-    MY_MALLOC(network->N_states[istate].NS_layer0_inputs,
-              scaled_double_t, network->N_ninputs)
+    int ivalue = cJSON_GetNumberValue(value_cjson);
 
-    //MY_MALLOC(network->N_states[istate].NS_layer0_sum,
-    //          i32_t, with->L_noutputs)
+    HARDBUG((ivalue < 0) or (ivalue > 40))
+
+    network->NS_nman_min = ivalue;
+  
+    if (arg_verbose)
+    {
+      PRINTF("NS_nman_min=%d\n", network->NS_nman_min);
+    }
   }
 
-  network->N_inputs = network->N_states[0].NS_layer0_inputs;
+  //nman_max
 
-  if (arg_skip_load) return;
+  network->NS_nman_max = 40;
 
-  network->N_loaded = TRUE;
+  value_cjson = cJSON_GetObjectItem(directory, CJSON_NMAN_MAX_ID);
+
+  if (cJSON_IsNumber(value_cjson))   
+  {
+    int ivalue = cJSON_GetNumberValue(value_cjson);
+
+    HARDBUG((ivalue < 0) or (ivalue > 40))
+
+    network->NS_nman_max = ivalue;
+  
+    if (arg_verbose)
+    {
+      PRINTF("NS_nman_max=%d\n", network->NS_nman_max);
+    }
+  }
+
+  HARDBUG(network->NS_nman_min > network->NS_nman_max)
+
+  construct_patterns_shared(&(patterns_shared), bdata(network->NS_bshape));
+
+PRINTF("load_network=%d\n", load_network);
+  if (!load_network) return;
+
+  network->NS_ninputs_patterns = 0;
+  network->NS_ninputs_material = 0;
+  network->NS_ninputs = 0;
+
+  network->NS_nlayers = 0;
+  network->NS_loaded = FALSE;
+
+  network->NS_loaded = TRUE;
+
+  //load the embedding vectors
+
+  patterns_shared_t *with_patterns_shared = &patterns_shared;
+
+  int iweight = 0;
+
+  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
+       ipattern++)
+  {
+    pattern_shared_t *with = with_patterns_shared->PS_patterns + ipattern;
+
+    BSTRING(bweights)
+
+    bformata(bweights, "weights%d.csv", iweight);
+
+    cJSON *file = open_cjson_file(directory, bdata(bweights));
+
+    BDESTROY(bweights)
+
+    HARDBUG(file == NULL)
+
+    read_2d_csv_base64(file, &(with->PS_nstates), &(with->PS_nembed),
+      &(with->PS_weights_nstatesxnembed), NULL);
+
+    mark_pointer_read_only(with->PS_weights_nstatesxnembed[0]);
+
+    if ((network->NS_embedding == NETWORK_EMBEDDING_SUM) or
+        (network->NS_embedding == NETWORK_EMBEDDING_SUM2))
+    {
+      with->PS_offset = 0;
+
+      if (network->NS_ninputs_patterns == 0)
+      {
+        network->NS_ninputs_patterns = with->PS_nembed; //first
+ 
+        network->NS_ninputs = with->PS_nembed;
+      }
+      else
+        HARDBUG(with->PS_nembed != network->NS_ninputs_patterns)
+    }
+    else
+    {
+      with->PS_offset = network->NS_ninputs;
+
+      network->NS_ninputs += with->PS_nembed;
+    }
+
+    PRINTF("ipattern=%d with->PS_nstates=%d with->PS_nembed=%d"
+           " with->PS_offset=%d\n",
+           ipattern, with->PS_nstates, with->PS_nembed, with->PS_offset);
+
+    HARDBUG(network->NS_ninputs >= NINPUTS_MAX)
+
+    iweight++;
+  }
+
+  //load the material
+
+  for (int imaterial = 0; imaterial < 4; imaterial++)
+  {
+    material_shared_t *with = &(network->NS_material[imaterial]);
+
+    BSTRING(bweights)
+
+    bformata(bweights, "weights%d.csv", iweight);
+
+    cJSON *file = open_cjson_file(directory, bdata(bweights));
+
+    BDESTROY(bweights)
+
+    HARDBUG(file == NULL)
+
+    with->MS_nstates = 21;
+    with->MS_nembed = INVALID;
+
+    read_2d_csv_base64(file, &(with->MS_nstates), &(with->MS_nembed),
+      &(with->MS_weights_nstatesxnembed),
+      &(with->MS_weights_nembedxnstates));
+
+    mark_pointer_read_only(with->MS_weights_nstatesxnembed[0]);
+    mark_pointer_read_only(with->MS_weights_nembedxnstates[0]);
+
+    if (network->NS_embedding == NETWORK_EMBEDDING_SUM)
+    {
+      with->MS_offset = 0;
+
+      if (network->NS_ninputs_material == 0)
+      {
+        network->NS_ninputs_material = with->MS_nembed; //first
+
+        HARDBUG(network->NS_ninputs_material != network->NS_ninputs_patterns)
+      }
+      else
+        HARDBUG(with->MS_nembed != network->NS_ninputs_material)
+    }
+    else if (network->NS_embedding == NETWORK_EMBEDDING_SUM2)
+    {
+      with->MS_offset = network->NS_ninputs_patterns;
+
+      if (network->NS_ninputs_material == 0)
+      {
+        network->NS_ninputs_material = with->MS_nembed; //first
+
+        network->NS_ninputs += with->MS_nembed;
+      }
+      else
+        HARDBUG(with->MS_nembed != network->NS_ninputs_material)
+    }
+    else 
+    {
+      with->MS_offset = network->NS_ninputs;
+
+      network->NS_ninputs += with->MS_nembed;
+    }
+
+    PRINTF("with->MS_nstates=%d with->MS_nembed=%d with->MS_offset=%d\n",
+           with->MS_nstates, with->MS_nembed, with->MS_offset);
+
+    HARDBUG(network->NS_ninputs >= NINPUTS_MAX)
+
+    iweight++;
+  }
+
+  PRINTF("network->NS_ninputs_patterns=%d\n", network->NS_ninputs_patterns);
+  PRINTF("network->NS_ninputs_material=%d\n", network->NS_ninputs_material);
+  PRINTF("network->NS_ninputs=%d\n", network->NS_ninputs);
+
+  //read the dense network
 
   while(TRUE)
   {
     BSTRING(bweights)
 
-    bformata(bweights, "weights%d.csv", network->N_nlayers);
+    bformata(bweights, "weights%d.csv", iweight);
 
     cJSON *file = open_cjson_file(directory, bdata(bweights));
 
@@ -484,20 +670,22 @@ void construct_network(network_t *self, int arg_skip_load, int arg_verbose)
 
     if (file == NULL) break;
 
-    HARDBUG(network->N_nlayers >= NLAYERS_MAX)
+    HARDBUG(network->NS_nlayers >= NLAYERS_MAX)
 
-    layer_t *with = network->N_layers + network->N_nlayers;
+    layer_shared_t *with = network->NS_layers + network->NS_nlayers;
 
-    with->L_ninputs = with->L_noutputs = INVALID;
+    with->LS_ninputs = with->LS_noutputs = INVALID;
 
-    read_2d_csv(file, FALSE,
-      &(with->L_ninputs), &(with->L_noutputs),
-      &(with->L_weights), &(with->L_weights_transposed),
-      &(with->L_weights_double), &(with->L_weights_transposed_double));
+    read_2d_csv_base64(file, &(with->LS_ninputs), &(with->LS_noutputs),
+      &(with->LS_weights_ninputsxnoutputs),
+      &(with->LS_weights_noutputsxninputs));
+
+    mark_pointer_read_only(with->LS_weights_ninputsxnoutputs[0]);
+    mark_pointer_read_only(with->LS_weights_noutputsxninputs[0]);
 
     BSTRING(bbias)
 
-    bformata(bbias, "bias%d.csv", network->N_nlayers);
+    bformata(bbias, "bias%d.csv", iweight);
 
     file = open_cjson_file(directory, bdata(bbias));
 
@@ -505,312 +693,280 @@ void construct_network(network_t *self, int arg_skip_load, int arg_verbose)
 
     BDESTROY(bbias)
 
-    read_1d_csv(file, &(with->L_noutputs), &(with->L_bias),
-      &(with->L_bias_double));
+    read_1d_csv_base64(file, &(with->LS_noutputs), &(with->LS_bias));
 
-    //scale the weights and transposed weights
+    mark_pointer_read_only(with->LS_bias);
 
-    MY_MALLOC(with->L_bias64, i64_t, with->L_noutputs);
-
-    for (int ioutput = 0; ioutput < with->L_noutputs; ioutput++)
-    {
-      for (int input = 0; input < with->L_ninputs; input++)
-      {
-        with->L_weights_transposed[input][ioutput] =
-          with->L_weights[ioutput][input] =
-            DOUBLE2SCALED(with->L_weights_double[ioutput][input]);
-      }
-
-      with->L_bias[ioutput] =
-        DOUBLE2SCALED(with->L_bias_double[ioutput]);
-
-      with->L_bias64[ioutput] =
-        with->L_bias[ioutput] * SCALED_DOUBLE_FACTOR;
-    }
-
-    mark_pointer_read_only(with->L_weights);
-    mark_pointer_read_only(with->L_weights_double);
-
-    for (int ioutput = 0; ioutput < with->L_noutputs; ioutput++)
-    {
-      mark_pointer_read_only(with->L_weights[ioutput]);
-      mark_pointer_read_only(with->L_weights_double[ioutput]);
-    }
-
-    mark_pointer_read_only(with->L_weights_transposed);
-    mark_pointer_read_only(with->L_weights_transposed_double);
-
-    for (int input = 0; input < with->L_ninputs; input++)
-    {
-      mark_pointer_read_only(with->L_weights_transposed[input]);
-      mark_pointer_read_only(with->L_weights_transposed_double[input]);
-    }
-
-    mark_pointer_read_only(with->L_bias);
-    mark_pointer_read_only(with->L_bias_double);
-
-    network->N_nlayers++;
+    network->NS_nlayers++;
+   
+    iweight++;
   }
 
-  if (arg_verbose) PRINTF("nlayers=%d\n", network->N_nlayers);
+  if (arg_verbose) PRINTF("nlayers=%d\n", network->NS_nlayers);
 
-  HARDBUG(network->N_nlayers < 2)
+  HARDBUG(network->NS_nlayers < 2)
 
-  network->N_nstate = 0;
-
-  for (int istate = 0; istate < NODE_MAX; istate++)
+  if (arg_verbose)
   {
-    layer_t *with = network->N_layers;
-
-    //MY_MALLOC(network->N_states[istate].NS_layer0_inputs,
-    //          scaled_double_t, with->L_ninputs)
-
-    MY_MALLOC(network->N_states[istate].NS_layer0_sum,
-              i32_t, with->L_noutputs)
-  }
-
-  for (int ilayer = 0; ilayer < network->N_nlayers; ilayer++)
-  {
-    layer_t *with = network->N_layers + ilayer;
-
-    if (arg_verbose)
+    for (int ilayer = 0; ilayer < network->NS_nlayers; ilayer++)
     {
+      layer_shared_t *with = network->NS_layers + ilayer;
+
       PRINTF("ilayer=%d (inputs, outputs)=(%d, %d)\n",
-        ilayer, with->L_ninputs, with->L_noutputs);
+        ilayer, with->LS_ninputs, with->LS_noutputs);
     }
-
-    if (ilayer == 0)
-    {
-      //network->N_inputs = network->N_states[0].NS_layer0_inputs;
-
-      with->L_sum = network->N_states[0].NS_layer0_sum;
-    }
-    else
-    {
-      MY_MALLOC(with->L_dot64, i64_t, with->L_noutputs);
-
-      MY_MALLOC(with->L_sum, i32_t, with->L_noutputs);
-    }
-
-    MY_MALLOC(with->L_outputs, scaled_double_t, with->L_noutputs);
-    MY_MALLOC(with->L_sum_double, double, with->L_noutputs);
-    MY_MALLOC(with->L_outputs_double, double, with->L_noutputs);
   }
  
   //check topology
 
-  for (int ilayer = 0; ilayer < network->N_nlayers - 1; ilayer++)
+  for (int ilayer = 0; ilayer < network->NS_nlayers - 1; ilayer++)
   {
-    layer_t *with_current = network->N_layers + ilayer;
-    layer_t *with_next = network->N_layers + ilayer + 1;
+    layer_shared_t *with_current = network->NS_layers + ilayer;
+    layer_shared_t *with_next = network->NS_layers + ilayer + 1;
    
-    HARDBUG(with_current->L_noutputs != with_next->L_ninputs)
+    HARDBUG(with_current->LS_noutputs != with_next->LS_ninputs)
   }
-}
 
-local i32_t dot_scaled(int n, scaled_double_t *restrict a,
-  scaled_double_t *restrict b)
-{
-  BEGIN_BLOCK(__FUNC__)
-
-  i32_t s = 0;
-
-#ifdef USE_AVX2_INTRINSICS
-
-  SOFTBUG((n % 8) != 0)
-
-  __m256i ts = _mm256_setzero_si256();
-
-  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+  if ((network->NS_embedding == NETWORK_EMBEDDING_SUM) or
+      (network->NS_embedding == NETWORK_EMBEDDING_SUM2))
   {
-    const __m256i ta = _mm256_load_si256((__m256i*)a);
-    const __m256i tb = _mm256_load_si256((__m256i*)b);
+    for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
+         ipattern++)
+    {
+      pattern_shared_t *with_pattern_shared =
+        with_patterns_shared->PS_patterns + ipattern;
 
-    ts = _mm256_add_epi32(ts, _mm256_mullo_epi32(ta, tb));
+      with_pattern_shared->PS_sum_nstatesxnoutputs = NULL;
+    }
+
+    for (int imaterial = 0; imaterial < 4; imaterial++)
+    {
+      material_shared_t *with_material_shared =
+        &(network->NS_material[imaterial]);
+  
+      with_material_shared->MS_sum = NULL;
+    }
   }
-
-  ALIGN64(i32_t r[8]);
-
-  _mm256_store_si256((__m256i*)r, ts);
-
-  s = r[0] + r[1] + r[2] + r[3] + r[4] + r[5] + r[6] + r[7];
-
-#else
-
-  for (int i = 0; i < n; i++)
-    s += a[i] * b[i];
-
-#endif
-
-  END_BLOCK
-
-  return(s);
-}
-
-local i64_t dot_scaled64(int n, scaled_double_t *restrict a,
-  scaled_double_t *restrict b)
-{
-  BEGIN_BLOCK(__FUNC__)
-
-  i64_t s = 0;
-
-#ifdef USE_AVX2_INTRINSICS
-
-  SOFTBUG((n % 8) != 0)
-
-  __m256i s_lo = _mm256_setzero_si256();
-  __m256i s_hi = _mm256_setzero_si256();
-
-  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+  else
   {
-    __m256i ta = _mm256_load_si256((__m256i*)a);
-    __m256i tb = _mm256_load_si256((__m256i*)b);
+    //precompute layer0 contribution
 
-    __m256i ta_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(ta));
-    __m256i ta_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(ta, 1));
+    layer_shared_t *with_current = network->NS_layers;
+  
+    for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
+         ipattern++)
+    {
+      pattern_shared_t *with_pattern_shared =
+        with_patterns_shared->PS_patterns + ipattern;
+  
+      scaled_double_t *sum_nstatesxnoutputs;
+  
+      MY_MALLOC_BY_TYPE(sum_nstatesxnoutputs, scaled_double_t,
+                        with_pattern_shared->PS_nstates *
+                        with_current->LS_noutputs);
+  
+      MY_MALLOC_BY_TYPE(with_pattern_shared->PS_sum_nstatesxnoutputs,
+                        scaled_double_t *, with_pattern_shared->PS_nstates);
+  
+      for (int istate = 0; istate < with_pattern_shared->PS_nstates; istate++)
+      {
+        with_pattern_shared->PS_sum_nstatesxnoutputs[istate] =
+          sum_nstatesxnoutputs + istate * with_current->LS_noutputs;
+  
+        for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
+        {
+          with_pattern_shared->PS_sum_nstatesxnoutputs[istate][ioutput] = 
+            dot_scaled(with_pattern_shared->PS_nembed,
+                       with_pattern_shared->PS_weights_nstatesxnembed[istate],
+                       with_current->LS_weights_noutputsxninputs[ioutput] +
+                       with_pattern_shared->PS_offset);
+        }
+      }
+  
+      mark_pointer_read_only(sum_nstatesxnoutputs);
+    }
 
-    __m256i tb_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(tb));
-    __m256i tb_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(tb, 1));
-
-    s_lo = _mm256_add_epi64(s_lo, _mm256_mul_epi32(ta_lo, tb_lo));
-    s_hi = _mm256_add_epi64(s_hi, _mm256_mul_epi32(ta_hi, tb_hi));
+    for (int imaterial = 0; imaterial < 4; imaterial++)
+    {
+      material_shared_t *with_material_shared =
+        &(network->NS_material[imaterial]);
+  
+      scaled_double_t *sum;
+  
+      MY_MALLOC_BY_TYPE(sum, scaled_double_t,
+                        with_material_shared->MS_nstates *
+                        with_current->LS_noutputs);
+  
+      MY_MALLOC_BY_TYPE(with_material_shared->MS_sum, scaled_double_t *,
+                        with_material_shared->MS_nstates);
+  
+      for (int istate = 0; istate < with_material_shared->MS_nstates; istate++)
+      {
+        with_material_shared->MS_sum[istate] =
+          sum + istate * with_current->LS_noutputs;
+  
+        for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
+        {
+          with_material_shared->MS_sum[istate][ioutput] = 
+            dot_scaled(with_material_shared->MS_nembed,
+                       with_material_shared->MS_weights_nstatesxnembed[istate],
+                       with_current->LS_weights_noutputsxninputs[ioutput] +
+                       with_material_shared->MS_offset);
+        }
+      }
+  
+      mark_pointer_read_only(sum);
+    }
   }
-
-  ALIGN64(i64_t result_lo[4]);
-  ALIGN64(i64_t result_hi[4]);
-
-  _mm256_store_si256((__m256i*)result_lo, s_lo);
-  _mm256_store_si256((__m256i*)result_hi, s_hi);
-
-  s = result_lo[0] + result_lo[1] + result_lo[2] + result_lo[3] +
-      result_hi[0] + result_hi[1] + result_hi[2] + result_hi[3];
-
-#else
-
-  for (int i = 0; i < n; i++)
-    s += a[i] * b[i];
-
-#endif
-
-  END_BLOCK
-
-  return(s);
 }
 
-local double dot_double(int n, double *restrict a, double *restrict b)
+void construct_network_thread(network_thread_t *self, int arg_verbose)
+{
+  network_thread_t *object = self;
+
+  MY_MALLOC_BY_TYPE(object->NT_inputs, scaled_double_t,
+                    network_shared.NS_ninputs);
+
+  for (int ilayer = 0; ilayer < network_shared.NS_nlayers; ilayer++)
+  {
+    layer_shared_t *with = network_shared.NS_layers + ilayer;
+    layer_thread_t *with_thread = object->NT_layers + ilayer;
+
+    MY_MALLOC_BY_TYPE(with_thread->LT_dot, scaled_double_t, with->LS_noutputs);
+    MY_MALLOC_BY_TYPE(with_thread->LT_sum, scaled_double_t, with->LS_noutputs);
+    MY_MALLOC_BY_TYPE(with_thread->LT_outputs, scaled_double_t,
+                      with->LS_noutputs);
+  }
+}
+
+local scaled_double_t dot_double(int n, scaled_double_t *restrict a,
+  scaled_double_t *restrict b)
 {
   double s = 0;
 
   for (int i = 0; i < n; i++)
-    s += a[i] * b[i];
+    s += SCALED2DOUBLE(a[i]) * SCALED2DOUBLE(b[i]);
 
-  return(s);
+  return(DOUBLE2SCALED(s));
 }
 
-local void vcopy_ab(int n, scaled_double_t *restrict a,
+void vcopy_ab(int n, scaled_double_t *restrict a,
   scaled_double_t *restrict b)
 {
 #ifdef USE_AVX2_INTRINSICS
-
-  SOFTBUG((n % 8) != 0)
-
-  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+  if (n < 8)
+#endif
   {
-    __m256i ta = _mm256_load_si256((__m256i*)a);
-
-    _mm256_store_si256((__m256i*)b, ta);
+    for (int i = 0; i < n; i++) b[i] = a[i];
   }
 
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+    SOFTBUG((n % 8) != 0)
+
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    for (const scaled_double_t *z = a + n ; a < z; a += 8, b += 8)
+    {
+      __m256 va = _mm256_loadu_ps(a);
+  
+      _mm256_store_ps(b, va);
+    }
 #else
-
-  for (int i = 0; i < n; i++) b[i] = a[i];
-
+    for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+    {
+      __m256i va = _mm256_load_si256((__m256i *)a);
+  
+      _mm256_store_si256((__m256i *)b, va);
+    }
+#endif
+  }
 #endif
 }
 
-local void vadd_aba(int n, scaled_double_t *restrict a,
-  scaled_double_t *restrict b)
+void vadd_cab(int n, scaled_double_t *restrict c,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
 {
   BEGIN_BLOCK(__FUNC__)
 
 #ifdef USE_AVX2_INTRINSICS
-
-  SOFTBUG((n % 8) != 0)
-
-  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+  if (n < 8)
+#endif
   {
-    const __m256i ta = _mm256_load_si256((__m256i*)a);
-    const __m256i tb = _mm256_load_si256((__m256i*)b);
-
-    const __m256i ts = _mm256_add_epi32(ta, tb);
-
-    _mm256_store_si256((__m256i*)a, ts);
+    for (int i = 0; i < n; i++) c[i] = a[i] + b[i];
   }
 
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+    SOFTBUG((n % 8) != 0)
+
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
+    {
+      __m256 va = _mm256_load_ps(a);
+      __m256 vb = _mm256_load_ps(b);
+  
+      __m256 vc = _mm256_add_ps(va, vb);
+
+      _mm256_store_ps(c, vc);
+    }
 #else
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
+    {
+      __m256i va = _mm256_load_si256((__m256i *)a);
+      __m256i vb = _mm256_load_si256((__m256i *)b);
 
-  for (int i = 0; i < n; i++) a[i] += b[i];
+      __m256i vc = _mm256_add_epi32(va, vb);
 
+      _mm256_store_si256((__m256i *)c, vc);
+    }
+#endif
+  }
 #endif
 
   END_BLOCK
 }
 
-local void vsub_aba(int n, scaled_double_t *restrict a,
+void vadd_aba(int n, scaled_double_t *restrict a,
   scaled_double_t *restrict b)
 {
   BEGIN_BLOCK(__FUNC__)
 
 #ifdef USE_AVX2_INTRINSICS
-
-  SOFTBUG((n % 8) != 0)
-
-  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
-  {
-    const __m256i ta = _mm256_load_si256((__m256i*)a);
-    const __m256i tb = _mm256_load_si256((__m256i*)b);
-
-    const __m256i ts = _mm256_sub_epi32(ta, tb);
-
-    _mm256_store_si256((__m256i*)a, ts);
-  }
-
-#else
-
-  for (int i = 0; i < n; i++) a[i] -= b[i];
-
+  if (n < 8)
 #endif
-
-  END_BLOCK
-}
-
-local void vadd_acba(int n, i32_t *restrict a,
-  scaled_double_t c, scaled_double_t *restrict b)
-{
-  BEGIN_BLOCK(__FUNC__)
+  {
+    for (int i = 0; i < n; i++) a[i] += b[i];
+  }
 
 #ifdef USE_AVX2_INTRINSICS
-
-  SOFTBUG((n % 8) != 0)
-
-  __m256i tc = _mm256_set1_epi32(c);
-
-  for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+  else
   {
-    const __m256i ta = _mm256_load_si256((__m256i*)a);
-    const __m256i tb = _mm256_load_si256((__m256i*)b);
+    SOFTBUG((n % 8) != 0)
 
-    const __m256i tm = _mm256_mullo_epi32(tb, tc);
-
-    const __m256i ts = _mm256_add_epi32(ta, tm);
-
-    _mm256_store_si256((__m256i*)a, ts);
-  }
-
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    for (const scaled_double_t *z = a + n ; a < z; a += 8, b += 8)
+    {
+      const __m256 va = _mm256_load_ps(a);
+      const __m256 vb = _mm256_load_ps(b);
+  
+      const __m256 vs = _mm256_add_ps(va, vb);
+  
+      _mm256_store_ps(a, vs);
+    }
 #else
+    for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+    {
+      const __m256i va = _mm256_load_si256((__m256i *)a);
+      const __m256i vb = _mm256_load_si256((__m256i *)b);
 
-  for (int i = 0; i < n; i++) a[i] += c * b[i];
+      const __m256i vs = _mm256_add_epi32(va, vb);
 
+      _mm256_store_si256((__m256i *)a, vs);
+    }
+#endif
+  }
 #endif
 
   END_BLOCK
@@ -819,47 +975,52 @@ local void vadd_acba(int n, i32_t *restrict a,
 local void activation_relu_scaled(int n,
   scaled_double_t *restrict a, scaled_double_t *restrict b)
 {
-  FATAL("not implemented yet", EXIT_FAILURE)
-}
-
-local void activation_clipped_relu_scaled(int n,
-  scaled_double_t *restrict a, scaled_double_t *restrict b,
-  int arg_clip)
-{
 #ifdef USE_AVX2_INTRINSICS
-
-  SOFTBUG((n % 8) != 0)
-
-  __m256i zero = _mm256_setzero_si256();
-  __m256i clip = _mm256_set1_epi32(SCALED_DOUBLE_FACTOR * arg_clip);
-
-  for (const int32_t *z = a + n; a < z; a += 8, b += 8)
+  if (n < 8)
+#endif
   {
-    __m256i ta = _mm256_load_si256((__m256i*)a);
-
-    ta = _mm256_max_epi32(ta, zero);
-    ta = _mm256_min_epi32(ta, clip);
-
-    _mm256_store_si256((__m256i*)b, ta);
+    for (int i = 0; i < n; i++)
+    {
+      if (a[i] <= 0)
+        b[i] = 0;
+      else
+        b[i] = a[i];
+    }
   }
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+    SOFTBUG((n % 8) != 0)
 
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    const __m256 vz = _mm256_setzero_ps();
+  
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256 va = _mm256_load_ps(a);
+  
+      va = _mm256_max_ps(va, vz);
+  
+      _mm256_store_ps(b, va);
+    }
 #else
+    __m256i zero = _mm256_setzero_si256();
 
-  for (int i = 0; i < n; i++)
-  {
-    if (a[i] <= 0)
-      b[i] = 0;
-    else if (a[i] >= SCALED_DOUBLE_FACTOR * arg_clip)
-      b[i] = SCALED_DOUBLE_FACTOR * arg_clip;
-    else
-      b[i] = a[i];
+    for (const int32_t *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256i va = _mm256_load_si256((__m256i *) a);
+
+      va = _mm256_max_epi32(va, zero);
+
+      _mm256_store_si256((__m256i *) b, va);
+    }
+#endif
   }
-
 #endif
 }
 
 local void activation_relu_double(int n,
-  double *restrict a, double *restrict b)
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
 {
   for (int i = 0; i < n; i++)
   {
@@ -870,18 +1031,248 @@ local void activation_relu_double(int n,
   }
 }
 
+#define CLIP_VALUE 6
+
+local void activation_clipped_relu_scaled(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+  //for (int i = 0; i < n; i++) HARDBUG(a[i] > CLIP_VALUE)
+
+#ifdef USE_AVX2_INTRINSICS
+  if (n < 8)
+#endif
+  {
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    for (int i = 0; i < n; i++)
+    {
+      if (a[i] <= 0)
+        b[i] = 0;
+      else if (a[i] >= (scaled_double_t) CLIP_VALUE)
+        b[i] = (scaled_double_t) CLIP_VALUE;
+      else
+        b[i] = a[i];
+    }
+#else
+    for (int i = 0; i < n; i++)
+    {
+      if (a[i] <= 0)
+        b[i] = 0;
+      else if (a[i] >= (SCALED_DOUBLE_FACTOR * CLIP_VALUE))
+        b[i] = (SCALED_DOUBLE_FACTOR * CLIP_VALUE);
+      else
+        b[i] = a[i];
+    }
+#endif
+  }
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+    SOFTBUG((n % 8) != 0)
+
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    const __m256 vz = _mm256_setzero_ps();
+  
+    const __m256 vc = _mm256_set1_ps((scaled_double_t) CLIP_VALUE);
+  
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256 ta = _mm256_load_ps(a);
+  
+      ta = _mm256_max_ps(ta, vz);
+      ta = _mm256_min_ps(ta, vc);
+  
+      _mm256_store_ps(b, ta);
+    }
+#else
+    __m256i zero = _mm256_setzero_si256();
+    __m256i clip = _mm256_set1_epi32(SCALED_DOUBLE_FACTOR * CLIP_VALUE);
+
+    for (const int32_t *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256i va = _mm256_load_si256((__m256i *)a);
+
+      va = _mm256_max_epi32(va, zero);
+      va = _mm256_min_epi32(va, clip);
+
+      _mm256_store_si256((__m256i *)b, va);
+    }
+#endif
+  }
+#endif
+}
+
 local void activation_clipped_relu_double(int n,
-  double *restrict a, double *restrict b, int arg_clip)
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
 {
   for (int i = 0; i < n; i++)
   {
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
     if (a[i] <= 0.0)
       b[i] = 0.0;
-    else if (a[i] >= arg_clip)
-      b[i] = arg_clip;
+    else if (a[i] >= CLIP_VALUE)
+      b[i] = (scaled_double_t) CLIP_VALUE;
     else
       b[i] = a[i];
+#else
+    if (a[i] <= 0.0)
+      b[i] = 0.0;
+    else if (a[i] >= (SCALED_DOUBLE_FACTOR * CLIP_VALUE))
+      b[i] = (scaled_double_t) (SCALED_DOUBLE_FACTOR * CLIP_VALUE);
+    else
+      b[i] = a[i];
+#endif
   }
+}
+
+local void activation_tanh_scaled(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+#ifdef USE_AVX2_INTRINSICS
+  if (n < 8)
+#endif
+  {
+    for (int i = 0; i < n; i++)
+      b[i] = tanhf(a[i]);
+  }
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 half = _mm256_set1_ps(0.5f);
+    const __m256 three_halfs = _mm256_set1_ps(1.5f);
+    const __m256 p = _mm256_set1_ps(2.425f);
+    const __m256 q = _mm256_set1_ps(1.400f);
+
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256 va = _mm256_load_ps(a);
+
+      __m256 va2p = _mm256_add_ps(p, _mm256_mul_ps(va, va));
+
+      __m256 rsqrt = _mm256_rsqrt_ps(va2p);
+
+      //needed for Newton-Raphson
+
+      __m256 rsqrt2 = _mm256_mul_ps(rsqrt, rsqrt);
+
+      rsqrt = _mm256_mul_ps(rsqrt,
+                _mm256_sub_ps(three_halfs,
+                  _mm256_mul_ps(half, _mm256_mul_ps(va2p, rsqrt2))));
+
+      //needed for correction
+
+      rsqrt2 = _mm256_mul_ps(rsqrt, rsqrt);
+
+      __m256 vq = _mm256_add_ps(one, _mm256_mul_ps(q, rsqrt2));
+
+      _mm256_store_ps(b, _mm256_mul_ps(va,
+                           _mm256_mul_ps(rsqrt, vq)));
+    }
+#else
+    for (int i = 0; i < n; i++)
+      b[i] = FLOAT2SCALED(tanhf(SCALED2FLOAT(a[i])));
+#endif
+  }
+#endif
+}
+
+local void activation_tanh_double(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+  for (int i = 0; i < n; i++)
+    b[i] = DOUBLE2SCALED(tanh(SCALED2DOUBLE(a[i])));
+}
+
+local void activation_rsqrt_scaled(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+#ifdef USE_AVX2_INTRINSICS
+  if (n < 8)
+#endif
+  {
+    for (int i = 0; i < n; i++)
+      b[i] = a[i]/sqrtf(1.0f + a[i] * a[i]);
+  }
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 half = _mm256_set1_ps(0.5f);
+    const __m256 three_halfs = _mm256_set1_ps(1.5f);
+
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256 va = _mm256_load_ps(a);
+
+      __m256 va2p1 = _mm256_add_ps(one, _mm256_mul_ps(va, va));
+
+      __m256 rsqrt = _mm256_rsqrt_ps(va2p1);
+
+      __m256 rsqrt2 = _mm256_mul_ps(rsqrt, rsqrt);
+
+      rsqrt = _mm256_mul_ps(rsqrt,
+                _mm256_sub_ps(three_halfs,
+                  _mm256_mul_ps(half, _mm256_mul_ps(va2p1, rsqrt2))));
+
+      _mm256_store_ps(b, _mm256_mul_ps(va, rsqrt));
+    }
+#else
+    for (int i = 0; i < n; i++)
+    {
+      float af = SCALED2FLOAT(a[i]);
+      b[i] = af/sqrtf(1.0f + af * af);
+    }
+#endif
+  }
+#endif
+}
+
+local void activation_rsqrt_double(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+  for (int i = 0; i < n; i++)
+    b[i] = DOUBLE2SCALED(a[i])/
+                         sqrt(1.0 + SCALED2DOUBLE(a[i]) * SCALED2DOUBLE(a[i]));
+}
+
+local void activation_scaled(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+  if (network_shared.NS_activation == NETWORK_ACTIVATION_RELU6)
+  {
+    activation_clipped_relu_scaled(n, a, b);
+  }
+  else if (network_shared.NS_activation == NETWORK_ACTIVATION_TANH)
+  {
+    activation_tanh_scaled(n, a, b);
+  }
+  else if (network_shared.NS_activation == NETWORK_ACTIVATION_RSQRT)
+  {
+    activation_rsqrt_scaled(n, a, b);
+  }
+  else
+    FATAL("unknown activation option", EXIT_FAILURE)
+}
+
+local void activation_double(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+  if (network_shared.NS_activation == NETWORK_ACTIVATION_RELU6)
+  {
+    activation_clipped_relu_double(n, a, b);
+  }
+  else if (network_shared.NS_activation == NETWORK_ACTIVATION_TANH)
+  {
+    activation_tanh_double(n, a, b);
+  }
+  else if (network_shared.NS_activation == NETWORK_ACTIVATION_RSQRT)
+  {
+    activation_rsqrt_double(n, a, b);
+  }
+  else
+    FATAL("unknown activation option", EXIT_FAILURE)
 }
 
 local double return_sigmoid(double x)
@@ -889,124 +1280,88 @@ local double return_sigmoid(double x)
   return(2.0 / (1.0 + exp(-x)) - 1.0);
 }
 
-local void vscalea(int n, scaled_double_t *restrict a)
+int base3_index(const int32_t *embed, int nlinear)
 {
-  BEGIN_BLOCK(__FUNC__)
+  int result = 0;
+  int power = 1;
 
-#ifdef USE_AVX2_INTRINSICS
-
-  SOFTBUG((n % 8) != 0)
-
-  __m256 fs = _mm256_set1_ps(1.0 / 1.0f);
-
-  for (const i32_t *z = a + n; a < z; a += 8)
+  for (int ilinear = 0; ilinear < nlinear; ilinear++)
   {
-    const __m256i ta = _mm256_load_si256((__m256i *)a);
+    result += embed[ilinear] * power;
 
-    const __m256 fm = _mm256_mul_ps(_mm256_cvtepi32_ps(ta), fs);
-
-    _mm256_store_si256((__m256i *)a, _mm256_cvtps_epi32(fm));
+    power *= 3;
   }
-
-#endif
-  END_BLOCK
+  return(result);
 }
 
-double return_network_score_scaled(network_t *arg_network, int arg_with_sigmoid,
-  int arg_skip_inputs)
+//assumes inputs have been set
+
+double return_network_score_scaled(network_thread_t *arg_network)
 {
   BEGIN_BLOCK(__func__)
 
-  //first layer
+  layer_shared_t *with_current = network_shared.NS_layers;
+  layer_thread_t *with_current_thread = arg_network->NT_layers;
 
-  layer_t *with_current = arg_network->N_layers;
+  if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
+      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2))
+  {
+    ALIGN64(scaled_double_t activated_inputs[NINPUTS_MAX]);
+
+    activation_scaled(network_shared.NS_ninputs,
+                      arg_network->NT_inputs, activated_inputs);
+
+    for (int i = 0; i < with_current->LS_noutputs; i++)
+    {
+      with_current_thread->LT_dot[i] =
+        dot_scaled(with_current->LS_ninputs,
+                   activated_inputs,
+                   with_current->LS_weights_noutputsxninputs[i]);
+    }
+  }
+
+  //first layer
 
   BEGIN_BLOCK("Ax+b-and-activation-first-layer")
 
-  if (!arg_skip_inputs)
-  {
-    for (int i = 0; i < with_current->L_noutputs; i++)
-    {
-      with_current->L_sum[i] = 
-        dot_scaled(with_current->L_ninputs,
-                   arg_network->N_inputs,
-                   with_current->L_weights[i]) +
-        with_current->L_bias[i];
-    }
-
-    double inputs_double[NINPUTS_MAX];
-
-    for (int i = 0; i < arg_network->N_ninputs; i++) inputs_double[i] =
-      (double) arg_network->N_inputs[i];
-
-    for (int i = 0; i < with_current->L_noutputs; i++)
-    {
-      with_current->L_sum_double[i] = 
-        dot_double(with_current->L_ninputs,
-                   inputs_double,
-                   with_current->L_weights_double[i]) +
-        with_current->L_bias_double[i];
-
-      with_current->L_sum[i] = 
-        DOUBLE2SCALED(with_current->L_sum_double[i]);
-    }
-  }
+  vadd_cab(with_current->LS_noutputs, with_current_thread->LT_sum,
+           with_current_thread->LT_dot, with_current->LS_bias);
   
   BEGIN_BLOCK("Ax+b-and-activation-first-layer-activation")
 
-  if (arg_network->N_clip_value == 0)
-  {
-    activation_relu_scaled(with_current->L_noutputs,
-      with_current->L_sum, with_current->L_outputs);
-  }
-  else
-  {
-    activation_clipped_relu_scaled(with_current->L_noutputs,
-      with_current->L_sum, with_current->L_outputs,
-      arg_network->N_clip_value);
-  }
+  activation_scaled(with_current->LS_noutputs,
+    with_current_thread->LT_sum, with_current_thread->LT_outputs);
 
   END_BLOCK
 
   END_BLOCK
 
-  for (int ilayer = 1; ilayer < arg_network->N_nlayers; ilayer++)
+  for (int ilayer = 1; ilayer < network_shared.NS_nlayers; ilayer++)
   {
-    with_current = arg_network->N_layers + ilayer;
+    with_current = network_shared.NS_layers + ilayer;
+    with_current_thread = arg_network->NT_layers + ilayer;
 
-    layer_t *with_previous = arg_network->N_layers + ilayer - 1;
+    layer_thread_t *with_previous_thread = arg_network->NT_layers + ilayer - 1;
 
     BEGIN_BLOCK("Ax+b-and-activation-other-layers")
 
-    //if (ilayer == 1)
-    //  vscalea(with_current->L_ninputs, with_previous->L_outputs);
-
-    for (int i = 0; i < with_current->L_noutputs; i++)
+    for (int i = 0; i < with_current->LS_noutputs; i++)
     {
-      with_current->L_dot64[i] = 
-        dot_scaled64(with_current->L_ninputs,
-                     with_previous->L_outputs,
-                     with_current->L_weights[i]);
+      with_current_thread->LT_dot[i] = 
+        dot_scaled(with_current->LS_ninputs,
+                   with_previous_thread->LT_outputs,
+                   with_current->LS_weights_noutputsxninputs[i]);
     }
 
-    add2_64(with_current->L_noutputs, with_current->L_sum,
-            with_current->L_dot64, with_current->L_bias64);
+    vadd_cab(with_current->LS_noutputs, with_current_thread->LT_sum,
+             with_current_thread->LT_dot, with_current->LS_bias);
 
-    if (ilayer < (arg_network->N_nlayers - 1))
+    if (ilayer < (network_shared.NS_nlayers - 1))
     {
       BEGIN_BLOCK("Ax+b-and-activation-other-layers-activation")
 
-      if (arg_network->N_clip_value == 0)
-      {
-        activation_relu_scaled(with_current->L_noutputs,
-          with_current->L_sum, with_current->L_outputs);
-      }
-      else
-      {
-        activation_clipped_relu_scaled(with_current->L_noutputs,
-          with_current->L_sum, with_current->L_outputs,
-          arg_network->N_clip_value);
-      }
+      activation_scaled(with_current->LS_noutputs,
+        with_current_thread->LT_sum, with_current_thread->LT_outputs);
 
       END_BLOCK
     }
@@ -1014,17 +1369,18 @@ double return_network_score_scaled(network_t *arg_network, int arg_with_sigmoid,
     {
       BEGIN_BLOCK("Ax+b-and-activation-other-layers-last-layer")
 
-      for (int i = 0; i < with_current->L_noutputs; i++)
+      for (int i = 0; i < with_current->LS_noutputs; i++)
       {
-        if (arg_network->N_activation_last == NETWORK_ACTIVATION_LINEAR)
+        if (network_shared.NS_activation_last == NETWORK_ACTIVATION_LINEAR)
         {
-          with_current->L_outputs_double[i] =
-            SCALED2DOUBLE(with_current->L_sum[i]);
+          with_current_thread->LT_outputs[i] =
+            with_current_thread->LT_sum[i];
         }
-        else if (arg_network->N_activation_last == NETWORK_ACTIVATION_SIGMOID)
+        else if (network_shared.NS_activation_last ==
+                 NETWORK_ACTIVATION_SIGMOID)
         {
-          with_current->L_outputs_double[i] =
-            return_sigmoid(SCALED2DOUBLE(with_current->L_sum[i]));
+          with_current_thread->LT_outputs[i] =
+            return_sigmoid(with_current_thread->LT_sum[i]);
         }
         else
           FATAL("unknown activation_last option", EXIT_FAILURE)
@@ -1038,83 +1394,84 @@ double return_network_score_scaled(network_t *arg_network, int arg_with_sigmoid,
  
   END_BLOCK
 
-  layer_t *with = arg_network->N_layers + arg_network->N_nlayers - 1;
+  layer_thread_t *with_thread =
+    arg_network->NT_layers + network_shared.NS_nlayers - 1;
 
-  return(with->L_outputs_double[0]);
+  return(SCALED2DOUBLE(with_thread->LT_outputs[0]));
 }
 
-double return_network_score_double(network_t *arg_network, int arg_with_sigmoid)
+double return_network_score_double(network_thread_t *arg_network)
 {
-  double inputs_double[NINPUTS_MAX];
+  layer_shared_t *with_current = network_shared.NS_layers;
+  layer_thread_t *with_current_thread = arg_network->NT_layers;
 
-  layer_t *with_current = arg_network->N_layers;
-
-  for (int i = 0; i < arg_network->N_ninputs; i++)
-    inputs_double[i] = (double) arg_network->N_inputs[i];
-
-  for (int i = 0; i < with_current->L_noutputs; i++)
+  if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
+      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2))
   {
-    with_current->L_sum_double[i] =
-      dot_double(with_current->L_ninputs,
-                 inputs_double,
-                 with_current->L_weights_double[i]) +
-      with_current->L_bias_double[i];
-  }
+    scaled_double_t activated_inputs[NINPUTS_MAX];
 
-  if (arg_network->N_clip_value == 0)
-  {
-    activation_relu_double(with_current->L_noutputs,
-      with_current->L_sum_double, with_current->L_outputs_double);
+    activation_double(network_shared.NS_ninputs,
+                      arg_network->NT_inputs, activated_inputs);
+
+    for (int i = 0; i < with_current->LS_noutputs; i++)
+    {
+      with_current_thread->LT_sum[i] =
+        dot_double(with_current->LS_ninputs,
+                   activated_inputs,
+                   with_current->LS_weights_noutputsxninputs[i]) +
+        with_current->LS_bias[i];
+    }
   }
   else
   {
-    activation_clipped_relu_double(with_current->L_noutputs,
-      with_current->L_sum_double, with_current->L_outputs_double,
-      arg_network->N_clip_value);
+    for (int i = 0; i < with_current->LS_noutputs; i++)
+    {
+      with_current_thread->LT_sum[i] =
+        dot_double(with_current->LS_ninputs,
+                   arg_network->NT_inputs,
+                   with_current->LS_weights_noutputsxninputs[i]) +
+        with_current->LS_bias[i];
+    }
   }
 
-  for (int ilayer = 1; ilayer < arg_network->N_nlayers; ilayer++)
+  activation_double(with_current->LS_noutputs,
+    with_current_thread->LT_sum, with_current_thread->LT_outputs);
+
+  for (int ilayer = 1; ilayer < network_shared.NS_nlayers; ilayer++)
   {
-    with_current = arg_network->N_layers + ilayer;
+    with_current = network_shared.NS_layers + ilayer;
 
-    layer_t *with_previous = arg_network->N_layers + ilayer - 1;
+    with_current_thread = arg_network->NT_layers + ilayer;
 
-    for (int i = 0; i < with_current->L_noutputs; i++)
+    layer_thread_t *with_previous_thread = arg_network->NT_layers + ilayer - 1;
+
+    for (int i = 0; i < with_current->LS_noutputs; i++)
     {
-      with_current->L_sum_double[i] =
-        dot_double(with_current->L_ninputs,
-                   with_previous->L_outputs_double,
-                   with_current->L_weights_double[i]) +
-        with_current->L_bias_double[i];
+      with_current_thread->LT_sum[i] =
+        dot_double(with_current->LS_ninputs,
+                   with_previous_thread->LT_outputs,
+                   with_current->LS_weights_noutputsxninputs[i]) +
+        with_current->LS_bias[i];
     }
 
-    if (ilayer < (arg_network->N_nlayers - 1))
+    if (ilayer < (network_shared.NS_nlayers - 1))
     {
-      if (arg_network->N_clip_value == 0)
-      {
-        activation_relu_double(with_current->L_noutputs,
-          with_current->L_sum_double, with_current->L_outputs_double);
-      }
-      else
-      {
-        activation_clipped_relu_double(with_current->L_noutputs,
-          with_current->L_sum_double, with_current->L_outputs_double,
-          arg_network->N_clip_value);
-      }
+      activation_double(with_current->LS_noutputs,
+        with_current_thread->LT_sum, with_current_thread->LT_outputs);
     }
     else
     {
-      for (int i = 0; i < with_current->L_noutputs; i++)
+      for (int i = 0; i < with_current->LS_noutputs; i++)
       {
-        if (arg_network->N_activation_last == NETWORK_ACTIVATION_LINEAR)
+        if (network_shared.NS_activation_last == NETWORK_ACTIVATION_LINEAR)
         {
-          with_current->L_outputs_double[i] =
-            with_current->L_sum_double[i];
+          with_current_thread->LT_outputs[i] =
+            with_current_thread->LT_sum[i];
         }
-        else if (arg_network->N_activation_last == NETWORK_ACTIVATION_SIGMOID)
+        else if (network_shared.NS_activation_last == NETWORK_ACTIVATION_SIGMOID)
         {
-          with_current->L_outputs_double[i] =
-            return_sigmoid(with_current->L_sum_double[i]);
+          with_current_thread->LT_outputs[i] =
+            return_sigmoid(with_current_thread->LT_sum[i]);
         }
         else
           FATAL("unknown activation_last option", EXIT_FAILURE)
@@ -1122,186 +1479,103 @@ double return_network_score_double(network_t *arg_network, int arg_with_sigmoid)
     }
   }
 
-  layer_t *with = arg_network->N_layers + arg_network->N_nlayers - 1;
+  layer_thread_t *with_thread =
+    arg_network->NT_layers + network_shared.NS_nlayers - 1;
 
-  if (arg_with_sigmoid)
-    return(with->L_outputs_double[0]);
-  else
-    return(with->L_sum_double[0]);
+  return(SCALED2DOUBLE(with_thread->LT_outputs[0]));
 }
 
-void push_network_state(network_t *arg_network)
+//assumes board2pattern has been called
+
+void board2network(board_t *object)
 {
-  layer_t *with = arg_network->N_layers;
+  check_board_patterns_thread(object, (char *) __FUNC__, TRUE);
 
-  HARDBUG(with->L_sum !=
-          arg_network->N_states[arg_network->N_nstate].NS_layer0_sum)
+  network_thread_t *network_thread = &(object->B_network_thread);
 
-  arg_network->N_nstate++;
+  patterns_thread_t *with_patterns_thread = &(network_thread->NT_patterns);
 
-  HARDBUG(arg_network->N_nstate >= NODE_MAX)
+  for (int input = 0; input < network_shared.NS_ninputs; input++)
+    network_thread->NT_inputs[input] = 0;
 
-  network_state_t *state = arg_network->N_states + arg_network->N_nstate;
+  layer_shared_t *with_current = network_shared.NS_layers;
+  layer_thread_t *with_current_thread = network_thread->NT_layers;
 
-  vcopy_ab(with->L_ninputs, arg_network->N_inputs,
-           state->NS_layer0_inputs);
+  for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
+    with_current_thread->LT_dot[ioutput] = 0;
 
-  vcopy_ab(with->L_noutputs, with->L_sum, state->NS_layer0_sum);
-
-  arg_network->N_inputs = state->NS_layer0_inputs;
-
-  with->L_sum = state->NS_layer0_sum;
-}
-
-void pop_network_state(network_t *arg_network)
-{
-  arg_network->N_nstate--;
-
-  HARDBUG(arg_network->N_nstate < 0)
-
-  network_state_t *state = arg_network->N_states + arg_network->N_nstate;
-
-  layer_t *with = arg_network->N_layers;
-
-  arg_network->N_inputs = state->NS_layer0_inputs;
-
-  with->L_sum = state->NS_layer0_sum;
-}
-
-void check_layer0(network_t *arg_network)
-{
-  layer_t *with_current = arg_network->N_layers;
-
-  for (int i = 0; i < with_current->L_noutputs; i++)
+  for (int ipattern = 0; ipattern < patterns_shared.PS_npatterns; ipattern++)
   {
-    i32_t L_sum = 
-      dot_scaled(with_current->L_ninputs,
-                 arg_network->N_inputs,
-                 with_current->L_weights[i]) +
-      with_current->L_bias[i];
+    pattern_shared_t *with_pattern_shared =
+      patterns_shared.PS_patterns + ipattern;
 
-    if (FALSE and (abs(L_sum - with_current->L_sum[i]) > 10))
+    pattern_thread_t *with_pattern_thread =
+      with_patterns_thread->PT_patterns + ipattern;
+
+    int istate = base3_index(with_pattern_thread->PT_embed,
+                             with_pattern_shared->PS_nlinear);
+
+    if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
+        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2))
     {
-      PRINTF("L_sum=%d with-current->L_sum[i]=%d\n",
-             L_sum, with_current->L_sum[i]);
-
-      FATAL("POSSIBLE OVERFLOW?", EXIT_FAILURE)
+      vadd_aba(with_pattern_shared->PS_nembed,
+               network_thread->NT_inputs + with_pattern_shared->PS_offset,
+               with_pattern_shared->PS_weights_nstatesxnembed[istate]);
     }
-  }
-}
-
-void update_layer0(network_t *arg_network, int arg_j, scaled_double_t arg_v)
-{
-  if (options.material_only) return;
-
-  layer_t *with_current = arg_network->N_layers;
-
-  if (arg_v == 1)
-  {
-    vadd_aba(with_current->L_noutputs,
-      with_current->L_sum,
-      with_current->L_weights_transposed[arg_j]);
-  }
-  else if (arg_v == -1)
-  {
-    vsub_aba(with_current->L_noutputs,
-      with_current->L_sum,
-      with_current->L_weights_transposed[arg_j]);
-  } 
-  else
-  {
-    vadd_acba(with_current->L_noutputs,
-      with_current->L_sum, arg_v,
-      with_current->L_weights_transposed[arg_j]);
-  }
-
-  arg_network->N_inputs[arg_j] += arg_v;
-}
-
-void board2network(board_t *object, int arg_debug)
-{
-  scaled_double_t inputs[NINPUTS_MAX];
-
-  network_t *network = &(object->B_network);
-
-  HARDBUG(network->N_ninputs >= NINPUTS_MAX)
-
-  if (arg_debug)
-  {
-    for (int input = 0; input < network->N_ninputs; input++)
-      inputs[input] = network->N_inputs[input];
-  }
-
-  if (network->N_loaded)
-  {
-    network->N_nstate = 0;
-
-    network->N_inputs =
-      network->N_states[0].NS_layer0_inputs;
-  
-    network->N_layers[0].L_sum =
-      network->N_states[0].NS_layer0_sum;
-  
-    for (int input = 0; input < network->N_ninputs; input++)
-      network->N_inputs[input] = 0;
-  }
-
-  patterns_t *with_patterns = network->N_patterns;
-
-  for (int ipattern = 0; ipattern < with_patterns->npatterns; ipattern++)
-  {
-    pattern_t *with_pattern = with_patterns->patterns + ipattern;
-
-    int *mask = object->B_pattern_mask->PM_mask + ipattern;
-
-    int input = with_pattern->P_mask2inputs[*mask];
-
-    if ((*mask & with_pattern->P_valid_mask) == with_pattern->P_valid_mask)
+    else if (network_shared.NS_embedding == NETWORK_EMBEDDING_CONCAT) 
     {
-      //valid or NINPUTS_MAX
-   
-      if (input != NINPUTS_MAX) network->N_inputs[input] = 1;
+      vcopy_ab(with_pattern_shared->PS_nembed,
+               with_pattern_shared->PS_weights_nstatesxnembed[istate],
+               network_thread->NT_inputs + with_pattern_shared->PS_offset);
+
+      vadd_aba(with_current->LS_noutputs, with_current_thread->LT_dot,
+               with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
+    }
+    else  
+      FATAL("unknown embedding", EXIT_FAILURE)
+
+  }
+
+  int nwhite_man = BIT_COUNT(object->B_white_man_bb);
+  int nblack_man = BIT_COUNT(object->B_black_man_bb);
+  int nwhite_king = BIT_COUNT(object->B_white_king_bb);
+  int nblack_king = BIT_COUNT(object->B_black_king_bb);
+
+  for (int imaterial = 0; imaterial < 4; imaterial++)
+  {
+    int istate;
+
+    if (imaterial == 0)
+      istate = nwhite_man;
+    else if (imaterial == 1)
+      istate = nblack_man;
+    else if (imaterial == 2)
+      istate = nwhite_king;
+    else
+      istate = nblack_king;
+
+    material_shared_t *with_material_shared =
+      &(network_shared.NS_material[imaterial]);
+
+    if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
+        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2))
+    {
+      vadd_aba(with_material_shared->MS_nembed,
+               network_thread->NT_inputs + with_material_shared->MS_offset,
+               with_material_shared->MS_weights_nstatesxnembed[istate]);
+    }
+    else if (network_shared.NS_embedding == NETWORK_EMBEDDING_CONCAT)
+    {
+      vcopy_ab(with_material_shared->MS_nembed,
+               with_material_shared->MS_weights_nstatesxnembed[istate],
+               network_thread->NT_inputs + with_material_shared->MS_offset);
+
+      vadd_aba(with_current->LS_noutputs, with_current_thread->LT_dot,
+               with_material_shared->MS_sum[istate]);
     }
     else
-    {
-      HARDBUG(input != INVALID)
-    }
+      FATAL("unknown embedding", EXIT_FAILURE)
   }
-
-  if (network->N__king_weight > 0)
-  {
-    int nwhite_king = BIT_COUNT(object->B_white_king_bb);
-    int nblack_king = BIT_COUNT(object->B_black_king_bb);
-  
-    network->N_inputs[network->N_nwhite_king_input_map] =
-      nwhite_king * network->N__king_weight;
-    network->N_inputs[network->N_nblack_king_input_map] =
-      nblack_king * network->N__king_weight;
-  }
-  else
-  {
-    network->N_inputs[network->N_nwhite_king_input_map] = 0;
-    network->N_inputs[network->N_nblack_king_input_map] = 0;
-  }
-
-  if (arg_debug)
-  {
-    int error = FALSE;
-
-    for (int input = 0; input < network->N_ninputs; input++)
-    {
-      if (inputs[input] != network->N_inputs[input])
-      {
-        PRINTF("input=%d inputs[input]=%d N_inputs[input]=%d\n",
-          input, inputs[input], network->N_inputs[input]);
-
-        error = TRUE;
-      }
-    } 
-    if (error) FATAL("eh?", 1)
-  }
-
-  check_board_patterns(object, (char *) __FUNC__);
 }
 
 local void heap_sort_double(i64_t n, i64_t *p, double *a)
@@ -1368,11 +1642,9 @@ local void update_mean_sigma(long long n, double x,
 
 void fen2network(char *arg_name, i64_t arg_npositions)
 {
-#ifdef USE_OPENMPI
-
   board_t board;
 
-  construct_board(&board, STDOUT, FALSE);
+  construct_board(&board, STDOUT);
 
   board_t *with = &board;
 
@@ -1397,23 +1669,23 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
   i64_t *npieces_fen;
 
-  MY_MALLOC(npieces_fen, i64_t, nfen)
+  MY_MALLOC_BY_TYPE(npieces_fen, i64_t, nfen)
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
     npieces_fen[ifen] = 0;
 
   double *score_scaled, *score_double;
 
-  MY_MALLOC(score_scaled, double, nfen)
-  MY_MALLOC(score_double, double, nfen)
+  MY_MALLOC_BY_TYPE(score_scaled, double, nfen)
+  MY_MALLOC_BY_TYPE(score_double, double, nfen)
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
     score_scaled[ifen] = score_double[ifen] = 0.0;
 
   double *delta_scaled, *delta_double;
 
-  MY_MALLOC(delta_scaled, double, nfen)
-  MY_MALLOC(delta_double, double, nfen)
+  MY_MALLOC_BY_TYPE(delta_scaled, double, nfen)
+  MY_MALLOC_BY_TYPE(delta_double, double, nfen)
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
     delta_scaled[ifen] = delta_double[ifen] = 0.0;
@@ -1434,6 +1706,15 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
   BSTRING(bfen)
 
+  i64_t ntodo = nfen;
+
+  if (my_mpi_globals.MMG_nslaves > 0)
+    ntodo = nfen / my_mpi_globals.MMG_nslaves + 1;
+
+  progress_t progress;
+
+  construct_progress(&progress, ntodo, 10);
+
   for (i64_t ifen = 0; ifen < nfen; ifen++)
   {
     HARDBUG(my_bstream_readln(&my_bstream, TRUE) == BSTR_ERR)
@@ -1442,21 +1723,16 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     if (bchar(bline, 0) == '#') continue;
 
-    if ((my_mpi_globals.MY_MPIG_nslaves > 0) and
-        ((nfen % my_mpi_globals.MY_MPIG_nslaves) !=
-         my_mpi_globals.MY_MPIG_id_slave))
+    if ((my_mpi_globals.MMG_nslaves > 0) and
+        ((ifen % my_mpi_globals.MMG_nslaves) !=
+         my_mpi_globals.MMG_id_slave))
     {
       continue;
     }
 
-    nfen_mpi++;
+    update_progress(&progress);
 
-#ifdef DEBUG
-    if ((nfen_mpi % 1000) == 0) PRINTF("nfen_mpi=%lld\n", nfen_mpi);
-    if (nfen_mpi == 10000) break;
-#else
-    if ((nfen_mpi % 100000) == 0) PRINTF("nfen_mpi=%lld\n", nfen_mpi);
-#endif
+    nfen_mpi++;
 
     CSTRING(cfen, blength(bline))
 
@@ -1468,7 +1744,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     CDESTROY(cfen)
 
-    fen2board(with, bdata(bfen), TRUE);
+    fen2board(with, bdata(bfen));
 
     int nwhite_man = BIT_COUNT(with->B_white_man_bb);
     int nblack_man = BIT_COUNT(with->B_black_man_bb);
@@ -1497,10 +1773,10 @@ void fen2network(char *arg_name, i64_t arg_npositions)
     int mat_score = return_material_score(with);
 
     score_scaled[ifen] =
-      return_network_score_scaled(&(with->B_network), FALSE, FALSE);
+      return_network_score_scaled(&(with->B_network_thread));
 
     score_double[ifen] =
-      return_network_score_double(&(with->B_network), FALSE);
+      return_network_score_double(&(with->B_network_thread));
 
     if (IS_BLACK(with->B_colour2move)) mat_score = -mat_score;
 
@@ -1565,49 +1841,51 @@ void fen2network(char *arg_name, i64_t arg_npositions)
     }
   }
 
+  finalize_progress(&progress);
+
   destroy_my_bstream(&my_bstream);
 
   PRINTF("nfen_mpi=%lld\n", nfen_mpi);
 
   my_mpi_allreduce(MPI_IN_PLACE, &nfen_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   HARDBUG(nfen_mpi != nfen)
 
   my_mpi_allreduce(MPI_IN_PLACE, npieces_fen, nfen,
-    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, score_scaled, nfen,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, score_double, nfen,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, delta_scaled, nfen,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, delta_double, nfen,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, &mse_vs_draw_scaled, 1,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
   my_mpi_allreduce(MPI_IN_PLACE, &mse_vs_draw_double, 1,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
   my_mpi_allreduce(MPI_IN_PLACE, &mse_scaled, 1,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
   my_mpi_allreduce(MPI_IN_PLACE, &mse_double, 1,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, &nnetwork2mat_score_gt_score_man, 1,
-    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, &error_max_scaled_vs_double, 1,
-    MPI_DOUBLE, MPI_MAX, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_MAX, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, &nfactor, 1,
-    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_LONG_LONG_INT, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
   my_mpi_allreduce(MPI_IN_PLACE, &factor, 1,
-    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_DOUBLE, MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   PRINTF("delta npieces\n");
 
@@ -1642,7 +1920,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
   i64_t *pdelta_scaled;
 
-  MY_MALLOC(pdelta_scaled, i64_t, nfen)
+  MY_MALLOC_BY_TYPE(pdelta_scaled, i64_t, nfen)
 
   heap_sort_double(nfen, pdelta_scaled, delta_scaled);
 
@@ -1714,9 +1992,9 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     if (bchar(bline, 0) == '#') continue;
 
-    if ((my_mpi_globals.MY_MPIG_nslaves > 0) and
-        ((nfen % my_mpi_globals.MY_MPIG_nslaves) !=
-         my_mpi_globals.MY_MPIG_id_slave))
+    if ((my_mpi_globals.MMG_nslaves > 0) and
+        ((nfen % my_mpi_globals.MMG_nslaves) !=
+         my_mpi_globals.MMG_id_slave))
     {
       continue;
     }
@@ -1740,7 +2018,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     CDESTROY(cfen)
 
-    fen2board(with, bdata(bfen), TRUE);
+    fen2board(with, bdata(bfen));
 
     moves_list_t moves_list;
 
@@ -1798,19 +2076,19 @@ void fen2network(char *arg_name, i64_t arg_npositions)
     nfen_mpi, nfen_skipped_mpi);
 
   my_mpi_allreduce(MPI_IN_PLACE, &nfen_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, &nfen_skipped_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   HARDBUG(nfen_mpi != nfen)
 
   PRINTF("nfen_skipped=%lld\n", nfen_skipped_mpi);
 
   my_mpi_allreduce(MPI_IN_PLACE, &nfactor, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
   my_mpi_allreduce(MPI_IN_PLACE, &factor, 1, MPI_DOUBLE,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
   
  factor /= nfactor;
 
@@ -1818,63 +2096,83 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
  PRINTF("nfactor=%lld factor=%.6f factor2man_score=%.6f\n",
    nfactor, factor, factor2man_score);
-#endif
 }
 
-#define TAG "w2m-nocapt"
+#define TAG "w2m-embed-patterns-wmbmwkbk"
 
-#define SEP ","
-
-local void append_fen(board_t *self, int arg_king_weight,
+local void append_fen(board_t *self, 
   bstring arg_bfen, double arg_result,
   fbuffer_t *arg_fcsv, fbuffer_t *arg_ffen)
 {
   board_t *object = self;
 
-  patterns_t *with_patterns = object->B_network.N_patterns;
+  patterns_shared_t *with_patterns_shared = &patterns_shared;
+  patterns_thread_t *with_patterns_thread =
+     &(self->B_network_thread.NT_patterns);
 
-  for (int ipattern = 0; ipattern < with_patterns->npatterns; ipattern++)
+  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns; ipattern++)
   {
-    pattern_t *with_pattern = with_patterns->patterns + ipattern;
+    pattern_shared_t *with_pattern_shared = with_patterns_shared->PS_patterns + ipattern;
 
-    int input =
-      with_pattern->P_mask2inputs[object->B_pattern_mask->PM_mask[ipattern]];
+    pattern_thread_t *with_pattern_thread =
+      with_patterns_thread->PT_patterns + ipattern;
 
-    if ((object->B_pattern_mask->PM_mask[ipattern] &
-         with_pattern->P_valid_mask) == with_pattern->P_valid_mask)
-    {
-      if (input == NINPUTS_MAX) input = INVALID;
-    }
-    else
-    {
-      HARDBUG(input != INVALID)
-    }
+    int input = base3_index(with_pattern_thread->PT_embed,
+                            with_pattern_shared->PS_nlinear);
 
-    append_fbuffer(arg_fcsv, "%d" SEP, input);
+    bin_t ibin = input;
+
+    append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
   }
 
   //always W2M
 
   if (IS_BLACK(object->B_colour2move)) arg_result = -arg_result;
 
+  int nwhite_man = BIT_COUNT(object->B_white_man_bb);
+  int nblack_man = BIT_COUNT(object->B_black_man_bb);
   int nwhite_king = BIT_COUNT(object->B_white_king_bb);
   int nblack_king = BIT_COUNT(object->B_black_king_bb);
 
-  append_fbuffer(arg_fcsv, "%3u" SEP "%3u" SEP "%.6f\n",
-    nwhite_king * arg_king_weight, nblack_king * arg_king_weight, arg_result);
+  int input = nwhite_man;
 
-  if (arg_ffen != NULL) append_fbuffer(arg_ffen, "%s {%.6f}\n", bdata(arg_bfen), arg_result);
+  bin_t ibin = input;
+
+  append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+
+  input = nblack_man;
+
+  ibin = input;
+
+  append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+
+  input = nwhite_king;
+
+  ibin = input;
+
+  append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+
+  input = nblack_king;
+
+  ibin = input;
+
+  append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+
+//PRINTF("material=%d\n", input);
+
+  float result = arg_result;
+
+  append_fbuffer_bin(arg_fcsv, &result, sizeof(float));
+
+  append_fbuffer_bin(arg_fcsv, NULL, 0);
+
+  if (arg_ffen != NULL)
+    append_fbuffer_fmt(arg_ffen, "%s {%.6f}\n", bdata(arg_bfen), arg_result);
 }
 
-void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
-  int arg_king_weight)
+void fen2csv(char *arg_name, int arg_nman_min, int arg_nman_max,
+  int arg_nkings_min, int arg_nkings_max)
 {
-#ifdef USE_OPENMPI
-
-  ares = FALSE;
-  if (strstr(arg_name, "v19") != NULL) ares = TRUE;
-  PRINTF("ares=%d\n", ares);
-
   my_random_t fen2csv_random;
 
   options.material_only = TRUE;
@@ -1883,7 +2181,7 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
   board_t board;
 
-  construct_board(&board, STDOUT, TRUE);
+  construct_board(&board, STDOUT);
 
   board_t *with = &board;
 
@@ -1891,13 +2189,19 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
   HARDBUG(bassigncstr(barg_name, arg_name) == BSTR_ERR)
 
+  BSTRING(btag)
+
+  HARDBUG(bformata(btag, "%s-nmanmin%d-nmanmax%d"
+                         "-nkingsmin%d-nkingsmax%d-%s",
+                         TAG, arg_nman_min, arg_nman_max,
+                         arg_nkings_min, arg_nkings_max,
+                         bdata(network_shared.NS_bshape)) == BSTR_ERR)
+
   //training
 
   BSTRING(bsuffix)
 
-  HARDBUG(bformata(bsuffix, "-%s-nman%d-nkings%d-weight%d-%s-training.csv",
-                   TAG, arg_nman_max, arg_nkings_max, arg_king_weight,
-                   bdata(with->B_network.N_bshape)) == BSTR_ERR)
+  HARDBUG(bformata(bsuffix, "-%s-training.bin", bdata(btag)) == BSTR_ERR)
 
   fbuffer_t ftraining;
 
@@ -1907,9 +2211,7 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
   HARDBUG(bassigncstr(bsuffix, "") == BSTR_ERR)
 
-  HARDBUG(bformata(bsuffix, "-%s-nman%d-nkings%d-weight%d-%s-validation.csv",
-                   TAG, arg_nman_max, arg_nkings_max, arg_king_weight,
-                   bdata(with->B_network.N_bshape)) == BSTR_ERR)
+  HARDBUG(bformata(bsuffix, "-%s-validation.bin", bdata(btag)) == BSTR_ERR)
 
   fbuffer_t fvalidation;
 
@@ -1919,9 +2221,7 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
   HARDBUG(bassigncstr(bsuffix, "") == BSTR_ERR)
 
-  HARDBUG(bformata(bsuffix, "-%s-nman%d-nkings%d-weight%d-%s.fen",
-                   TAG, arg_nman_max, arg_nkings_max, arg_king_weight,
-                   bdata(with->B_network.N_bshape)) == BSTR_ERR)
+  HARDBUG(bformata(bsuffix, "-%s.fen", bdata(btag)) == BSTR_ERR)
 
   fbuffer_t ffen;
 
@@ -1933,18 +2233,23 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
   PRINTF("validation_name=%s\n", bdata(return_fbuffer_bname(&fvalidation)));
   PRINTF("fen_name=%s\n", bdata(return_fbuffer_bname(&ffen)));
 
+  my_bstream_t my_bstream;
+
+  construct_my_bstream(&my_bstream, arg_name);
+
   i64_t nfen = 0;
+
+  while (my_bstream_readln(&my_bstream, TRUE) == BSTR_OK) nfen++;
+
+  destroy_my_bstream(&my_bstream);
+
+  PRINTF("nfen=%lld\n", nfen);
+
   i64_t nfen_mpi = 0;
-  i64_t nfen_delta_mpi = 0;
-  i64_t nfen_result_mpi = 0;
-  i64_t nfen_nkings_mpi = 0;
   i64_t nfen_nman_mpi = 0;
-  i64_t nfen_moves_capt_mpi = 0;
-
-  bucket_t bucket_result_root;
-
-  construct_bucket(&bucket_result_root, "bucket_result_root",
-                   SCORE_MAN, SCORE_LOST, SCORE_WON, BUCKET_LINEAR);
+  i64_t nfen_nkings_mpi = 0;
+  i64_t nfen_ncapt_mpi = 0;
+  i64_t nfen_append_mpi = 0;
 
   bucket_t bucket_material_score;
 
@@ -1976,6 +2281,11 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
   construct_bucket(&bucket_nman, "bucket_nman",
                    1, 0, 2 * NPIECES_MAX, BUCKET_LINEAR);
 
+  bucket_t bucket_nkings;
+
+  construct_bucket(&bucket_nkings, "bucket_nkings",
+                   1, 0, 2 * NPIECES_MAX, BUCKET_LINEAR);
+
   BSTRING(bdata_name);
 
   HARDBUG(bassigncstr(bdata_name, "/tmp5/gwies/data.csv") == BSTR_ERR)
@@ -1984,76 +2294,62 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
   construct_fbuffer(&fdata, bdata_name, NULL, TRUE);
 
-  my_bstream_t my_bstream;
-
   construct_my_bstream(&my_bstream, arg_name);
 
   BSTRING(bfen)
 
-  while (my_bstream_readln(&my_bstream, TRUE) == BSTR_OK)
+  progress_t progress;
+
+  i64_t ntodo = nfen;
+
+  if (my_mpi_globals.MMG_nslaves > 0)
+    ntodo = nfen / my_mpi_globals.MMG_nslaves + 1;
+
+  construct_progress(&progress, ntodo, 10);
+
+  for (i64_t ifen = 0; ifen < nfen; ifen++)
   {
+    HARDBUG(my_bstream_readln(&my_bstream, TRUE) == BSTR_ERR)
+
     bstring bline = my_bstream.BS_bline;
 
     if (bchar(bline, 0) == '#') continue;
 
-    if ((nfen % 1000000) == 0) PRINTF("nfen=%lld\n", nfen);
-   
-    if ((my_mpi_globals.MY_MPIG_nslaves > 0) and
-        ((nfen % my_mpi_globals.MY_MPIG_nslaves) !=
-         my_mpi_globals.MY_MPIG_id_slave))
-    {
-      nfen++;
+    if ((my_mpi_globals.MMG_nslaves > 0) and
+        ((ifen % my_mpi_globals.MMG_nslaves) !=
+         my_mpi_globals.MMG_id_slave)) continue;
 
-      continue;
-    }
+    update_progress(&progress);
 
-    nfen++;
     nfen_mpi++;
 
-    double result, result_root, label;
+    double result;
 
     CSTRING(cfen, blength(bline))
 
-    HARDBUG(ares == INVALID)
- 
-    if (ares)
-    {
-      HARDBUG(sscanf(bdata(bline), "%s {%lf}", cfen, &result) != 2)
-    }
-    else
-    {
-      if (sscanf(bdata(bline), "%s {%lf} %*s %lf %lf",
-                 cfen, &result, &result_root, &label) != 4)
-      {
-        PRINTF("bline=%s\n", bdata(bline));
-  
-        FATAL("sscanf != 4", EXIT_FAILURE)
-      }
-    }
+    //ARES convention
+
+    HARDBUG(sscanf(bdata(bline), "%s {%lf}", cfen, &result) != 2)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
-    fen2board(with, bdata(bfen), FALSE);
+    fen2board(with, bdata(bfen));
+
+    if (IS_BLACK(with->B_colour2move)) result = -result;
+
+    //END ARES CONVENTION
 
     CDESTROY(cfen)
 
-    if (ares)
-    {
-      if (IS_BLACK(with->B_colour2move)) result = -result;
+    int nwhite_man = BIT_COUNT(with->B_white_man_bb);
 
-      result_root = result;
-    }
+    int nblack_man = BIT_COUNT(with->B_black_man_bb);
 
-    if (fabs(result - result_root) >= (SCORE_MAN / 4.0))
-    {
-      nfen_delta_mpi++;
+    int nman = nwhite_man + nblack_man;
 
-      continue;
-    }
-
-    if (fabs(result) > 999)
-    {
-      nfen_result_mpi++;
+    if ((nman < arg_nman_min) or (nman > arg_nman_max))
+    {   
+      nfen_nman_mpi++;
 
       continue;
     }
@@ -2062,30 +2358,11 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
     int nblack_kings = BIT_COUNT(with->B_black_king_bb);
 
-    if ((arg_nkings_max == INVALID) and
-        ((nwhite_kings + nblack_kings) == 0))
-    {
+    int nkings = nwhite_kings + nblack_kings;
+
+    if ((nkings < arg_nkings_min) or (nkings > arg_nkings_max))
+    {   
       nfen_nkings_mpi++;
-
-      continue;
-    }
- 
-    if ((arg_nkings_max != INVALID) and
-        ((nwhite_kings > arg_nkings_max) or
-         (nblack_kings > arg_nkings_max)))
-    {
-      nfen_nkings_mpi++;
-
-      continue;
-    }
-
-    int nwhite_man = BIT_COUNT(with->B_white_man_bb);
-
-    int nblack_man = BIT_COUNT(with->B_black_man_bb);
-
-    if ((nwhite_man + nblack_man) > arg_nman_max)
-    {
-      nfen_nman_mpi++;
 
       continue;
     }
@@ -2097,14 +2374,16 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
     if ((moves_list.ML_nmoves <= 1) or
         (moves_list.ML_ncaptx > 0))
     {
-      nfen_moves_capt_mpi++;
+      nfen_ncapt_mpi++;
 
       continue;
     }
 
-    update_bucket(&bucket_result_root, result_root);
+    nfen_append_mpi++;
 
     int material_score = return_material_score(with);
+
+    update_bucket(&bucket_material_score, material_score);
 
     update_bucket(&bucket_nwhite_man, nwhite_man);
 
@@ -2114,15 +2393,9 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
     update_bucket(&bucket_nblack_kings, nblack_kings);
 
-    update_bucket(&bucket_material_score, material_score);
+    update_bucket(&bucket_nman, nman);
 
-    update_bucket(&bucket_nman, nwhite_man + nblack_man);
-
-    if (!ares)
-    {
-      result = result_root;
-      result *= 0.001;
-    }
+    update_bucket(&bucket_nkings, nkings);
 
     {
       int delta_nman = nwhite_man - nblack_man;
@@ -2133,24 +2406,28 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
       if (IS_BLACK(with->B_colour2move)) result_wtm = -result_wtm;
 
-      append_fbuffer(&fdata, "%d,%d,%d,%.6f\n",
-        delta_nman, delta_nkings, nman, result_wtm);
+      append_fbuffer_fmt(&fdata, "%d,%d,%.6f\n",
+        delta_nman, delta_nkings, result_wtm);
     }
 
     int prob = return_my_random(&fen2csv_random) % 100;
 
     if (prob <= 79) 
     {
-      append_fen(with, arg_king_weight, bfen, result, &ftraining, NULL);
+      append_fen(with, bfen, result, &ftraining, NULL);
     }
     else
     {
-      append_fen(with, arg_king_weight, bfen, result, &fvalidation, &ffen);
+      append_fen(with, bfen, result, &fvalidation, &ffen);
     }
   }
 
+  finalize_progress(&progress);
+
   destroy_my_bstream(&my_bstream);
 
+  flush_fbuffer(&ftraining, 0);
+  flush_fbuffer(&fvalidation, 0);
   flush_fbuffer(&fdata, 0);
 
   BDESTROY(bfen)
@@ -2158,54 +2435,49 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
   BDESTROY(bdata_name)
 
   my_mpi_allreduce(MPI_IN_PLACE, &nfen_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-
-  my_mpi_allreduce(MPI_IN_PLACE, &nfen_delta_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-
-  my_mpi_allreduce(MPI_IN_PLACE, &nfen_result_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
-
-  my_mpi_allreduce(MPI_IN_PLACE, &nfen_nkings_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE, &nfen_nman_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
-  my_mpi_allreduce(MPI_IN_PLACE, &nfen_moves_capt_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+  my_mpi_allreduce(MPI_IN_PLACE, &nfen_nkings_mpi, 1, MPI_LONG_LONG_INT,
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
+
+  my_mpi_allreduce(MPI_IN_PLACE, &nfen_ncapt_mpi, 1, MPI_LONG_LONG_INT,
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
+
+  my_mpi_allreduce(MPI_IN_PLACE, &nfen_append_mpi, 1, MPI_LONG_LONG_INT,
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   HARDBUG(nfen_mpi != nfen)
 
   PRINTF("nfen=%lld\n", nfen);
-  PRINTF("nfen_delta_mpi=%lld\n", nfen_delta_mpi);
-  PRINTF("nfen_result_mpi=%lld\n", nfen_result_mpi);
-  PRINTF("nfen_nkings_mpi=%lld\n", nfen_nkings_mpi);
+  PRINTF("nfen_mpi=%lld\n", nfen_mpi);
   PRINTF("nfen_nman_mpi=%lld\n", nfen_nman_mpi);
-  PRINTF("nfen_moves_capt_mpi=%lld\n", nfen_moves_capt_mpi);
-
-  my_mpi_bucket_aggregate(&bucket_result_root,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+  PRINTF("nfen_nkings_mpi=%lld\n", nfen_nkings_mpi);
+  PRINTF("nfen_ncapt_mpi=%lld\n", nfen_ncapt_mpi);
+  PRINTF("nfen_append_mpi=%lld\n", nfen_append_mpi);
 
   my_mpi_bucket_aggregate(&bucket_material_score,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nwhite_man,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nblack_man,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nwhite_kings,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nblack_kings,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nman,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
-  printf_bucket(&bucket_result_root);
+  my_mpi_bucket_aggregate(&bucket_nkings,
+    my_mpi_globals.MMG_comm_slaves);
 
   printf_bucket(&bucket_material_score);
 
@@ -2219,6 +2491,8 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
   printf_bucket(&bucket_nman);
 
+  printf_bucket(&bucket_nkings);
+
   //write remaining
 
   flush_fbuffer(&ffen, 0);
@@ -2229,11 +2503,15 @@ void fen2csv(char *arg_name, int arg_nman_max, int arg_nkings_max,
 
   BDESTROY(bsuffix)
 
+  BDESTROY(btag)
+
   BDESTROY(barg_name)
-#endif
 }
 
-void test_network(void)
-{ 
+void init_networks(void)
+{
+  init_base64_table();
+
+  construct_network_shared(&network_shared, TRUE);
 }
 

@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #undef ALIGN8
@@ -243,7 +243,7 @@ void construct_cache(void *self, char *arg_cache_name, i64_t arg_cache_size,
 
   //copy the default key value
 
-  MY_MALLOC(object->C_entry_key_default, i8_t,
+  MY_MALLOC_BY_TYPE(object->C_entry_key_default, i8_t,
     object->C_entry_key_size)
 
   memcpy(object->C_entry_key_default, arg_entry_key_default,
@@ -265,7 +265,7 @@ void construct_cache(void *self, char *arg_cache_name, i64_t arg_cache_size,
 
   HARDBUG(object->C_nentries < 3)
 
-  MY_MALLOC(object->C_entry_values, i8_t,
+  MY_MALLOC_BY_TYPE(object->C_entry_values, i8_t,
     CACHE_ENTRY_SIZE(object) * object->C_nentries)
 
   memcpy(object->C_entry_values, object->C_entry_key_default,

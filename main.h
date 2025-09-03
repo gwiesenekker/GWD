@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef MainH
 #define MainH
 
@@ -53,23 +53,23 @@ typedef struct
   int captures_are_transparent;
   int returned_depth_includes_captures;
 
+  int quiescence_evaluation_policy;
   int quiescence_extension_search_delta;
   int pv_extension_search_delta;
+
+  int aspiration_window;
 
   int use_reductions;
 
   int reduction_depth_root;
   int reduction_depth_leaf;
+  int reduction_moves_min;
 
-  int reduction_mean;
-  int reduction_sigma;
-
-  int reduction_delta;
-  int reduction_max;
-  int reduction_strong;
-  int reduction_weak;
-  int reduction_min;
-  int nreductions;
+  int reduction_full_min;
+  int reduction_strength;
+  int reduction_probes;
+  int reduction_probe_window;
+  int reduction_research_window;
 
   int use_single_reply_extensions;
 
@@ -78,11 +78,11 @@ typedef struct
   i64_t alpha_beta_cache_size;
   int pv_cache_fraction;
 
+  i64_t score_cache_size;
+
   int nthreads_alpha_beta;
 
   int lazy_smp_policy;
-
-  int nslaves;
 
   char ipc_dir[MY_LINE_MAX];
  

@@ -1,15 +1,17 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef MovesH
 #define MovesH
 
-#define MOVES_MAX       128
+#define NMOVES_MAX       128
 #define MOVE_STRING_MAX 128
 
 #define MOVE_DO_NOT_REDUCE_BIT        BIT(0)
 #define MOVE_EXTEND_IN_QUIESCENCE_BIT BIT(1)
+#define MOVE_KING_BIT                 BIT(2)
 
 #define MOVE_DO_NOT_REDUCE(F)        ((F) & MOVE_DO_NOT_REDUCE_BIT)
 #define MOVE_EXTEND_IN_QUIESCENCE(F) ((F) & MOVE_EXTEND_IN_QUIESCENCE_BIT)
+#define MOVE_KING(F)                 ((F) & MOVE_KING_BIT)
 
 typedef struct
 {
@@ -24,10 +26,11 @@ typedef struct
   int ML_ncaptx;
 
   int ML_nblocked;
-  move_t ML_moves[MOVES_MAX];
+  int ML_nsafe;
+  move_t ML_moves[NMOVES_MAX];
 
-  int ML_move_weights[MOVES_MAX];
-  int ML_move_flags[MOVES_MAX];
+  int ML_move_weights[NMOVES_MAX];
+  int ML_move_flags[NMOVES_MAX];
 } moves_list_t;
 
 //moves.c
@@ -47,8 +50,6 @@ typedef struct
 #define undo_the_move(X) cat3(undo_, X, _move)
 #define undo_my_move     undo_the_move(my_colour)
 #define undo_your_move   undo_the_move(your_colour)
-
-void update_patterns_and_layer0(board_t *, int, int, int);
 
 void gen_white_moves(board_t *, moves_list_t *, int);
 void gen_black_moves(board_t *, moves_list_t *, int);

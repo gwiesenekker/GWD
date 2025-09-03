@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef BoardsH
 #define BoardsH
 
@@ -100,9 +100,7 @@ typedef struct board
 
   node_t B_nodes[NODE_MAX];
 
-  pattern_mask_t *B_pattern_mask;
-
-  network_t B_network;
+  network_thread_t B_network_thread;
 
   char B_string[MY_LINE_MAX];
 
@@ -110,9 +108,9 @@ typedef struct board
   board_state_t B_states[NODE_MAX];
 } board_t;
 
-extern int map[1 + 50];
+extern int square2field[1 + 50];
 
-extern int inverse_map[BOARD_MAX];
+extern int field2square[BOARD_MAX];
 
 extern char *nota[BOARD_MAX];
 
@@ -135,17 +133,17 @@ extern ui64_t right_half_bb;
 extern ui64_t white_row_empty_bb;
 extern ui64_t black_row_empty_bb;
 
-void construct_board(void *, my_printf_t *, int);
+void construct_board(void *, my_printf_t *);
 void push_board_state(void *self);
 void pop_board_state(void *self);
 
 hash_key_t return_key_from_bb(void *);
-void string2board(board_t *, char *, int);
-void fen2board(board_t *, char *, int);
+void string2board(board_t *, char *);
+void fen2board(board_t *, char *);
 void board2fen(board_t *, bstring, int);
 void print_board(board_t *);
 void init_boards();
-void state2board(board_t *, state_t *);
+void state2board(board_t *, game_state_t *);
 char *board2string(board_t *, int);
 
 //boards.d

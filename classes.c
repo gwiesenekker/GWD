@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 //objects are derived from a class
@@ -66,7 +66,7 @@ class_t *init_class(int nobjects_max, ctor_t arg_ctor, dtor_t arg_dtor, iter_t a
 {
   class_t *self;
  
-  MY_MALLOC(self, class_t, 1)
+  MY_MALLOC_BY_TYPE(self, class_t, 1)
 
   //the class keeps track of the (number of) created objects
 
@@ -76,7 +76,7 @@ class_t *init_class(int nobjects_max, ctor_t arg_ctor, dtor_t arg_dtor, iter_t a
 
   self->object_id = 0;
 
-  MY_MALLOC(self->objects, void *, nobjects_max)
+  MY_MALLOC_BY_TYPE(self->objects, void *, nobjects_max)
 
   for (int iobject = 0; iobject < nobjects_max; iobject++)
    self->objects[iobject] = NULL;
@@ -163,7 +163,7 @@ local void *construct_my_object(void)
 {
   my_object_t *object;
   
-  MY_MALLOC(object, my_object_t, 1)
+  MY_MALLOC_BY_TYPE(object, my_object_t, 1)
 
   //call the class 'constructor'
 

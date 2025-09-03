@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 mcts_globals_t mcts_globals;
@@ -72,6 +72,8 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
 int mcts_search(search_t *object, int arg_root_score, int arg_nply,
   int arg_mcts_depth, moves_list_t *arg_moves_list, int *arg_best_pv, int arg_verbose)
 {
+  PUSH_NAME(__FUNC__)
+
   int best_score = SCORE_PLUS_INFINITY;
   *arg_best_pv = INVALID;
 
@@ -125,7 +127,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
     goto label_return;
   }
 
-  int sort[MOVES_MAX];
+  int sort[NMOVES_MAX];
 
   shuffle(sort, arg_moves_list->ML_nmoves, &mcts_random);
 
@@ -264,10 +266,12 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
 
     if ((arg_nply == 0) and arg_verbose)
     { 
+      print_board(&(object->S_board));
+
       move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-      PRINTF("depth=%d move=%s best_score=%d\n",
-             depth, bdata(bmove_string), best_score);
+      my_printf(object->S_my_printf, "depth=%d move=%s best_score=%d\n",
+                depth, bdata(bmove_string), best_score);
     }
 
     for (int imove = 1; imove < arg_moves_list->ML_nmoves; imove++)
@@ -318,13 +322,12 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
       best_score = temp_score;
       *arg_best_pv = jmove;
 
-
       if ((arg_nply == 0) and arg_verbose)
       {
         move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-        PRINTF("depth=%d move=%s best_score>=%d\n",
-               depth, bdata(bmove_string), best_score);
+        my_printf(object->S_my_printf, "depth=%d move=%s best_score>=%d\n",
+                  depth, bdata(bmove_string), best_score);
       }
 
       window = SCORE_MAN / 4;
@@ -371,8 +374,8 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
       {
         move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-        PRINTF("depth=%d move=%s best_score==%d\n",
-               depth, bdata(bmove_string), best_score);
+        my_printf(object->S_my_printf, "depth=%d move=%s best_score==%d\n",
+                  depth, bdata(bmove_string), best_score);
       }
 
       undo_move(&(object->S_board), jmove, arg_moves_list);
@@ -382,8 +385,8 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
     {
       move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-      PRINTF("depth=%d move=%s best_score===%d\n",
-             depth, bdata(bmove_string), best_score);
+      my_printf(object->S_my_printf, "depth=%d move=%s best_score===%d\n",
+                depth, bdata(bmove_string), best_score);
     }
 
     if (depth >= arg_mcts_depth)
@@ -404,13 +407,15 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
   {
     move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-    PRINTF("depth=%d move=%s best_score====%d\n",
-           depth, bdata(bmove_string), best_score);
+    my_printf(object->S_my_printf, "depth=%d move=%s best_score====%d\n",
+              depth, bdata(bmove_string), best_score);
   }
 
   label_return:
 
   BDESTROY(bmove_string)
+
+  POP_NAME(__FUNC__)
 
   return(best_score);
 }
@@ -421,7 +426,7 @@ local int mcts_shoot_out(search_t *object, int arg_nply, int arg_mcts_depth)
   {
     print_board(&(object->S_board));
 
-    PRINTF("WARNING: VERY DEEP SEARCH\n");
+    my_printf(object->S_my_printf, "WARNING: VERY DEEP SEARCH\n");
   }
 
   moves_list_t moves_list;
@@ -501,7 +506,8 @@ double mcts_shoot_outs(search_t *object, int arg_nply,
     {
       HARDBUG(arg_mcts_time_limit >= 0.0)
 
-      PRINTF("time limit in mcts_shoot_outs ishoot_out=%d!\n", ishoot_out);
+      my_printf(object->S_my_printf,
+                "time limit in mcts_shoot_outs ishoot_out=%d!\n", ishoot_out);
 
       *arg_nshoot_outs = ishoot_out;
 
@@ -516,14 +522,15 @@ double mcts_shoot_outs(search_t *object, int arg_nply,
       (*arg_ndraw)++;
   }
 
-  if (*arg_nshoot_outs == 0) PRINTF("WARNING: *nshoot_outs == 0\n");
+  if (*arg_nshoot_outs == 0)
+    my_printf(object->S_my_printf, "WARNING: *nshoot_outs == 0\n");
 
   if ((*arg_nwon + *arg_nlost) > 0)
     result = (double) (*arg_nwon - *arg_nlost) / (*arg_nwon + *arg_nlost);
 
-  PRINTF("*nshoot_outs=%d time=%.2f"
-         " *nwon=%d *nlost=%d *ndraw=%d result=%.6f"
-         " (%.2f shoot_outs/second)\n",
+  my_printf(object->S_my_printf, "*nshoot_outs=%d time=%.2f"
+            " *nwon=%d *nlost=%d *ndraw=%d result=%.6f"
+            " (%.2f shoot_outs/second)\n",
          *arg_nshoot_outs, return_my_timer(&mcts_timer, FALSE),
          *arg_nwon, *arg_nlost, *arg_ndraw, result,
          *arg_nshoot_outs / return_my_timer(&mcts_timer, FALSE));
@@ -533,7 +540,7 @@ double mcts_shoot_outs(search_t *object, int arg_nply,
 
 void init_mcts(void)
 {
-  if (my_mpi_globals.MY_MPIG_nslaves == 1)
+  if (my_mpi_globals.MMG_nslaves == 1)
     construct_my_random(&mcts_random, 0);
   else
     construct_my_random(&mcts_random, INVALID);

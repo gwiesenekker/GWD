@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef TimersH
 #define TimersH
 
@@ -21,6 +21,18 @@ typedef struct
 
 typedef struct
 {
+  my_timer_t P_timer;
+  i64_t P_ntodo;
+  double P_seconds;
+  i64_t P_ndone;
+  i64_t P_ndone_previous;
+  double P_seconds_done;
+  double P_seconds_previous;
+  i64_t P_ndelta;
+} progress_t;
+
+typedef struct
+{
   int TC_game_time;
   int TC_ngame_moves;
   double TC_game_time_per_move[NODE_MAX];
@@ -31,6 +43,11 @@ void reset_my_timer(my_timer_t *);
 double return_my_timer(my_timer_t *, int);
 void stop_my_timer(my_timer_t *);
 void start_my_timer(my_timer_t *);
+
+void construct_progress(progress_t *, i64_t, double);
+void update_progress(progress_t *);
+void finalize_progress(progress_t *);
+i64_t return_ndone(progress_t *);
 
 void configure_time_control(int, int, time_control_t *);
 void update_time_control(int, double, time_control_t *);

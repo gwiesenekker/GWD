@@ -1,93 +1,83 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef NetworksH
 #define NetworksH
 
 //network.c
 
-#define NETWORK_KING_WEIGHT_ARES        -2
-#define NETWORK_KING_WEIGHT_GWD         -3
+#define NETWORK_EMBEDDING_SUM           1
+#define NETWORK_EMBEDDING_SUM2          2
+#define NETWORK_EMBEDDING_CONCAT        3
 
-#define NETWORK_ACTIVATION_RELU         4
-#define NETWORK_ACTIVATION_CLIPPED_RELU 5
+#define NETWORK_ACTIVATION_RELU6        3
+#define NETWORK_ACTIVATION_TANH         4
+#define NETWORK_ACTIVATION_RSQRT        5
 #define NETWORK_ACTIVATION_LINEAR       6
 #define NETWORK_ACTIVATION_SIGMOID      7
 
-#define SCALED_DOUBLE_FACTOR 10000
-#define SCALED_DOUBLE_MAX    L_MAX
-#define SCALED_DOUBLE_MIN    L_MIN
-
-typedef i32_t scaled_double_t;
-
-#define DOUBLE2SCALED(D) (round((D) * SCALED_DOUBLE_FACTOR))
-#define SCALED2DOUBLE(S) ((double) (S) / SCALED_DOUBLE_FACTOR)
-
-#define NINPUTS_MAX 8192
+#define NINPUTS_MAX 2048
 #define NLAYERS_MAX 8
 
 typedef struct
 {
-  scaled_double_t *NS_layer0_inputs;
-  i32_t *NS_layer0_sum;
-} network_state_t;
+  int LS_ninputs;
+  int LS_noutputs;
+
+  scaled_double_t **LS_weights_noutputsxninputs;
+  scaled_double_t **LS_weights_ninputsxnoutputs;
+  scaled_double_t *LS_bias;
+} layer_shared_t;
 
 typedef struct
 {
-  int L_ninputs;
-  int L_noutputs;
-
-  scaled_double_t **L_weights;
-  scaled_double_t **L_weights_transposed;
-  scaled_double_t *L_bias;
-  i64_t *L_bias64;
-  i64_t *L_dot64;
-  scaled_double_t *L_sum;
-  scaled_double_t *L_outputs;
-
-  double **L_weights_double;
-  double **L_weights_transposed_double;
-  double *L_bias_double;
-  double *L_sum_double;
-  double *L_outputs_double;
-} layer_t;
+  scaled_double_t *LT_dot;
+  scaled_double_t *LT_sum;
+  scaled_double_t *LT_outputs;
+} layer_thread_t;
 
 typedef struct
 {  
-  bstring N_bshape;
+  bstring NS_bshape;
 
-  int N_nwhite_king_input_map;
-  int N_nblack_king_input_map;
-   
-  int N_ninputs;
-  int N_loaded;
+  int NS_ninputs_patterns;
+  int NS_ninputs_material;
+  int NS_ninputs;
+  int NS_loaded;
 
-  double N_network2material_score;
-  int N__king_weight;
-  int N_clip_value;
-  int N_activation_last;
+  double NS_network2material_score;
+  int NS_embedding;
+  int NS_activation;
+  int NS_activation_last;
+  int NS_nman_min;  
+  int NS_nman_max;
 
-  int N_nlayers;
+  material_shared_t NS_material[4];
 
-  scaled_double_t *N_inputs;
+  int NS_nlayers;
 
-  layer_t N_layers[NLAYERS_MAX];
+  layer_shared_t NS_layers[NLAYERS_MAX];
+} network_shared_t;
 
-  int N_nstate;
-  network_state_t N_states[NODE_MAX];
+typedef struct
+{
+  patterns_thread_t NT_patterns;
+  scaled_double_t *NT_inputs;
+  layer_thread_t NT_layers[NLAYERS_MAX];
+} network_thread_t;
 
-  patterns_t *N_patterns;
-} network_t;
+extern int load_network;
+extern network_shared_t network_shared;
 
-void check_layer0(network_t *);
-double return_network_score_scaled(network_t *, int, int);
-double return_network_score_double(network_t *, int);
-void push_network_state(network_t *);
-void pop_network_state(network_t *);
-void update_layer0(network_t *, int, scaled_double_t);
-void construct_network(network_t *, int, int);
-void board2network(board_t *, int);
+void construct_network_shared(network_shared_t *, int);
+void construct_network_thread(network_thread_t *, int);
+int base3_index(const int32_t *, int);
+void vadd_aba(int, scaled_double_t *restrict, scaled_double_t *restrict);
+void vcopy_ab(int n, scaled_double_t *, scaled_double_t *b);
+double return_network_score_scaled(network_thread_t *);
+double return_network_score_double(network_thread_t *);
+void board2network(board_t *);
 void fen2network(char *, i64_t);
-void fen2csv(char *, int, int, int);
-void test_network(void);
+void fen2csv(char *, int, int, int, int);
+void init_networks(void);
 
 #endif
 

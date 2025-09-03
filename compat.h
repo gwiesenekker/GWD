@@ -1,21 +1,37 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef CompatH
 #define CompatH
 
-#define COMPAT_OS_LINUX     1
-#define COMPAT_OS_WINDOWS   2
-#define COMPAT_CSTD_C11     3
-#define COMPAT_CSTD_WIN     4
-#define COMPAT_CSTD_PTHREAD 5
+#define COMPAT_OS_LINUX     11
+#define COMPAT_OS_WINDOWS   12
+
+#define COMPAT_CSTD_C11     21
+#define COMPAT_CSTD_WIN     22
+#define COMPAT_CSTD_PTHREAD 23
+
+#define COMPAT_ARCH_X86_64  31
+#define COMPAT_ARCH_AARCH64 32
 
 #ifdef _WIN32
+
 #define COMPAT_OS   COMPAT_OS_WINDOWS
-
 #define COMPAT_CSTD COMPAT_CSTD_WIN
-#else
-#define COMPAT_OS   COMPAT_OS_LINUX
 
+#else
+
+#define COMPAT_OS   COMPAT_OS_LINUX
 #define COMPAT_CSTD COMPAT_CSTD_PTHREAD
+
+#endif
+
+#ifdef __aarch64__
+
+#define COMPAT_ARCH COMPAT_ARCH_AARCH64
+
+#else
+
+#define COMPAT_ARCH COMPAT_ARCH_X86_64
+
 #endif
 
 #if COMPAT_OS == COMPAT_OS_LINUX
@@ -29,13 +45,13 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <mm_malloc.h>
-#include <smmintrin.h>
-#include <immintrin.h>
+
 #include <fcntl.h>
+#include <sys/random.h>
 
 #define ALIGN64(X) X __attribute__((aligned(64)))
 
-#define MALLOC(P, S) (P) = _mm_malloc(S, 64);
+#define COMPAT_MALLOC(P, S) (P) = _mm_malloc(S, 64);
 #define FREE(P) _mm_free(P);
 
 #define BIT_COUNT(ULL)   (int) __builtin_popcountll(ULL)
@@ -55,6 +71,7 @@ typedef int pipe_t;
 #include <process.h>
 #include <direct.h>
 #include <intrin.h>
+#include <bcrypt.h>
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <WinSock2.h>
@@ -64,13 +81,14 @@ typedef int pipe_t;
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "libzstd.lib")
+#pragma comment(lib, "bcrypt.lib")
 #pragma comment(linker, "/STACK:16777216")
 
 #define F_OK 0
 
 #define ALIGN64(X) __declspec(align(64)) X
 
-#define MALLOC(P, S) (P) = _aligned_malloc(S, 64);
+#define COMPAT_MALLOC(P, S) (P) = _aligned_malloc(S, 64);
 #define FREE(P) _aligned_free(P);
 
 #define BIT_COUNT(ULL)   (int) __popcnt64(ULL)
@@ -93,6 +111,25 @@ typedef HANDLE my_thread_t;
 #include <pthread.h>
 typedef pthread_mutex_t my_mutex_t;
 typedef pthread_t my_thread_t;
+#endif
+
+#if COMPAT_ARCH == COMPAT_ARCH_X86_64
+#include <smmintrin.h>
+#include <immintrin.h>
+
+#define HW_CRC32_U8  _mm_crc32_u8
+#define HW_CRC32_U16 _mm_crc32_u16
+#define HW_CRC32_U32 _mm_crc32_u32
+#define HW_CRC32_U64 _mm_crc32_u64
+
+#else
+#include <arm_acle.h>
+
+#define HW_CRC32_U8  __crc32b
+#define HW_CRC32_U16 __crc32h
+#define HW_CRC32_U32 __crc32w
+#define HW_CRC32_U64 __crc32d
+
 #endif
 
 typedef void *(*my_thread_func_t)(void *);
@@ -144,6 +181,8 @@ int compat_poll(void);
 
 int compat_access(char *, int);
 
+i64_t compat_size(char *);
+
 int compat_dup2(int, int);
 
 int compat_chdir(char *);
@@ -162,6 +201,8 @@ void compat_sleep(double);
 
 double compat_time(void);
 
+i64_t compat_getpid(void);
+
 //threads
 unsigned long compat_pthread_self(void);
 
@@ -173,6 +214,8 @@ int compat_mutex_destroy(my_mutex_t *);
 
 void compat_thread_create(my_thread_t *, my_thread_func_t, void *);
 void compat_thread_join(my_thread_t);
+
+void compat_getrandom_u64(ui64_t *);
 
 #endif
 

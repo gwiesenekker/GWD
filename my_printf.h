@@ -1,26 +1,36 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef MyPrintfH
 #define MyPrintfH
 
 typedef struct 
 {
-  int my_printf2stdout;
+  int MP2stdout;
 
-  bstring my_printf_bname;
+  bstring MP_bname;
 
-  FILE *my_printf_flog;
+  FILE *MP_flog;
 
-  long my_printf_fsize;
+  long MP_fsize;
 
-  bstring my_printf_bbuffer;
+  bstring MP_bformat;
+  bstring MP_bbuffer;
 
-  my_mutex_t my_printf_mutex;
+  bstring MP_bline;
+  bstring MP_bstamp;
+
+  my_mutex_t MP_mutex;
+
+  int MP_paused;
 } my_printf_t;
+
+extern bstring my_printf_logs_dir;
 
 //my_printf.c
 
-void construct_my_printf(void *, char *, int);
-void my_printf(void *, char *, ...);
+void construct_my_printf(my_printf_t *, char *, int);
+void my_printf(my_printf_t *, char *, ...) __attribute__((format(printf, 2, 3)));
+void pause_my_printf(my_printf_t *);
+void resume_my_printf(my_printf_t *);
 void init_my_printf(void);
 void test_my_printf(void);
 

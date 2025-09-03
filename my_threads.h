@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef ThreadsH
 #define ThreadsH
 
@@ -8,20 +8,20 @@ typedef struct
 {
   int thread_role;
 
-  my_printf_t thread_my_printf;
+  my_printf_t T_my_printf;
 
-  my_random_t thread_random;
+  my_random_t T_random;
 
-  queue_t thread_queue;
+  queue_t T_queue;
 
-  my_thread_t thread;
+  my_thread_t T_thread;
 
-  my_timer_t thread_idle_timer;
-  my_timer_t thread_busy_timer;
+  my_timer_t T_idle_timer;
+  my_timer_t T_busy_timer;
 
-  search_t thread_search;
+  search_t T_search;
 
-  double thread_idle;
+  double T_idle;
 } thread_t;
 
 extern thread_t threads[NTHREADS_MAX];

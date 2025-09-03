@@ -1,9 +1,9 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define NPAD (4 * 64)
 
-#define NMY_LEAKS_MAX 1024
+#define NMY_NAMES_MAX 1024
 
 typedef struct
 {
@@ -32,24 +32,24 @@ typedef struct
 
 typedef struct
 {
-  char *ML_name;
-  char *ML_file;
-  const char *ML_func;
-  int ML_line;
-  unsigned long ML_pthread_self;
-} my_leak_t;
+  char *MN_name;
+  char *MN_file;
+  const char *MN_func;
+  int MN_line;
+  unsigned long MN_pthread_self;
+} my_name_t;
 
 local my_random_t my_malloc_random;
 local int nmy_mallocs_max = 128;
 local int nmy_mallocs = 0;
 local my_malloc_t *my_mallocs = NULL;
 
-local int nmy_leaks = 0;
-local my_leak_t *my_leaks = NULL;
+local int nmy_names = 0;
+local my_name_t *my_names = NULL;
 
 local my_mutex_t my_malloc_mutex;
 
-local my_mutex_t my_leak_mutex;
+local my_mutex_t my_names_mutex;
 
 #include "xxhash.h"
 
@@ -292,14 +292,14 @@ void *my_malloc(char *arg_name, char *arg_file, const char *arg_func,
 {
   void *result;
 
-  MALLOC(result, NPAD + arg_size + NPAD)
+  COMPAT_MALLOC(result, NPAD + arg_size + NPAD)
 
   if (result == NULL)
   {
-    PRINTF("MALLOC ERROR name=%s file=%s func=%s line=%d size=%zu\n",
+    PRINTF("COMPAT_MALLOC ERROR name=%s file=%s func=%s line=%d size=%zu\n",
            arg_name, arg_file, arg_func, arg_line, arg_size);
 
-    FATAL("MALLOC ERROR", EXIT_FAILURE)
+    FATAL("COMPAT_MALLOC ERROR", EXIT_FAILURE)
   }
 
   register_heap(arg_name, arg_file, arg_func, arg_line,
@@ -317,93 +317,93 @@ void my_free(void *arg_pointer)
   FREE(heap)
 }
 
-void print_my_leaks(int arg_all)
+void print_my_names(int arg_all)
 {
-  for (int ileak = nmy_leaks - 1; ileak >= 0; --ileak)
+  for (int iname = nmy_names - 1; iname >= 0; --iname)
   {
-    if (arg_all or (my_leaks[ileak].ML_pthread_self == compat_pthread_self()))
+    if (arg_all or (my_names[iname].MN_pthread_self == compat_pthread_self()))
     {
-      PRINTF("ileak=%d name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
-        ileak,
-        my_leaks[ileak].ML_name,
-        my_leaks[ileak].ML_file,
-        my_leaks[ileak].ML_func,
-        my_leaks[ileak].ML_line,
-        my_leaks[ileak].ML_pthread_self);
+      PRINTF("iname=%d name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+        iname,
+        my_names[iname].MN_name,
+        my_names[iname].MN_file,
+        my_names[iname].MN_func,
+        my_names[iname].MN_line,
+        my_names[iname].MN_pthread_self);
     }
   }
 }
 
-void push_leak(char *arg_name, char *arg_file, const char *arg_func,
+void push_name(char *arg_name, char *arg_file, const char *arg_func,
   int arg_line)
 {
-  HARDBUG(compat_mutex_lock(&my_leak_mutex) != 0)
+  HARDBUG(compat_mutex_lock(&my_names_mutex) != 0)
 
-  if (nmy_leaks >= NMY_LEAKS_MAX)
+  if (nmy_names >= NMY_NAMES_MAX)
   {
-    PRINTF("PUSH_LEAK name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+    PRINTF("PUSH_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
            arg_name, arg_file, arg_func, arg_line, compat_pthread_self());
 
-    print_my_leaks(FALSE);
+    print_my_names(FALSE);
 
-    FATAL("TOO MANY PUSH_LEAKS", EXIT_FAILURE)
+    FATAL("TOO MANY PUSH_NAMES", EXIT_FAILURE)
   }
   
-  my_leaks[nmy_leaks].ML_name = arg_name;
-  my_leaks[nmy_leaks].ML_file = arg_file;
-  my_leaks[nmy_leaks].ML_func = arg_func;
-  my_leaks[nmy_leaks].ML_line = arg_line;
-  my_leaks[nmy_leaks].ML_pthread_self = compat_pthread_self();
+  my_names[nmy_names].MN_name = arg_name;
+  my_names[nmy_names].MN_file = arg_file;
+  my_names[nmy_names].MN_func = arg_func;
+  my_names[nmy_names].MN_line = arg_line;
+  my_names[nmy_names].MN_pthread_self = compat_pthread_self();
 
-  nmy_leaks++;
+  nmy_names++;
 
-  HARDBUG(compat_mutex_unlock(&my_leak_mutex) != 0)
+  HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
 }
 
-void pop_leak(char *arg_name, char *arg_file, const char *arg_func,
+void pop_name(char *arg_name, char *arg_file, const char *arg_func,
   int arg_line)
 {
-  HARDBUG(compat_mutex_lock(&my_leak_mutex) != 0)
+  HARDBUG(compat_mutex_lock(&my_names_mutex) != 0)
   
-  if (nmy_leaks == 0)
+  if (nmy_names == 0)
   {
-    PRINTF("POP_LEAK name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+    PRINTF("POP_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
            arg_name, arg_file, arg_func, arg_line, compat_pthread_self());
 
     FATAL("NO PUSHED LEAKS", EXIT_FAILURE)
   }
 
-  int ileak;
+  int iname;
 
-  for (ileak = nmy_leaks - 1; ileak >= 0; --ileak)
-    if (my_leaks[ileak].ML_pthread_self == compat_pthread_self()) break;
+  for (iname = nmy_names - 1; iname >= 0; --iname)
+    if (my_names[iname].MN_pthread_self == compat_pthread_self()) break;
 
-  if (ileak < 0)
+  if (iname < 0)
   {
-    PRINTF("POP_LEAK name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+    PRINTF("POP_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
            arg_name, arg_file, arg_func, arg_line, compat_pthread_self());
 
-    print_my_leaks(FALSE);
+    print_my_names(FALSE);
 
-    FATAL("POP_LEAK DID NOT FIND ANY PUSH_LEAK", EXIT_FAILURE)
+    FATAL("POP_NAME DID NOT FIND ANY PUSH_NAME", EXIT_FAILURE)
   }
 
-  if (strcmp(my_leaks[ileak].ML_name, arg_name) != 0)
+  if (strcmp(my_names[iname].MN_name, arg_name) != 0)
   {
-    PRINTF("POP_LEAK name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+    PRINTF("POP_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
            arg_name, arg_file, arg_func, arg_line, compat_pthread_self());
 
-    print_my_leaks(FALSE);
+    print_my_names(FALSE);
 
-    FATAL("POP_LEAK DID NOT FIND CORRESPONDING PUSH_LEAK", EXIT_FAILURE)
+    FATAL("POP_NAME DID NOT FIND CORRESPONDING PUSH_NAME", EXIT_FAILURE)
   }
 
-  for (int jleak = ileak; jleak < nmy_leaks; jleak++)
-    my_leaks[jleak] = my_leaks[jleak + 1];
+  for (int jname = iname; jname < nmy_names; jname++)
+    my_names[jname] = my_names[jname + 1];
 
-  nmy_leaks--;
+  nmy_names--;
 
-  HARDBUG(compat_mutex_unlock(&my_leak_mutex) != 0)
+  HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
 }
 
 void init_my_malloc(void)
@@ -414,13 +414,13 @@ void init_my_malloc(void)
 
   HARDBUG(my_mallocs == NULL)
   
-  my_leaks = malloc(sizeof(my_leak_t) * NMY_LEAKS_MAX);
+  my_names = malloc(sizeof(my_name_t) * NMY_NAMES_MAX);
 
-  HARDBUG(my_leaks == NULL)
+  HARDBUG(my_names == NULL)
 
   HARDBUG(compat_mutex_init(&my_malloc_mutex) != 0)
 
-  HARDBUG(compat_mutex_init(&my_leak_mutex) != 0)
+  HARDBUG(compat_mutex_init(&my_names_mutex) != 0)
 
   char *f = "The quick brown fox jumps over the lazy dog";
   char s[MY_LINE_MAX];
@@ -429,7 +429,7 @@ void init_my_malloc(void)
 
   (void) snprintf(s, MY_LINE_MAX, "%#llX", c);
 
-  PRINTF("the XXH3_64 of '%s' is %s hex\n", f, s);
+  //PRINTF("the XXH3_64 of '%s' is %s hex\n", f, s);
 
   HARDBUG(strcmp(s, "0XCE7D19A5418FB365") != 0)
 }
@@ -500,6 +500,54 @@ local void printf_imalloc(int imalloc)
          object->MM_size);
 }
 
+void check_my_malloc(void)
+{
+  int corrupt = FALSE;
+
+  for (int imalloc = 0; imalloc < nmy_mallocs; imalloc++)
+  {
+    my_malloc_t *object = my_mallocs + imalloc;
+
+    if (object->MM_pad)
+    {
+      if (object->MM_prefix_crc64 !=
+          return_XXH3_64(object->MM_prefix, NPAD))
+      {
+        printf_imalloc(imalloc);
+
+        PRINTF("WARNING: PREFIX BLOCK CORRUPT!\n");
+ 
+        corrupt = TRUE;
+      }
+
+      if (object->MM_postfix_crc64 !=
+          return_XXH3_64(object->MM_postfix, NPAD))
+      {
+        printf_imalloc(imalloc);
+
+        PRINTF("WARNING: POSTFIX BLOCK CORRUPT!\n");
+ 
+        corrupt = TRUE;
+      }
+    }
+
+    if (object->MM_read_only)
+    {
+      if (object->MM_crc64 !=
+          return_XXH3_64(object->MM_pointer, object->MM_size))
+      {
+        printf_imalloc(imalloc);
+
+        PRINTF("WARNING: READONLY BLOCK CORRUPT!\n");
+  
+        corrupt = TRUE;
+      }
+    }
+  }
+
+  if (corrupt) FATAL("BLOCK(S) CORRUPTED", EXIT_FAILURE)
+}
+
 void fin_my_malloc(int arg_verbose)
 {
   int corrupt = FALSE;
@@ -510,11 +558,11 @@ void fin_my_malloc(int arg_verbose)
 
   i64_t *sizes, *psizes;
 
-  MALLOC(sizes, nmy_mallocs * sizeof(i64_t))
+  COMPAT_MALLOC(sizes, nmy_mallocs * sizeof(i64_t))
   
   HARDBUG(sizes == NULL)
 
-  MALLOC(psizes, nmy_mallocs * sizeof(i64_t))
+  COMPAT_MALLOC(psizes, nmy_mallocs * sizeof(i64_t))
 
   HARDBUG(psizes == NULL)
 
@@ -592,9 +640,9 @@ void fin_my_malloc(int arg_verbose)
     if (!arg_verbose and (object->MM_size < MBYTE)) break;
   }
 
-  if (nmy_leaks > 0)
+  if (nmy_names > 0)
   {
-    print_my_leaks(TRUE);
+    print_my_names(TRUE);
 
     PRINTF("MEMORY LEAK DETECTED!\n");
   }

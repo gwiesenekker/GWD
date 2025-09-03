@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define SA struct sockaddr
@@ -100,24 +100,24 @@ local void encode(char arg_type, dxp_t *object,
 
     for (int j = 1; j <= 50; ++j)
     {
-      int jboard = map[j];
+      int jfield = square2field[j];
 
-      if (object->DXP_search.S_board.B_white_man_bb & BITULL(jboard))
+      if (object->DXP_search.S_board.B_white_man_bb & BITULL(jfield))
       {
         strcpy(arg_buffer + i, "w");
         i++;
       }
-      else if (object->DXP_search.S_board.B_white_king_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.B_white_king_bb & BITULL(jfield))
       {
         strcpy(arg_buffer + i, "W");
         i++;
       } 
-      else if (object->DXP_search.S_board.B_black_man_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.B_black_man_bb & BITULL(jfield))
       {
         strcpy(arg_buffer + i, "z");
         i++;
       }
-      else if (object->DXP_search.S_board.B_black_king_bb & BITULL(jboard))
+      else if (object->DXP_search.S_board.B_black_king_bb & BITULL(jfield))
       {
         strcpy(arg_buffer + i, "Z");
         i++;
@@ -311,7 +311,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
     {
       PRINTF("starting position\n");
 
-      string2board(&(object->DXP_search.S_board), STARTING_POSITION, TRUE);
+      string2board(&(object->DXP_search.S_board), STARTING_POSITION);
     }
     else if (arg_buffer[i] == 'B')
     {
@@ -348,7 +348,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
 
       PRINTF("string=%s\n", string);
 
-      string2board(&(object->DXP_search.S_board), string, TRUE);
+      string2board(&(object->DXP_search.S_board), string);
 
       PRINTF("starting position\n");
 
@@ -393,7 +393,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
     HARDBUG(f < 1)
     HARDBUG(f > 50)
     PRINTF("f=%d\n", f);
-    f = map[f];
+    f = square2field[f];
 
     i += 2;
 
@@ -403,7 +403,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
     HARDBUG(t < 1)
     HARDBUG(t > 50)
     PRINTF("t=%d\n", t);
-    t = map[t];
+    t = square2field[t];
     i += 2;
 
     int n;
@@ -421,7 +421,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
       HARDBUG(c[j] < 1)
       HARDBUG(c[j] > 50) 
       PRINTF("j=%d c[j]=%d\n", j, c[j]);
-      c[j] = map[c[j]];
+      c[j] = square2field[c[j]];
       i += 2;
     }
 
@@ -441,12 +441,12 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
     {
       move_t *move = moves_list.ML_moves + imove;
 
-      int iboard = move->M_from;
-      int kboard = move->M_move_to;
+      int ifield = move->M_from;
+      int kfield = move->M_move_to;
       ui64_t captures_bb = move->M_captures_bb;
 
-      if (iboard != f) continue;
-      if (kboard != t) continue;
+      if (ifield != f) continue;
+      if (kfield != t) continue;
 
       if (captures_bb == 0)
       {
@@ -458,17 +458,17 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
 
         while(captures_bb != 0)
         {
-          int jboard = BIT_CTZ(captures_bb);
+          int jfield = BIT_CTZ(captures_bb);
 
           m = 0;
           for (int j = 0; j < n; j++)
-            if (c[j] == jboard) m++;
+            if (c[j] == jfield) m++;
 
           if (m == 0) break;
 
           HARDBUG(m != 1)
 
-          captures_bb &= ~BITULL(jboard);
+          captures_bb &= ~BITULL(jfield);
         } 
         if (m == 1)
         {
@@ -608,9 +608,9 @@ local int play_game(dxp_t *object, int arg_sockfd)
 {
   int result = INVALID;
 
-  state_t game_state;
+  game_state_t game_state;
 
-  construct_state(&game_state);
+  construct_game_state(&game_state);
 
   game_state.set_event(&game_state, event);
 
@@ -646,6 +646,9 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
   configure_time_control(object->DXP_game_time,
     object->DXP_game_moves, &time_control);
+
+  int score_min = SCORE_PLUS_INFINITY;
+  int score_max = SCORE_MINUS_INFINITY;
 
   while(TRUE)
   {
@@ -703,7 +706,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
         PRINTF("\nPondering..\n");
   
         enqueue(return_thread_queue(thread_alpha_beta_master),
-          MESSAGE_STATE, game_state.get_state(&game_state));
+          MESSAGE_STATE, game_state.get_game_state(&game_state));
 
         enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_GO, "dxp/play_game");
@@ -771,6 +774,9 @@ local int play_game(dxp_t *object, int arg_sockfd)
         else if (object->DXP_game_code == DXP_DRAW)
         {
           result = 1;
+
+          PRINTF("DRAW score_min=%d score_max=%d\n",
+                 score_min, score_max);
         }
         else if (object->DXP_game_code == DXP_IWIN)
         {
@@ -862,6 +868,9 @@ local int play_game(dxp_t *object, int arg_sockfd)
           object->DXP_game_code = DXP_DRAW;
 
           result = 1;
+
+          PRINTF("DRAW score_min=%d score_max=%d\n",
+                 score_min, score_max);
         }
         else if (egtb_mate > 0)
         {
@@ -981,7 +990,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
           set_time_limit(object->DXP_move_number, &time_control);
   
           enqueue(return_thread_queue(thread_alpha_beta_master),
-            MESSAGE_STATE, game_state.get_state(&game_state));
+            MESSAGE_STATE, game_state.get_game_state(&game_state));
   
           enqueue(return_thread_queue(thread_alpha_beta_master),
             MESSAGE_GO, "dxp/play_game");
@@ -1040,6 +1049,9 @@ local int play_game(dxp_t *object, int arg_sockfd)
   
         PRINTF("\n* * * * * * * * * * %s %d %d\n\n",
           bdata(bbest_move), best_score, best_depth);
+
+        if (best_score < score_min) score_min = best_score;
+        if (best_score > score_max) score_max = best_score;
       }
 
       strcpy(object->DXP_move_string, bdata(bbest_move));
@@ -1096,7 +1108,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
  
   game_state.save2pdn(&game_state, "dxp.pdn");
 
-  destroy_state(&game_state);
+  destroy_game_state(&game_state);
 
   return(result);
 }
@@ -1198,7 +1210,7 @@ local void dxp_game_initiator(int arg_fd)
 
       PRINTF("event=%s\n", event);
 
-      fen2board(&(with->DXP_search.S_board), fen, TRUE);
+      fen2board(&(with->DXP_search.S_board), fen);
 
       PRINTF("The starting position for game %d is:\n", igame);
 

@@ -1,17 +1,9 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define the_dir(X) cat2(X, _dir)
 #define my_dir     the_dir(my_colour)
 #define your_dir   the_dir(your_colour)
-
-#define the_man_input_map(X) cat2(X, _man_input_map)
-#define my_man_input_map     the_man_input_map(my_colour)
-#define your_man_input_map   the_man_input_map(your_colour)
-
-#define the_king_input_map(X) cat2(X, _king_input_map)
-#define my_king_input_map     the_king_input_map(my_colour)
-#define your_king_input_map   the_king_input_map(your_colour)
 
 #define check_the_moves(X) cat3(check_, X, _moves)
 #define check_my_moves     check_the_moves(my_colour)
@@ -23,133 +15,60 @@ local int black_dir[4] = {5, 6, -6, -5};
 //we always have to update the mask
 //not always the input
 
-void update_patterns_and_layer0(board_t *self,
-  int arg_colour2move, int arg_iboard, int arg_delta)
+local void update_patterns(board_t *self,
+  int arg_piece, int arg_ifield, int arg_delta)
 {
   board_t *object = self;
 
-  //loop over all patterns in which iboard occurs
+  //loop over all PS_patterns in which ifield occurs
 
-  patterns_t *with_patterns = object->B_network.N_patterns;
+  patterns_shared_t *with_patterns_shared = &patterns_shared;
 
-  for (int ipattern = 0; ipattern < with_patterns->npatterns; ipattern++)
+  patterns_thread_t *with_patterns_thread =
+    &(object->B_network_thread.NT_patterns);
+
+  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns; ipattern++)
   {
-    int jpattern = with_patterns->patterns_map[arg_iboard][ipattern];
+    int jpattern = with_patterns_shared->PS_patterns_map[arg_ifield][ipattern];
 
     //last pattern
 
     if (jpattern == INVALID) break;
 
-    //iboard occurs in pattern jpattern
+    //ifield occurs in pattern jpattern
 
-    pattern_t *with_pattern = with_patterns->patterns + jpattern;
+    pattern_shared_t *with_pattern_shared = with_patterns_shared->PS_patterns + jpattern;
 
-    //*mask is the current occupation of pattern jpattern
-    //as iboard occurs in pattern jpattern *with will always be updated
-    //if delta > 0 an empty square will be removed and
-    //a white man or black man will be added
-    //if delta < 0 a white man or black man will be removed and
-    //an empty square will be added
+    pattern_thread_t *with_pattern_thread =
+      with_patterns_thread->PT_patterns + jpattern;
 
-    int *mask = object->B_pattern_mask->PM_mask + jpattern;
+    int ilinear = with_pattern_shared->PS_field2linear[arg_ifield];
 
-    //we only have to update the associated input if
-    //the current and/or the next occupation are valid
+    HARDBUG(ilinear == INVALID)
+    HARDBUG(ilinear >= with_pattern_shared->PS_nlinear)
 
-    int input = with_pattern->P_mask2inputs[*mask];
+    //update P_embed
 
-    if (input == INVALID)
+    int embed = INVALID;
+
+    if (arg_piece == (WHITE_BIT | MAN_BIT))
+      embed = EMBED_WHITE_MAN;
+    else if (arg_piece == (BLACK_BIT | MAN_BIT))
+      embed = EMBED_BLACK_MAN;
+
+    HARDBUG(embed == INVALID)
+
+    if (arg_delta > 0)
     {
-      //there is no input associated with the current occupation
+      HARDBUG(with_pattern_thread->PT_embed[ilinear] != EMBED_EMPTY)
 
-      HARDBUG((*mask & with_pattern->P_valid_mask)
-              == with_pattern->P_valid_mask)
-    }
+      with_pattern_thread->PT_embed[ilinear] = embed;
+    } 
     else
     {
-      //there is an input associated with the current occupation
+      HARDBUG(with_pattern_thread->PT_embed[ilinear] != embed)
 
-      //valid or NINPUTS_MAX
-
-      HARDBUG((*mask & with_pattern->P_valid_mask) != with_pattern->P_valid_mask)
-
-      if (input != NINPUTS_MAX)
-      {
-        if (object->B_network.N_inputs[input] == 1)
-        {
-          update_layer0(&(object->B_network), input, -1);
-        }
-      }
-    }
-
-    int nshift =
-      (arg_iboard - with_patterns->patterns[jpattern].P_root_square) * 4;
-
-    HARDBUG(nshift < 0)
-    HARDBUG(nshift > 60)
-
-    int ilinear =
-      (with_pattern->P_square2linear >> nshift) & 0xF;
-
-    HARDBUG(ilinear >= with_pattern->P_nlinear)
-
-    if (IS_WHITE(arg_colour2move))
-    {
-      if (arg_delta > 0)
-      {
-        HARDBUG((*mask & (MASK_EMPTY << (2 * ilinear))) !=
-                (MASK_EMPTY << (2 * ilinear)))
-
-        *mask ^= (MASK_EMPTY << (2 * ilinear));
-        *mask |= (MASK_WHITE_MAN << (2 * ilinear));
-      }
-      else
-      {
-        HARDBUG((*mask & (MASK_WHITE_MAN << (2 * ilinear))) !=
-                (MASK_WHITE_MAN << (2 * ilinear)))
-
-        *mask ^= (MASK_WHITE_MAN << (2 * ilinear));
-        *mask |= (MASK_EMPTY << (2 * ilinear));
-      }
-    }
-    else
-    {
-      if (arg_delta > 0)
-      {
-        HARDBUG((*mask & (MASK_EMPTY << (2 * ilinear))) !=
-                (MASK_EMPTY << (2 * ilinear)))
-
-        *mask ^= (MASK_EMPTY << (2 * ilinear));
-        *mask |= (MASK_BLACK_MAN << (2 * ilinear));
-      }
-      else
-      {
-        HARDBUG((*mask & (MASK_BLACK_MAN << (2 * ilinear))) !=
-                (MASK_BLACK_MAN << (2 * ilinear)))
-
-        *mask ^= (MASK_BLACK_MAN << (2 * ilinear));
-        *mask |= (MASK_EMPTY << (2 * ilinear));
-      }
-    }
-
-    input = with_pattern->P_mask2inputs[*mask];
-
-    if ((*mask & with_pattern->P_valid_mask) == with_pattern->P_valid_mask)
-    {
-      HARDBUG(input == INVALID)
-
-      //valid or NINPUTS_MAX
-
-      if (input != NINPUTS_MAX)
-      {
-        HARDBUG(object->B_network.N_inputs[input] != 0)
-
-        update_layer0(&(object->B_network), input, 1);
-      }
-    }
-    else
-    {
-      HARDBUG(input != INVALID)
+      with_pattern_thread->PT_embed[ilinear] = EMBED_EMPTY;
     }
   }
 }
@@ -188,8 +107,8 @@ void move2bstring(void *self, int arg_imove, bstring arg_bmove_string)
 
   move_t *move = object->ML_moves + arg_imove;
    
-  int iboard = move->M_from;
-  int kboard = move->M_move_to;
+  int ifield = move->M_from;
+  int kfield = move->M_move_to;
 
   btrunc(arg_bmove_string, 0);
 
@@ -197,23 +116,23 @@ void move2bstring(void *self, int arg_imove, bstring arg_bmove_string)
 
   if (captures_bb == 0)
     HARDBUG(bformata(arg_bmove_string, "%s-%s",
-                     nota[iboard], nota[kboard]) == BSTR_ERR)
+                     nota[ifield], nota[kfield]) == BSTR_ERR)
   else
   {
-    int jboard = BIT_CTZ(captures_bb);
+    int jfield = BIT_CTZ(captures_bb);
    
-    captures_bb &= ~BITULL(jboard);
+    captures_bb &= ~BITULL(jfield);
 
     HARDBUG(bformata(arg_bmove_string, "%sx%sx%s",
-                     nota[iboard], nota[kboard], nota[jboard]) == BSTR_ERR)
+                     nota[ifield], nota[kfield], nota[jfield]) == BSTR_ERR)
 
     while(captures_bb != 0)
     {
-      jboard = BIT_CTZ(captures_bb);
+      jfield = BIT_CTZ(captures_bb);
 
-      captures_bb &= ~BITULL(jboard);
+      captures_bb &= ~BITULL(jfield);
 
-      HARDBUG(bformata(arg_bmove_string, "x%s", nota[jboard]) == BSTR_ERR)
+      HARDBUG(bformata(arg_bmove_string, "x%s", nota[jfield]) == BSTR_ERR)
     }
   }
 }

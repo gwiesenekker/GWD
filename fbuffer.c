@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define NFBUFFER (4 * MBYTE)
@@ -7,36 +7,64 @@ void flush_fbuffer(fbuffer_t *self, int arg_nfbuffer)
 {
   fbuffer_t *object = self;
 
-  if (blength(object->FB_bbuffer) > arg_nfbuffer)
+  if (object->FB_nfbuffer > arg_nfbuffer)
   {
     int fd = compat_lock_file(bdata(object->FB_bname));
 
     HARDBUG(fd == -1)
   
-    HARDBUG(compat_write(fd, bdata(object->FB_bbuffer),
-                         blength(object->FB_bbuffer)) !=
-            blength(object->FB_bbuffer))
+    HARDBUG(compat_write(fd, object->FB_fbuffer, object->FB_nfbuffer) !=
+            object->FB_nfbuffer)
   
     compat_unlock_file(fd);
   
-    HARDBUG(bassigncstr(object->FB_bbuffer, "") == BSTR_ERR)
+    object->FB_nfbuffer = 0;
   }
 }
 
-void append_fbuffer(fbuffer_t *self, const char *arg_fmt, ...)
+void append_fbuffer_fmt(fbuffer_t *self, const char *arg_fmt, ...)
 {
   fbuffer_t *object = self;
 
   int ret;
 
-  bvformata(ret, object->FB_bbuffer, arg_fmt, arg_fmt);
+  bvformata(ret, object->FB_bstring, arg_fmt, arg_fmt);
 
   HARDBUG(ret == BSTR_ERR)
 
-  bstring bbuffer = object->FB_bbuffer;
+  bstring bstring = object->FB_bstring;
 
-  if (bchar(bbuffer, blength(bbuffer) - 1) == '\n')
+  if (bchar(bstring, blength(bstring) - 1) == '\n')
+  {
+    HARDBUG((object->FB_nfbuffer + blength(bstring)) >= (2 * NFBUFFER))
+
+    memcpy((i8_t *) object->FB_fbuffer + object->FB_nfbuffer,
+           bdata(bstring), blength(bstring));
+
+    object->FB_nfbuffer += blength(bstring);
+
+    HARDBUG(bassigncstr(object->FB_bstring, "") == BSTR_ERR)
+
     flush_fbuffer(object, NFBUFFER);
+  }
+}
+
+void append_fbuffer_bin(fbuffer_t *self, void *arg_data, size_t ldata)
+{
+  fbuffer_t *object = self;
+
+  if (arg_data == NULL)
+  {
+    flush_fbuffer(object, NFBUFFER);
+
+    return;
+  }
+
+  HARDBUG((object->FB_nfbuffer + ldata) >= (2 * NFBUFFER))
+
+  memcpy((i8_t *) object->FB_fbuffer + object->FB_nfbuffer, arg_data, ldata);
+
+  object->FB_nfbuffer += ldata;
 }
 
 bstring return_fbuffer_bname(fbuffer_t *self)
@@ -79,7 +107,10 @@ void construct_fbuffer(fbuffer_t *self, bstring arg_bname, char *arg_suffix,
     }
   }
 
-  HARDBUG((object->FB_bbuffer = bfromcstr("")) == NULL)
+  object->FB_nfbuffer = 0;
+  MY_MALLOC_VOID(object->FB_fbuffer, 2 * NFBUFFER)
+
+  HARDBUG((object->FB_bstring = bfromcstr("")) == NULL)
 
   if (arg_remove) remove(bdata(object->FB_bname));
 }
@@ -96,7 +127,7 @@ void test_fbuffer(void)
  
   for (int itest = 0; itest < 1000000; itest++)
   {
-    append_fbuffer(&test, "itest=%d\n", itest);
+    append_fbuffer_fmt(&test, "itest=%d\n", itest);
   }
 
   flush_fbuffer(&test, 0);

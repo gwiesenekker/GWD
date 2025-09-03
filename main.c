@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define GWD_JSON       "gwd.json"
@@ -6,10 +6,7 @@
 
 #define NMAN_MIN              4
 #define PROBABILITY_EQUAL     0.5
-#define MAN_REDUCTION_FACTOR  ((sqrt(3.0) - 1.0) / 2.0)
-#define KING_REDUCTION_FACTOR ((sqrt(3.0) - 1.0) / 2.0)
 #define NPIECES_MIN           7
-#define NSAME                 10
 
 void *STDOUT;
 
@@ -61,7 +58,7 @@ local void solve_problems(char *arg_name)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
-    fen2board(&(with->S_board), bdata(bfen), FALSE);
+    fen2board(&(with->S_board), bdata(bfen));
 
     CDESTROY(cfen)
 
@@ -167,13 +164,13 @@ local void solve_problems_mcts(char *arg_name,
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
-    fen2board(&(with->S_board), bdata(bfen), FALSE);
+    fen2board(&(with->S_board), bdata(bfen));
 
     CDESTROY(cfen)
 
-    if ((my_mpi_globals.MY_MPIG_nslaves > 0) and
-        (((nproblems - 1) % my_mpi_globals.MY_MPIG_nslaves) !=
-         my_mpi_globals.MY_MPIG_id_slave)) continue;
+    if ((my_mpi_globals.MMG_nslaves > 0) and
+        (((nproblems - 1) % my_mpi_globals.MMG_nslaves) !=
+         my_mpi_globals.MMG_id_slave)) continue;
 
     ++nproblems_mpi;
 
@@ -200,7 +197,7 @@ local void solve_problems_mcts(char *arg_name,
 
       PRINTF("mcts_result=%.6f\n", mcts_result);
 
-      append_fbuffer(&fcsv, "%.6f,%.6f\n", result, mcts_result);
+      append_fbuffer_fmt(&fcsv, "%.6f,%.6f\n", result, mcts_result);
     }
   }
 
@@ -213,7 +210,7 @@ local void solve_problems_mcts(char *arg_name,
   PRINTF("nproblems=%lld nproblems_mpi=%lld\n", nproblems, nproblems_mpi);
 
   my_mpi_allreduce(MPI_IN_PLACE, &nproblems_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
   
   HARDBUG(nproblems != nproblems_mpi)
 
@@ -273,9 +270,9 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
   construct_my_random(&play_random, 0);
 
-  state_t game_state;
+  game_state_t game_state;
 
-  construct_state(&game_state);
+  construct_game_state(&game_state);
 
   if (fexists(arg_name))
   {
@@ -318,7 +315,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
   while(TRUE)
   {
     enqueue(return_thread_queue(thread_alpha_beta_master),
-      MESSAGE_STATE, game_state.get_state(&game_state));
+      MESSAGE_STATE, game_state.get_game_state(&game_state));
 
     state2board(&(with->S_board), &game_state);
 
@@ -645,7 +642,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
   game_state.save2pdn(&game_state, "play.pdn");
 
-  destroy_state(&game_state);
+  destroy_game_state(&game_state);
 }
 
 double weibull_shape(int arg_npieces)
@@ -785,7 +782,7 @@ local int add_man_random(int arg_nwhite_man, int arg_nblack_man,
 
     arg_s[51] = '\0';
   
-    string2board(&(arg_with->S_board), arg_s, FALSE);
+    string2board(&(arg_with->S_board), arg_s);
   
     moves_list_t moves_list;
 
@@ -902,7 +899,7 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
     int squares[NPIECES_MAX];
     int nsquares = 0;
 
-    string2board(&(arg_with->S_board), arg_s, FALSE);
+    string2board(&(arg_with->S_board), arg_s);
 
 /*
     PRINTF("before while\n");
@@ -1001,7 +998,7 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
 
 /*
     PRINTF("after while\n");
-    string2board(&(arg_with->S_board), arg_s, FALSE);
+    string2board(&(arg_with->S_board), arg_s);
     print_board(&(arg_with->S_board));
 */
 
@@ -1014,7 +1011,7 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
 
     HARDBUG((nwhite_kings + nblack_kings) != nsquares)
 
-    string2board(&(arg_with->S_board), arg_s, FALSE);
+    string2board(&(arg_with->S_board), arg_s);
 
     moves_list_t moves_list;
 
@@ -1102,7 +1099,7 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
 {
   my_random_t temp_random;
 
-  if (my_mpi_globals.MY_MPIG_nslaves == 0)
+  if (my_mpi_globals.MMG_nslaves == 0)
     construct_my_random(&temp_random, 0);
   else
     construct_my_random(&temp_random, INVALID);
@@ -1135,11 +1132,11 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
 
   i64_t npositions = arg_npositions_max;
 
-  if (my_mpi_globals.MY_MPIG_nslaves > 0)
+  if (my_mpi_globals.MMG_nslaves > 0)
   {
-    npositions = arg_npositions_max / my_mpi_globals.MY_MPIG_nslaves;
+    npositions = arg_npositions_max / my_mpi_globals.MMG_nslaves;
    
-    if (npositions * my_mpi_globals.MY_MPIG_nslaves < 
+    if (npositions * my_mpi_globals.MMG_nslaves < 
         arg_npositions_max) ++npositions;
   }
 
@@ -1410,7 +1407,7 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
     
       board2fen(&(with->S_board), bfen, FALSE);
       
-      append_fbuffer(&ffen, "%s {0.000000}\n", bdata(bfen));
+      append_fbuffer_fmt(&ffen, "%s {0.000000}\n", bdata(bfen));
   
       BDESTROY(bfen)
     
@@ -1441,36 +1438,37 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
   printf_bucket(&bucket_nblack_kings);
   printf_bucket(&bucket_nkings);
 
-  my_mpi_barrier("after gen", my_mpi_globals.MY_MPIG_comm_slaves, TRUE);
+  my_mpi_barrier_v3("after gen", my_mpi_globals.MMG_comm_slaves,
+                    SEMKEY_GEN_RANDOM_BARRIER, TRUE);
 
   my_mpi_allreduce(MPI_IN_PLACE, &iposition, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MY_MPIG_comm_slaves);
+    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
 
   PRINTF("iposition=%lld\n", iposition);
 
   my_mpi_bucket_aggregate(&bucket_root_score,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_npieces,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_ndelta,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nwhite_man,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nblack_man,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nwhite_kings,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nblack_kings,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nkings,
-    my_mpi_globals.MY_MPIG_comm_slaves);
+    my_mpi_globals.MMG_comm_slaves);
 
   printf_bucket(&bucket_root_score);
 
@@ -1590,22 +1588,23 @@ local void load_gwd_json(void)
   options.captures_are_transparent = TRUE;
   options.returned_depth_includes_captures = FALSE;
 
+  options.quiescence_evaluation_policy = 0;
   options.quiescence_extension_search_delta = 25;
   options.pv_extension_search_delta = 25;
+
+  options.aspiration_window = 2;
 
   options.use_reductions = TRUE;
 
   options.reduction_depth_root = 2;
   options.reduction_depth_leaf = 2;
+  options.reduction_moves_min = 4;
 
-  options.reduction_mean = 20;
-  options.reduction_sigma = 10;
-
-  options.reduction_delta = 25;
-  options.reduction_max = 80;
-  options.reduction_max = 50;
-  options.reduction_min = 20;
-  options.nreductions = 2;
+  options.reduction_full_min = 1;
+  options.reduction_strength = 2;
+  options.reduction_probes = 2;
+  options.reduction_probe_window = 25;
+  options.reduction_research_window = 10;
 
   options.use_single_reply_extensions = TRUE;
 
@@ -1614,10 +1613,10 @@ local void load_gwd_json(void)
   options.alpha_beta_cache_size = 1024;
   options.pv_cache_fraction = 10;
 
+  options.score_cache_size = 256;
+
   options.nthreads_alpha_beta = 4;
   options.lazy_smp_policy = 1;
-
-  options.nslaves = 0;
 
   strcpy(options.egtb_dir, "NULL");
   strcpy(options.egtb_dir_wdl, "NULL");
@@ -1741,6 +1740,10 @@ local void parse_parameters(void)
       }
 
       else if (compat_strcasecmp(parameter_name,
+                                 "quiescence_evaluation_policy") == 0)  
+        options.quiescence_evaluation_policy = ivalue;
+
+      else if (compat_strcasecmp(parameter_name,
                                  "quiescence_extension_search_delta") == 0)  
         options.quiescence_extension_search_delta = ivalue;
 
@@ -1748,37 +1751,33 @@ local void parse_parameters(void)
                                  "pv_extension_search_delta") == 0)  
         options.pv_extension_search_delta = ivalue;
 
+      else if (compat_strcasecmp(parameter_name,
+                                 "aspiration_window") == 0)  
+        options.aspiration_window = ivalue;
+
       else if (compat_strcasecmp(parameter_name, "reduction_depth_root") == 0)  
         options.reduction_depth_root = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_depth_leaf") == 0)  
         options.reduction_depth_leaf = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                             "reduction_mean") == 0)  
-        options.reduction_mean = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_moves_min") == 0)  
+        options.reduction_moves_min = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                             "reduction_sigma") == 0)  
-        options.reduction_sigma = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_full_min") == 0)  
+        options.reduction_full_min = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_delta") == 0)  
-        options.reduction_delta = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_strength") == 0)  
+        options.reduction_strength = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_max") == 0)  
-        options.reduction_max = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_probes") == 0)  
+        options.reduction_probes = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_strong") == 0)  
-        options.reduction_strong = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_probe_window") == 0)  
+        options.reduction_probe_window = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_weak") == 0)  
-        options.reduction_weak = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "reduction_min") == 0)  
-        options.reduction_min = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "nreductions") == 0)  
-        options.nreductions = ivalue;
+      else if (compat_strcasecmp(parameter_name, "reduction_research_window") == 0)  
+        options.reduction_research_window = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)  
         options.alpha_beta_cache_size = ivalue;
@@ -1786,14 +1785,14 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "pv_cache_fraction") == 0)  
         options.pv_cache_fraction = ivalue;
 
+      else if (compat_strcasecmp(parameter_name, "score_cache_size") == 0)  
+        options.score_cache_size = ivalue;
+
       else if (compat_strcasecmp(parameter_name, "nthreads_alpha_beta") == 0)  
         options.nthreads_alpha_beta = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "lazy_smp_policy") == 0)  
         options.lazy_smp_policy = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "nslaves") == 0)  
-        options.nslaves = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "egtb_entry_cache_size") == 0)  
         options.egtb_entry_cache_size = ivalue;
@@ -2591,153 +2590,7 @@ int main(int argc, char **argv)
 
   //MPI
 
-  if ((iarg == narg) or (compat_strcasecmp(argv[iarg], "hub") == 0))
-  {
-    //do not initialize OpenMPI
- 
-    my_mpi_globals.MY_MPIG_init = FALSE;
-
-    my_mpi_globals.MY_MPIG_nglobal = 0;
-    my_mpi_globals.MY_MPIG_id_global = INVALID;
-
-    my_mpi_globals.MY_MPIG_nslaves = 0;
-    my_mpi_globals.MY_MPIG_id_slave = INVALID;
-  }
-  else
-  {
-   //we always initialize OpenMPI even if there are no slaves
-
-#ifdef USE_OPENMPI
-    if (MPI_Init(&narg, &argv) != MPI_SUCCESS)
-    {
-      PRINTF("MPI_Init failed!\n");
-      exit(EXIT_FAILURE);
-    }
-
-    my_mpi_globals.MY_MPIG_init = TRUE;
-
-    my_mpi_globals.MY_MPIG_nslaves = options.nslaves;
-  
-    int mpi_nworld;
-  
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_nworld);
-  
-#if COMPAT_OS == COMPAT_OS_LINUX
-    MPI_Comm mpi_comm_parent;
-
-    MPI_Comm_get_parent(&mpi_comm_parent);
-  
-    if (mpi_comm_parent == MPI_COMM_NULL)
-    {
-      if (mpi_nworld > 1)
-      {
-        PRINTF("do not use mpirun but use --nslaves=\n");
-        exit(EXIT_FAILURE);
-      }
-      if (my_mpi_globals.MY_MPIG_nslaves > 0)
-      {
-        if (RUNNING_ON_VALGRIND)
-        {
-          MPI_Comm_spawn("valgrind", argv, my_mpi_globals.MY_MPIG_nslaves,
-            MPI_INFO_NULL, 0, MPI_COMM_SELF,
-            &my_mpi_globals.MY_MPIG_comm_slaves, MPI_ERRCODES_IGNORE);
-        }
-        else
-        {
-          MPI_Comm_spawn(argv[0], argv + 1, my_mpi_globals.MY_MPIG_nslaves,
-            MPI_INFO_NULL, 0, MPI_COMM_SELF,
-            &my_mpi_globals.MY_MPIG_comm_slaves, MPI_ERRCODES_IGNORE);
-        }
-        MPI_Intercomm_merge(my_mpi_globals.MY_MPIG_comm_slaves, FALSE,
-                            &my_mpi_globals.MY_MPIG_comm_global);
-      }
-      else
-      {
-        //MPI_Comm_dup(MPI_COMM_WORLD, &my_mpi_globals.MY_MPIG_comm_global);
-        my_mpi_globals.MY_MPIG_comm_global = MPI_COMM_WORLD;
-        my_mpi_globals.MY_MPIG_comm_slaves = MPI_COMM_NULL;
-      }
-      my_mpi_globals.MY_MPIG_id_slave = INVALID;
-    }
-    else 
-    {
-      MPI_Intercomm_merge(mpi_comm_parent, TRUE,
-                          &my_mpi_globals.MY_MPIG_comm_global);
-  
-      //MPI_Comm_dup(MPI_COMM_WORLD, &my_mpi_globals.MY_MPIG_comm_slaves);
-      my_mpi_globals.MY_MPIG_comm_slaves = MPI_COMM_WORLD;
-
-      MPI_Comm_rank(my_mpi_globals.MY_MPIG_comm_slaves,
-                    &my_mpi_globals.MY_MPIG_id_slave);
-    }
-#else
-    if (my_mpi_globals.MY_MPIG_nslaves > 0)
-    {
-      PRINTF("do not use --nslaves= but mpirun\n");
-      exit(EXIT_FAILURE);
-    }
-
-    HARDBUG(mpi_nworld < 1)
-
-    int mpi_id_world;
-
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_id_world);
-  
-    my_mpi_globals.MY_MPIG_comm_global = MPI_COMM_WORLD;
-    my_mpi_globals.MY_MPIG_comm_slaves = MPI_COMM_NULL;
-  
-    int slave = (mpi_id_world == 0) ? 0 : 1;
-  
-    MPI_Comm_split(MPI_COMM_WORLD, slave, mpi_id_world,
-                   &my_mpi_globals.MY_MPIG_comm_slaves);
-  
-    if (!slave)
-    {
-      my_mpi_globals.MY_MPIG_comm_slaves = MPI_COMM_NULL;
-  
-      my_mpi_globals.MY_MPIG_id_slave = INVALID;
-    }
-    else
-    {
-      MPI_Comm_rank(my_mpi_globals.MY_MPIG_comm_slaves,
-                    &my_mpi_globals.MY_MPIG_id_slave);
-    }
-
-    my_mpi_allreduce(&slave, &my_mpi_globals.MY_MPIG_nslaves, 1, MPI_INT, MPI_SUM,
-      MPI_COMM_WORLD);
-  
-    HARDBUG(my_mpi_globals.MY_MPIG_nslaves != (mpi_nworld - 1))
-#endif
-
-    MPI_Comm_size(my_mpi_globals.MY_MPIG_comm_global,
-                  &my_mpi_globals.MY_MPIG_nglobal);
-
-    HARDBUG(my_mpi_globals.MY_MPIG_nglobal > my_mpi_globals.MY_MPIG_NGLOBAL_MAX)
-  
-    HARDBUG(my_mpi_globals.MY_MPIG_nglobal !=
-            (my_mpi_globals.MY_MPIG_nslaves + 1))
-  
-    MPI_Comm_rank(my_mpi_globals.MY_MPIG_comm_global,
-                  &my_mpi_globals.MY_MPIG_id_global);
-  
-    if (my_mpi_globals.MY_MPIG_id_global == 0)
-    {
-      HARDBUG(my_mpi_globals.MY_MPIG_id_slave != INVALID)
-    }
-    else
-    {
-      HARDBUG(my_mpi_globals.MY_MPIG_id_slave == INVALID)
-    }
-
-    //Sync
-
-    MPI_Barrier(my_mpi_globals.MY_MPIG_comm_global);
-  
-    MPI_Bcast(&physical_memory, 1, MPI_INT, 0,
-              my_mpi_globals.MY_MPIG_comm_global);
-   
-#endif
-  }
+  my_mpi_init(&narg, &argv, physical_memory);
 
   //now that we have the MPI context we can initialize 
 
@@ -2835,23 +2688,23 @@ int main(int argc, char **argv)
   PRINTF_CFG_B(captures_are_transparent);
   PRINTF_CFG_B(returned_depth_includes_captures);
 
+  PRINTF_CFG_I(quiescence_evaluation_policy);
   PRINTF_CFG_I(quiescence_extension_search_delta);
   PRINTF_CFG_I(pv_extension_search_delta);
+
+  PRINTF_CFG_I(aspiration_window);
 
   PRINTF_CFG_B(use_reductions);
 
   PRINTF_CFG_I(reduction_depth_root);
   PRINTF_CFG_I(reduction_depth_leaf);
+  PRINTF_CFG_I(reduction_moves_min);
 
-  PRINTF_CFG_I(reduction_mean);
-  PRINTF_CFG_I(reduction_sigma);
-
-  PRINTF_CFG_I(reduction_delta);
-  PRINTF_CFG_I(reduction_max);
-  PRINTF_CFG_I(reduction_strong);
-  PRINTF_CFG_I(reduction_weak);
-  PRINTF_CFG_I(reduction_min);
-  PRINTF_CFG_I(nreductions);
+  PRINTF_CFG_I(reduction_full_min);
+  PRINTF_CFG_I(reduction_strength);
+  PRINTF_CFG_I(reduction_probes);
+  PRINTF_CFG_I(reduction_probe_window);
+  PRINTF_CFG_I(reduction_research_window);
 
   PRINTF_CFG_B(use_single_reply_extensions);
 
@@ -2860,10 +2713,10 @@ int main(int argc, char **argv)
   PRINTF_CFG_I64(alpha_beta_cache_size);
   PRINTF_CFG_I(pv_cache_fraction);
 
+  PRINTF_CFG_I64(score_cache_size);
+
   PRINTF_CFG_I(nthreads_alpha_beta);
   PRINTF_CFG_I(lazy_smp_policy);
-
-  PRINTF_CFG_I(nslaves);
 
   PRINTF_CFG_S(egtb_dir);
   PRINTF_CFG_S(egtb_dir_wdl);
@@ -2892,23 +2745,21 @@ int main(int argc, char **argv)
 
   PRINTF_CFG_I(nthreads);
 
-  PRINTF("my_mpi_globals.MY_MPIG_nslaves=%d"
-         " my_mpi_globals.MY_MPIG_id_slave=%d\n",
-    my_mpi_globals.MY_MPIG_nslaves, my_mpi_globals.MY_MPIG_id_slave);
+  PRINTF("my_mpi_globals.MMG_nslaves=%d"
+         " my_mpi_globals.MMG_id_slave=%d\n",
+    my_mpi_globals.MMG_nslaves, my_mpi_globals.MMG_id_slave);
 
-  PRINTF("my_mpi_globals.MY_MPIG_nglobal=%d"
-         " my_mpi_globals.MY_MPIG_id_global=%d\n",
-    my_mpi_globals.MY_MPIG_nglobal, my_mpi_globals.MY_MPIG_id_global);
+  PRINTF("my_mpi_globals.MMG_nglobal=%d"
+         " my_mpi_globals.MMG_id_global=%d\n",
+    my_mpi_globals.MMG_nglobal, my_mpi_globals.MMG_id_global);
 
-#ifdef USE_OPENMPI
-  if (my_mpi_globals.MY_MPIG_nglobal > 0)
-    my_mpi_barrier("main", my_mpi_globals.MY_MPIG_comm_global, TRUE);
-#endif
-  
-  if (((options.nslaves > 0) and (my_mpi_globals.MY_MPIG_id_slave == INVALID))
+  if (((my_mpi_globals.MMG_nslaves > 0) and
+       (my_mpi_globals.MMG_id_slave == INVALID))
       or RUNNING_ON_VALGRIND)
   {
     options.alpha_beta_cache_size = 128;
+
+    options.score_cache_size = 32;
 
     PRINTF("WARNING: CACHE AND PRELOAD EGTB HAVE BEEN ADJUSTED!\n");
   }
@@ -2917,6 +2768,7 @@ int main(int argc, char **argv)
   
   int memory =
     options.alpha_beta_cache_size + 
+    options.score_cache_size + 
     options.egtb_entry_cache_size * options.nthreads;
 
   PRINTF("memory=%d MBYTE\n", memory);
@@ -2927,24 +2779,25 @@ int main(int argc, char **argv)
 
   //parameter checks
 
+  HARDBUG(options.quiescence_evaluation_policy < 0)
   HARDBUG(options.quiescence_extension_search_delta < 0)
   HARDBUG(options.pv_extension_search_delta < 0)
+
+  HARDBUG((options.aspiration_window % 2) != 0)
 
   HARDBUG(options.reduction_depth_root < 0)
   HARDBUG(options.reduction_depth_leaf < 0)
 
-  HARDBUG(options.reduction_delta < 0)
-  HARDBUG(options.reduction_max < 0)
-  HARDBUG(options.reduction_strong < 0)
-  HARDBUG(options.reduction_weak < 0)
-  HARDBUG(options.reduction_min < 0)
-  HARDBUG(options.nreductions < 1)
+  HARDBUG(options.reduction_strength < 1)
+  HARDBUG(options.reduction_probes < 0)
+  HARDBUG(options.reduction_probe_window < 1)
+  HARDBUG(options.reduction_research_window < 0)
 
   INIT_PROFILE
   
   //BEGIN_BLOCK("main-init")
 
-    if (my_mpi_globals.MY_MPIG_nglobal > 0) test_mpi();
+    if (my_mpi_globals.MMG_nglobal > 0) test_my_mpi();
 
     construct_my_random(&main_random, 0);
 
@@ -2963,8 +2816,13 @@ int main(int argc, char **argv)
 
     init_mcts();
 
+    init_networks();
+
+    init_score();
+
     init_search();
 
+check_my_malloc();
   //END_BLOCK
 
   //BEGIN_BLOCK("main-tests")
@@ -3013,6 +2871,9 @@ int main(int argc, char **argv)
     //FATAL("test_stats", EXIT_FAILURE)
 
     //test_threads();
+
+    //test_compress();
+    //FATAL("test_compress", EXIT_FAILURE)
 
   //END_BLOCK
 
@@ -3082,8 +2943,8 @@ int main(int argc, char **argv)
 
     HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
 
-    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
-        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
     {
       solve_problems_mcts(name, nshoot_outs, mcts_depth, mcts_time_limit);
     }
@@ -3113,19 +2974,20 @@ int main(int argc, char **argv)
   }
   else if (compat_strcasecmp(argv[iarg], "hub_server") == 0)
   {
-    i64_t memory_slaves = memory * options.nslaves;
+    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= (physical_memory / 2))
 
-    int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
+    int nthreads_slaves =
+      options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
   
     if (options.ponder)
       HARDBUG(nthreads_slaves > (physical_cpus / 2))
     else
       HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((my_mpi_globals.MY_MPIG_nslaves < 1) or
-        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+    if ((my_mpi_globals.MMG_nslaves < 1) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
     {
       cJSON *hub_server_client =
         cJSON_GetObjectItem(overrides_json, options.hub_server_client);
@@ -3299,11 +3161,12 @@ int main(int argc, char **argv)
 
     HARDBUG(mcts_time_limit <= 0.0)
 
-    i64_t memory_slaves = memory * options.nslaves;
+    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
+    //int nthreads_slaves =
+    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
 
     test_weibull();
@@ -3312,17 +3175,25 @@ int main(int argc, char **argv)
       PRINTF("npieces=%d probability_one_king=%.6f\n",
              npieces, probability_one_king(npieces));
 
-    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
-        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
       gen_random(fen_name, npositions_max, nkings_max, mcts_time_limit);
   }
   else if (compat_strcasecmp(argv[iarg], "read_games") == 0)
   {
     iarg++;
 
-    HARDBUG(argv[iarg] == NULL)
+    if (argv[iarg] == NULL) FATAL("db_name missing!", EXIT_FAILURE)
+
+    char *db_name = argv[iarg];
   
-    read_games(argv[iarg]);
+    iarg++;
+
+    if (argv[iarg] == NULL) FATAL("pdn_name missing!", EXIT_FAILURE)
+
+    char *pdn_name = argv[iarg];
+  
+    read_games(db_name, pdn_name);
   }
   else if (compat_strcasecmp(argv[iarg], "gen_book") == 0)
   {
@@ -3334,11 +3205,22 @@ int main(int argc, char **argv)
 
     iarg++;
 
-    char *positions_name = argv[iarg];
+    int centi_seconds = INVALID;
 
-    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
-        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
-      gen_book(db_name, positions_name);
+    if (argv[iarg] != NULL)
+      HARDBUG(sscanf(argv[iarg], "%d", &centi_seconds) != 1)
+
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
+    {
+      my_sqlite3_t db;
+
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+
+      gen_book(&db, centi_seconds);
+
+      close_my_sqlite3(&db);
+    }
   }
   else if (compat_strcasecmp(argv[iarg], "walk_book") == 0)
   {
@@ -3350,9 +3232,67 @@ int main(int argc, char **argv)
 
     iarg++;
 
+    char *fen = argv[iarg];
+
+    walk_book(db_name, fen);
+  }
+  else if (compat_strcasecmp(argv[iarg], "add2book") == 0)
+  {
+    iarg++;
+
     HARDBUG(argv[iarg] == NULL)
  
-    walk_book(db_name);
+    char *db_name = argv[iarg];
+
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    char *fen = argv[iarg];
+
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    int depth_max;
+   
+    HARDBUG(sscanf(argv[iarg], "%d", &depth_max) != 1)
+
+    HARDBUG(depth_max < 1)
+
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    int centi_seconds1;
+
+    HARDBUG(sscanf(argv[iarg], "%d", &centi_seconds1) != 1)
+
+    HARDBUG(centi_seconds1 < 1)
+
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    int centi_seconds2;
+
+    HARDBUG(sscanf(argv[iarg], "%d", &centi_seconds2) != 1)
+
+    HARDBUG(centi_seconds2 < 1)
+
+    HARDBUG(centi_seconds2 <= centi_seconds1)
+
+    my_sqlite3_t db;
+
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
+    {
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+
+      add2book(&db, fen, depth_max, centi_seconds1, centi_seconds2);
+  
+      close_my_sqlite3(&db);
+    }
   }
   else if (compat_strcasecmp(argv[iarg], "gen_db") == 0)
   {
@@ -3366,9 +3306,9 @@ int main(int argc, char **argv)
     iarg++;
     HARDBUG(argv[iarg] == NULL)
  
-    i64_t npositions_max;
+    i64_t npositions;
 
-    HARDBUG(sscanf(argv[iarg], "%lld", &npositions_max) != 1)
+    HARDBUG(sscanf(argv[iarg], "%lld", &npositions) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -3377,25 +3317,45 @@ int main(int argc, char **argv)
 
     HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
-    iarg++;
-    HARDBUG(argv[iarg] == NULL)
- 
-    double mcts_time_limit;
-
-    HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
-
-    HARDBUG(mcts_time_limit < 0.0)
-
-    i64_t memory_slaves = memory * options.nslaves;
+    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
+    //int nthreads_slaves =
+    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
-        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
-      gen_db(db_name, npositions_max, mcts_depth, mcts_time_limit);
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
+    {
+      my_sqlite3_t db;
+
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+
+      gen_db(&db, npositions, mcts_depth);
+
+      close_my_sqlite3(&db);
+    }
+  }
+  else if (compat_strcasecmp(argv[iarg], "gen_lmr") == 0)
+  {
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+ 
+    char *fen = argv[iarg];
+
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    int seconds;
+   
+    HARDBUG(sscanf(argv[iarg], "%d", &seconds) != 1)
+
+    HARDBUG(seconds < 1)
+
+    gen_lmr(fen, seconds);
   }
   else if (compat_strcasecmp(argv[iarg], "update_db") == 0)
   {
@@ -3409,9 +3369,38 @@ int main(int argc, char **argv)
     iarg++;
     HARDBUG(argv[iarg] == NULL)
  
-    int nshoot_outs;
+    int mcts_depth;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &nshoot_outs) != 1)
+    HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
+
+    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+
+    HARDBUG(memory_slaves >= physical_memory)
+
+    //int nthreads_slaves =
+    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+    //HARDBUG(nthreads_slaves > physical_cpus)
+
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
+    {
+      my_sqlite3_t db;
+
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+
+      update_db(&db, mcts_depth);
+
+      close_my_sqlite3(&db);
+    }
+  }
+  else if (compat_strcasecmp(argv[iarg], "update_db_v2") == 0)
+  {
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+ 
+    char *db_name;
+
+    db_name = argv[iarg];
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -3423,20 +3412,29 @@ int main(int argc, char **argv)
     iarg++;
     HARDBUG(argv[iarg] == NULL)
  
-    double mcts_time_limit;
+    int frequency;
 
-    HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
+    HARDBUG(sscanf(argv[iarg], "%d", &frequency) != 1)
 
-    i64_t memory_slaves = memory * options.nslaves;
+    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
+    //int nthreads_slaves =
+    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((my_mpi_globals.MY_MPIG_nslaves == 0) or
-        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
-      update_db(db_name, nshoot_outs, mcts_depth, mcts_time_limit);
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
+    {
+      my_sqlite3_t db;
+
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+
+      update_db_v2(&db, mcts_depth, frequency);
+
+      close_my_sqlite3(&db);
+    }
   }
   else if (compat_strcasecmp(argv[iarg], "play_game") == 0)
   {
@@ -3575,21 +3573,29 @@ int main(int argc, char **argv)
     i64_t npositions;
     HARDBUG(sscanf(argv[iarg], "%lld", &npositions) != 1)
 
-    i64_t memory_slaves = memory * options.nslaves;
+    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
+    //int nthreads_slaves =
+    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((options.nslaves == 0) or
-        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
     {
       fen2network(fen_name, npositions);
     }
   }
   else if (compat_strcasecmp(argv[iarg], "fen2csv") == 0)
   { 
+    iarg++;
+    if (argv[iarg] == NULL) FATAL("nman_min argument missing", EXIT_FAILURE)
+
+    int nman_min;
+
+    HARDBUG(sscanf(argv[iarg], "%d", &nman_min) != 1)
+
     iarg++;
     if (argv[iarg] == NULL) FATAL("nman_max argument missing", EXIT_FAILURE)
 
@@ -3598,35 +3604,38 @@ int main(int argc, char **argv)
     HARDBUG(sscanf(argv[iarg], "%d", &nman_max) != 1)
 
     iarg++;
+    if (argv[iarg] == NULL) FATAL("nkings_min argument missing", EXIT_FAILURE)
+
+    int nkings_min;
+
+    HARDBUG(sscanf(argv[iarg], "%d", &nkings_min) != 1)
+
+    iarg++;
     if (argv[iarg] == NULL) FATAL("nkings_max argument missing", EXIT_FAILURE)
 
     int nkings_max;
 
     HARDBUG(sscanf(argv[iarg], "%d", &nkings_max) != 1)
 
-    iarg++;
-    if (argv[iarg] == NULL) FATAL("king_weight argument missing", EXIT_FAILURE)
-
-    int king_weight;
-
-    HARDBUG(sscanf(argv[iarg], "%d", &king_weight) != 1)
-
     //
 
     iarg++;
     if (argv[iarg] == NULL) FATAL("file argument missing", EXIT_FAILURE)
 
-    i64_t memory_slaves = memory * options.nslaves;
+    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves = options.nthreads_alpha_beta * options.nslaves;
+    //int nthreads_slaves =
+    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((options.nslaves == 0) or
-        (my_mpi_globals.MY_MPIG_id_slave != INVALID))
+    load_network = FALSE;
+
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
     {
-      fen2csv(argv[iarg], nman_max, nkings_max, king_weight);
+      fen2csv(argv[iarg], nman_min, nman_max, nkings_min, nkings_max);
     }
   }
   else if (compat_strcasecmp(argv[iarg], "dxp_server") == 0)
@@ -3721,23 +3730,23 @@ int main(int argc, char **argv)
 
   label_hub:
 
-#ifdef USE_OPENMPI
-  if (my_mpi_globals.MY_MPIG_nglobal > 0)
-    my_mpi_barrier("main", my_mpi_globals.MY_MPIG_comm_global, TRUE);
-#endif
+  if (my_mpi_globals.MMG_nglobal > 0)
+    my_mpi_barrier_v3("main", my_mpi_globals.MMG_comm_global,
+                      SEMKEY_MAIN_BARRIER, TRUE);
+
   END_BLOCK
 
   //BEGIN_BLOCK("main-final")
 
-    //finalization
+  //finalization
 
-    fin_endgame();
+  fin_endgame();
  
-    fin_search();
+  fin_search();
 
-    fin_my_malloc(FALSE);
+  fin_my_malloc(FALSE);
   
-    PRINTF("", NULL);
+  PRINTF("$");
   
   //END_BLOCK
 

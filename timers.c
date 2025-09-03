@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0
@@ -106,8 +106,6 @@ double return_my_timer(my_timer_t *self, int arg_wall)
     result = wall_time_used;
   }
 
-  END_BLOCK
-
   return(result);
 }
 
@@ -145,6 +143,84 @@ void start_my_timer(my_timer_t *self)
   object->MT_start_wall_clock = compat_time();
 
   object->MT_status = MY_TIMER_STARTED;
+}
+
+void construct_progress(progress_t *arg_progress, i64_t arg_ntodo,
+  double arg_seconds)
+{
+  construct_my_timer(&(arg_progress->P_timer), "progress", STDOUT, FALSE);
+
+  reset_my_timer(&(arg_progress->P_timer));
+
+  arg_progress->P_ntodo = arg_ntodo;
+  arg_progress->P_seconds = arg_seconds; 
+  arg_progress->P_ndone = 0;
+  arg_progress->P_ndone_previous = 0;
+  arg_progress->P_seconds_done = 0.0;
+  arg_progress->P_seconds_previous = 0.0;
+  arg_progress->P_ndelta = 0;
+}
+
+void update_progress(progress_t *arg_progress)
+{
+  if ((arg_progress->P_ntodo > 0) and
+      (arg_progress->P_ndone > arg_progress->P_ntodo))
+  {
+    PRINTF("P_ndone=%lld P_ntodo=%lld\n", 
+           arg_progress->P_ndone, arg_progress->P_ntodo);
+
+    //FATAL("P_ndone > P_ntodo", EXIT_FAILURE)
+  }
+
+  arg_progress->P_ndone++;
+
+  if ((arg_progress->P_ndone - arg_progress->P_ndone_previous) >=
+      arg_progress->P_ndelta)
+  {
+    arg_progress->P_seconds_done =
+      return_my_timer(&(arg_progress->P_timer), FALSE);
+
+    double seconds_delta = 
+      arg_progress->P_seconds_done - arg_progress->P_seconds_previous;
+
+    if (seconds_delta >= arg_progress->P_seconds)
+    {
+      double speed = arg_progress->P_ndone / arg_progress->P_seconds_done;
+  
+      PRINTF("ndone=%lld speed=%.2f/second\n$", arg_progress->P_ndone, speed);
+
+      if (arg_progress->P_ntodo > 0)
+      {
+        i64_t nremaining = arg_progress->P_ntodo - arg_progress->P_ndone;
+  
+        PRINTF("nremaining=%lld ETA=%.2f seconds\n$",
+               nremaining, (double) nremaining / speed);
+      }
+
+      arg_progress->P_ndone_previous = arg_progress->P_ndone;
+  
+      arg_progress->P_seconds_previous = arg_progress->P_seconds_done;
+
+      arg_progress->P_ndelta = round(speed * seconds_delta);
+
+      if (arg_progress->P_ndelta == 0) arg_progress->P_ndelta = 1;
+    }
+  }
+}
+
+void finalize_progress(progress_t *arg_progress)
+{
+  arg_progress->P_seconds_done =
+    return_my_timer(&(arg_progress->P_timer), FALSE);
+
+  PRINTF("progress took %.0f seconds for %lld entries %.0f entries/second\n",
+         arg_progress->P_seconds_done, arg_progress->P_ndone,
+         (double) arg_progress->P_ndone / arg_progress->P_seconds_done);
+}
+
+i64_t return_ndone(progress_t *arg_progress)
+{
+  return(arg_progress->P_ndone);
 }
 
 local double cdf(int arg_game_time, int arg_imove)
@@ -333,7 +409,7 @@ void test_my_timers(void)
       double wall = return_my_timer(test + itest, TRUE);
 
       PRINTF("itimer=%d cpu=%.2f wall=%.2f\n",
-        test + itest, cpu, wall);
+             itest, cpu, wall);
     }
 
     PRINTF("burning CPU for %d +/- 0.5 seconds..\n", isecond);
@@ -346,7 +422,7 @@ void test_my_timers(void)
       double wall = return_my_timer(test + itest, TRUE);
 
       PRINTF("itimer=%d cpu=%.2f wall=%.2f\n",
-        test + itest, cpu, wall);
+             itest, cpu, wall);
     }
   }
 }

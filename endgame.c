@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 
 #include "globals.h"
 
@@ -69,9 +69,7 @@ typedef struct
 
   FILE *fendgame;
   FILE *fendgame_wdl;
-#ifdef USE_OPENMPI
   MPI_Win wendgame;
-#endif
   void *pendgame;
 
   i64_t endgame_nreads;
@@ -116,346 +114,324 @@ local void convert2wdl(void)
     }
   }
 
-  for (int nwk = 0; nwk < NENDGAME_MAX; nwk++)
-  {
-    for (int nwm = 0; nwm < NENDGAME_MAX; nwm++)
-    {
-      if ((nwk + nwm) == 0) continue;
+  if (compat_strcasecmp(options.egtb_ram_wdl, "NULL") == 0) return;
 
-      for (int nbk = 0; nbk < NENDGAME_MAX; nbk++)
-      {
-        for (int nbm = 0; nbm < NENDGAME_MAX; nbm++)
-        {
-          if ((nbk + nbm) == 0) continue;
-
-          if ((nwk + nwm + nbk + nbm) >= NENDGAME_MAX) continue;
-
-          char endgame_name[MY_LINE_MAX];
-
-          snprintf(endgame_name, MY_LINE_MAX,
-                   "%dwX-%dwO-%dbX-%dbO", nwk, nwm, nbk, nbm);
-          
-          snprintf(path, MY_LINE_MAX, "%s/%s", options.egtb_dir, endgame_name);
-  
-          if (!fexists(path))
-          {
-            PRINTF("EGTB %s does not exist!\n", endgame_name);
-
-            continue;
-          }
-
-          FILE *fendgame;
-
-          HARDBUG((fendgame = fopen(path, "r+b")) == NULL)
-
-          i8_t version;
-          i16_t nblock_entries;
-          i64_t index_max;
-
-          HARDBUG(fread(&version, sizeof(i8_t), 1, fendgame) != 1)
-
-          HARDBUG(version != EGTB_COMPRESSED_VERSION)
-
-          HARDBUG(fread(&nblock_entries, sizeof(i16_t), 1, fendgame) != 1)
-
-          HARDBUG(nblock_entries != NPAGE_ENTRIES)
-
-          HARDBUG(fread(&index_max, sizeof(i64_t), 1, fendgame) != 1)
+  cJSON *egtbs = cJSON_GetObjectItem(gwd_json, options.egtb_ram_wdl);
  
-          if (options.verbose > 1)
-            PRINTF("version=%d nblock_entries=%d index_max=%lld\n",
-              version, nblock_entries, index_max);
+  HARDBUG(!cJSON_IsArray(egtbs))
 
-          i64_t npages = (index_max + 1) / nblock_entries;
+  cJSON *egtb;
 
-          if ((npages * nblock_entries) < (index_max + 1)) npages++;
+  cJSON_ArrayForEach(egtb, egtbs)
+  {
+    HARDBUG(!cJSON_IsString(egtb))
 
-          HARDBUG((npages * nblock_entries) < (index_max + 1))
+    char *endgame_name = cJSON_GetStringValue(egtb);
+
+    snprintf(path, MY_LINE_MAX, "%s/%s", options.egtb_dir, endgame_name);
+  
+    if (!fexists(path))
+    {
+      PRINTF("EGTB %s does not exist!\n", endgame_name);
+
+      continue;
+    }
+
+    char wdl[MY_LINE_MAX];
+
+    snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl", options.egtb_dir_wdl, endgame_name);
+
+    if (fexists(wdl))
+    {
+      PRINTF("WDL encoded EGTB %s already exists!\n", wdl);
+
+      continue;
+    }
+
+    FILE *fendgame;
+
+    HARDBUG((fendgame = fopen(path, "r+b")) == NULL)
+
+    i8_t version;
+    i16_t nblock_entries;
+    i64_t index_max;
+
+    HARDBUG(fread(&version, sizeof(i8_t), 1, fendgame) != 1)
+
+    HARDBUG(version != EGTB_COMPRESSED_VERSION)
+
+    HARDBUG(fread(&nblock_entries, sizeof(i16_t), 1, fendgame) != 1)
+
+    HARDBUG(nblock_entries != NPAGE_ENTRIES)
+
+    HARDBUG(fread(&index_max, sizeof(i64_t), 1, fendgame) != 1)
+ 
+    if (options.verbose > 1)
+      PRINTF("version=%d nblock_entries=%d index_max=%lld\n",
+             version, nblock_entries, index_max);
+
+    i64_t npages = (index_max + 1) / nblock_entries;
+
+    if ((npages * nblock_entries) < (index_max + 1)) npages++;
+
+    HARDBUG((npages * nblock_entries) < (index_max + 1))
                 
-          //not true because of last block
-          //i64_t uncompressed_size = 2 * (index_max + 1);
+    //not true because of last block
+    //i64_t uncompressed_size = 2 * (index_max + 1);
 
-          i64_t nentries = npages * nblock_entries;
+    i64_t nentries = npages * nblock_entries;
 
-          i64_t uncompressed_size = sizeof(entry_i8_t)  * nentries;
+    i64_t uncompressed_size = sizeof(entry_i8_t)  * nentries;
 
-          if (options.verbose > 1)
-            PRINTF("npages=%lld nentries=%lld uncompressed_size=%lld\n",
+    if (options.verbose > 1)
+      PRINTF("npages=%lld nentries=%lld uncompressed_size=%lld\n",
               npages, nentries, uncompressed_size);
 
-          char wdl[MY_LINE_MAX];
+    PRINTF("WDL encoding EGTB %s..\n", path);
 
-          snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl", options.egtb_dir_wdl,
-                   endgame_name);
+    //each entry consists of wtm_mate and btm_mate
+    //each encoded as 2 bits so 4 bits (1 byte) in total
 
-          if (fexists(wdl))
-          {
-            PRINTF("WDL encoded EGTB %s already exists!\n", wdl);
-
-            FCLOSE(fendgame)
-
-            continue;
-          }
-
-          PRINTF("WDL encoding EGTB %s..\n", path);
-
-          //each entry consists of wtm_mate and btm_mate
-          //each encoded as 2 bits so 4 bits (1 byte) in total
-
-          HARDBUG((nentries % 2) != 0)
+    HARDBUG((nentries % 2) != 0)
   
-          i64_t nwdl = nentries / 2;
-              
-          i64_t wdl_size = nwdl * sizeof(wdl_t);
-  
-          if (options.verbose > 1)
-            PRINTF("nwdl=%lld wdl_size=%lld\n", nwdl, wdl_size);
-  
-          void *pendgame;
-  
-          MY_MALLOC(pendgame, wdl_t, nwdl)
-
-          wdl_t *pwdl_t = pendgame;
+    i64_t nwdl = nentries / 2;
             
-          for (i64_t iwdl = 0; iwdl < nwdl; iwdl++) pwdl_t[iwdl] = 0;
+    i64_t wdl_size = nwdl * sizeof(wdl_t);
 
-          i64_t jentry = 0;
-             
-          for (i64_t ipage = 0; ipage < npages; ipage++)
-          {
-            i64_t seek =
-              sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) + 
-              ipage * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
-                
-            HARDBUG(compat_fseeko(fendgame, seek, SEEK_SET) != 0)
-                    
-            i64_t offset;
-
-            i16_t length;
-
-            ui32_t crc32;
-                  
-            HARDBUG(fread(&offset, sizeof(i64_t), 1, fendgame) != 1)
-
-            HARDBUG(fread(&length, sizeof(i16_t), 1, fendgame) != 1)
-
-            HARDBUG(fread(&crc32,  sizeof(ui32_t), 1, fendgame) != 1)
-                  
-            //some blocks may have offset INVALID
-                  
-            if (offset == INVALID)
-            {
-              HARDBUG(length != 0)
-                
-              HARDBUG(crc32 != 0xFFFFFFFF)
-               
-              continue;
-            }
-                  
-            HARDBUG(length <= 0)
-
-            HARDBUG(length > (2 * ARRAY_PAGE_SIZE))
-                  
-            i8_t source[2 * ARRAY_PAGE_SIZE];
-
-            size_t sourceLen = length;
-               
-            HARDBUG(compat_fseeko(fendgame, offset, SEEK_SET) != 0)
-                
-            HARDBUG(fread(source, sizeof(i8_t), sourceLen, fendgame) !=
-                    sourceLen)
-                
-            if (source[0] == ALL_DRAW)
-            {
-              crc32 = 0xFFFFFFFF;
-                    
-              crc32 = _mm_crc32_u8(crc32, source[0]);
-                  
-              HARDBUG(crc32 != crc32)
-                   
-              for (int ientry = 0; ientry < nblock_entries; ientry++)
-              {
-                ui8_t wdl_entry = (WDL_DRAW << 2) | WDL_DRAW;
-
-                HARDBUG(jentry >= nentries)
-   
-                i64_t iwdl = jentry / 2;
-
-                HARDBUG(iwdl >= nwdl)
-
-                int jwdl = jentry % 2;
-
-                pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
-
-                HARDBUG(pwdl_t[iwdl] == 0)
-
-                jentry++;
-              }
-            }
-            else if (source[0] == ALL_I8)
-            {
-              entry_i8_t dest[NPAGE_ENTRIES];
-
-              size_t destLen = sizeof(dest);
-                      
-              //exclude source[0]
-              --sourceLen;
-                    
-              destLen = ZSTD_decompress(dest, destLen,
-                                        source + 1, sourceLen);
-                  
-              HARDBUG(ZSTD_isError(destLen))
-                  
-              HARDBUG(destLen > sizeof(dest))
-                  
-              HARDBUG((destLen % sizeof(entry_i8_t)) != 0)
-                  
-              HARDBUG((destLen / sizeof(entry_i8_t)) != nblock_entries)
-#ifdef USE_HARDWARE_CRC32
-              crc32 = 0xFFFFFFFF;
-                 
-              crc32 = _mm_crc32_u8(crc32, source[0]);
-                  
-              for (int ientry = 0; ientry < nblock_entries; ientry++)
-              {
-                crc32 = _mm_crc32_u8(crc32, dest[ientry].entry_white_mate);
-                crc32 = _mm_crc32_u8(crc32, dest[ientry].entry_black_mate);
-              }
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
-              HARDBUG(crc32 != crc32)
-                  
-              for (int ientry = 0; ientry < nblock_entries; ientry++)
-              {
-                ui8_t wdl_entry = 0;
- 
-                if (dest[ientry].entry_black_mate == INVALID)
-                  wdl_entry = WDL_DRAW;
-                else if (dest[ientry].entry_black_mate > 0)
-                  wdl_entry = WDL_WON;
-                else
-                  wdl_entry = WDL_LOST;
-
-                if (dest[ientry].entry_white_mate == INVALID)
-                  wdl_entry = (wdl_entry << 2) | WDL_DRAW;
-                else if (dest[ientry].entry_white_mate > 0)
-                  wdl_entry = (wdl_entry << 2) | WDL_WON;
-                else
-                  wdl_entry = (wdl_entry << 2) | WDL_LOST;
-
-                HARDBUG(jentry >= nentries)
-
-                i64_t iwdl = jentry / 2;
-
-                HARDBUG(iwdl >= nwdl)
-
-                int jwdl = jentry % 2;
-
-                pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
-
-                HARDBUG(pwdl_t[iwdl] == 0)
-
-                jentry++;
-              }
-            }
-            else
-            {
-              entry_i16_t dest[NPAGE_ENTRIES];
-
-              size_t destLen = sizeof(dest);
-                      
-              //exclude source[0]
-              --sourceLen;
-                   
-              destLen = ZSTD_decompress(dest, destLen,
-                                        source + 1, sourceLen);
-                  
-              HARDBUG(ZSTD_isError(destLen))
-                    
-              HARDBUG(destLen > sizeof(dest))
-                  
-              HARDBUG((destLen % sizeof(entry_i16_t)) != 0)
-                  
-              HARDBUG((destLen / sizeof(entry_i16_t)) != nblock_entries)
-#ifdef USE_HARDWARE_CRC32
-              crc32 = 0xFFFFFFFF;
-                    
-              crc32 = _mm_crc32_u8(crc32, source[0]);
-                  
-              for (int ientry = 0; ientry < nblock_entries; ientry++)
-              {
-                crc32 = _mm_crc32_u16(crc32, dest[ientry].entry_white_mate);
-                crc32 = _mm_crc32_u16(crc32, dest[ientry].entry_black_mate);
-              }
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
-              HARDBUG(crc32 != crc32)
-                  
-              for (int ientry = 0; ientry < nblock_entries; ientry++)
-              {
-                ui8_t wdl_entry = 0;
-
-                if (dest[ientry].entry_black_mate == INVALID)
-                  wdl_entry = WDL_DRAW;
-                else if (dest[ientry].entry_black_mate > 0)
-                  wdl_entry = WDL_WON;
-                else
-                  wdl_entry = WDL_LOST;
-
-                if (dest[ientry].entry_white_mate == INVALID)
-                  wdl_entry = (wdl_entry << 2) | WDL_DRAW;
-                else if (dest[ientry].entry_white_mate > 0)
-                  wdl_entry = (wdl_entry << 2) | WDL_WON;
-                else
-                  wdl_entry = (wdl_entry << 2) | WDL_LOST;
-
-                HARDBUG(jentry >= nentries)
-
-                i64_t iwdl = jentry / 2;
-
-                HARDBUG(iwdl >= nwdl)
-
-                int jwdl = jentry % 2;
-
-                pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
-
-                HARDBUG(pwdl_t[iwdl] == 0)
-
-                jentry++;
-              }
-            }
-          }//for (i64_t ipage = 0; ipage < npages; ipage++)
-
-          HARDBUG(jentry != nentries)
-
-          FCLOSE(fendgame)
-         
-          PRINTF("writing WDL encoded EGTB %s to disk..\n", path);
-
-          FILE *fwdl;
- 
-          HARDBUG((fwdl = fopen(wdl, "wb")) == NULL)
-
-          i8_t wdl_version = EGTB_WDL_VERSION;
-
-          HARDBUG(fwrite(&wdl_version, sizeof(i8_t), 1, fwdl) != 1)
-
-          HARDBUG(fwrite(pendgame, sizeof(i8_t), wdl_size, fwdl) != wdl_size)
+    if (options.verbose > 1)
+      PRINTF("nwdl=%lld wdl_size=%lld\n", nwdl, wdl_size);
   
-          FCLOSE(fwdl)
+    void *pendgame;
+  
+    MY_MALLOC_BY_TYPE(pendgame, wdl_t, nwdl)
 
-          MY_FREE_AND_NULL(pendgame)
+    wdl_t *pwdl_t = pendgame;
+            
+    for (i64_t iwdl = 0; iwdl < nwdl; iwdl++) pwdl_t[iwdl] = 0;
 
-          PRINTF("..done size is %lld\n", wdl_size);
+    i64_t jentry = 0;
+             
+    for (i64_t ipage = 0; ipage < npages; ipage++)
+    {
+      i64_t seek =
+        sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) + 
+        ipage * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
+                
+      HARDBUG(compat_fseeko(fendgame, seek, SEEK_SET) != 0)
+                    
+      i64_t offset;
+
+      i16_t length;
+
+      ui32_t crc32;
+                  
+      HARDBUG(fread(&offset, sizeof(i64_t), 1, fendgame) != 1)
+
+      HARDBUG(fread(&length, sizeof(i16_t), 1, fendgame) != 1)
+
+      HARDBUG(fread(&crc32,  sizeof(ui32_t), 1, fendgame) != 1)
+                  
+      //some blocks may have offset INVALID
+                  
+      if (offset == INVALID)
+      {
+        HARDBUG(length != 0)
+                
+        HARDBUG(crc32 != 0xFFFFFFFF)
+               
+        continue;
+      }
+                  
+      HARDBUG(length <= 0)
+
+      HARDBUG(length > (2 * ARRAY_PAGE_SIZE))
+                 
+      i8_t source[2 * ARRAY_PAGE_SIZE];
+
+      size_t sourceLen = length;
+               
+      HARDBUG(compat_fseeko(fendgame, offset, SEEK_SET) != 0)
+                
+      HARDBUG(fread(source, sizeof(i8_t), sourceLen, fendgame) != sourceLen)
+                
+      if (source[0] == ALL_DRAW)
+      {
+        crc32 = 0xFFFFFFFF;
+                    
+        crc32 = HW_CRC32_U8(crc32, source[0]);
+                  
+        HARDBUG(crc32 != crc32)
+                   
+        for (int ientry = 0; ientry < nblock_entries; ientry++)
+        {
+          ui8_t wdl_entry = (WDL_DRAW << 2) | WDL_DRAW;
+
+          HARDBUG(jentry >= nentries)
+   
+          i64_t iwdl = jentry / 2;
+
+          HARDBUG(iwdl >= nwdl)
+
+          int jwdl = jentry % 2;
+
+          pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
+
+          HARDBUG(pwdl_t[iwdl] == 0)
+
+          jentry++;
         }
       }
-    }
+      else if (source[0] == ALL_I8)
+      {
+        entry_i8_t dest[NPAGE_ENTRIES];
+
+        size_t destLen = sizeof(dest);
+                      
+        //exclude source[0]
+        --sourceLen;
+                    
+        destLen = ZSTD_decompress(dest, destLen, source + 1, sourceLen);
+                  
+        HARDBUG(ZSTD_isError(destLen))
+                  
+        HARDBUG(destLen > sizeof(dest))
+                  
+        HARDBUG((destLen % sizeof(entry_i8_t)) != 0)
+                  
+        HARDBUG((destLen / sizeof(entry_i8_t)) != nblock_entries)
+
+        crc32 = 0xFFFFFFFF;
+                 
+        crc32 = HW_CRC32_U8(crc32, source[0]);
+                  
+        for (int ientry = 0; ientry < nblock_entries; ientry++)
+        {
+          crc32 = HW_CRC32_U8(crc32, dest[ientry].entry_white_mate);
+          crc32 = HW_CRC32_U8(crc32, dest[ientry].entry_black_mate);
+        }
+
+        HARDBUG(crc32 != crc32)
+                  
+        for (int ientry = 0; ientry < nblock_entries; ientry++)
+        {
+          ui8_t wdl_entry = 0;
+ 
+          if (dest[ientry].entry_black_mate == INVALID)
+            wdl_entry = WDL_DRAW;
+          else if (dest[ientry].entry_black_mate > 0)
+            wdl_entry = WDL_WON;
+          else
+            wdl_entry = WDL_LOST;
+
+          if (dest[ientry].entry_white_mate == INVALID)
+            wdl_entry = (wdl_entry << 2) | WDL_DRAW;
+          else if (dest[ientry].entry_white_mate > 0)
+            wdl_entry = (wdl_entry << 2) | WDL_WON;
+          else
+            wdl_entry = (wdl_entry << 2) | WDL_LOST;
+
+          HARDBUG(jentry >= nentries)
+
+          i64_t iwdl = jentry / 2;
+
+          HARDBUG(iwdl >= nwdl)
+
+          int jwdl = jentry % 2;
+
+          pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
+
+          HARDBUG(pwdl_t[iwdl] == 0)
+
+          jentry++;
+        }
+      }
+      else
+      {
+        entry_i16_t dest[NPAGE_ENTRIES];
+
+        size_t destLen = sizeof(dest);
+                      
+        //exclude source[0]
+        --sourceLen;
+               
+        destLen = ZSTD_decompress(dest, destLen, source + 1, sourceLen);
+                  
+        HARDBUG(ZSTD_isError(destLen))
+                    
+        HARDBUG(destLen > sizeof(dest))
+                  
+        HARDBUG((destLen % sizeof(entry_i16_t)) != 0)
+                  
+        HARDBUG((destLen / sizeof(entry_i16_t)) != nblock_entries)
+
+        crc32 = 0xFFFFFFFF;
+                    
+        crc32 = HW_CRC32_U8(crc32, source[0]);
+                  
+        for (int ientry = 0; ientry < nblock_entries; ientry++)
+        {
+          crc32 = HW_CRC32_U16(crc32, dest[ientry].entry_white_mate);
+          crc32 = HW_CRC32_U16(crc32, dest[ientry].entry_black_mate);
+        }
+
+        HARDBUG(crc32 != crc32)
+                  
+        for (int ientry = 0; ientry < nblock_entries; ientry++)
+        {
+          ui8_t wdl_entry = 0;
+
+          if (dest[ientry].entry_black_mate == INVALID)
+            wdl_entry = WDL_DRAW;
+          else if (dest[ientry].entry_black_mate > 0)
+            wdl_entry = WDL_WON;
+          else
+            wdl_entry = WDL_LOST;
+
+          if (dest[ientry].entry_white_mate == INVALID)
+            wdl_entry = (wdl_entry << 2) | WDL_DRAW;
+          else if (dest[ientry].entry_white_mate > 0)
+            wdl_entry = (wdl_entry << 2) | WDL_WON;
+          else
+            wdl_entry = (wdl_entry << 2) | WDL_LOST;
+
+          HARDBUG(jentry >= nentries)
+
+          i64_t iwdl = jentry / 2;
+
+          HARDBUG(iwdl >= nwdl)
+
+          int jwdl = jentry % 2;
+
+          pwdl_t[iwdl] |= wdl_entry << (jwdl * 4);
+
+          HARDBUG(pwdl_t[iwdl] == 0)
+
+          jentry++;
+        }
+      }
+    }//for (i64_t ipage = 0; ipage < npages; ipage++)
+
+    HARDBUG(jentry != nentries)
+
+    FCLOSE(fendgame)
+         
+    PRINTF("writing WDL encoded EGTB %s to disk..\n", path);
+
+    FILE *fwdl;
+ 
+    HARDBUG((fwdl = fopen(wdl, "wb")) == NULL)
+
+    i8_t wdl_version = EGTB_WDL_VERSION;
+
+    HARDBUG(fwrite(&wdl_version, sizeof(i8_t), 1, fwdl) != 1)
+
+    HARDBUG(fwrite(pendgame, sizeof(i8_t), wdl_size, fwdl) != wdl_size)
+  
+    FCLOSE(fwdl)
+
+    MY_FREE_AND_NULL(pendgame)
+
+    PRINTF("..done size is %lld\n", wdl_size);
   }
   PRINTF("..done\n");
 }
@@ -464,9 +440,10 @@ void init_endgame(void)
 {
   PRINTF("init_endgame..\n");
 
-  if (my_mpi_globals.MY_MPIG_nglobal <= 1) convert2wdl();
+  if (my_mpi_globals.MMG_nglobal == 0) convert2wdl();
 
-  my_mpi_barrier("convert2wdl", my_mpi_globals.MY_MPIG_comm_global, TRUE);
+  my_mpi_barrier_v3("convert2wdl", my_mpi_globals.MMG_comm_global,
+                    SEMKEY_INIT_ENDGAME_BARRIER, TRUE);
 
   HARDBUG(sizeof(entry_i8_t) != 2)
   HARDBUG(sizeof(entry_i16_t) != 4)
@@ -564,9 +541,9 @@ void init_endgame(void)
             continue;
           }
 
-          struct stat st;
-  
-          stat(path, &st);
+          i64_t size;
+ 
+          HARDBUG((size = compat_size(path)) == -1)
 
           HARDBUG((with_endgame->fendgame = fopen(path, "r+b")) == NULL)
 
@@ -609,54 +586,14 @@ void init_endgame(void)
             PRINTF("npages=%lld nentries=%lld uncompressed_size=%lld\n",
               npages, nentries, uncompressed_size);
 
-          //always open WDL
-
-          char wdl[MY_LINE_MAX];
-
-          snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl",
-            options.egtb_dir_wdl, with_endgame->endgame_name);
-
-          HARDBUG(!fexists(wdl))
-  
-          HARDBUG((with_endgame->fendgame_wdl = fopen(wdl, "r+b")) == NULL)
-
-          i8_t wdl_version;
-  
-          HARDBUG(fread(&wdl_version, sizeof(i8_t), 1,
-                        with_endgame->fendgame_wdl) != 1)
-      
-          HARDBUG(wdl_version != EGTB_WDL_VERSION)
-      
-          if (options.verbose > 1)
-            PRINTF("wdl_version=%d\n", wdl_version);
-
-          //each entry consists of wtm_mate and btm_mate
-          //each encoded as 2 bits so 4 bits (1 byte) in total
-
-          HARDBUG((nentries % 2) != 0)
-
-          i64_t nwdl = nentries / 2;
-            
-          i64_t wdl_size = nwdl * sizeof(wdl_t);
-
-          if (options.verbose > 1)
-            PRINTF("nwdl=%lld wdl_size=%lld\n", nwdl, wdl_size);
-
-          //optionally load WDL in RAM
-
           cJSON *egtbs = NULL;
 
-          if (compat_strcasecmp(options.egtb_ram_wdl, "NULL") == 0)
+          if (compat_strcasecmp(options.egtb_ram_wdl, "NULL") != 0)
           {
-            egtbs = cJSON_CreateArray();
+            egtbs = cJSON_GetObjectItem(gwd_json, options.egtb_ram_wdl);
+
+            HARDBUG(!cJSON_IsArray(egtbs))
           }
-          else
-          {
-            egtbs =
-             cJSON_GetObjectItem(gwd_json, options.egtb_ram_wdl);
-          }
- 
-          HARDBUG(!cJSON_IsArray(egtbs))
 
           cJSON *egtb;
 
@@ -665,44 +602,69 @@ void init_endgame(void)
             HARDBUG(!cJSON_IsString(egtb))
 
             if (compat_strcasecmp(with_endgame->endgame_name,
-                              cJSON_GetStringValue(egtb)) != 0) continue;
+                                  cJSON_GetStringValue(egtb)) != 0) continue;
 
-            if (my_mpi_globals.MY_MPIG_nglobal <= 1)
+            char wdl[MY_LINE_MAX];
+
+            snprintf(wdl, MY_LINE_MAX, "%s/%s.wdl",
+              options.egtb_dir_wdl, with_endgame->endgame_name);
+  
+            HARDBUG(!fexists(wdl))
+    
+            HARDBUG((with_endgame->fendgame_wdl = fopen(wdl, "r+b")) == NULL)
+  
+            i8_t wdl_version;
+    
+            HARDBUG(fread(&wdl_version, sizeof(i8_t), 1,
+                          with_endgame->fendgame_wdl) != 1)
+        
+            HARDBUG(wdl_version != EGTB_WDL_VERSION)
+        
+            if (options.verbose > 1) PRINTF("wdl_version=%d\n", wdl_version);
+
+            //each entry consists of wtm_mate and btm_mate
+            //each encoded as 2 bits so 4 bits (1 byte) in total
+  
+            HARDBUG((nentries % 2) != 0)
+  
+            i64_t nwdl = nentries / 2;
+              
+            i64_t wdl_size = nwdl * sizeof(wdl_t);
+  
+            if (options.verbose > 1)
+              PRINTF("nwdl=%lld wdl_size=%lld\n", nwdl, wdl_size);
+
+            if (my_mpi_globals.MMG_nglobal == 0)
             {
-              MY_MALLOC(with_endgame->pendgame, wdl_t, nwdl)
+              MY_MALLOC_BY_TYPE(with_endgame->pendgame, wdl_t, nwdl)
             }
             else
             {
-#ifdef USE_OPENMPI
-              MPI_Win_allocate_shared(
-                my_mpi_globals.MY_MPIG_id_global == 0 ? wdl_size : 0,
+              my_mpi_win_allocate_shared(
+                my_mpi_globals.MMG_id_global == 0 ? wdl_size : 0,
                 sizeof(wdl_t), MPI_INFO_NULL,
-                my_mpi_globals.MY_MPIG_comm_global,
+                my_mpi_globals.MMG_comm_global,
                 &(with_endgame->pendgame), &(with_endgame->wendgame));
 
-              my_mpi_win_fence(my_mpi_globals.MY_MPIG_comm_global,
+              my_mpi_win_fence(my_mpi_globals.MMG_comm_global,
                                0, with_endgame->wendgame);
 
               int disp_unit;
               MPI_Aint ssize;
 
-              MPI_Win_shared_query(with_endgame->wendgame, 0,
+              my_mpi_win_shared_query(with_endgame->wendgame, 0,
                 &ssize, &disp_unit, &(with_endgame->pendgame));
 
               PRINTF("ssize=%lld disp_unit=%d\n",
                 (long long) ssize, disp_unit);
 
-              my_mpi_win_fence(my_mpi_globals.MY_MPIG_comm_global,
+              my_mpi_win_fence(my_mpi_globals.MMG_comm_global,
                                0, with_endgame->wendgame);
-#else
-              FATAL("my_mpi_globals.MY_MPIG_nglobal > 1", EXIT_FAILURE)
-#endif
             }
 
             wdl_t *pwdl_t = with_endgame->pendgame;
             
-            if ((my_mpi_globals.MY_MPIG_id_global == INVALID) or
-                (my_mpi_globals.MY_MPIG_id_global == 0))
+            if (my_mpi_globals.MMG_id_global <= 0)
             {
               for (i64_t iwdl = 0; iwdl < nwdl; iwdl++) pwdl_t[iwdl] = 0;
 
@@ -717,17 +679,15 @@ void init_endgame(void)
 
               MARK_ARRAY_READ_ONLY(with_endgame->pendgame, wdl_size);
             }
-#ifdef USE_OPENMPI
-            if (my_mpi_globals.MY_MPIG_nglobal > 1)
-              my_mpi_win_fence(my_mpi_globals.MY_MPIG_comm_global,
+
+            if (my_mpi_globals.MMG_nglobal > 0)
+              my_mpi_win_fence(my_mpi_globals.MMG_comm_global,
                                 0, with_endgame->wendgame);
 
-            if ((my_mpi_globals.MY_MPIG_id_global != INVALID) and
-                (my_mpi_globals.MY_MPIG_id_global != 0))
+            if (my_mpi_globals.MMG_id_global > 0)
             {
               PRINTF("sharing wdl EGTB %s in RAM\n", path);
             }
-#endif
 
             endgame_ram += wdl_size;
 
@@ -740,16 +700,12 @@ void init_endgame(void)
           {
             egtbs = NULL;
 
-            if (compat_strcasecmp(options.egtb_ram, "NULL") == 0)
-            {
-              egtbs = cJSON_CreateArray();
-            }
-            else
+            if (compat_strcasecmp(options.egtb_ram, "NULL") != 0)
             {
               egtbs = cJSON_GetObjectItem(gwd_json, options.egtb_ram);
+
+              HARDBUG(!cJSON_IsArray(egtbs))
             }
- 
-            HARDBUG(!cJSON_IsArray(egtbs))
 
             cJSON_ArrayForEach(egtb, egtbs)
             {
@@ -758,22 +714,22 @@ void init_endgame(void)
               if (compat_strcasecmp(with_endgame->endgame_name,
                                 cJSON_GetStringValue(egtb)) != 0) continue;
 
-#ifdef USE_OPENMPI
-              //not implemented yet
-              HARDBUG(my_mpi_globals.MY_MPIG_nglobal > 1)
-#endif
-              MY_MALLOC(with_endgame->pendgame, i8_t, st.st_size)
+              //sharing of compressed EGTBs not implemented yet
+
+              HARDBUG(my_mpi_globals.MMG_nglobal > 0)
+
+              MY_MALLOC_BY_TYPE(with_endgame->pendgame, i8_t, size)
 
               PRINTF("loading compressed EGTB %s into RAM..\n", path);
                 
               HARDBUG(compat_fseeko(with_endgame->fendgame, 0, SEEK_SET) != 0)
   
-              HARDBUG(fread(with_endgame->pendgame, 1, st.st_size,
-                        with_endgame->fendgame) != st.st_size)
+              HARDBUG(fread(with_endgame->pendgame, 1, size,
+                            with_endgame->fendgame) != size)
   
-              PRINTF("..done size in RAM=%lld\n", (i64_t) st.st_size);
+              PRINTF("..done size in RAM=%lld\n", size);
 
-              endgame_ram += st.st_size;
+              endgame_ram += size;
 
               with_endgame->endgame_status = ENDGAME_ALPHA_BETA_COMPRESSED;
 
@@ -1187,7 +1143,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      white_king_sort[nwk - 1 - nbb++] = 49 - inverse_map[lsb];
+      white_king_sort[nwk - 1 - nbb++] = 49 - field2square[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nwk)
@@ -1198,7 +1154,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      white_man_sort[nwm - 1 - nbb++] = 49 - inverse_map[lsb];
+      white_man_sort[nwm - 1 - nbb++] = 49 - field2square[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nwm)
@@ -1209,7 +1165,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      black_king_sort[nbk - 1 - nbb++] = 49 - inverse_map[lsb];
+      black_king_sort[nbk - 1 - nbb++] = 49 - field2square[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nbk)
@@ -1220,7 +1176,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      black_man_sort[nbm - 1 - nbb++] = 49 - inverse_map[lsb];
+      black_man_sort[nbm - 1 - nbb++] = 49 - field2square[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nbm)
@@ -1236,7 +1192,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      white_king_sort[nbb++] = inverse_map[lsb];
+      white_king_sort[nbb++] = field2square[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nwk)
@@ -1247,7 +1203,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      white_man_sort[nbb++] = inverse_map[lsb];
+      white_man_sort[nbb++] = field2square[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nwm)
@@ -1258,7 +1214,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      black_king_sort[nbb++] = inverse_map[lsb];
+      black_king_sort[nbb++] = field2square[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nbk)
@@ -1269,7 +1225,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     while(bb != 0)
     {
       int lsb = BIT_CTZ(bb);
-      black_man_sort[nbb++] = inverse_map[lsb];
+      black_man_sort[nbb++] = field2square[lsb];
       bb &= ~BITULL(lsb);
     }
     HARDBUG(nbb != nbm)
@@ -1313,6 +1269,8 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     *arg_wdl = TRUE;
 
     wdl_t *pwdl_t = with_endgame->pendgame;
+
+    HARDBUG(with_endgame->pendgame == NULL)
 
     i64_t iwdl = endgame_index / 2;
 
@@ -1591,7 +1549,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
 #ifdef DEBUG
       ui32_t temp_crc32 = 0xFFFFFFFF;
     
-      temp_crc32 = _mm_crc32_u8(temp_crc32, source[0]);
+      temp_crc32 = HW_CRC32_U8(temp_crc32, source[0]);
   
       HARDBUG(temp_crc32 != crc32)
 #endif
@@ -1616,23 +1574,15 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
 
 #ifdef DEBUG
 
-#ifdef USE_HARDWARE_CRC32
-
       ui32_t temp_crc32 = 0xFFFFFFFF;
   
-      temp_crc32 = _mm_crc32_u8(temp_crc32, source[0]);
+      temp_crc32 = HW_CRC32_U8(temp_crc32, source[0]);
 
       for (int ientry = 0; ientry < NPAGE_ENTRIES; ientry++)
       {
-        temp_crc32 = _mm_crc32_u8(temp_crc32, dest[ientry].entry_white_mate);
-        temp_crc32 = _mm_crc32_u8(temp_crc32, dest[ientry].entry_black_mate);
+        temp_crc32 = HW_CRC32_U8(temp_crc32, dest[ientry].entry_white_mate);
+        temp_crc32 = HW_CRC32_U8(temp_crc32, dest[ientry].entry_black_mate);
       }
-
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
 
       HARDBUG(temp_crc32 != crc32)
 #endif
@@ -1658,23 +1608,15 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
 
 #ifdef DEBUG
 
-#ifdef USE_HARDWARE_CRC32
-
       ui32_t temp_crc32 = 0xFFFFFFFF;
     
-      temp_crc32 = _mm_crc32_u8(temp_crc32, source[0]);
+      temp_crc32 = HW_CRC32_U8(temp_crc32, source[0]);
   
       for (int ientry = 0; ientry < NPAGE_ENTRIES; ientry++)
       {
-        temp_crc32 = _mm_crc32_u16(temp_crc32, page[ientry].entry_white_mate);
-        temp_crc32 = _mm_crc32_u16(temp_crc32, page[ientry].entry_black_mate);
+        temp_crc32 = HW_CRC32_U16(temp_crc32, page[ientry].entry_white_mate);
+        temp_crc32 = HW_CRC32_U16(temp_crc32, page[ientry].entry_black_mate);
       }
-
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
 
       HARDBUG(temp_crc32 != crc32)
 #endif
@@ -1985,15 +1927,7 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
   
       if (all_draw)
       {
-#ifdef USE_HARDWARE_CRC32
-
-        crc32 = _mm_crc32_u8(crc32, ALL_DRAW);
-
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
+        crc32 = HW_CRC32_U8(crc32, ALL_DRAW);
 
         dest_new[0] = ALL_DRAW;
   
@@ -2013,21 +1947,14 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
             page_i16[jentry + ientry].entry_black_mate;
         }
 
-#ifdef USE_HARDWARE_CRC32
-
-        crc32 = _mm_crc32_u8(crc32, ALL_I8);
+        crc32 = HW_CRC32_U8(crc32, ALL_I8);
   
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
-          crc32 = _mm_crc32_u8(crc32, source_new[ientry].entry_white_mate);
-          crc32 = _mm_crc32_u8(crc32, source_new[ientry].entry_black_mate);
+          crc32 = HW_CRC32_U8(crc32, source_new[ientry].entry_white_mate);
+          crc32 = HW_CRC32_U8(crc32, source_new[ientry].entry_black_mate);
         }
 
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
         dest_new[0] = ALL_I8;
         
         destLen_new = ZSTD_compress(dest_new + 1, destLen_new - 1,
@@ -2071,23 +1998,16 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
       {
         nall_i16++;
 
-#ifdef USE_HARDWARE_CRC32
-
-        crc32 = _mm_crc32_u8(crc32, ALL_I16);
+        crc32 = HW_CRC32_U8(crc32, ALL_I16);
 
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
-          crc32 = _mm_crc32_u16(crc32,
+          crc32 = HW_CRC32_U16(crc32,
                                 page_i16[jentry + ientry].entry_white_mate);
-          crc32 = _mm_crc32_u16(crc32,
+          crc32 = HW_CRC32_U16(crc32,
                                 page_i16[jentry + ientry].entry_black_mate);
         }
 
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
         size_t sourceLen_new = sizeof(entry_i16_t) * nblock_entries;
   
         dest_new[0] = ALL_I16;
@@ -2262,7 +2182,7 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
     {
       ui32_t crc32 = 0xFFFFFFFF;
   
-      crc32 = _mm_crc32_u8(crc32, source_new[0]);
+      crc32 = HW_CRC32_U8(crc32, source_new[0]);
 
       HARDBUG(crc32 != crc32_new)
    
@@ -2288,23 +2208,15 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
 
       HARDBUG((destLen_new / sizeof(entry_i8_t)) != nblock_entries)
 
-#ifdef USE_HARDWARE_CRC32
-
       ui32_t crc32 = 0xFFFFFFFF;
   
-      crc32 = _mm_crc32_u8(crc32, source_new[0]);
+      crc32 = HW_CRC32_U8(crc32, source_new[0]);
 
       for (int ientry = 0; ientry < nblock_entries; ientry++)
       {
-        crc32 = _mm_crc32_u8(crc32, dest_new[ientry].entry_white_mate);
-        crc32 = _mm_crc32_u8(crc32, dest_new[ientry].entry_black_mate);
+        crc32 = HW_CRC32_U8(crc32, dest_new[ientry].entry_white_mate);
+        crc32 = HW_CRC32_U8(crc32, dest_new[ientry].entry_black_mate);
       }
-
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
 
       HARDBUG(crc32 != crc32_new)
 
@@ -2331,23 +2243,15 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
 
       HARDBUG((destLen_new / sizeof(entry_i16_t)) != nblock_entries)
 
-#ifdef USE_HARDWARE_CRC32
-
       ui32_t crc32 = 0xFFFFFFFF;
   
-      crc32 = _mm_crc32_u8(crc32, source_new[0]);
+      crc32 = HW_CRC32_U8(crc32, source_new[0]);
 
       for (int ientry = 0; ientry < nblock_entries; ientry++)
       {
-        crc32 = _mm_crc32_u16(crc32, dest_new[ientry].entry_white_mate);
-        crc32 = _mm_crc32_u16(crc32, dest_new[ientry].entry_black_mate);
+        crc32 = HW_CRC32_U16(crc32, dest_new[ientry].entry_white_mate);
+        crc32 = HW_CRC32_U16(crc32, dest_new[ientry].entry_black_mate);
       }
-
-#else
-
-#error NOT IMPLEMENTED YET
-
-#endif
 
       HARDBUG(crc32 != crc32_new)
 

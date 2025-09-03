@@ -1,9 +1,9 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM  gwd7
-#define REVISION "7.851"
+#define REVISION "7.902"
 
 //generic includes
 
@@ -35,7 +35,8 @@
 #define LINE_MAX    do_not_use_LINE_MAX
 #define MY_LINE_MAX 8192
 
-typedef long long  i64_t;
+typedef long long          i64_t;
+typedef unsigned long long ui64_t;
 
 #include "compat.h"
 
@@ -70,13 +71,16 @@ typedef long long  i64_t;
 #define NODE_MAX    1024
 #define NPIECES_MAX 20
 
-#define CJSON_PARAMETERS_ID        "parameters"
-#define CJSON_TWEAKS_ID            "tweaks"
+#define CJSON_PARAMETERS_ID            "parameters"
+#define CJSON_TWEAKS_ID                "tweaks"
+#define CJSON_SHAPE_ID                 "shape"
 #define CJSON_NEURAL2MATERIAL_SCORE_ID "network2material_score"
-#define CJSON_KING_WEIGHT_ID       "king_weight"
-#define CJSON_SHAPE_ID             "shape"
-#define CJSON_CLIP_ID              "clip"
-#define CJSON_ACTIVATION_LAST_ID   "activation_last"
+#define CJSON_EMBEDDING_ID             "embedding"
+#define CJSON_ACTIVATION_ID            "activation"
+#define CJSON_ACTIVATION_LAST_ID       "activation_last"
+#define CJSON_NMAN_MIN_ID              "nman_min"
+#define CJSON_NMAN_MAX_ID              "nman_max"
+
 #define CJSON_EVENT_ID             "event"
 #define CJSON_DATE_ID              "date"
 #define CJSON_WHITE_ID             "white"
@@ -116,6 +120,9 @@ typedef long long  i64_t;
 #define CJSON_FILES_ID             "files"
 #define CJSON_FILE_NAME_ID         "name"
 #define CJSON_FILE_LINES_ID        "lines"
+#define CJSON_FILE_ROWS_ID         "rows"
+#define CJSON_FILE_COLS_ID         "cols"
+#define CJSON_FILE_DATA_ID         "data"
 
 //generic macro's
 
@@ -189,12 +196,21 @@ typedef int16_t  i16_t;
 typedef uint16_t ui16_t;
 typedef int32_t  i32_t;
 typedef uint32_t ui32_t;
-typedef unsigned long long ui64_t;
 
 //specific typedefs
 
 typedef ui64_t hash_key_t;
 typedef struct board board_t;
+
+#define SCALED_DOUBLE_FLOAT 1
+#define SCALED_DOUBLE_I32   2
+#define SCALED_DOUBLE_T     SCALED_DOUBLE_FLOAT
+
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+typedef float scaled_double_t;
+#else
+typedef i32_t scaled_double_t;
+#endif
 
 //I have to get rid of this!
 
@@ -211,10 +227,12 @@ extern void *STDOUT;
 #include "my_malloc.h"
 #include "my_mpi.h"
 #include "my_random.h"
+#include "my_sqlite3.h"
 #include "fbuffer.h"
 
 #include "buckets.h"
 #include "caches.h"
+#include "compress.h"
 #include "records.h"
 #include "queues.h"
 #include "states.h"
@@ -227,9 +245,8 @@ extern void *STDOUT;
 #include "boards.h"
 #include "moves.h"
 #include "search.h"
-#include "threads.h"
+#include "my_threads.h"
 #include "book.h"
-#include "dbase.h"
 #include "dxp.h"
 #include "endgame.h"
 #include "hub.h"

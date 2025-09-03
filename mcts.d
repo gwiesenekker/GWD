@@ -1,7 +1,10 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
-int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg_my_beta, 
-  int arg_node_type, moves_list_t *arg_moves_list, int *arg_best_pv, int arg_all_moves)
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+int my_mcts_quiescence(search_t *object, int arg_nply,
+  int arg_my_alpha, int arg_my_beta, int arg_node_type,
+  moves_list_t *arg_moves_list, int *arg_best_pv, int arg_all_moves)
 {
+  PUSH_NAME(__FUNC__)
+
   HARDBUG(arg_my_alpha >= arg_my_beta)
 
   HARDBUG(arg_node_type == 0)
@@ -114,7 +117,7 @@ int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg
     if (best_score >= arg_my_beta) goto label_return;
   }
 
-  int moves_weight[MOVES_MAX];
+  int moves_weight[NMOVES_MAX];
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
     moves_weight[imove] = arg_moves_list->ML_move_weights[imove];
@@ -138,7 +141,8 @@ int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg
 
     if (!arg_all_moves)
     {
-      if (!MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[jmove])) continue;
+      if (!MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[jmove]))
+        continue;
     }
 
     int temp_alpha;
@@ -225,6 +229,8 @@ int my_mcts_quiescence(search_t *object, int arg_nply, int arg_my_alpha, int arg
    
   label_return:
 
+  POP_NAME(__FUNC__)
+
   return(best_score);
 }
 
@@ -232,6 +238,8 @@ int my_mcts_alpha_beta(search_t *object, int arg_nply,
   int arg_my_alpha, int arg_my_beta, int arg_my_depth,
   int arg_node_type, moves_list_t *arg_moves_list, int *arg_best_pv)
 {
+  PUSH_NAME(__FUNC__)
+
   HARDBUG(arg_my_alpha >= arg_my_beta)
 
   HARDBUG(arg_my_depth < 0)
@@ -318,7 +326,7 @@ int my_mcts_alpha_beta(search_t *object, int arg_nply,
     goto label_return;
   }
 
-  int moves_weight[MOVES_MAX];
+  int moves_weight[NMOVES_MAX];
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
     moves_weight[imove] = arg_moves_list->ML_move_weights[imove];
@@ -433,6 +441,8 @@ int my_mcts_alpha_beta(search_t *object, int arg_nply,
   HARDBUG(best_score == SCORE_MINUS_INFINITY)
    
   label_return:
+
+  POP_NAME(__FUNC__)
 
   return(best_score);
 }

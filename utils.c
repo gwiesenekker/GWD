@@ -1,7 +1,7 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
-#ifdef USE_HARDWARE_CRC32
+#if COMPAT_ARCH == COMPAT_ARCH_X86_64
 #define POLYNOMIAL_CRC32 0x82F63B78UL
 #else
 #define POLYNOMIAL_CRC32 0xEDB88320UL
@@ -12,8 +12,8 @@ int zzzzzz_invocation = 0;
 void zzzzzz(char *arg_file, const char *arg_func, long arg_line, char *arg_error, int arg_code)
 {
   fprintf(stderr, "** %s **\n"
-    " my_mpi_globals.MY_MPIG_id_global=%d\n"
-    " my_mpi_globals.MY_MPIG_nglobal=%d\n"
+    " my_mpi_globals.MMG_id_global=%d\n"
+    " my_mpi_globals.MMG_nglobal=%d\n"
     " pthread_self=%#lX\n"
     " file=%s\n"
     " func=%s\n"
@@ -22,8 +22,8 @@ void zzzzzz(char *arg_file, const char *arg_func, long arg_line, char *arg_error
     " code=%d\n"
     " version=%s\n",
    arg_code == 0 ? "OK" : "FATAL",
-   my_mpi_globals.MY_MPIG_id_global,
-   my_mpi_globals.MY_MPIG_nglobal,
+   my_mpi_globals.MMG_id_global,
+   my_mpi_globals.MMG_nglobal,
    compat_pthread_self(),
    arg_file, arg_func, arg_line, arg_error, arg_code, REVISION);
 
@@ -33,42 +33,38 @@ void zzzzzz(char *arg_file, const char *arg_func, long arg_line, char *arg_error
   }
   else if (arg_code != EXIT_SUCCESS)
   { 
+    print_my_names(FALSE);
+
     PRINTF("** %s **\n"
-      " my_mpi_globals.MY_MPIG_id_global=%d\n"
-      " my_mpi_globals.MY_MPIG_nglobal=%d\n"
+      " my_mpi_globals.MMG_id_global=%d\n"
+      " my_mpi_globals.MMG_nglobal=%d\n"
       " pthread_self=%#lX\n"
       " file=%s\n"
       " func=%s\n"
       " line=%ld\n"
       " error=%s\n"
       " code=%d\n"
-      " version=%s\n",
+      " version=%s\n$$",
      arg_code == 0 ? "OK" : "FATAL",
-     my_mpi_globals.MY_MPIG_id_global,
-     my_mpi_globals.MY_MPIG_nglobal,
+     my_mpi_globals.MMG_id_global,
+     my_mpi_globals.MMG_nglobal,
      compat_pthread_self(),
      arg_file, arg_func, arg_line, arg_error, arg_code, REVISION);
-
-     //flush
-
-     PRINTF("", NULL);
   }
 
-#ifdef USE_OPENMPI
-  if (my_mpi_globals.MY_MPIG_init)
+  if (my_mpi_globals.MMG_init)
   {
     if (arg_code == EXIT_SUCCESS)
     {
-      MPI_Finalize();
+      my_mpi_finalize();
     }
     else
     {
-      //issue when multiple processes call MPI_Abort
+      //issue when multiple processes call my_mpi_abort
 
-      MPI_Abort(my_mpi_globals.MY_MPIG_comm_global, arg_code);
+      my_mpi_abort(my_mpi_globals.MMG_comm_global, arg_code);
     }
   }
-#endif
   exit(arg_code);
 }
 
@@ -113,18 +109,6 @@ void init_crc32(ui32_t *crc)
   *crc = 0xFFFFFFFF;
 }
 
-#ifdef USE_HARDWARE_CRC32
-void update_crc32(ui32_t *crc, void *p, ui32_t n)
-{
-  BEGIN_BLOCK(__FUNC__)
-
-  i8_t *a = (i8_t *) p;
-  for (ui32_t i = 0; i < n; i++)
-    *crc = _mm_crc32_u8(*crc, a[i]);
-
-  END_BLOCK
-}
-#else
 void update_crc32(ui32_t *crc, void *p, ui32_t n)
 {
   BEGIN_BLOCK(__FUNC__)
@@ -135,7 +119,6 @@ void update_crc32(ui32_t *crc, void *p, ui32_t n)
 
   END_BLOCK
 }
-#endif
 
 ui32_t return_crc32(void *a, ui32_t n)
 {
@@ -211,17 +194,25 @@ void test_utils(void)
 
   (void) snprintf(s, MY_LINE_MAX, "%#X", c);
 
-#ifdef USE_HARDWARE_CRC32
-  PRINTF("the HW crc32 of '%s' is %s hex\n", f, s);
+  PRINTF("the crc32 of '%s' is %s hex\n", f, s);
+
+#if POLYNOMIAL_CRC32 == 0x82F63B78UL
   HARDBUG(strcmp(s, "0X22620404") != 0)
 #else
-  PRINTF("the SW crc32 of '%s' is %s hex\n", f, s);
   HARDBUG(strcmp(s, "0X414FA339") != 0)
 #endif
 }
 
 void file2bstring(char *arg_name, bstring arg_bstring)
 {
+  i64_t size;
+
+  HARDBUG((size = compat_size(arg_name)) == -1)
+
+  btrunc(arg_bstring, 0);
+
+  ballocmin(arg_bstring, size);
+
   FILE *farg_name;
 
   HARDBUG((farg_name = fopen(arg_name, "r")) == NULL)

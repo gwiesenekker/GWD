@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #undef read
@@ -282,6 +282,23 @@ int compat_access(char* pathname, int mode)
 #endif
 }
 
+i64_t compat_size(char* pathname)
+{
+#if COMPAT_OS == COMPAT_OS_LINUX
+  struct stat st;
+  
+  if (stat(pathname, &st) != 0) return(-1);
+
+  return(st.st_size);
+#else
+  struct __stat64 st;
+
+  if (_stat64(pathname, &st) != 0) return -1;
+
+  return(st.st_size);
+#endif
+}
+
 int compat_dup2(int oldfd, int newfd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
@@ -377,26 +394,20 @@ int return_physical_cpus(void)
 
   HARDBUG((fproc = fopen("/proc/cpuinfo", "r")) == NULL)
 
-    char line[MY_LINE_MAX];
+  char line[MY_LINE_MAX];
 
-  int result = INVALID;
+  int result = 0;
 
   while (fgets(line, MY_LINE_MAX, fproc) != NULL)
   {
-    int d;
+    int dummy;
 
-    if (sscanf(line, "cpu cores%*s%d", &d) == 1)
-    {
-      result = d;
-      break;
-    }
+    if (sscanf(line, "processor%*[^0-9]%d", &dummy) == 1) ++result;
   }
 
   FCLOSE(fproc)
 
-    HARDBUG(result == INVALID)
-
-    return(result);
+  return(result);
 #else
   PSYSTEM_LOGICAL_PROCESSOR_INFORMATION plpi = NULL;
   DWORD returnLength = 0;
@@ -636,3 +647,24 @@ void compat_thread_join(my_thread_t thread)
   }
 #endif
 }
+
+void compat_getrandom_u64(ui64_t *r)
+{
+#if COMPAT_CSTD == COMPAT_CSTD_WIN
+  HARDBUG(BCryptGenRandom(NULL, (PUCHAR) r, (ULONG) sizeof(ui64_t),
+                          BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0)
+
+#else
+  HARDBUG(getrandom(r, sizeof(ui64_t), 0) != sizeof(ui64_t))
+#endif
+}
+
+i64_t compat_getpid(void)
+{
+#if COMPAT_OS == COMPAT_OS_LINUX
+  return(getpid());
+#else
+  return(GetCurrentProcessId());
+#endif
+}
+

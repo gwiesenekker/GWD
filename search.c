@@ -1,10 +1,15 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #define TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT BIT(0)
 #define TWEAK_PREVIOUS_MOVE_NULL_BIT       BIT(1)
 #define TWEAK_PREVIOUS_MOVE_REDUCED_BIT    BIT(2)
 #define TWEAK_PREVIOUS_MOVE_EXTENDED_BIT   BIT(3)
+
+#define STAGE_SEARCH_MOVE_AT_REDUCED_DEPTH   BIT(0)
+#define STAGE_SEARCH_MOVE_AT_FULL_DEPTH      BIT(1)
+#define STAGE_SEARCHED_MOVE_AT_REDUCED_DEPTH BIT(2)
+#define STAGE_SEARCHED_MOVE_AT_FULL_DEPTH    BIT(3)
 
 #undef CHECK_TIME_LIMIT_IN_QUIESCENCE
 
@@ -75,6 +80,11 @@ local alpha_beta_cache_entry_t *black_alpha_beta_cache;
 local i64_t global_nodes;
 
 local bucket_t bucket_depth;
+
+#undef LAZY_STATS
+#ifdef LAZY_STATS
+local stats_t lazy_stats[2 * NPIECES_MAX + 1][2 * NPIECES_MAX + 1];
+#endif
 
 local void white_endgame_pv(search_t *, int, bstring);
 local void black_endgame_pv(search_t *, int, bstring);
@@ -211,18 +221,16 @@ void clear_totals(search_t *object)
   object->S_total_pv_extension_searches_le_alpha = 0;
   object->S_total_pv_extension_searches_ge_beta = 0;
 
-  object->S_total_reductions_delta = 0;
-  object->S_total_reductions_delta_lost = 0;
-  object->S_total_reductions_delta_le_alpha = 0;
-  object->S_total_reductions_delta_ge_beta = 0;
-
   object->S_total_reductions = 0;
+  object->S_total_reductions_lost = 0;
   object->S_total_reductions_le_alpha = 0;
   object->S_total_reductions_ge_beta = 0;
 
   object->S_total_single_reply_extensions = 0;
 
   object->S_total_evaluations = 0;
+  object->S_total_lazy_alpha_evaluations = 0;
+  object->S_total_lazy_beta_evaluations = 0;
   object->S_total_material_only_evaluations = 0;
   object->S_total_network_evaluations = 0;
 
@@ -238,6 +246,9 @@ void clear_totals(search_t *object)
   object->S_total_alpha_beta_cache_true_score_stored = 0;
   object->S_total_alpha_beta_cache_nmoves_errors = 0;
   object->S_total_alpha_beta_cache_crc32_errors = 0;
+
+  object->S_total_score_cache_hits = 0;
+  object->S_total_score_cache_crc32_errors = 0;
 }
 
 #define PRINTF_TOTAL(X) my_printf(object->S_my_printf, #X "=%lld\n", object->X);
@@ -264,18 +275,16 @@ void print_totals(search_t *object)
   PRINTF_TOTAL(S_total_pv_extension_searches_le_alpha)
   PRINTF_TOTAL(S_total_pv_extension_searches_ge_beta)
 
-  PRINTF_TOTAL(S_total_reductions_delta)
-  PRINTF_TOTAL(S_total_reductions_delta_lost)
-  PRINTF_TOTAL(S_total_reductions_delta_le_alpha)
-  PRINTF_TOTAL(S_total_reductions_delta_ge_beta)
-
   PRINTF_TOTAL(S_total_reductions)
+  PRINTF_TOTAL(S_total_reductions_lost)
   PRINTF_TOTAL(S_total_reductions_le_alpha)
   PRINTF_TOTAL(S_total_reductions_ge_beta)
 
   PRINTF_TOTAL(S_total_single_reply_extensions)
 
   PRINTF_TOTAL(S_total_evaluations)
+  PRINTF_TOTAL(S_total_lazy_alpha_evaluations)
+  PRINTF_TOTAL(S_total_lazy_beta_evaluations)
   PRINTF_TOTAL(S_total_material_only_evaluations)
   PRINTF_TOTAL(S_total_network_evaluations)
 
@@ -291,54 +300,43 @@ void print_totals(search_t *object)
   PRINTF_TOTAL(S_total_alpha_beta_cache_true_score_stored)
   PRINTF_TOTAL(S_total_alpha_beta_cache_nmoves_errors)
   PRINTF_TOTAL(S_total_alpha_beta_cache_crc32_errors)
+
+  PRINTF_TOTAL(S_total_score_cache_hits)
+  PRINTF_TOTAL(S_total_score_cache_crc32_errors)
 }
 
-local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv_only,
+local int probe_alpha_beta_cache(search_t *object,
+  int arg_node_type, int arg_pv_only,
   alpha_beta_cache_entry_t *arg_alpha_beta_cache,
-  alpha_beta_cache_entry_t *arg_alpha_beta_cache_entry,
-  alpha_beta_cache_slot_t **arg_alpha_beta_cache_slot)
+  alpha_beta_cache_slot_t *arg_alpha_beta_cache_slot)
 {
   int result = FALSE;
 
+  alpha_beta_cache_entry_t *with = NULL;
+
   if (IS_PV(arg_node_type))
   {
-    *arg_alpha_beta_cache_entry =
-      arg_alpha_beta_cache[object->S_board.B_key % nalpha_beta_pv_cache_entries];
-
-#ifdef DEBUG
-    for (int idebug = 0; idebug < NSLOTS; idebug++)
-    {
-      if (arg_alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key == 0) continue;
-
-      int ndebug = 0;
-      
-      for (int jdebug = 0; jdebug < NSLOTS; jdebug++)
-      {
-        if (arg_alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key ==
-            arg_alpha_beta_cache_entry->ABCE_slots[jdebug].ABCS_key) ndebug++;
-      }
-      HARDBUG(ndebug != 1)
-    }
-#endif
+    with = arg_alpha_beta_cache +
+           object->S_board.B_key % nalpha_beta_pv_cache_entries;
 
     int islot;
 
     for (islot = 0; islot < NSLOTS; islot++)
     {
-      *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots + islot;
+      *arg_alpha_beta_cache_slot = with->ABCE_slots[islot];
 
       ui32_t crc32 = 0xFFFFFFFF;
-      crc32 = _mm_crc32_u64(crc32, (*arg_alpha_beta_cache_slot)->ABCS_key);
-      crc32 = _mm_crc32_u64(crc32, (*arg_alpha_beta_cache_slot)->ABCS_data);
+      crc32 = HW_CRC32_U64(crc32, arg_alpha_beta_cache_slot->ABCS_key);
+      crc32 = HW_CRC32_U64(crc32, arg_alpha_beta_cache_slot->ABCS_data);
       crc32 = ~crc32;
     
-      if (crc32 != (*arg_alpha_beta_cache_slot)->ABCS_crc32)
+      if (crc32 != arg_alpha_beta_cache_slot->ABCS_crc32)
       {
         object->S_total_alpha_beta_cache_crc32_errors++;
- 
-        **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
+
+        with->ABCE_slots[islot] = alpha_beta_cache_slot_default;
       }
-      else if ((*arg_alpha_beta_cache_slot)->ABCS_key == object->S_board.B_key)
+      else if (arg_alpha_beta_cache_slot->ABCS_key == object->S_board.B_key)
       {
         result = TRUE;
 
@@ -349,21 +347,21 @@ local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv
 
   if (!result and !arg_pv_only)
   {
-    *arg_alpha_beta_cache_entry =
-      arg_alpha_beta_cache[nalpha_beta_pv_cache_entries + 
-                       object->S_board.B_key % nalpha_beta_cache_entries];
+    with = arg_alpha_beta_cache +
+           nalpha_beta_pv_cache_entries + 
+           object->S_board.B_key % nalpha_beta_cache_entries;
 
 #ifdef DEBUG
     for (int idebug = 0; idebug < NSLOTS; idebug++)
     {
-      if (arg_alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key == 0) continue;
+      if (with->ABCE_slots[idebug].ABCS_key == 0) continue;
 
       int ndebug = 0;
       
       for (int jdebug = 0; jdebug < NSLOTS; jdebug++)
       {
-        if (arg_alpha_beta_cache_entry->ABCE_slots[idebug].ABCS_key ==
-            arg_alpha_beta_cache_entry->ABCE_slots[jdebug].ABCS_key) ndebug++;
+        if (with->ABCE_slots[idebug].ABCS_key ==
+            with->ABCE_slots[jdebug].ABCS_key) ndebug++;
       }
       HARDBUG(ndebug != 1)
     }
@@ -373,20 +371,20 @@ local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv
 
     for (islot = 0; islot < NSLOTS; islot++)
     {
-      *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots + islot;
+      *arg_alpha_beta_cache_slot = with->ABCE_slots[islot];
 
       ui32_t crc32 = 0xFFFFFFFF;
-      crc32 = _mm_crc32_u64(crc32, (*arg_alpha_beta_cache_slot)->ABCS_key);
-      crc32 = _mm_crc32_u64(crc32, (*arg_alpha_beta_cache_slot)->ABCS_data);
+      crc32 = HW_CRC32_U64(crc32, arg_alpha_beta_cache_slot->ABCS_key);
+      crc32 = HW_CRC32_U64(crc32, arg_alpha_beta_cache_slot->ABCS_data);
       crc32 = ~crc32;
     
-      if (crc32 != (*arg_alpha_beta_cache_slot)->ABCS_crc32)
+      if (crc32 != arg_alpha_beta_cache_slot->ABCS_crc32)
       {
         object->S_total_alpha_beta_cache_crc32_errors++;
-  
-        **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
+
+        with->ABCE_slots[islot] = alpha_beta_cache_slot_default;
       }
-      else if ((*arg_alpha_beta_cache_slot)->ABCS_key == object->S_board.B_key)
+      else if (arg_alpha_beta_cache_slot->ABCS_key == object->S_board.B_key)
       {
         result = TRUE;
 
@@ -396,26 +394,8 @@ local int probe_alpha_beta_cache(search_t *object, int arg_node_type, int arg_pv
   }
 
   if (!result)
-  {
-    //find empty slot
-
-    int islot;
-
-    for (islot = 0; islot < NSLOTS; islot++)
-    {
-      *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots + islot;
-
-      if ((*arg_alpha_beta_cache_slot)->ABCS_key == 0) break;
-    }
-    if (islot == NSLOTS)
-    {
-      *arg_alpha_beta_cache_slot = arg_alpha_beta_cache_entry->ABCE_slots +
-                               object->S_board.B_key % NSLOTS;
-
-      **arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
-    }
-  }
-
+    *arg_alpha_beta_cache_slot = alpha_beta_cache_slot_default;
+   
   return(result);
 }
 
@@ -462,6 +442,41 @@ local void update_alpha_beta_cache_slot_moves(
 #endif
 }
 
+local void update_alpha_beta_cache(search_t *object, int arg_node_type,
+  alpha_beta_cache_entry_t *arg_alpha_beta_cache,
+  alpha_beta_cache_slot_t *arg_alpha_beta_cache_slot)
+{
+  alpha_beta_cache_entry_t *with = NULL;
+
+  if (IS_PV(arg_node_type))
+  {
+    with = arg_alpha_beta_cache +
+           object->S_board.B_key % nalpha_beta_pv_cache_entries;
+  }
+  else
+  {
+    with = arg_alpha_beta_cache +
+           nalpha_beta_pv_cache_entries + 
+           object->S_board.B_key % nalpha_beta_cache_entries;
+  }
+
+  int islot = INVALID;
+
+  for (islot = 0; islot < NSLOTS; islot++)
+    if (with->ABCE_slots[islot].ABCS_key == object->S_board.B_key) break;
+
+  if (islot == NSLOTS) islot = NSLOTS - 1;
+
+  while(islot > 0)
+  {
+    with->ABCE_slots[islot] = with->ABCE_slots[islot - 1];
+ 
+    --islot;
+  }
+
+  with->ABCE_slots[0] = *arg_alpha_beta_cache_slot;
+}
+
 #define MY_BIT      WHITE_BIT
 #define YOUR_BIT    BLACK_BIT
 #define my_colour   white
@@ -486,9 +501,9 @@ local void update_alpha_beta_cache_slot_moves(
 #undef my_colour
 #undef your_colour
 
-void clear_caches(void)
+local void clear_alpha_beta_caches(void)
 {
-  PRINTF("clear_caches..\n");
+  PRINTF("clear_alpha_beta_caches..\n");
 
   for (i64_t ientry = 0;
        ientry < (nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries);
@@ -516,7 +531,7 @@ void construct_search(void *self,
 
   object->S_thread = arg_thread;
 
-  construct_board(&(object->S_board), arg_my_printf, FALSE);
+  construct_board(&(object->S_board), arg_my_printf);
   
   construct_my_timer(&(object->S_timer), "board",
     object->S_my_printf, FALSE);
@@ -597,25 +612,37 @@ void init_search(void)
       alpha_beta_cache_slot_default.ABCS_moves[imove] = INVALID;
   
     ui32_t crc32 = 0xFFFFFFFF;
-    crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot_default.ABCS_key);
-    crc32 = _mm_crc32_u64(crc32, alpha_beta_cache_slot_default.ABCS_data);
+    crc32 = HW_CRC32_U64(crc32, alpha_beta_cache_slot_default.ABCS_key);
+    crc32 = HW_CRC32_U64(crc32, alpha_beta_cache_slot_default.ABCS_data);
     alpha_beta_cache_slot_default.ABCS_crc32 = ~crc32;
   
     for (int islot = 0; islot < NSLOTS; islot++)
       alpha_beta_cache_entry_default.ABCE_slots[islot] = 
         alpha_beta_cache_slot_default;
   
-    MY_MALLOC(white_alpha_beta_cache, alpha_beta_cache_entry_t,
+    MY_MALLOC_BY_TYPE(white_alpha_beta_cache, alpha_beta_cache_entry_t,
               nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
   
-    MY_MALLOC(black_alpha_beta_cache, alpha_beta_cache_entry_t,
+    MY_MALLOC_BY_TYPE(black_alpha_beta_cache, alpha_beta_cache_entry_t,
               nalpha_beta_pv_cache_entries + nalpha_beta_cache_entries)
 
-    clear_caches();
+    clear_alpha_beta_caches();
   }
 
   construct_bucket(&bucket_depth, "bucket_depth",
                    1, 0, DEPTH_MAX, BUCKET_LINEAR);
+
+#ifdef LAZY_STATS
+  for (int ndelta_man = -NPIECES_MAX; ndelta_man <= NPIECES_MAX; ++ndelta_man)
+  {
+    for (int ndelta_king = -NPIECES_MAX; ndelta_king <= NPIECES_MAX;
+         ++ndelta_king)
+    {
+      construct_stats(&(lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]), "lazy_stats");
+
+    }
+  }
+#endif
 }
 
 void fin_search(void)

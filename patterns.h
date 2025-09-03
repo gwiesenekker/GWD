@@ -1,51 +1,60 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef PatternsH
 #define PatternsH
 
-#define MASK_WHITE_MAN 01
-#define MASK_BLACK_MAN 02
-#define MASK_EMPTY     03
-
 #define NPATTERNS_MAX    256
-#define NLINEAR_MAX      5
-#define NMASK2INPUTS_MAX (1 << (2 * NLINEAR_MAX))
+#define NLINEAR_MAX      16
+#define NMASK2INPUTS_MAX (1 << NLINEAR_MAX)
+
+#define EMBED_EMPTY     0
+#define EMBED_WHITE_MAN 1
+#define EMBED_BLACK_MAN 2
 
 typedef struct
 {
-  int P_root_square;
-  int P_nlinear;
-  int P_valid_mask;
-  ui64_t P_square2linear;
-  int P_mask2inputs[NMASK2INPUTS_MAX];
-} pattern_t;
+  int PS_nlinear;
+  int PS_field2linear[BOARD_MAX];
+  int PS_nstates;
+  int PS_nembed;
+  int PS_offset;
+  scaled_double_t **PS_weights_nstatesxnembed;
+  scaled_double_t **PS_sum_nstatesxnoutputs;
+} pattern_shared_t;
 
 typedef struct
 {
-  int PMS_mask[NPATTERNS_MAX];
-} pattern_mask_state_t;
+  i32_t PT_embed[NLINEAR_MAX];
+} pattern_thread_t;
 
 typedef struct
 {
-  int PM_npatterns;
-  int PM_mask[NPATTERNS_MAX];
-  int PM_nstates;
-  pattern_mask_state_t PM_states[NODE_MAX];
-} pattern_mask_t;
+  int MS_nstates;
+  int MS_nembed; 
+  int MS_offset;
+  scaled_double_t **MS_weights_nembedxnstates;
+  scaled_double_t **MS_weights_nstatesxnembed;
+  scaled_double_t **MS_sum;
+} material_shared_t;
 
 typedef struct
 {
-  int npatterns;
-  int *patterns_map[BOARD_MAX];
-  pattern_t patterns[NPATTERNS_MAX];
-} patterns_t;
+  int PS_npatterns;
+  int *PS_patterns_map[BOARD_MAX];
+  pattern_shared_t PS_patterns[NPATTERNS_MAX];
+} patterns_shared_t;
 
-int construct_patterns(patterns_t *, char *);
+typedef struct
+{
+  pattern_thread_t PT_patterns[NPATTERNS_MAX];
+} patterns_thread_t;
 
-void push_pattern_mask_state(pattern_mask_t *self);
-void pop_pattern_mask_state(pattern_mask_t *self);
+extern patterns_shared_t patterns_shared;
 
-void board2patterns(board_t *);
+void construct_patterns_shared(patterns_shared_t *, char *);
 
-void check_board_patterns(board_t *, char *where);
+void board2patterns_thread(board_t *);
+
+void check_board_patterns_thread(board_t *, char *where, int);
 
 #endif
+

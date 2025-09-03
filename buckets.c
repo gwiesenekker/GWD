@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 #undef WEIBULL
@@ -183,7 +183,7 @@ void construct_bucket(void *self, char *arg_bucket_name,
   else
     FATAL("unknown bucket_scale", EXIT_FAILURE)
 
-  MY_MALLOC(object->buckets, i64_t, object->nbuckets)
+  MY_MALLOC_BY_TYPE(object->buckets, i64_t, object->nbuckets)
 
   for (int ibucket = 0; ibucket < object->nbuckets; ibucket++)
    object->buckets[ibucket] = 0;

@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #ifndef ScoreH
 #define ScoreH
 
@@ -16,11 +16,13 @@
 #define return_my_score     return_the_score(my_colour)
 #define return_your_score   return_the_score(your_colour)
 
-int return_white_score(board_t *, moves_list_t *);
-int return_black_score(board_t *, moves_list_t *);
+int return_white_score(search_t *, moves_list_t *);
+int return_black_score(search_t *, moves_list_t *);
 
 int return_npieces(board_t *);
 int return_material_score(board_t *);
+
+void init_score(void);
 
 #endif
 

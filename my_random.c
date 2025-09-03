@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 /*
@@ -77,11 +77,7 @@ void construct_my_random(my_random_t *self, i64_t arg_seed)
 
   if (arg_seed == INVALID)
   {
-#ifdef USE_HARDWARE_RAND
-    HARDBUG(!_rdrand64_step(&seed))
-#else
-#error NOT IMPLEMENTED
-#endif
+    compat_getrandom_u64(&seed);
   }
   else
   {

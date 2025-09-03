@@ -1,4 +1,4 @@
-//SCU REVISION 7.851 di  8 apr 2025  7:23:10 CEST
+//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
 #include "globals.h"
 
 void clear_stats(void *self)
@@ -9,11 +9,16 @@ void clear_stats(void *self)
 
   object->S_min = 0.0;
   object->S_max = 0.0;
-  object->S_mean = 0.0;
-  object->S_sigma = 0.0;
+
+  object->S_mean_welford = 0.0;
+  object->S_sigma_welford = 0.0;
 
   object->S_sum = 0.0;
   object->S_sum2 = 0.0;
+
+  object->S_mean = 0.0;
+  object->S_sigma = 0.0;
+
   object->S_mean_sum = 0.0;
   object->S_sigma_sum2 = 0.0;
 }
@@ -31,10 +36,12 @@ void mean_sigma(void *self)
 {
   stats_t *object = self;
 
-  object->S_sigma = sqrt(object->S_sigma / object->S_n);
+  if (object->S_n == 0) return;
+
+  object->S_mean = object->S_mean_welford;
+  object->S_sigma = sqrt(object->S_sigma_welford / object->S_n);
 
   object->S_mean_sum = object->S_sum / object->S_n;
-
   object->S_sigma_sum2 = sqrt(object->S_sum2 / object->S_n -
                               object->S_mean_sum * object->S_mean_sum);
 }
@@ -65,9 +72,9 @@ void my_stats_aggregate(void *self, MPI_Comm arg_comm)
     MPI_DOUBLE, MPI_SUM, arg_comm);
   my_mpi_allreduce(MPI_IN_PLACE, &(object->S_max), 1,
     MPI_DOUBLE, MPI_SUM, arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_mean), 1,
+  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_mean_welford), 1,
     MPI_DOUBLE, MPI_SUM, arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_sigma), 1,
+  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_sigma_welford), 1,
     MPI_DOUBLE, MPI_SUM, arg_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE, &(object->S_sum), 1,
