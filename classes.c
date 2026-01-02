@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 //objects are derived from a class

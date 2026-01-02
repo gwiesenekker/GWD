@@ -1,8 +1,5 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
-
-#define IS_MINE(X) ((X) & MY_BIT)
-#define IS_YOURS(X) ((X) & YOUR_BIT)
 
 int square2field[1 + 50] =
 {
@@ -85,44 +82,7 @@ int black_row[BOARD_MAX] =
 
 my_random_t boards_random;
 
-hash_key_t white_man_key[BOARD_MAX];
-hash_key_t white_king_key[BOARD_MAX];
-
-hash_key_t black_man_key[BOARD_MAX];
-hash_key_t black_king_key[BOARD_MAX];
-
-ui64_t left_wing_bb;
-ui64_t center_bb;
-ui64_t right_wing_bb;
-
-ui64_t left_half_bb;
-ui64_t right_half_bb;
-
-ui64_t white_row_empty_bb;
-ui64_t black_row_empty_bb;
-
-#define MY_BIT      WHITE_BIT
-#define YOUR_BIT    BLACK_BIT
-#define my_colour   white
-#define your_colour black
-#include "boards.d"
-
-#undef my_colour
-#undef your_colour
-#undef MY_BIT
-#undef YOUR_BIT
-
-#define MY_BIT      BLACK_BIT
-#define YOUR_BIT    WHITE_BIT
-#define my_colour   black
-#define your_colour white
-
-#include "boards.d"
-
-#undef my_colour
-#undef your_colour
-#undef MY_BIT
-#undef YOUR_BIT
+hash_key_t hash_keys[NCOLOUR_ENUM][NPIECE_ENUM][BOARD_MAX];
 
 void construct_board(void *self, my_printf_t *arg_my_printf)
 {
@@ -144,11 +104,10 @@ void push_board_state(void *self)
   board_state_t *state = object->B_states + object->B_nstate;
 
   state->BS_key = object->B_key;
-  state->BS_white_man_bb = object->B_white_man_bb;
-  state->BS_white_king_bb = object->B_white_king_bb;
-  state->BS_black_man_bb = object->B_black_man_bb;
-  state->BS_black_king_bb = object->B_black_king_bb;
- 
+
+  memcpy(state->BS_bit_boards, object->B_bit_boards,
+         sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
+
   state->BS_npieces = 
     BIT_COUNT(object->B_white_man_bb) +
     BIT_COUNT(object->B_white_king_bb) +
@@ -169,10 +128,9 @@ void pop_board_state(void *self)
   board_state_t *state = object->B_states + object->B_nstate;
 
   object->B_key = state->BS_key;
-  object->B_white_man_bb = state->BS_white_man_bb;
-  object->B_white_king_bb = state->BS_white_king_bb;
-  object->B_black_man_bb = state->BS_black_man_bb;
-  object->B_black_king_bb = state->BS_black_king_bb;
+
+  memcpy(object->B_bit_boards, state->BS_bit_boards,
+         sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
   SOFTBUG(state->BS_npieces !=
           (BIT_COUNT(object->B_white_man_bb) +
@@ -195,7 +153,7 @@ hash_key_t return_key_from_bb(void *self)
   {
     int ifield = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, white_man_key[ifield])
+    XOR_HASH_KEY(result, hash_keys[WHITE_ENUM][MAN_ENUM][ifield])
 
     bb &= ~BITULL(ifield);
   }
@@ -206,7 +164,7 @@ hash_key_t return_key_from_bb(void *self)
   {
     int ifield = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, white_king_key[ifield])
+    XOR_HASH_KEY(result, hash_keys[WHITE_ENUM][KING_ENUM][ifield])
 
     bb &= ~BITULL(ifield);
   }
@@ -217,7 +175,7 @@ hash_key_t return_key_from_bb(void *self)
   {
     int ifield = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, black_man_key[ifield])
+    XOR_HASH_KEY(result, hash_keys[BLACK_ENUM][MAN_ENUM][ifield])
 
     bb &= ~BITULL(ifield);
   }
@@ -228,7 +186,7 @@ hash_key_t return_key_from_bb(void *self)
   {
     int ifield = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, black_king_key[ifield])
+    XOR_HASH_KEY(result, hash_keys[BLACK_ENUM][KING_ENUM][ifield])
 
     bb &= ~BITULL(ifield);
   }
@@ -320,20 +278,13 @@ void string2board(board_t *self, char *arg_s)
   node->node_move_key = 0;
 
   if ((*arg_s == 'w') or (*arg_s == 'W'))
-    object->B_colour2move = WHITE_BIT;
+    object->B_colour2move = WHITE_ENUM;
   else if ((*arg_s == 'b') or (*arg_s == 'B'))
-    object->B_colour2move = BLACK_BIT;
+    object->B_colour2move = BLACK_ENUM;
   else
     FATAL("colour2move error", EXIT_FAILURE)
 
   board2patterns_thread(object);
-
-  if (load_network)
-  {
-    board2network(object);
-
-    return_network_score_scaled(&(object->B_network_thread));
-  }
 }
 
 void fen2board(board_t *self, char *arg_fen)
@@ -572,14 +523,6 @@ void print_board(board_t *self)
   BDESTROY(bfen)
 }
 
-//helper function
-
-local void init_key(hash_key_t *k)
-{
-  for (int i = 0; i < BOARD_MAX; i++) 
-    k[i] = return_my_random(&boards_random);
-}
-
 char *board2string(board_t *self, int arg_hub)
 {
   board_t *object = self;
@@ -646,87 +589,6 @@ char *board2string(board_t *self, int arg_hub)
   return(object->B_string);
 }
 
-local int left_wing[BOARD_MAX] = 
-{
-  -1, -1, -1, -1, -1, -1,
-     1,  0,  0,  0,  0,
-   1,  1,  0,  0,  0, -1,
-     1,  0,  0,  0,  0,
-   1,  1,  0,  0,  0, -1,
-     1,  0,  0,  0,  0,
-   1,  1,  0,  0,  0, -1,
-     1,  0,  0,  0,  0,
-   1,  1,  0,  0,  0, -1,
-     1,  0,  0,  0,  0,
-   1,  1,  0,  0,  0, -1,
-    -1, -1, -1, -1, -1
-};
-
-local int center[BOARD_MAX] = 
-{
-  -1, -1, -1, -1, -1, -1,
-     0,  1,  1,  0,  0,
-   0,  0,  1,  1,  0, -1,
-     0,  1,  1,  0,  0,
-   0,  0,  1,  1,  0, -1,
-     0,  1,  1,  0,  0,
-   0,  0,  1,  1,  0, -1,
-     0,  1,  1,  0,  0,
-   0,  0,  1,  1,  0, -1,
-     0,  1,  1,  0,  0,
-   0,  0,  1,  1,  0, -1,
-    -1, -1, -1, -1, -1
-};
-
-local int right_wing[BOARD_MAX] = 
-{
-  -1, -1, -1, -1, -1, -1,
-     0,  0,  0,  1,  1,
-   0,  0,  0,  0,  1, -1,
-     0,  0,  0,  1,  1,
-   0,  0,  0,  0,  1, -1,
-     0,  0,  0,  1,  1,
-   0,  0,  0,  0,  1, -1,
-     0,  0,  0,  1,  1,
-   0,  0,  0,  0,  1, -1,
-     0,  0,  0,  1,  1,
-   0,  0,  0,  0,  1, -1,
-    -1, -1, -1, -1, -1
-};
-
-
-local int left_half[BOARD_MAX] = 
-{
-  -1, -1, -1, -1, -1, -1,
-     1,  1,  0,  0,  0,
-   1,  1,  1,  0,  0, -1,
-     1,  1,  0,  0,  0,
-   1,  1,  1,  0,  0, -1,
-     1,  1,  0,  0,  0,
-   1,  1,  1,  0,  0, -1,
-     1,  1,  0,  0,  0,
-   1,  1,  1,  0,  0, -1,
-     1,  1,  0,  0,  0,
-   1,  1,  1,  0,  0, -1,
-    -1, -1, -1, -1, -1
-};
-
-local int right_half[BOARD_MAX] = 
-{
-  -1, -1, -1, -1, -1, -1,
-     0,  0,  1,  1,  1,
-   0,  0,  0,  1,  1, -1,
-     0,  0,  1,  1,  1,
-   0,  0,  0,  1,  1, -1,
-     0,  0,  1,  1,  1,
-   0,  0,  0,  1,  1, -1,
-     0,  0,  1,  1,  1,
-   0,  0,  0,  1,  1, -1,
-     0,  0,  1,  1,  1,
-   0,  0,  0,  1,  1, -1,
-    -1, -1, -1, -1, -1
-};
-
 void init_boards(void)
 {
   construct_my_random(&boards_random, 0);
@@ -739,46 +601,19 @@ void init_boards(void)
 
   MARK_ARRAY_READ_ONLY(black_row, sizeof(field2square))
 
-  init_key(white_man_key);
-  init_key(white_king_key);
+  for (int i = 0; i < BOARD_MAX; i++) 
+    hash_keys[WHITE_ENUM][MAN_ENUM][i] = return_my_random(&boards_random);
 
-  MARK_ARRAY_READ_ONLY(white_man_key, sizeof(field2square))
-  MARK_ARRAY_READ_ONLY(white_king_key, sizeof(field2square))
+  for (int i = 0; i < BOARD_MAX; i++) 
+    hash_keys[WHITE_ENUM][KING_ENUM][i] = return_my_random(&boards_random);
 
-  init_key(black_man_key);
-  init_key(black_king_key);
+  for (int i = 0; i < BOARD_MAX; i++) 
+    hash_keys[BLACK_ENUM][MAN_ENUM][i] = return_my_random(&boards_random);
 
-  MARK_ARRAY_READ_ONLY(black_man_key, sizeof(field2square))
-  MARK_ARRAY_READ_ONLY(black_king_key, sizeof(field2square))
+  for (int i = 0; i < BOARD_MAX; i++) 
+    hash_keys[BLACK_ENUM][KING_ENUM][i] = return_my_random(&boards_random);
 
-  left_wing_bb = center_bb = right_wing_bb = 0;
-
-  left_half_bb = right_half_bb = 0;
-
-  white_row_empty_bb = black_row_empty_bb = 0;
-
-  for (int i = 1; i <= 50; ++i)
-  {
-    int ifield = square2field[i];
-
-    if (left_wing[ifield]) left_wing_bb |= BITULL(ifield);
-    if (center[ifield]) center_bb |= BITULL(ifield);
-    if (right_wing[ifield]) right_wing_bb |= BITULL(ifield);
-
-    if (left_half[ifield]) left_half_bb |= BITULL(ifield);
-    if (right_half[ifield]) right_half_bb |= BITULL(ifield);
-
-    if (white_row[ifield] >= 8) white_row_empty_bb |= BITULL(ifield);
-    if (black_row[ifield] >= 8) black_row_empty_bb |= BITULL(ifield);
-  }
-
-  HARDBUG(left_wing_bb & center_bb)
-  HARDBUG(left_wing_bb & right_wing_bb)
-  HARDBUG(center_bb & right_wing_bb)
-
-  HARDBUG(BIT_COUNT(left_half_bb) != 25)
-  HARDBUG(BIT_COUNT(right_half_bb) != 25)
-  HARDBUG(left_half_bb & right_half_bb)
+  MARK_ARRAY_READ_ONLY(hash_keys, sizeof(hash_keys))
 } 
 
 void state2board(board_t *self, game_state_t *arg_game)
@@ -804,7 +639,7 @@ void state2board(board_t *self, game_state_t *arg_game)
 
     HARDBUG(bassigncstr(bmove, cJSON_GetStringValue(move_string)) == BSTR_ERR)
 
-    gen_moves(object, &moves_list, FALSE);
+    gen_moves(object, &moves_list);
 
     int imove;
 
@@ -817,7 +652,7 @@ void state2board(board_t *self, game_state_t *arg_game)
       FATAL("bmove not found", EXIT_FAILURE)
     }
 
-    do_move(object, imove, &moves_list);
+    do_move(object, imove, &moves_list, FALSE);
   }
   BDESTROY(bmove)
 }

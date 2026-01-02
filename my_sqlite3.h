@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef DbaseH
 #define DbaseH
 
@@ -28,6 +28,7 @@ typedef struct
   sqlite3 *MS_db;
   MPI_Comm MS_comm;
   bstring MS_bbuffer;
+  int MS_verbose;
 } my_sqlite3_t;
 
 const char *my_sqlite3_errmsg(sqlite3 *);
@@ -60,21 +61,17 @@ int execute_sql(sqlite3 *, const void *, int);
 
 void create_tables(sqlite3 *);
 
-i64_t query_position(sqlite3 *, const char *, int *);
+int query_position_fen(sqlite3 *, i64_t, bstring);
 
-i64_t insert_position(sqlite3 *, const char *);
+i64_t query_position_id(sqlite3 *, const char *, int);
 
-i64_t query_move(sqlite3 *, i64_t, const char *);
+i64_t query_move(sqlite3 *, i64_t, const char *, int);
 
-i64_t insert_move(sqlite3 *, i64_t, const char *, int);
-
-int query_evaluation(sqlite3 *, i64_t, int *);
-
-void query_moves(sqlite3 *, i64_t);
+int query_evaluation(sqlite3 *, i64_t);
 
 void backup_db(sqlite3 *, const char *);
  
-void append_sql_buffer(my_sqlite3_t *, const char *fmt, ...);
+void append_sql_buffer(my_sqlite3_t *, const char *, ...);
 
 void flush_sql_buffer(my_sqlite3_t *, int);
 

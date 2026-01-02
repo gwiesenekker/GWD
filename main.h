@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef MainH
 #define MainH
 
@@ -41,6 +41,8 @@ typedef struct
   int use_book;
   char book_name[MY_LINE_MAX];
   int book_randomness;
+  int book_position_frequency;
+  int book_move_frequency;
   int book_evaluation_time;
   int book_minimax;
 
@@ -54,29 +56,37 @@ typedef struct
   int returned_depth_includes_captures;
 
   int quiescence_evaluation_policy;
-  int quiescence_extension_search_delta;
-  int pv_extension_search_delta;
+  int quiescence_combination_length;
+  int quiescence_extension_search_window;
+  int quiescence_capture_extensions;
+
+  int pv_combination_length;
+  int pv_extension_search_window;
 
   int aspiration_window;
+  int best_score_margin;
 
   int use_reductions;
 
   int reduction_depth_root;
   int reduction_depth_leaf;
   int reduction_moves_min;
+  int reduction_combination_length;
 
   int reduction_full_min;
   int reduction_strength;
   int reduction_probes;
   int reduction_probe_window;
-  int reduction_research_window;
+  int reduction_research_margin;
 
   int use_single_reply_extensions;
 
   int sync_clock;
 
   i64_t alpha_beta_cache_size;
+  int alpha_beta_cache_depth_margin;
   int pv_cache_fraction;
+  int pv2cache;
 
   i64_t score_cache_size;
 

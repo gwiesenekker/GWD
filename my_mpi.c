@@ -1,5 +1,14 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
+
+enum
+{
+  SEM_MUTEX      = 0,
+  SEM_COUNT      = 1,
+  SEM_ENTRY_GATE = 2,
+  SEM_EXIT_GATE  = 3,
+  NSEMS
+};
 
 #define TAG_REQUEST_LOCK 1
 #define TAG_LOCK_GRANTED 2
@@ -26,9 +35,7 @@ my_mpi_globals_t my_mpi_globals =
   .MMG_comm_slaves = MPI_COMM_NULL
 };
 
-#define NSEMS 3
-
-local void my_semput(int arg_semid, int arg_sem_num, int arg_value)
+local void my_sem_setval(int arg_semid, int arg_sem_num, int arg_value)
 {
 #ifdef USE_OPENMPI
   union semun
@@ -46,59 +53,53 @@ local void my_semput(int arg_semid, int arg_sem_num, int arg_value)
 #endif
 }
 
-local void my_create_semaphore(int arg_semkey, int arg_rank)
+local int my_sem_getval(int arg_semid, int arg_sem_num)
 {
 #ifdef USE_OPENMPI
-  if (arg_rank == 0)
-  {
-    int semid = semget(arg_semkey, NSEMS, IPC_CREAT | 0600);
+  int value;
 
-    if (semid == -1)
+  HARDBUG((value = semctl(arg_semid, arg_sem_num, GETVAL)) == -1)
+
+  return(value);
+#endif
+}
+
+local void my_create_semaphore(int arg_semkey)
+{
+#ifdef USE_OPENMPI
+  int semid = semget(arg_semkey, NSEMS, IPC_CREAT | IPC_EXCL | 0600);
+
+  if (semid == -1)
+  {
+    HARDBUG(errno != EEXIST)
+
+    if ((semid = semget(arg_semkey, NSEMS, 0600)) == -1)
     {
-      if (errno == EEXIST)
-      {
-        if ((semid = semget(arg_semkey, NSEMS, 0600)) == -1)
-        {
-          perror("semget failed");
+      perror("semget failed");
 
-          FATAL("semget", EXIT_FAILURE)
-        }
-  
-        if (semctl(semid, 0, IPC_RMID) == -1)
-        { 
-          perror("semctl failed");
-  
-          FATAL("semctl", EXIT_FAILURE)
-        }
-  
-        if ((semid = semget(arg_semkey, NSEMS,
-                            IPC_CREAT | IPC_EXCL | 0600)) == -1)
-        {
-          perror("semget failed");
-  
-          FATAL("semget", EXIT_FAILURE)
-        }
-      }
-      else
-      {
-        FATAL("errno != EEXIST", EXIT_FAILURE)
-      }
+      FATAL("semget", EXIT_FAILURE)
     }
-
-    my_semput(semid, 2, 0);
-    my_semput(semid, 1, 1);
-    my_semput(semid, 0, 1);
+  
+    if (semctl(semid, 0, IPC_RMID) == -1)
+    { 
+      perror("semctl failed");
+  
+      FATAL("semctl", EXIT_FAILURE)
+    }
+  
+    if ((semid = semget(arg_semkey, NSEMS,
+                        IPC_CREAT | IPC_EXCL | 0600)) == -1)
+    {
+      perror("semget failed");
+ 
+      FATAL("semget", EXIT_FAILURE)
+    }
   }
-  else if (arg_rank > 0)
-  {
-    int semid;
 
-    while((semid = semget(arg_semkey, NSEMS, 0600)) == -1)
-      compat_sleep(MILLI_SECOND);
-
-    while(semctl(semid, 1, GETVAL) != 1)
-      compat_sleep(MILLI_SECOND);
-  }
+  my_sem_setval(semid, SEM_MUTEX, 1);
+  my_sem_setval(semid, SEM_COUNT, 0);
+  my_sem_setval(semid, SEM_ENTRY_GATE, 0);
+  my_sem_setval(semid, SEM_EXIT_GATE, 1);
 #endif
 }
 
@@ -122,19 +123,26 @@ void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
 
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_id_world);
 
-  my_create_semaphore(SEMKEY_GEN_BOOK_BARRIER, mpi_id_world);
-  my_create_semaphore(SEMKEY_INIT_ENDGAME_BARRIER, mpi_id_world);
-  my_create_semaphore(SEMKEY_GEN_RANDOM_BARRIER, mpi_id_world);
-  my_create_semaphore(SEMKEY_MAIN_BARRIER, mpi_id_world);
-  my_create_semaphore(SEMKEY_TEST_MY_MPI, mpi_id_world);
-  my_create_semaphore(SEMKEY_TEST_MY_MPI_BARRIER, mpi_id_world);
-  my_create_semaphore(SEMKEY_FLUSH_SQL_BUFFER, mpi_id_world);
-  my_create_semaphore(SEMKEY_CONSTRUCT_MY_SQLITE3_BARRIER, mpi_id_world);
-  my_create_semaphore(SEMKEY_CLOSE_MY_SQLITE3, mpi_id_world);
-  my_create_semaphore(SEMKEY_CLOSE_MY_SQLITE3_BARRIER, mpi_id_world);
-  my_create_semaphore(SEMKEY_GEN_DB_BARRIER, mpi_id_world);
-  my_create_semaphore(SEMKEY_UPDATE_DB_BARRIER, mpi_id_world);
- 
+  if (mpi_id_world == 0)
+  {
+    my_create_semaphore(SEMKEY_GEN_BOOK_BARRIER);
+    my_create_semaphore(SEMKEY_INIT_ENDGAME_BARRIER);
+    my_create_semaphore(SEMKEY_GEN_RANDOM_BARRIER);
+    my_create_semaphore(SEMKEY_MAIN_BARRIER);
+    my_create_semaphore(SEMKEY_TEST_MY_MPI);
+    my_create_semaphore(SEMKEY_TEST_MY_MPI_BARRIER);
+    my_create_semaphore(SEMKEY_FLUSH_SQL_BUFFER);
+    my_create_semaphore(SEMKEY_CONSTRUCT_MY_SQLITE3_BARRIER);
+    my_create_semaphore(SEMKEY_CLOSE_MY_SQLITE3);
+    my_create_semaphore(SEMKEY_CLOSE_MY_SQLITE3_BARRIER);
+    my_create_semaphore(SEMKEY_GEN_DB_BARRIER);
+    my_create_semaphore(SEMKEY_UPDATE_DB_BARRIER);
+    my_create_semaphore(SEMKEY_ADD_POSITIONS_BARRIER);
+    my_create_semaphore(SEMKEY_QUERY_POSITIONS_BARRIER);
+  }
+
+  if (mpi_nworld > 1) MPI_Barrier(MPI_COMM_WORLD);
+
   my_mpi_globals.MMG_comm_global = MPI_COMM_WORLD;
   my_mpi_globals.MMG_comm_slaves = MPI_COMM_NULL;
   
@@ -536,8 +544,6 @@ void my_mpi_acquire_semaphore_v2(MPI_Comm arg_comm)
     }
 
     compat_sleep(MILLI_SECOND);
-
-    continue;
   }
 
   finalize_progress(&progress);
@@ -816,8 +822,6 @@ void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
     update_progress(&progress);
 
     compat_sleep(MILLI_SECOND);
-
-    continue;
   }
 
   finalize_progress(&progress);
@@ -881,77 +885,71 @@ void my_mpi_barrier_v3(char *arg_info, MPI_Comm arg_comm,
 
   double t0 = compat_time();
 
-  //acquire the lock
+  //arrival
 
-  HARDBUG(my_semop(semid, 0, -1, 0) != 0)
+  HARDBUG(my_semop(semid, SEM_MUTEX, -1, 0) != 0)
 
-  int ready;
+  int count = my_sem_getval(semid, SEM_COUNT);
 
-  HARDBUG((ready = semctl(semid, 2, GETVAL)) == -1)
+  ++count;
 
-  if (ready == 0)
+  my_sem_setval(semid, SEM_COUNT, count);
+
+  if (count == nprocs)
   {
-    if (arg_verbose)
-      PRINTF("%s::initializing barrier %s..\n$", __FUNC__, arg_info);
+    //close second gate
 
-    my_semput(semid, 1, nprocs);
+    HARDBUG(my_semop(semid, SEM_EXIT_GATE, -1, 0) != 0)
 
-    my_semput(semid, 2, 1);
+    //open first gate
 
-    if (arg_verbose)
-      PRINTF("%s::..initialized barrier %s\n$", __FUNC__, arg_info);
-  }
-  else
-  {
-    if (ready != 1)
-    {
-      PRINTF("ready=%d\n$", ready);
-      FATAL("ready != 1", EXIT_FAILURE)
-    }
+    HARDBUG(my_semop(semid, SEM_ENTRY_GATE, +1, 0) != 0)
   }
 
-  //release the lock
+  HARDBUG(my_semop(semid, SEM_MUTEX, +1, 0) != 0)
 
-  HARDBUG(my_semop(semid, 0, 1, 0) != 0)
+  //pass the baton
 
-  //decrement counter
+  HARDBUG(my_semop(semid, SEM_ENTRY_GATE, -1, 0) != 0)
 
-  if (arg_verbose)
-    PRINTF("%s::decrementing counter %s\n..$", __FUNC__, arg_info);
+  HARDBUG(my_semop(semid, SEM_ENTRY_GATE, +1, 0) != 0)
 
-  HARDBUG(my_semop(semid, 1, -1, 0) != 0)
+  //departure
 
-  if (arg_verbose)
-    PRINTF("%s::..decremented counter %s\n$", __FUNC__, arg_info);
+  HARDBUG(my_semop(semid, SEM_MUTEX, -1, 0) != 0)
 
-  //wait until counter is 0
+  count = my_sem_getval(semid, SEM_COUNT);
 
-  if (arg_verbose)
-    PRINTF("%s::waiting until counter becomes zero..%s\n$",
-           __FUNC__, arg_info);
+  --count;
 
-  while(TRUE)
+  my_sem_setval(semid, SEM_COUNT, count);
+
+  if (count == 0)
   {
-    int val = semctl(semid, 1, GETVAL);
+    //close the first gate
 
-    HARDBUG(val == -1)
+    HARDBUG(my_semop(semid, SEM_ENTRY_GATE, -1, 0) != 0)
 
-    if (val == 0) break;
+    //open the second gate
 
-    compat_sleep(MILLI_SECOND);
+    HARDBUG(my_semop(semid, SEM_EXIT_GATE, +1, 0) != 0)
   }
 
-  if (arg_verbose)
-    PRINTF("%s::..counter reached zero%s\n$", __FUNC__, arg_info);
+  HARDBUG(my_semop(semid, SEM_MUTEX, +1, 0) != 0)
 
-  my_semput(semid, 2, 0);
+  //pass the baton
+
+  HARDBUG(my_semop(semid, SEM_EXIT_GATE, -1, 0) != 0)
+
+  HARDBUG(my_semop(semid, SEM_EXIT_GATE, +1, 0) != 0)
 
   double t1 = compat_time();
 
   double wall = t1 - t0;
 
   if (arg_verbose)
-    PRINTF("%s::..leaving barrier %s wall=%.0f\n$", __FUNC__, arg_info, wall);
+    PRINTF("%s::..leaving barrier %s wall=%.0f seconds\n$",
+           __FUNC__, arg_info, wall);
 
 #endif
 }
@@ -959,7 +957,6 @@ void my_mpi_barrier_v3(char *arg_info, MPI_Comm arg_comm,
 #define SIZE 1024
 
 #define NMESSAGES 10
-#define KEY       1
 
 void test_my_mpi(void)
 {

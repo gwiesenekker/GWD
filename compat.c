@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 #undef read
@@ -365,9 +365,9 @@ int return_physical_memory(void)
   {
     i64_t lld;
 
-    if (sscanf(line, "MemFree:%lld", &lld) == 1)
+    if (my_sscanf(line, "MemFree:%lld", &lld) == 1)
       result += lld * KBYTE;
-    if (sscanf(line, "Cached:%lld", &lld) == 1)
+    if (my_sscanf(line, "Cached:%lld", &lld) == 1)
       result += lld * KBYTE;
   }
 
@@ -402,7 +402,7 @@ int return_physical_cpus(void)
   {
     int dummy;
 
-    if (sscanf(line, "processor%*[^0-9]%d", &dummy) == 1) ++result;
+    if (my_sscanf(line, "processor%*[^0-9]%d", &dummy) == 1) ++result;
   }
 
   FCLOSE(fproc)
@@ -460,7 +460,7 @@ void return_cpu_flags(char flags[MY_LINE_MAX])
 
   while (fgets(line, MY_LINE_MAX, fproc) != NULL)
   {
-    if (sscanf(line, "flags%*s%[^\n]", flags) == 1)
+    if (my_sscanf(line, "flags%*s%[^\n]", flags) == 1)
       break;
   }
 

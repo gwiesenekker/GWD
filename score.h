@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef ScoreH
 #define ScoreH
 
@@ -12,12 +12,8 @@
 #define SCORE_PLUS_INFINITY  30000
 #define SCORE_MINUS_INFINITY (-SCORE_PLUS_INFINITY)
 
-#define return_the_score(X) cat3(return_, X, _score)
-#define return_my_score     return_the_score(my_colour)
-#define return_your_score   return_the_score(your_colour)
-
-int return_white_score(search_t *, moves_list_t *);
-int return_black_score(search_t *, moves_list_t *);
+int return_score_from_board(board_t *, double_t *);
+int return_score(search_t *);
 
 int return_npieces(board_t *);
 int return_material_score(board_t *);

@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef BoardsH
 #define BoardsH
 
@@ -19,50 +19,37 @@
 #define STARTING_POSITION "wOOOOOOOOOOOOOOOOOOOO..........oooooooooooooooooooo"
 #define STARTING_POSITION2FEN "W:W31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50:B01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20"
 
-#define MAN_BIT   BIT(0)
-#define KING_BIT BIT(1)
-#define SIDE_BIT  BIT(2)
-#define WHITE_BIT BIT(3)
-#define BLACK_BIT BIT(4)
-
 #define BOARD_INTERRUPT_TIME     BIT(0)
 #define BOARD_INTERRUPT_MESSAGE  BIT(1)
 
-#define IS_WHITE(X) ((X) & WHITE_BIT)
-#define IS_BLACK(X) ((X) & BLACK_BIT)
+#define IS_WHITE(X) ((X) == WHITE_ENUM)
+#define IS_BLACK(X) ((X) == BLACK_ENUM)
 
 #define IS_EMPTY(X) ((X) == 0)
-#define IS_MAN(X)   ((X) & MAN_BIT)
-#define IS_KING(X) ((X) & KING_BIT)
+#define IS_MAN(X)   ((X) == MAN_ENUM)
+#define IS_KING(X)  ((X) == KING_ENUM)
 
-#define IS_MINE(X) ((X) & MY_BIT)
-#define IS_YOURS(X) ((X) & YOUR_BIT)
+#define B_white_man_bb  B_bit_boards[WHITE_ENUM][MAN_ENUM]
+#define B_black_man_bb  B_bit_boards[BLACK_ENUM][MAN_ENUM]
+#define B_white_king_bb B_bit_boards[WHITE_ENUM][KING_ENUM]
+#define B_black_king_bb B_bit_boards[BLACK_ENUM][KING_ENUM]
 
-#define the_man_bb(X) cat3(B_, X, _man_bb)
-#define my_man_bb     the_man_bb(my_colour)
-#define your_man_bb   the_man_bb(your_colour)
+#define my_man_bb    B_bit_boards[my_colour][MAN_ENUM]
+#define your_man_bb  B_bit_boards[your_colour][MAN_ENUM]
 
-#define the_king_bb(X) cat3(B_, X, _king_bb)
-#define my_king_bb     the_king_bb(my_colour)
-#define your_king_bb   the_king_bb(your_colour)
+#define my_king_bb   B_bit_boards[my_colour][KING_ENUM]
+#define your_king_bb B_bit_boards[your_colour][KING_ENUM]
 
-#define the_row(X) cat2(X, _row)
-#define my_row     the_row(my_colour)
-#define your_row   the_row(your_colour)
+#define my_man_key    hash_keys[my_colour][MAN_ENUM]
+#define your_man_key  hash_keys[your_colour][MAN_ENUM]
 
-#define the_man_key(X) cat2(X, _man_key)
-#define my_man_key     the_man_key(my_colour)
-#define your_man_key   the_man_key(your_colour)
-
-#define the_king_key(X) cat2(X, _king_key)
-#define my_king_key     the_king_key(my_colour)
-#define your_king_key   the_king_key(your_colour)
-
-#define the_row_empty_bb(X) cat2(X, _row_empty_bb)
-#define my_row_empty_bb     the_row_empty_bb(my_colour)
-#define your_row_empty_bb   the_row_empty_bb(your_colour)
+#define my_king_key   hash_keys[my_colour][KING_ENUM]
+#define your_king_key hash_keys[your_colour][KING_ENUM]
 
 #define PV_MAX 256
+
+typedef enum {WHITE_ENUM = 0, BLACK_ENUM = 1, NCOLOUR_ENUM} colour_enum;
+typedef enum {MAN_ENUM = 0, KING_ENUM = 1, NPIECE_ENUM} piece_enum;
 
 typedef i8_t pv_t;
 
@@ -75,10 +62,7 @@ typedef struct
 typedef struct 
 {
   ui64_t BS_key;
-  ui64_t BS_white_man_bb;
-  ui64_t BS_white_king_bb;
-  ui64_t BS_black_man_bb;
-  ui64_t BS_black_king_bb;
+  ui64_t BS_bit_boards[NCOLOUR_ENUM][NPIECE_ENUM];
   int BS_npieces;
 } board_state_t;
 
@@ -87,12 +71,11 @@ typedef struct board
   my_printf_t *B_my_printf;
 
   ui64_t B_valid_bb;
-  ui64_t B_white_man_bb;
-  ui64_t B_white_king_bb;
-  ui64_t B_black_man_bb;
-  ui64_t B_black_king_bb;
 
-  int B_colour2move;
+  colour_enum B_colour2move;
+
+  ui64_t B_bit_boards[NCOLOUR_ENUM][NPIECE_ENUM];
+
   hash_key_t B_key;
 
   int B_inode;
@@ -117,21 +100,7 @@ extern char *nota[BOARD_MAX];
 extern int white_row[BOARD_MAX];
 extern int black_row[BOARD_MAX];
 
-extern hash_key_t white_man_key[BOARD_MAX];
-extern hash_key_t white_king_key[BOARD_MAX];
-
-extern hash_key_t black_man_key[BOARD_MAX];
-extern hash_key_t black_king_key[BOARD_MAX];
-
-extern ui64_t left_wing_bb;
-extern ui64_t center_bb;
-extern ui64_t right_wing_bb;
-
-extern ui64_t left_half_bb;
-extern ui64_t right_half_bb;
-
-extern ui64_t white_row_empty_bb;
-extern ui64_t black_row_empty_bb;
+extern hash_key_t hash_keys[NCOLOUR_ENUM][NPIECE_ENUM][BOARD_MAX];
 
 void construct_board(void *, my_printf_t *);
 void push_board_state(void *self);
@@ -145,11 +114,6 @@ void print_board(board_t *);
 void init_boards();
 void state2board(board_t *, game_state_t *);
 char *board2string(board_t *, int);
-
-//boards.d
-
-void check_white_list(board_t *);
-void check_black_list(board_t *);
 
 #endif
 

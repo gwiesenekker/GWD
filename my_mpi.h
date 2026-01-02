@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef MpiH
 #define MpiH
 
@@ -16,6 +16,8 @@
 #define SEMKEY_CLOSE_MY_SQLITE3_BARRIER     10
 #define SEMKEY_GEN_DB_BARRIER               11
 #define SEMKEY_UPDATE_DB_BARRIER            12
+#define SEMKEY_ADD_POSITIONS_BARRIER        13
+#define SEMKEY_QUERY_POSITIONS_BARRIER      14
 
 #ifdef USE_OPENMPI
 
@@ -83,7 +85,7 @@ int my_mpi_win_allocate_shared(MPI_Aint, int, MPI_Info, MPI_Comm, void *,
 int my_mpi_win_shared_query(MPI_Win, int, MPI_Aint *, int *, void *);
 
 void my_mpi_win_allocate(MPI_Aint, int, MPI_Info, MPI_Comm, void *, MPI_Win *);
-int my_mpi_win_fence(MPI_Comm, int assert, MPI_Win);
+int my_mpi_win_fence(MPI_Comm, int, MPI_Win);
 int my_mpi_win_free(MPI_Win *);
 
 int my_mpi_finalize(void);
@@ -104,6 +106,7 @@ void my_mpi_acquire_semaphore_v3(MPI_Comm, int);
 void my_mpi_release_semaphore_v3(MPI_Comm, int);
 
 void my_mpi_barrier_v3(char *, MPI_Comm, int, int);
+void my_mpi_barrier_v4(char *, MPI_Comm, int, int);
 
 void test_my_mpi(void);
 

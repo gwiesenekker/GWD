@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "profile.h"
 
 #ifdef PROFILE
@@ -505,7 +505,7 @@ void dump_profile(int pid, int verbose)
     fprintf(f, "# Profile dumped at %s\n", stamp);
   }
 
-  fprintf(f, "# The frequency is %llu ticks, or %.10f secs/tick.\n",
+  fprintf(f, "# The frequency is %lld ticks, or %.10f secs/tick.\n",
     frequency, 1.0/frequency);
   fprintf(f, "# The intrinsic profile overhead is %lld ticks on average.\n",
     counter_mean);

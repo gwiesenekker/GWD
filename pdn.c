@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 #define NAG            '$'
@@ -139,23 +139,8 @@ local int get_next_token(bstring arg_bstring, int *arg_ichar,
   return(result);
 }
 
-void read_games(char *arg_db_name, char *arg_pdn_name)
+void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
 {
-  sqlite3 *db;
-
-  int rc = my_sqlite3_open(arg_db_name, &db);
-
-  if (rc != SQLITE_OK)
-  {
-    PRINTF("Cannot open database: %s\n", my_sqlite3_errmsg(db));
-
-    FATAL("sqlite3", EXIT_FAILURE)
-  }
-
-  HARDBUG(execute_sql(db, "PRAGMA foreign_keys = ON;", FALSE) != SQLITE_OK)
-
-  create_tables(db);
-
   BSTRING(string);
 
   file2bstring(arg_pdn_name, string);
@@ -207,6 +192,8 @@ void read_games(char *arg_db_name, char *arg_pdn_name)
   BSTRING(bmove_string)
 
   BSTRING(bfen)
+
+  BSTRING(bmove)
  
   construct_game_state(&game_state);
 
@@ -255,7 +242,7 @@ void read_games(char *arg_db_name, char *arg_pdn_name)
 
       construct_moves_list(&moves_list);
 
-      gen_moves(with, &moves_list, FALSE);
+      gen_moves(with, &moves_list);
 
       //update statistics
 
@@ -298,30 +285,6 @@ void read_games(char *arg_db_name, char *arg_pdn_name)
       check_moves(with, &moves_list);
 #endif
 
-      if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
-      {
-        board2fen(with, bfen, FALSE);
-
-        i64_t position_id = query_position(db, bdata(bfen), NULL);
-
-        if (position_id == INVALID)
-          position_id = insert_position(db, bdata(bfen));
-        
-        const char *sql =
-          "UPDATE positions"
-          " SET frequency = frequency + 1"
-          " WHERE id = ?;";
-      
-        sqlite3_stmt *stmt;
-      
-        my_sqlite3_prepare_v2(db, sql, &stmt);
-      
-        HARDBUG(my_sqlite3_bind_int64(stmt, 1, position_id) != SQLITE_OK)
-      
-        HARDBUG(execute_sql(db, stmt, TRUE) != SQLITE_DONE)
-      
-        HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
-      }
 
       cJSON *move_string = cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
 
@@ -345,11 +308,61 @@ void read_games(char *arg_db_name, char *arg_pdn_name)
         break;
       }
 
-      do_move(with, imove, &moves_list);
+      if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
+      {
+        board2fen(with, bfen, FALSE);
+
+        char *column;
+
+        if ((IS_WHITE(with->B_colour2move) and (itoken == TOKEN_WON)) or
+            (IS_BLACK(with->B_colour2move) and (itoken == TOKEN_LOST)))
+        {
+          column = "nwon";
+        }
+        else if ((IS_WHITE(with->B_colour2move) and (itoken == TOKEN_LOST)) or
+                 (IS_BLACK(with->B_colour2move) and (itoken == TOKEN_WON)))
+        {
+          column = "nlost";
+        }
+        else
+        {
+          HARDBUG(itoken != TOKEN_DRAW)
+
+          column = "ndraw";
+        }
+
+        append_sql_buffer(arg_db,
+          "INSERT INTO positions (fen, frequency, %s) VALUES ('%s', 1, 1) "
+          "ON CONFLICT(fen) DO UPDATE SET "
+          "frequency = frequency + 1, %s = %s + 1;",
+          column, bdata(bfen), column, column);
+
+        move2bstring(&moves_list, imove, bmove);
+
+        append_sql_buffer(arg_db,
+          "INSERT INTO moves "
+          "(position_id, move, frequency, %s) "
+          "VALUES ("
+            "(SELECT id FROM positions WHERE fen = '%s'), "
+            "'%s', 1, 1"
+          ") "
+          "ON CONFLICT(position_id, move) DO UPDATE SET "
+            "frequency = frequency + 1, %s = %s + 1;",
+          column,
+          bdata(bfen),
+          bdata(bmove),
+          column, column);
+      }
+
+      do_move(with, imove, &moves_list, FALSE);
     }
   }
 
+  flush_sql_buffer(arg_db, 0);
+
   destroy_game_state(&game_state);
+
+  BDESTROY(bmove)
 
   BDESTROY(bfen)
  
@@ -364,13 +377,25 @@ void read_games(char *arg_db_name, char *arg_pdn_name)
   const char *sql = 
     "DELETE FROM positions WHERE frequency = 1;";
 
-  HARDBUG(execute_sql(db, sql, FALSE) != SQLITE_OK)
+  HARDBUG(execute_sql(arg_db->MS_db, sql, FALSE) != SQLITE_OK)
+
+  HARDBUG(execute_sql(arg_db->MS_db, "VACUUM;", FALSE) != SQLITE_OK)
 
   PRINTF("..done\n");
 
-  HARDBUG(execute_sql(db, "VACUUM;", FALSE) != SQLITE_OK)
-
-  HARDBUG(my_sqlite3_close(db) != SQLITE_OK)
+  HARDBUG(execute_sql(arg_db->MS_db,
+    "INSERT INTO evaluations (move_id, evaluation) "
+    "SELECT "
+      "m.id, "
+      "CAST(ROUND(1000.0 * "
+        "CASE WHEN (m.nwon + m.nlost) > 0 "
+        "THEN (m.nwon - m.nlost) * 1.0 / (m.nwon + m.nlost) "
+        "ELSE 0.0 "
+        "END"
+      ") AS INTEGER) "
+    "FROM moves m WHERE 1 "
+    "ON CONFLICT(move_id) DO UPDATE SET "
+      "evaluation = excluded.evaluation;", FALSE) != SQLITE_OK)
 
   printf_bucket(&bucket_nman);
 
@@ -475,7 +500,7 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
       construct_moves_list(&moves_list);
 
-      gen_moves(&(with->S_board), &moves_list, FALSE);
+      gen_moves(&(with->S_board), &moves_list);
 
       if (moves_list.ML_nmoves == 0) break;
 
@@ -503,7 +528,7 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
       ++nply;
 
-      do_move(&(with->S_board), best_pv, &moves_list);
+      do_move(&(with->S_board), best_pv, &moves_list, FALSE);
     }
 
     resume_my_printf(with->S_my_printf);
@@ -553,7 +578,7 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
       construct_moves_list(&moves_list);
 
-      gen_moves(&(with->S_board), &moves_list, FALSE);
+      gen_moves(&(with->S_board), &moves_list);
 
       if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
       {
@@ -563,18 +588,18 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
             (IS_BLACK(with->S_board.B_colour2move) and (result == 0)))
         {
           append_sql_buffer(arg_db,
-            "INSERT INTO positions (fen, frequency, nwon) VALUES ('%s', 1, 1)"
-            " ON CONFLICT(fen) DO UPDATE SET "
-            " frequency = frequency + 1, nwon = nwon + 1;",
+            "INSERT INTO positions (fen, frequency, nwon) VALUES ('%s', 1, 1) "
+            "ON CONFLICT(fen) DO UPDATE SET "
+            "frequency = frequency + 1, nwon = nwon + 1;",
             bdata(bfen));
         }
         else if ((IS_WHITE(with->S_board.B_colour2move) and (result == 0)) or
                  (IS_BLACK(with->S_board.B_colour2move) and (result == 2)))
         {
           append_sql_buffer(arg_db,
-            "INSERT INTO positions (fen, frequency, nlost) VALUES ('%s', 1, 1)"
-            " ON CONFLICT(fen) DO UPDATE SET "
-            " frequency = frequency + 1, nlost = nlost + 1;",
+            "INSERT INTO positions (fen, frequency, nlost) VALUES ('%s', 1, 1) "
+            "ON CONFLICT(fen) DO UPDATE SET "
+            "frequency = frequency + 1, nlost = nlost + 1;",
             bdata(bfen));
         }
         else
@@ -582,9 +607,9 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
           HARDBUG(result != 1)
 
           append_sql_buffer(arg_db,
-            "INSERT INTO positions (fen, frequency, ndraw) VALUES ('%s', 1, 1)"
-            " ON CONFLICT(fen) DO UPDATE SET "
-            " frequency = frequency + 1, ndraw = ndraw + 1;",
+            "INSERT INTO positions (fen, frequency, ndraw) VALUES ('%s', 1, 1) "
+            "ON CONFLICT(fen) DO UPDATE SET "
+            "frequency = frequency + 1, ndraw = ndraw + 1;",
             bdata(bfen));
         }
 
@@ -604,7 +629,7 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
       HARDBUG((imove = search_move(&moves_list, bmove_string)) == INVALID)
 
-      do_move(&(with->S_board), imove, &moves_list);
+      do_move(&(with->S_board), imove, &moves_list, FALSE);
     }
   }
 
@@ -639,9 +664,9 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
 
   MY_MALLOC_BY_TYPE(ids, i64_t, NPOSITIONS_MAX)
 
-  char *sql = "SELECT id FROM positions WHERE"
-              " frequency = (SELECT MIN(frequency) FROM positions)"
-              " ORDER BY id ASC;";
+  char *sql = "SELECT id FROM positions WHERE "
+              "frequency = (SELECT MIN(frequency) FROM positions) "
+              "ORDER BY id ASC;";
 
   sqlite3_stmt *stmt;
 
@@ -763,7 +788,7 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
   
         construct_moves_list(&moves_list);
   
-        gen_moves(&(with->S_board), &moves_list, FALSE);
+        gen_moves(&(with->S_board), &moves_list);
   
         if (moves_list.ML_nmoves == 0) break;
   
@@ -791,7 +816,7 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
   
         ++nply;
   
-        do_move(&(with->S_board), best_pv, &moves_list);
+        do_move(&(with->S_board), best_pv, &moves_list, FALSE);
       }
 
       resume_my_printf(with->S_my_printf);
@@ -858,7 +883,7 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
 
       construct_moves_list(&moves_list);
 
-      gen_moves(&(with->S_board), &moves_list, FALSE);
+      gen_moves(&(with->S_board), &moves_list);
 
       if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
       {
@@ -868,16 +893,16 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
             (IS_BLACK(with->S_board.B_colour2move) and (result == 0)))
         {
           append_sql_buffer(arg_db,
-            "UPDATE positions SET"
-            " frequency = frequency + 1, nwon = nwon + 1 WHERE fen = '%s';",
+            "UPDATE positions SET "
+            "frequency = frequency + 1, nwon = nwon + 1 WHERE fen = '%s';",
             bdata(bfen));
         }
         else if ((IS_WHITE(with->S_board.B_colour2move) and (result == 0)) or
                  (IS_BLACK(with->S_board.B_colour2move) and (result == 2)))
         {
           append_sql_buffer(arg_db,
-            "UPDATE positions SET"
-            " frequency = frequency + 1, nlost = nlost + 1 WHERE fen = '%s';",
+            "UPDATE positions SET "
+            "frequency = frequency + 1, nlost = nlost + 1 WHERE fen = '%s';",
             bdata(bfen));
         }
         else
@@ -885,8 +910,8 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
           HARDBUG(result != 1)
 
           append_sql_buffer(arg_db,
-            "UPDATE positions SET"
-            " frequency = frequency + 1, ndraw = ndraw + 1 WHERE fen = '%s';",
+            "UPDATE positions SET "
+            "frequency = frequency + 1, ndraw = ndraw + 1 WHERE fen = '%s';",
             bdata(bfen));
         }
 
@@ -903,7 +928,7 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
 
       HARDBUG((imove = search_move(&moves_list, bmove_string)) == INVALID)
 
-      do_move(&(with->S_board), imove, &moves_list);
+      do_move(&(with->S_board), imove, &moves_list, FALSE);
     }
 
     POP_NAME("update_db::cJSON_ArrayForEach(game_move")
@@ -1060,10 +1085,10 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
     }
 
     append_sql_buffer(arg_db,
-      "UPDATE positions SET"
-      " frequency = frequency + %d,"
-      " nwon = nwon + %d, ndraw = ndraw + %d, nlost = nlost + %d"     
-      " WHERE fen = '%s';",
+      "UPDATE positions SET "
+      "frequency = frequency + %d,"
+      "nwon = nwon + %d, ndraw = ndraw + %d, nlost = nlost + %d "
+      "WHERE fen = '%s';",
       nshoot_outs, nwon, ndraw, nlost, bdata(bfen));
   }
 

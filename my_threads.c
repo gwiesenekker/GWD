@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 #define THREAD_ALPHA_BETA_MASTER 0
@@ -34,7 +34,7 @@ local void solve_problems(void *self, char *arg_name)
 
     CSTRING(cfen, blength(bline))
 
-    HARDBUG(sscanf(bdata(bline), "%[^\n]", cfen) != 1)
+    HARDBUG(my_sscanf(bdata(bline), "%[^\n]", cfen) != 1)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
@@ -75,7 +75,7 @@ local void solve_problems(void *self, char *arg_name)
 
     construct_moves_list(&moves_list);
 
-    gen_moves(with_board, &moves_list, FALSE);
+    gen_moves(with_board, &moves_list);
 
     check_moves(with_board, &moves_list);
 
@@ -232,7 +232,7 @@ local void thread_func_alpha_beta_master(void *self)
 
         construct_moves_list(&moves_list);
 
-        gen_moves(with_board, &moves_list, FALSE);
+        gen_moves(with_board, &moves_list);
 
         HARDBUG(moves_list.ML_nmoves == 0)
 
@@ -369,10 +369,10 @@ local void thread_func_alpha_beta_slave(thread_t *object)
           int root_score;
           int minimal_window;
 
-          HARDBUG(sscanf(bdata(message.message_text), "%s%d%d%d%d",
-                         cmove_string,
-                         &depth_min, &depth_max,
-                         &root_score, &minimal_window) != 5)
+          HARDBUG(my_sscanf(bdata(message.message_text), "%s%d%d%d%d",
+                            cmove_string,
+                            &depth_min, &depth_max,
+                            &root_score, &minimal_window) != 5)
 
           HARDBUG(bassigncstr(bmove_string, cmove_string) == BSTR_ERR)
 
@@ -384,7 +384,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
           construct_moves_list(&moves_list);
 
-          gen_moves(with_board, &moves_list, FALSE);
+          gen_moves(with_board, &moves_list);
 
           HARDBUG(moves_list.ML_nmoves == 0)
     
@@ -437,13 +437,13 @@ local void thread_func_alpha_beta_slave(thread_t *object)
               bdata(bmove_string), depth_min, depth_max,
               root_score, minimal_window);
 
-            do_move(with_board, imove, &moves_list);
+            do_move(with_board, imove, &moves_list, FALSE);
 
             moves_list_t your_moves_list;
   
             construct_moves_list(&your_moves_list);
   
-            gen_moves(with_board, &your_moves_list, FALSE);
+            gen_moves(with_board, &your_moves_list);
   
             if (your_moves_list.ML_nmoves > 0)
             {
@@ -461,7 +461,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
               print_totals(&(object->T_search));
             }
 
-            undo_move(with_board, imove, &moves_list);
+            undo_move(with_board, imove, &moves_list, FALSE);
           }
           else if (message.message_id == MESSAGE_SEARCH_SECOND)
           {

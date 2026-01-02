@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef SearchH
 #define SearchH
 
@@ -47,6 +47,7 @@ typedef struct
   i64_t S_total_quiescence_nodes;
   i64_t S_total_quiescence_all_moves_captures_only;
   i64_t S_total_quiescence_all_moves_le2_moves;
+  i64_t S_total_quiescence_all_moves_combination;
   i64_t S_total_quiescence_all_moves_extended;
 
   i64_t S_total_nodes;
@@ -55,13 +56,17 @@ typedef struct
   i64_t S_total_pv_nodes;
 
   i64_t S_total_quiescence_extension_searches;
+  i64_t S_total_quiescence_extension_searches_combination;
   i64_t S_total_quiescence_extension_searches_le_alpha;
   i64_t S_total_quiescence_extension_searches_ge_beta;
+  i64_t S_total_quiescence_capture_extensions;
 
   i64_t S_total_pv_extension_searches;
+  i64_t S_total_pv_extension_searches_combination;
   i64_t S_total_pv_extension_searches_le_alpha;
   i64_t S_total_pv_extension_searches_ge_beta;
 
+  i64_t S_total_reductions_combinations;
   i64_t S_total_reductions;
   i64_t S_total_reductions_lost;
   i64_t S_total_reductions_le_alpha;
@@ -86,7 +91,7 @@ typedef struct
   i64_t S_total_alpha_beta_cache_ge_beta_stored;
   i64_t S_total_alpha_beta_cache_true_score_stored;
   i64_t S_total_alpha_beta_cache_nmoves_errors;
-  i64_t S_total_alpha_beta_cache_crc32_errors;
+  i64_t S_total_alpha_beta_cache_crc64_errors;
 
   i64_t S_total_score_cache_hits;
   i64_t S_total_score_cache_crc32_errors;
@@ -95,11 +100,11 @@ typedef struct
 int draw_by_repetition(board_t *, int);
 void clear_totals(search_t *);
 void print_totals(search_t *);
+void do_search(search_t *, moves_list_t *, int, int, int, my_random_t *);
 void clear_caches(void);
 void construct_search(void *, my_printf_t *, void *);
 void init_search(void);
 void fin_search(void);
-void do_search(search_t *, moves_list_t *, int, int, int, my_random_t *);
 
 #endif
 

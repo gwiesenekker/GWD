@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 #define NFBUFFER (4 * MBYTE)
@@ -32,16 +32,16 @@ void append_fbuffer_fmt(fbuffer_t *self, const char *arg_fmt, ...)
 
   HARDBUG(ret == BSTR_ERR)
 
-  bstring bstring = object->FB_bstring;
+  bstring b = object->FB_bstring;
 
-  if (bchar(bstring, blength(bstring) - 1) == '\n')
+  if (bchar(b, blength(b) - 1) == '\n')
   {
-    HARDBUG((object->FB_nfbuffer + blength(bstring)) >= (2 * NFBUFFER))
+    HARDBUG((object->FB_nfbuffer + blength(b)) >= (2 * NFBUFFER))
 
     memcpy((i8_t *) object->FB_fbuffer + object->FB_nfbuffer,
-           bdata(bstring), blength(bstring));
+           bdata(b), blength(b));
 
-    object->FB_nfbuffer += blength(bstring);
+    object->FB_nfbuffer += blength(b);
 
     HARDBUG(bassigncstr(object->FB_bstring, "") == BSTR_ERR)
 

@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef PatternsH
 #define PatternsH
 
@@ -54,7 +54,7 @@ void construct_patterns_shared(patterns_shared_t *, char *);
 
 void board2patterns_thread(board_t *);
 
-void check_board_patterns_thread(board_t *, char *where, int);
+void check_board_patterns_thread(board_t *, char *, int);
 
 #endif
 

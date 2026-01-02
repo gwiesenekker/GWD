@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 #define SA struct sockaddr
@@ -22,7 +22,7 @@ typedef struct
 {
   search_t DXP_search;
 
-  int DXP_game_colour;
+  colour_enum DXP_game_colour;
   int DXP_game_time;
   int DXP_game_moves;
   char DXP_move_string[MY_LINE_MAX];
@@ -282,14 +282,14 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
     PRINTF("game_colour=%c\n", game_colour);
 
     if (game_colour == 'W')
-      object->DXP_game_colour = WHITE_BIT;
+      object->DXP_game_colour = WHITE_ENUM;
     else
-      object->DXP_game_colour = BLACK_BIT;
+      object->DXP_game_colour = BLACK_ENUM;
 
     int game_time;
  
     HARDBUG((i + 2) >= arg_nhuffer)
-    HARDBUG(sscanf(arg_buffer + i, "%3d", &game_time) != 1)
+    HARDBUG(my_sscanf(arg_buffer + i, "%3d", &game_time) != 1)
     i += 3;
 
     PRINTF("game_time=%d\n", game_time);
@@ -299,7 +299,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
     int game_moves;
 
     HARDBUG((i + 2) >= arg_nhuffer)
-    HARDBUG(sscanf(arg_buffer + i, "%3d", &game_moves) != 1)
+    HARDBUG(my_sscanf(arg_buffer + i, "%3d", &game_moves) != 1)
     i += 3;
 
     PRINTF("game_moves=%d\n", game_moves);
@@ -389,7 +389,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
 
     int f;
     HARDBUG(i >= arg_nhuffer)
-    HARDBUG(sscanf(arg_buffer + i, "%2d", &f) != 1)
+    HARDBUG(my_sscanf(arg_buffer + i, "%2d", &f) != 1)
     HARDBUG(f < 1)
     HARDBUG(f > 50)
     PRINTF("f=%d\n", f);
@@ -399,7 +399,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
 
     int t;
     HARDBUG(i >= arg_nhuffer)
-    HARDBUG(sscanf(arg_buffer + i, "%2d", &t) != 1)
+    HARDBUG(my_sscanf(arg_buffer + i, "%2d", &t) != 1)
     HARDBUG(t < 1)
     HARDBUG(t > 50)
     PRINTF("t=%d\n", t);
@@ -408,7 +408,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
 
     int n;
     HARDBUG(i >= arg_nhuffer)
-    HARDBUG(sscanf(arg_buffer + i, "%2d", &n) != 1)
+    HARDBUG(my_sscanf(arg_buffer + i, "%2d", &n) != 1)
     HARDBUG(n > NPIECES_MAX)
     PRINTF("n=%d\n", n);
     i += 2;
@@ -417,7 +417,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
     for (int j = 0; j < n; j++)
     { 
       HARDBUG(i >= arg_nhuffer)
-      HARDBUG(sscanf(arg_buffer + i, "%2d", c + j) != 1)
+      HARDBUG(my_sscanf(arg_buffer + i, "%2d", c + j) != 1)
       HARDBUG(c[j] < 1)
       HARDBUG(c[j] > 50) 
       PRINTF("j=%d c[j]=%d\n", j, c[j]);
@@ -429,7 +429,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *object)
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(object->DXP_search.S_board), &moves_list, FALSE);
+    gen_moves(&(object->DXP_search.S_board), &moves_list);
 
     HARDBUG(moves_list.ML_nmoves == 0)
 
@@ -658,7 +658,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(object->DXP_search.S_board), &moves_list, FALSE);
+    gen_moves(&(object->DXP_search.S_board), &moves_list);
 
     if (object->DXP_search.S_board.B_colour2move != object->DXP_game_colour)
     {
@@ -678,10 +678,8 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
           PRINTF("sending DXP_GAMEEND..\n");
   
-          int nwrite;
-
-          if ((nwrite = compat_socket_write(arg_sockfd, buffer, nbuffer)) ==
-              INVALID) break;
+          if (compat_socket_write(arg_sockfd, buffer, nbuffer) == INVALID)
+            break;
         }
 
         if (IS_WHITE(object->DXP_search.S_board.B_colour2move))
@@ -759,10 +757,8 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
           PRINTF("sending DXP_GAMEEND..\n");
 
-          int nwrite;
-
-          if ((nwrite = compat_socket_write(arg_sockfd, buffer, nbuffer)) ==
-              INVALID) break;
+          if (compat_socket_write(arg_sockfd, buffer, nbuffer) == INVALID)
+            break;
         }
         if (object->DXP_game_code == DXP_IGIVEUP)
         {
@@ -810,7 +806,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
       else
         game_state.push_move(&game_state, object->DXP_move_string, comment);
 
-      do_move(&(object->DXP_search.S_board), imove, &moves_list);
+      do_move(&(object->DXP_search.S_board), imove, &moves_list, FALSE);
     }
     else
     {  
@@ -938,6 +934,17 @@ local int play_game(dxp_t *object, int arg_sockfd)
   
         HARDBUG(nwrite != nbuffer)
 
+        if (options.dxp_strict_gameend)
+        {
+          PRINTF("waiting for DXP_GAMEEND..\n");
+
+          if (reads(arg_sockfd, buffer, &nbuffer) == INVALID) break;
+    
+          char type = decode(nbuffer, buffer, object);
+      
+          HARDBUG(type != DXP_GAMEEND)
+        }
+
         result = INVALID;
 
         break;
@@ -946,9 +953,6 @@ local int play_game(dxp_t *object, int arg_sockfd)
       BSTRING(bbest_move)
 
       HARDBUG(bassigncstr(bbest_move, "NULL") == BSTR_ERR)
-
-      int best_score;
-      int best_depth;
 
       BSTRING(bcomment)
 
@@ -962,13 +966,13 @@ local int play_game(dxp_t *object, int arg_sockfd)
         HARDBUG(bassigncstr(bcomment, "book") == BSTR_ERR)
 
         PRINTF("\nbook_move=%s\n", bdata(bbest_move));
-
-        best_score = 0;
-
-        best_depth = 0;
       }
       else
       {
+        int best_score;
+
+        int best_depth;
+
         PRINTF("\nthinking..\n");
 
         double t1 = compat_time();
@@ -1011,8 +1015,8 @@ local int play_game(dxp_t *object, int arg_sockfd)
     
                 CSTRING(cbest_move, blength(message.message_text))
   
-                HARDBUG(sscanf(bdata(message.message_text), "%s%d%d",
-                               cbest_move, &best_score, &best_depth) != 3)
+                HARDBUG(my_sscanf(bdata(message.message_text), "%s%d%d",
+                                  cbest_move, &best_score, &best_depth) != 3)
    
                 HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
   
@@ -1077,7 +1081,7 @@ local int play_game(dxp_t *object, int arg_sockfd)
 
       HARDBUG((imove = search_move(&moves_list, bbest_move)) == INVALID)
 
-      do_move(&(object->DXP_search.S_board), imove, &moves_list);
+      do_move(&(object->DXP_search.S_board), imove, &moves_list, FALSE);
 
       BDESTROY(bcomment)
 
@@ -1174,7 +1178,7 @@ local void dxp_game_initiator(int arg_fd)
 
         if (fgets(line, MY_LINE_MAX, fballot) == NULL) goto label_break;
 
-        if (sscanf(line, "%[^\n]", fen) == 0)
+        if (my_sscanf(line, "%[^\n]", fen) == 0)
         {
           PRINTF("skipping empty line..\n");
 
@@ -1183,7 +1187,7 @@ local void dxp_game_initiator(int arg_fd)
 
         if (strncmp(fen, "//", 2) == 0)
         {
-          HARDBUG(sscanf(fen, "//%[^\n]", opening) != 1)
+          HARDBUG(my_sscanf(fen, "//%[^\n]", opening) != 1)
 
           PRINTF("opening=%s\n", opening);
 
@@ -1217,9 +1221,9 @@ local void dxp_game_initiator(int arg_fd)
       print_board(&(with->DXP_search.S_board));
 
       if (icolour == 0)
-        with->DXP_game_colour = WHITE_BIT;
+        with->DXP_game_colour = WHITE_ENUM;
       else
-        with->DXP_game_colour = BLACK_BIT;
+        with->DXP_game_colour = BLACK_ENUM;
 
       PRINTF("sending DXP_GAMEREQ..\n");
   
@@ -1276,9 +1280,9 @@ local void dxp_game_initiator(int arg_fd)
         nwon, ndraw, nlost, nunknown);
   
       if (IS_WHITE(with->DXP_game_colour))
-        with->DXP_game_colour = BLACK_BIT;
+        with->DXP_game_colour = BLACK_ENUM;
       else
-        with->DXP_game_colour = WHITE_BIT;
+        with->DXP_game_colour = WHITE_ENUM;
     }
   }
 

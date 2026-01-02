@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef FBUFFER_H
 #define FBUFFER_H
 
@@ -12,7 +12,7 @@ typedef struct
 
 void flush_fbuffer(fbuffer_t *, int);
 
-void append_fbuffer_fmt(fbuffer_t *, const char *fmt, ...);
+void append_fbuffer_fmt(fbuffer_t *, const char *, ...);
 
 void append_fbuffer_bin(fbuffer_t *, void *, size_t);
 

@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 
 #include "globals.h"
 
@@ -256,11 +256,11 @@ local void convert2wdl(void)
                 
       if (source[0] == ALL_DRAW)
       {
-        crc32 = 0xFFFFFFFF;
+        ui32_t crc32_temp = 0xFFFFFFFF;
                     
-        crc32 = HW_CRC32_U8(crc32, source[0]);
+        crc32_temp = HW_CRC32_U8(crc32_temp, source[0]);
                   
-        HARDBUG(crc32 != crc32)
+        HARDBUG(crc32_temp != crc32)
                    
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
@@ -300,17 +300,17 @@ local void convert2wdl(void)
                   
         HARDBUG((destLen / sizeof(entry_i8_t)) != nblock_entries)
 
-        crc32 = 0xFFFFFFFF;
+        ui32_t crc32_temp = 0xFFFFFFFF;
                  
-        crc32 = HW_CRC32_U8(crc32, source[0]);
+        crc32_temp = HW_CRC32_U8(crc32, source[0]);
                   
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
-          crc32 = HW_CRC32_U8(crc32, dest[ientry].entry_white_mate);
-          crc32 = HW_CRC32_U8(crc32, dest[ientry].entry_black_mate);
+          crc32_temp = HW_CRC32_U8(crc32_temp, dest[ientry].entry_white_mate);
+          crc32_temp = HW_CRC32_U8(crc32_temp, dest[ientry].entry_black_mate);
         }
 
-        HARDBUG(crc32 != crc32)
+        HARDBUG(crc32_temp != crc32)
                   
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
@@ -364,17 +364,17 @@ local void convert2wdl(void)
                   
         HARDBUG((destLen / sizeof(entry_i16_t)) != nblock_entries)
 
-        crc32 = 0xFFFFFFFF;
+        ui32_t crc32_temp = 0xFFFFFFFF;
                     
-        crc32 = HW_CRC32_U8(crc32, source[0]);
+        crc32_temp = HW_CRC32_U8(crc32, source[0]);
                   
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
-          crc32 = HW_CRC32_U16(crc32, dest[ientry].entry_white_mate);
-          crc32 = HW_CRC32_U16(crc32, dest[ientry].entry_black_mate);
+          crc32_temp = HW_CRC32_U16(crc32_temp, dest[ientry].entry_white_mate);
+          crc32_temp = HW_CRC32_U16(crc32_temp, dest[ientry].entry_black_mate);
         }
 
-        HARDBUG(crc32 != crc32)
+        HARDBUG(crc32_temp != crc32)
                   
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
@@ -999,7 +999,7 @@ local void decode(i8_t *arg_flag, i16_t *arg_shift, ui8_t arg_code[ARRAY_PAGE_SI
 }
 #endif
 
-int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
+int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -1389,7 +1389,7 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
   }
   else
   { 
-    if (arg_wdl != NULL) *arg_wdl = FALSE;
+    //if (arg_wdl != NULL) *arg_wdl = FALSE;
 
     //check if the entry is in the entry cache
 
@@ -1547,11 +1547,11 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
     if (source[0] == ALL_DRAW)
     {
 #ifdef DEBUG
-      ui32_t temp_crc32 = 0xFFFFFFFF;
+      ui32_t crc32_temp = 0xFFFFFFFF;
     
-      temp_crc32 = HW_CRC32_U8(temp_crc32, source[0]);
+      crc32_temp = HW_CRC32_U8(crc32_temp, source[0]);
   
-      HARDBUG(temp_crc32 != crc32)
+      HARDBUG(crc32_temp != crc32)
 #endif
 
       entry.entry_white_mate = INVALID;
@@ -1574,17 +1574,17 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
 
 #ifdef DEBUG
 
-      ui32_t temp_crc32 = 0xFFFFFFFF;
+      ui32_t crc32_temp = 0xFFFFFFFF;
   
-      temp_crc32 = HW_CRC32_U8(temp_crc32, source[0]);
+      crc32_temp = HW_CRC32_U8(crc32_temp, source[0]);
 
       for (int ientry = 0; ientry < NPAGE_ENTRIES; ientry++)
       {
-        temp_crc32 = HW_CRC32_U8(temp_crc32, dest[ientry].entry_white_mate);
-        temp_crc32 = HW_CRC32_U8(temp_crc32, dest[ientry].entry_black_mate);
+        crc32_temp = HW_CRC32_U8(crc32_temp, dest[ientry].entry_white_mate);
+        crc32_temp = HW_CRC32_U8(crc32_temp, dest[ientry].entry_black_mate);
       }
 
-      HARDBUG(temp_crc32 != crc32)
+      HARDBUG(crc32_temp != crc32)
 #endif
 
       int ientry = endgame_index  % NPAGE_ENTRIES;
@@ -1608,17 +1608,17 @@ int read_endgame(search_t *object, int arg_colour2move, int *arg_wdl)
 
 #ifdef DEBUG
 
-      ui32_t temp_crc32 = 0xFFFFFFFF;
+      ui32_t crc32_temp = 0xFFFFFFFF;
     
-      temp_crc32 = HW_CRC32_U8(temp_crc32, source[0]);
+      crc32_temp = HW_CRC32_U8(crc32_temp, source[0]);
   
       for (int ientry = 0; ientry < NPAGE_ENTRIES; ientry++)
       {
-        temp_crc32 = HW_CRC32_U16(temp_crc32, page[ientry].entry_white_mate);
-        temp_crc32 = HW_CRC32_U16(temp_crc32, page[ientry].entry_black_mate);
+        crc32_temp = HW_CRC32_U16(crc32_temp, page[ientry].entry_white_mate);
+        crc32_temp = HW_CRC32_U16(crc32_temp, page[ientry].entry_black_mate);
       }
 
-      HARDBUG(temp_crc32 != crc32)
+      HARDBUG(crc32_temp != crc32)
 #endif
 
       int ientry = endgame_index  % NPAGE_ENTRIES;

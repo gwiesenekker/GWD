@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -266,7 +266,7 @@ void hub(void)
 
         int d;
   
-        HARDBUG(sscanf(value, "%d", &d) != 1)
+        HARDBUG(my_sscanf(value, "%d", &d) != 1)
  
         HARDBUG(d < 1)
         HARDBUG(d >= DEPTH_MAX)
@@ -281,7 +281,7 @@ void hub(void)
 
         int t;
    
-        HARDBUG(sscanf(value, "%d", &t) != 1)
+        HARDBUG(my_sscanf(value, "%d", &t) != 1)
   
         HARDBUG(t < 1)
 
@@ -299,7 +299,7 @@ void hub(void)
 
         int moves_left;
    
-        HARDBUG(sscanf(value, "%d", &moves_left) != 1)
+        HARDBUG(my_sscanf(value, "%d", &moves_left) != 1)
 
         HARDBUG(command.command_nargs < 2)
 
@@ -313,7 +313,7 @@ void hub(void)
 
         int time_left;
    
-        HARDBUG(sscanf(value, "%d", &time_left) != 1)
+        HARDBUG(my_sscanf(value, "%d", &time_left) != 1)
  
         PRINTF("got moves %d time_left %d\n", moves_left, time_left);
         
@@ -340,7 +340,7 @@ void hub(void)
 
         double t;
    
-        HARDBUG(sscanf(value, "%lf", &t) != 1)
+        HARDBUG(my_sscanf(value, "%lf", &t) != 1)
   
         HARDBUG(t < 0.0)
 
@@ -406,7 +406,7 @@ void hub(void)
 
       construct_moves_list(&moves_list);
 
-      gen_moves(&(with->S_board), &moves_list, FALSE);
+      gen_moves(&(with->S_board), &moves_list);
 
       HARDBUG(moves_list.ML_nmoves == 0)
 
@@ -481,8 +481,8 @@ void hub(void)
 
           CSTRING(cmove_string, blength(message.message_text))
 
-          HARDBUG(sscanf(bdata(message.message_text), "%s",
-                         cmove_string) != 1)
+          HARDBUG(my_sscanf(bdata(message.message_text), "%s",
+                            cmove_string) != 1)
 
           HARDBUG(bassigncstr(bmove_string, cmove_string) == BSTR_ERR)
 
@@ -681,7 +681,7 @@ void init_hub(void)
       {
         int ivalue;
 
-        HARDBUG(sscanf(value, "%d", &ivalue) != 1)
+        HARDBUG(my_sscanf(value, "%d", &ivalue) != 1)
       
         PRINTF("ivalue=%d\n", ivalue);
        
@@ -697,7 +697,7 @@ void init_hub(void)
       {
         double dvalue;
 
-        HARDBUG(sscanf(value, "%lf", &dvalue) != 1)
+        HARDBUG(my_sscanf(value, "%lf", &dvalue) != 1)
       
         PRINTF("dvalue=%.2f\n", dvalue);
        
@@ -825,7 +825,7 @@ local int play_game(search_t *object, int arg_my_colour,
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(object->S_board), &moves_list, FALSE);
+    gen_moves(&(object->S_board), &moves_list);
 
     PRINTF("nmy_game_moves_done=%d nyour_game_moves_done=%d\n",
       nmy_game_moves_done, nyour_game_moves_done);
@@ -983,7 +983,7 @@ local int play_game(search_t *object, int arg_my_colour,
 
       game_state.push_move(&game_state, bdata(bmove_string), NULL);
 
-      do_move(&(object->S_board), imove, &moves_list);
+      do_move(&(object->S_board), imove, &moves_list, FALSE);
 
       BDESTROY(bmove_string)
     }
@@ -1107,9 +1107,9 @@ local int play_game(search_t *object, int arg_my_colour,
 
                 CSTRING(cbest_move, blength(bbest_string))
 
-                HARDBUG(sscanf(bdata(bbest_string), "%s%d%d",
-                               cbest_move,
-                               &best_score, &best_depth) != 3)
+                HARDBUG(my_sscanf(bdata(bbest_string), "%s%d%d",
+                                  cbest_move,
+                                  &best_score, &best_depth) != 3)
 
                 HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
 
@@ -1183,9 +1183,9 @@ local int play_game(search_t *object, int arg_my_colour,
   
               CSTRING(cbest_move, blength(message.message_text))
 
-              HARDBUG(sscanf(bdata(message.message_text), "%s%d%d",
-                             cbest_move,
-                             &best_score, &best_depth) != 3)
+              HARDBUG(my_sscanf(bdata(message.message_text), "%s%d%d",
+                                cbest_move,
+                                &best_score, &best_depth) != 3)
 
               HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
 
@@ -1220,7 +1220,7 @@ local int play_game(search_t *object, int arg_my_colour,
 
       BDESTROY(bbest_move)
 
-      do_move(&(object->S_board), imove, &moves_list);
+      do_move(&(object->S_board), imove, &moves_list, FALSE);
     }
   }
 
@@ -1285,7 +1285,7 @@ local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2p
 
     char fen[MY_LINE_MAX];
 
-    if (sscanf(line, "%[^\n]", fen) == 0) continue;
+    if (my_sscanf(line, "%[^\n]", fen) == 0) continue;
 
     if (strncmp(fen, "//", 2) == 0) continue;
 
@@ -1318,11 +1318,11 @@ local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2p
 
       if (fgets(line, MY_LINE_MAX, fballot) == NULL) goto label_break;
 
-      if (sscanf(line, "%[^\n]", fen) == 0) continue;
+      if (my_sscanf(line, "%[^\n]", fen) == 0) continue;
 
       if (strncmp(fen, "//", 2) == 0)
       {
-        HARDBUG(sscanf(fen, "//%[^\n]", opening) != 1)
+        HARDBUG(my_sscanf(fen, "//%[^\n]", opening) != 1)
 
         continue;
       }
@@ -1357,12 +1357,12 @@ local void hub_server_game_initiator(pipe_t arg_parent2child, pipe_t arg_child2p
 
       PRINTF("event=%s\n", event);
 
-      int my_colour;
+      colour_enum my_colour;
 
       if (icolour == 0)
-        my_colour = WHITE_BIT;
+        my_colour = WHITE_ENUM;
       else
-        my_colour = BLACK_BIT;
+        my_colour = BLACK_ENUM;
 
       PRINTF("game=%d opening=%s\n", igame, opening);
 

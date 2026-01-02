@@ -2,6 +2,7 @@ OBJS=main.o\
   bstrlib.o\
   cJSON.o\
   xxhash.o\
+  my_safec.o\
   boards.o\
   book.o\
   buckets.o\
@@ -42,7 +43,8 @@ ifneq ($(ARCH), aarch64)
 #ARCH=skylake
 #ARCH=alderlake
 #ARCH=nocona
-ARCH=znver3
+#ARCH=znver3
+ARCH=native
 endif
 
 MAKE_VALGRIND=make_valgrind
@@ -56,7 +58,7 @@ CC=gcc
 CFLAGS=-g -DDEBUG
 else
 CC=clang
-CFLAGS=-O3 -g
+CFLAGS=-O3 -g 
 endif
 LFLAGS=-lm -lzstd -lpthread
 
@@ -70,7 +72,7 @@ endif
 
 ifdef MAKE_OPENMPI
 CFLAGS+=-DUSE_OPENMPI
-CFLAGS+=-I/usr/local/include
+CFLAGS+=-I/usr/local/include -I/usr/lib/x86_64-linux-gnu/openmpi/include
 LFLAGS+=-L/usr/local/lib -lmpi -lpmix
 endif
 
@@ -111,9 +113,7 @@ $(TARGET): $(OBJS)
 	$(CC) -o $@ $(CFLAGS) $(OBJS) $(LFLAGS)
 	REVISION=$$(./$(TARGET) --revision); echo $$REVISION;\
         mkdir -p /tmp8/gwies/dxp1/$$REVISION;\
-        cp $(TARGET) gwd.json overrides.json networks.json /tmp8/gwies/dxp1/$$REVISION;\
-        mkdir -p /tmp8/gwies/dxp2/$$REVISION;\
-        cp $(TARGET) gwd.json overrides.json networks.json /tmp8/gwies/dxp2/$$REVISION;\
+        cp $(TARGET) gwd.json overrides.json networks.json ballot2.fen /tmp8/gwies/dxp1/$$REVISION;\
         mkdir -p hub_client/$$REVISION;\
         cp $(TARGET) gwd.json overrides.json networks.json hub_client/$$REVISION
 
@@ -121,6 +121,7 @@ HEADERS=boards.h\
   bstrlib.h\
   cJSON.h\
   xxhash.h\
+  my_safec.h\
   book.h\
   buckets.h\
   caches.h\
@@ -161,7 +162,8 @@ main.o: Makefile main.c $(HEADERS)
 bstrlib.o: Makefile bstrlib.c $(HEADERS)
 cJSON.o: Makefile cJSON.c $(HEADERS)
 xxhash.o: Makefile xxhash.c $(HEADERS)
-boards.o: Makefile boards.d $(HEADERS)
+my_safec.o: Makefile my_safec.c $(HEADERS)
+boards.o: Makefile $(HEADERS)
 book.o: Makefile book.c $(HEADERS)
 my_bstreams.o: Makefile my_bstreams.c $(HEADERS)
 buckets.o: Makefile buckets.c $(HEADERS)
@@ -173,8 +175,8 @@ dxp.o: Makefile dxp.c $(HEADERS)
 endgame.o: Makefile endgame.c $(HEADERS)
 fbuffer.o: Makefile fbuffer.c $(HEADERS)
 hub.o: Makefile hub.c $(HEADERS)
-mcts.o: Makefile mcts.c mcts.d $(HEADERS)
-moves.o: Makefile moves.c moves.d $(HEADERS)
+mcts.o: Makefile mcts.c $(HEADERS)
+moves.o: Makefile moves.c $(HEADERS)
 my_cjson.o: Makefile my_cjson.c $(HEADERS)
 my_mpi.o: Makefile my_mpi.c $(HEADERS)
 my_malloc.o: Makefile my_malloc.c $(HEADERS)
@@ -187,16 +189,25 @@ profile.o: Makefile profile.c profile.h
 pdn.o: Makefile pdn.c $(HEADERS)
 queues.o: Makefile queues.c $(HEADERS)
 records.o: Makefile records.c $(HEADERS)
-score.o: Makefile score.c score.d $(HEADERS)
-search.o: Makefile search.c search.d $(HEADERS)
+score.o: Makefile score.c $(HEADERS)
+search.o: Makefile search.c $(HEADERS)
 states.o: Makefile states.c $(HEADERS)
 stats.o: Makefile stats.c $(HEADERS)
 my_threads.o: Makefile my_threads.c $(HEADERS)
 timers.o: Makefile timers.c $(HEADERS)
 utils.o: Makefile utils.c $(HEADERS)
 
-check:
-	cppcheck --enable=all .
+cppcheck:
+	clear
+	cppcheck --enable=all \
+	--suppress=missingIncludeSystem \
+	--suppress=constParameterPointer \
+	--suppress=constVariablePointer \
+	--suppress=constParameter \
+	--suppress=constParameterCallback \
+	--check-level=exhaustive \
+	--inconclusive \
+	--force -D__cppcheck__ -i bstrlib.c -i cJSON.c -i xxhash.c .
 
 clean:
 	rm *.o logs/*

@@ -1,9 +1,9 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM  gwd7
-#define REVISION "7.902"
+#define REVISION "8.0098"
 
 //generic includes
 
@@ -71,15 +71,17 @@ typedef unsigned long long ui64_t;
 #define NODE_MAX    1024
 #define NPIECES_MAX 20
 
-#define CJSON_PARAMETERS_ID            "parameters"
-#define CJSON_TWEAKS_ID                "tweaks"
-#define CJSON_SHAPE_ID                 "shape"
-#define CJSON_NEURAL2MATERIAL_SCORE_ID "network2material_score"
-#define CJSON_EMBEDDING_ID             "embedding"
-#define CJSON_ACTIVATION_ID            "activation"
-#define CJSON_ACTIVATION_LAST_ID       "activation_last"
-#define CJSON_NMAN_MIN_ID              "nman_min"
-#define CJSON_NMAN_MAX_ID              "nman_max"
+#define CJSON_PARAMETERS_ID             "parameters"
+#define CJSON_TWEAKS_ID                 "tweaks"
+#define CJSON_SHAPE_ID                  "shape"
+#define CJSON_NETWORK2MATERIAL_SCORE_ID "network2material_score"
+#define CJSON_NMATERIAL_ID              "nmaterial"
+#define CJSON_EMBEDDING_ID              "embedding"
+#define CJSON_ACTIVATION_INPUTS_ID      "activation_inputs"
+#define CJSON_ACTIVATION_ID             "activation"
+#define CJSON_ACTIVATION_LAST_ID        "activation_last"
+#define CJSON_NMAN_MIN_ID               "nman_min"
+#define CJSON_NMAN_MAX_ID               "nman_max"
 
 #define CJSON_EVENT_ID             "event"
 #define CJSON_DATE_ID              "date"
@@ -142,10 +144,14 @@ typedef unsigned long long ui64_t;
 
 #define PRINTF(...) my_printf(STDOUT, __VA_ARGS__)
 
+#ifdef __cppcheck__
+#define FATAL(X, C) {fprintf(stderr, "%s\n", #X); exit(C);}
+#else
 #define FATAL(X, C) {\
   zzzzzz_invocation++;\
   zzzzzz(__FILE__, __FUNC__, (int) __LINE__, X, C);\
 }
+#endif
 
 #define HARDBUG(X) {if (X) FATAL(#X, EXIT_FAILURE)}
 
@@ -220,6 +226,7 @@ extern void *STDOUT;
 
 #include "bstrlib.h"
 #include "cJSON.h"
+#include "my_safec.h"
 #include "classes.h"
 #include "my_printf.h"
 #include "my_bstreams.h"

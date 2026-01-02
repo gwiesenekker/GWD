@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 
 #include "globals.h"
 
@@ -95,6 +95,32 @@ local void add_pattern(patterns_shared_t *self, int arg_nlinear, int *arg_fields
   with_pattern_shared->PS_nembed = INVALID;
 
   object->PS_npatterns++;
+}
+
+local void add_quincunx(patterns_shared_t *self, int arg_irow, int arg_icol)
+{
+  patterns_shared_t *object = self;
+
+  int fields[NLINEAR_MAX];
+
+  int nlinear = 0;
+
+  int ifield;
+
+  if ((ifield = map_row_col2field(arg_irow, arg_icol)) !=
+      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) !=
+      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + 1)) !=
+      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) !=
+      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) !=
+      INVALID) fields[nlinear++] = ifield;
+
+  if (nlinear == 0) return;
+
+  add_pattern(object, nlinear, fields);
 }
 
 local void add_zigzag(patterns_shared_t *self, int arg_irow, int arg_icol,
@@ -321,13 +347,13 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
 
   HARDBUG(bassigncstr(barg_shape, arg_shape) == BSTR_ERR)
 
-  BSTRING(bsplit)
+  BSTRING(b)
 
-  bassigncstr(bsplit, ",:;");
+  bassigncstr(b, ",:;");
 
   struct bstrList *btokens;
   
-  HARDBUG((btokens = bsplits(barg_shape, bsplit)) == NULL)
+  HARDBUG((btokens = bsplits(barg_shape, b)) == NULL)
 
   BSTRING(string)
 
@@ -339,11 +365,30 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
     {
       for (int icol = -1; icol < 10; icol++)
       {
+        HARDBUG(bassigncstr(string, "quincunx") == BSTR_ERR)
+
+        if (bstrcmp(string, btokens->entry[itoken]) == 0)
+        {
+          if (((irow == 0) or (irow == 2) or (irow == 4) or (irow == 6)) and
+              ((icol == 1) or (icol == 3) or (icol == 5) or (icol == 7)))
+          {
+            add_quincunx(object, irow, icol);
+          }
+
+          if (((irow == 1) or (irow == 3) or (irow == 5) or (irow == 7)) and
+              ((icol == 0) or (icol == 2) or (icol == 4) or (icol == 6)))
+          {
+            add_quincunx(object, irow, icol);
+          }
+
+          ++nshapes;
+        }
+
         HARDBUG(bassigncstr(string, "zigzag2") == BSTR_ERR)
 
         if (bstrcmp(string, btokens->entry[itoken]) == 0)
         {
-          if (((irow == 0) or (irow == 2) or (irow == 4) or (irow ==6)) and
+          if (((irow == 0) or (irow == 2) or (irow == 4) or (irow == 6)) and
               ((icol == 1) or (icol == 3) or (icol == 5) or (icol == 7)))
           {
             add_zigzag(object, irow, icol, -1);
@@ -356,10 +401,28 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
 
         if (bstrcmp(string, btokens->entry[itoken]) == 0)
         {
-          if (((irow == 0) or (irow == 2) or (irow == 4) or (irow ==6)) and
+          if (((irow == 0) or (irow == 2) or (irow == 4) or (irow == 6)) and
               ((icol == 1) or (icol == 3) or (icol == 5)))
           {
             add_zigzag3(object, irow, icol, -1);
+          }
+
+          ++nshapes;
+        }
+
+        HARDBUG(bassigncstr(string, "zigzag9") == BSTR_ERR)
+
+        if (bstrcmp(string, btokens->entry[itoken]) == 0)
+        {
+          if (((irow == 0) or (irow == 6)) and
+              ((icol == 1) or (icol == 3) or (icol == 5) or (icol == 7)))
+          {
+            add_zigzag(object, irow, icol, -1);
+          }
+          if ((irow == 3) and
+              ((icol == 0) or (icol == 2) or (icol == 4) or (icol == 6)))
+          {
+            add_zigzag(object, irow, icol, 1);
           }
 
           ++nshapes;
@@ -444,7 +507,7 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
 
   HARDBUG(bstrListDestroy(btokens) == BSTR_ERR)
 
-  BDESTROY(bsplit)
+  BDESTROY(b)
 
   BDESTROY(barg_shape)
 
@@ -492,16 +555,11 @@ void board2patterns_thread(board_t *self)
   patterns_thread_t *with_patterns_thread =
     &(object->B_network_thread.NT_patterns);
 
-  //we do not consider the postion of kings
-
-  ui64_t empty_bb = object->B_white_man_bb | 
-                    object->B_black_man_bb;
-
-  empty_bb = object->B_valid_bb & ~empty_bb;
-
-  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns; ipattern++)
+  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
+       ipattern++)
   {
-    pattern_shared_t *with_pattern_shared = with_patterns_shared->PS_patterns + ipattern;
+    pattern_shared_t *with_pattern_shared =
+      with_patterns_shared->PS_patterns + ipattern;
 
     pattern_thread_t *with_pattern_thread =
       with_patterns_thread->PT_patterns + ipattern;
@@ -514,13 +572,15 @@ void board2patterns_thread(board_t *self)
   {
     int ifield = square2field[isquare];
 
-    for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns; ipattern++)
+    for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
+         ipattern++)
     {
       int jpattern = with_patterns_shared->PS_patterns_map[ifield][ipattern];
 
       if (jpattern == INVALID) break;
 
-      pattern_shared_t *with_pattern_shared = with_patterns_shared->PS_patterns + jpattern;
+      pattern_shared_t *with_pattern_shared =
+        with_patterns_shared->PS_patterns + jpattern;
 
       pattern_thread_t *with_pattern_thread =
         with_patterns_thread->PT_patterns + jpattern;
@@ -550,11 +610,11 @@ void check_board_patterns_thread(board_t *self, char *arg_where, int input_set)
   patterns_thread_t *with_patterns_thread =
     &(object->B_network_thread.NT_patterns);
 
-  int ok = TRUE;
-
-  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns; ipattern++)
+  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
+       ipattern++)
   {
-    pattern_shared_t *with_pattern_shared = with_patterns_shared->PS_patterns + ipattern;
+    pattern_shared_t *with_pattern_shared =
+      with_patterns_shared->PS_patterns + ipattern;
 
     pattern_thread_t *with_pattern_thread =
       with_patterns_thread->PT_patterns + ipattern;
@@ -581,12 +641,5 @@ void check_board_patterns_thread(board_t *self, char *arg_where, int input_set)
         }
       }
     }
-  }
-
-  if (!ok)
-  {
-    PRINTF("%s failed where=%s\n", __FUNC__, arg_where);
-
-    FATAL("eh??", EXIT_FAILURE)
   }
 }

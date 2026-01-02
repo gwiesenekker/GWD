@@ -1,4 +1,4 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 #define GWD_JSON       "gwd.json"
@@ -54,7 +54,7 @@ local void solve_problems(char *arg_name)
 
     CSTRING(cfen, blength(bline))
 
-    HARDBUG(sscanf(bdata(bline), "%s", cfen) != 1)
+    HARDBUG(my_sscanf(bdata(bline), "%s", cfen) != 1)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
@@ -70,7 +70,7 @@ local void solve_problems(char *arg_name)
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->S_board), &moves_list, FALSE);
+    gen_moves(&(with->S_board), &moves_list);
 
     check_moves(&(with->S_board), &moves_list);
 
@@ -159,8 +159,8 @@ local void solve_problems_mcts(char *arg_name,
 
     double result;
 
-    HARDBUG(sscanf(bdata(bline), "%s {%lf}",
-                   cfen, &result) != 2)
+    HARDBUG(my_sscanf(bdata(bline), "%s {%lf}",
+                      cfen, &result) != 2)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
@@ -180,7 +180,7 @@ local void solve_problems_mcts(char *arg_name,
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->S_board), &moves_list, FALSE);
+    gen_moves(&(with->S_board), &moves_list);
 
     check_moves(&(with->S_board), &moves_list);
 
@@ -292,12 +292,12 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
     }
   }
 
-  int human_colour;
+  colour_enum human_colour;
 
   if (*arg_colour == 'w')
-    human_colour = WHITE_BIT;
+    human_colour = WHITE_ENUM;
   else
-    human_colour = BLACK_BIT;
+    human_colour = BLACK_ENUM;
 
   double game_time = arg_game_minutes * 60.0;
   double game_time_used = arg_used_minutes * 60.0;
@@ -325,7 +325,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->S_board), &moves_list, FALSE);
+    gen_moves(&(with->S_board), &moves_list);
 
     if (moves_list.ML_nmoves == 0)
     {
@@ -361,7 +361,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
         int t;
 
-        if (sscanf(line, "%d", &t) == 1)
+        if (my_sscanf(line, "%d", &t) == 1)
         {
           game_time_used = game_time - t * 60.0;
 
@@ -398,7 +398,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
           CSTRING(canswer, strlen(line))
 
-          if (sscanf(line, "%s", canswer) != 1)
+          if (my_sscanf(line, "%s", canswer) != 1)
           {
             PRINTF("\neh?\n");
 
@@ -593,8 +593,8 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
             CSTRING(cbest_move, blength(message.message_text))
 
-            HARDBUG(sscanf(bdata(message.message_text), "%s%d",
-                           cbest_move, &best_score) != 2)
+            HARDBUG(my_sscanf(bdata(message.message_text), "%s%d",
+                              cbest_move, &best_score) != 2)
 
             HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
 
@@ -788,7 +788,7 @@ local int add_man_random(int arg_nwhite_man, int arg_nblack_man,
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(arg_with->S_board), &moves_list, FALSE);
+    gen_moves(&(arg_with->S_board), &moves_list);
 
     if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
     {
@@ -1017,7 +1017,7 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(arg_with->S_board), &moves_list, FALSE);
+    gen_moves(&(arg_with->S_board), &moves_list);
 
     if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
     {
@@ -1576,6 +1576,8 @@ local void load_gwd_json(void)
   options.use_book = TRUE;
   strncpy(options.book_name, "book.db", MY_LINE_MAX);
   options.book_randomness = 0;
+  options.book_position_frequency = 5;
+  options.book_move_frequency = 5;
   options.book_evaluation_time = 30;
   options.book_minimax = FALSE;
 
@@ -1589,28 +1591,35 @@ local void load_gwd_json(void)
   options.returned_depth_includes_captures = FALSE;
 
   options.quiescence_evaluation_policy = 0;
-  options.quiescence_extension_search_delta = 25;
-  options.pv_extension_search_delta = 25;
+  options.quiescence_combination_length = 2;
+  options.quiescence_extension_search_window = 25;
+  options.quiescence_capture_extensions = 0;
 
-  options.aspiration_window = 2;
+  options.pv_combination_length = 2;
+  options.pv_extension_search_window = 25;
+
+  options.aspiration_window = 1;
+  options.best_score_margin = 0;
 
   options.use_reductions = TRUE;
 
   options.reduction_depth_root = 2;
   options.reduction_depth_leaf = 2;
   options.reduction_moves_min = 4;
+  options.reduction_combination_length = 2;
 
   options.reduction_full_min = 1;
   options.reduction_strength = 2;
   options.reduction_probes = 2;
   options.reduction_probe_window = 25;
-  options.reduction_research_window = 10;
+  options.reduction_research_margin = 10;
 
   options.use_single_reply_extensions = TRUE;
 
   options.sync_clock = FALSE;
 
   options.alpha_beta_cache_size = 1024;
+  options.alpha_beta_cache_depth_margin = 1;
   options.pv_cache_fraction = 10;
 
   options.score_cache_size = 256;
@@ -1717,6 +1726,13 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "book_randomness") == 0)  
         options.book_randomness = ivalue;
 
+      else if (compat_strcasecmp(parameter_name,
+                                 "book_position_frequency") == 0)  
+        options.book_position_frequency = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "book_move_frequency") == 0)  
+        options.book_move_frequency = ivalue;
+
       else if (compat_strcasecmp(parameter_name, "book_evaluation_time") == 0)  
         options.book_evaluation_time = ivalue;
 
@@ -1744,16 +1760,32 @@ local void parse_parameters(void)
         options.quiescence_evaluation_policy = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "quiescence_extension_search_delta") == 0)  
-        options.quiescence_extension_search_delta = ivalue;
+                                 "quiescence_combination_length") == 0)  
+        options.quiescence_combination_length = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "pv_extension_search_delta") == 0)  
-        options.pv_extension_search_delta = ivalue;
+                                 "quiescence_extension_search_window") == 0)  
+        options.quiescence_extension_search_window = ivalue;
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "quiescence_capture_extensions") == 0)  
+        options.quiescence_capture_extensions = ivalue;
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "pv_combination_length") == 0)  
+        options.pv_combination_length = ivalue;
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "pv_extension_search_window") == 0)  
+        options.pv_extension_search_window = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
                                  "aspiration_window") == 0)  
         options.aspiration_window = ivalue;
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "best_score_margin") == 0)  
+        options.best_score_margin = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_depth_root") == 0)  
         options.reduction_depth_root = ivalue;
@@ -1767,20 +1799,31 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "reduction_full_min") == 0)  
         options.reduction_full_min = ivalue;
 
+      else if (compat_strcasecmp(parameter_name,
+                                 "reduction_combination_length") == 0)  
+        options.reduction_combination_length = ivalue;
+
       else if (compat_strcasecmp(parameter_name, "reduction_strength") == 0)  
         options.reduction_strength = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_probes") == 0)  
         options.reduction_probes = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_probe_window") == 0)  
+      else if (compat_strcasecmp(parameter_name,
+                                 "reduction_probe_window") == 0)  
         options.reduction_probe_window = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_research_window") == 0)  
-        options.reduction_research_window = ivalue;
+      else if (compat_strcasecmp(parameter_name,
+                                 "reduction_research_margin") == 0)  
+        options.reduction_research_margin = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)  
+      else if (compat_strcasecmp(parameter_name,
+                                 "alpha_beta_cache_size") == 0)  
         options.alpha_beta_cache_size = ivalue;
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "alpha_beta_cache_depth_margin") == 0)  
+        options.alpha_beta_cache_depth_margin = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "pv_cache_fraction") == 0)  
         options.pv_cache_fraction = ivalue;
@@ -1919,22 +1962,27 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "material_only") == 0)  
         options.material_only = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "captures_are_transparent") == 0)  
+      else if (compat_strcasecmp(parameter_name,
+                                 "captures_are_transparent") == 0)  
         options.captures_are_transparent = bvalue;
 
       else if (compat_strcasecmp(parameter_name,
-                             "returned_depth_includes_captures") == 0)  
+                                 "returned_depth_includes_captures") == 0)  
         options.returned_depth_includes_captures = bvalue;
 
       else if (compat_strcasecmp(parameter_name, "use_reductions") == 0)  
         options.use_reductions = bvalue;
 
       else if (compat_strcasecmp(parameter_name,
-                             "use_single_reply_extensions") == 0)  
+                                 "use_single_reply_extensions") == 0)  
         options.use_single_reply_extensions = bvalue;
 
       else if (compat_strcasecmp(parameter_name, "sync_clock") == 0)  
         options.sync_clock = bvalue;
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "pv2cache") == 0)  
+        options.pv2cache = bvalue;
 
       else if (compat_strcasecmp(parameter_name, "dxp_initiator") == 0)  
         options.dxp_initiator = bvalue;
@@ -2486,7 +2534,7 @@ int main(int argc, char **argv)
   
           int ivalue;
   
-          if (sscanf(argv[iarg], format, &ivalue) != 1) continue;
+          if (my_sscanf(argv[iarg], format, &ivalue) != 1) continue;
   
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -2506,7 +2554,7 @@ int main(int argc, char **argv)
   
           double dvalue;
   
-          if (sscanf(argv[iarg], format, &dvalue) != 1) continue;
+          if (my_sscanf(argv[iarg], format, &dvalue) != 1) continue;
   
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -2526,7 +2574,7 @@ int main(int argc, char **argv)
   
           char svalue[MY_LINE_MAX];
   
-          if (sscanf(argv[iarg], format, svalue) != 1) continue;
+          if (my_sscanf(argv[iarg], format, svalue) != 1) continue;
   
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -2546,7 +2594,7 @@ int main(int argc, char **argv)
   
           char svalue[MY_LINE_MAX];
   
-          if (sscanf(argv[iarg], format, svalue) != 1) continue;
+          if (my_sscanf(argv[iarg], format, svalue) != 1) continue;
   
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
   
@@ -2676,6 +2724,8 @@ int main(int argc, char **argv)
   PRINTF_CFG_B(use_book);
   PRINTF_CFG_S(book_name);
   PRINTF_CFG_I(book_randomness);
+  PRINTF_CFG_I(book_position_frequency);
+  PRINTF_CFG_I(book_move_frequency);
   PRINTF_CFG_I(book_evaluation_time);
   PRINTF_CFG_B(book_minimax);
 
@@ -2689,29 +2739,37 @@ int main(int argc, char **argv)
   PRINTF_CFG_B(returned_depth_includes_captures);
 
   PRINTF_CFG_I(quiescence_evaluation_policy);
-  PRINTF_CFG_I(quiescence_extension_search_delta);
-  PRINTF_CFG_I(pv_extension_search_delta);
+  PRINTF_CFG_I(quiescence_combination_length);
+  PRINTF_CFG_I(quiescence_extension_search_window);
+  PRINTF_CFG_I(quiescence_capture_extensions);
+
+  PRINTF_CFG_I(pv_combination_length);
+  PRINTF_CFG_I(pv_extension_search_window);
 
   PRINTF_CFG_I(aspiration_window);
+  PRINTF_CFG_I(best_score_margin);
 
   PRINTF_CFG_B(use_reductions);
 
   PRINTF_CFG_I(reduction_depth_root);
   PRINTF_CFG_I(reduction_depth_leaf);
   PRINTF_CFG_I(reduction_moves_min);
+  PRINTF_CFG_I(reduction_combination_length);
 
   PRINTF_CFG_I(reduction_full_min);
   PRINTF_CFG_I(reduction_strength);
   PRINTF_CFG_I(reduction_probes);
   PRINTF_CFG_I(reduction_probe_window);
-  PRINTF_CFG_I(reduction_research_window);
+  PRINTF_CFG_I(reduction_research_margin);
 
   PRINTF_CFG_B(use_single_reply_extensions);
 
   PRINTF_CFG_B(sync_clock);
 
   PRINTF_CFG_I64(alpha_beta_cache_size);
+  PRINTF_CFG_I(alpha_beta_cache_depth_margin);
   PRINTF_CFG_I(pv_cache_fraction);
+  PRINTF_CFG_B(pv2cache);
 
   PRINTF_CFG_I64(score_cache_size);
 
@@ -2780,18 +2838,28 @@ int main(int argc, char **argv)
   //parameter checks
 
   HARDBUG(options.quiescence_evaluation_policy < 0)
-  HARDBUG(options.quiescence_extension_search_delta < 0)
-  HARDBUG(options.pv_extension_search_delta < 0)
+  HARDBUG(options.quiescence_combination_length < 0)
+  HARDBUG(options.quiescence_extension_search_window < 0)
+  HARDBUG(options.quiescence_capture_extensions < 0)
 
-  HARDBUG((options.aspiration_window % 2) != 0)
+  HARDBUG(options.pv_combination_length < 0)
+  HARDBUG(options.pv_extension_search_window < 0)
+
+  HARDBUG(options.aspiration_window < 1)
+  HARDBUG(options.best_score_margin < 0)
+
+  HARDBUG(options.alpha_beta_cache_size < 0)
+  HARDBUG(options.alpha_beta_cache_depth_margin < 0)
 
   HARDBUG(options.reduction_depth_root < 0)
   HARDBUG(options.reduction_depth_leaf < 0)
+  HARDBUG(options.reduction_moves_min < 0)
+  HARDBUG(options.reduction_combination_length < 0)
 
   HARDBUG(options.reduction_strength < 1)
   HARDBUG(options.reduction_probes < 0)
   HARDBUG(options.reduction_probe_window < 1)
-  HARDBUG(options.reduction_research_window < 0)
+  HARDBUG(options.reduction_research_margin < 0)
 
   INIT_PROFILE
   
@@ -2927,21 +2995,21 @@ check_my_malloc();
  
     int nshoot_outs;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &nshoot_outs) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nshoot_outs) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
  
     int mcts_depth;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
  
     double mcts_time_limit;
 
-    HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -2974,7 +3042,7 @@ check_my_malloc();
   }
   else if (compat_strcasecmp(argv[iarg], "hub_server") == 0)
   {
-    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= (physical_memory / 2))
 
@@ -3139,7 +3207,7 @@ check_my_malloc();
  
     i64_t npositions_max;
 
-    HARDBUG(sscanf(argv[iarg], "%lld", &npositions_max) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions_max) != 1)
 
     //
 
@@ -3148,7 +3216,7 @@ check_my_malloc();
 
     int nkings_max;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &nkings_max) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nkings_max) != 1)
  
     //
 
@@ -3157,11 +3225,11 @@ check_my_malloc();
  
     double mcts_time_limit;
 
-    HARDBUG(sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
 
     HARDBUG(mcts_time_limit <= 0.0)
 
-    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
@@ -3193,9 +3261,17 @@ check_my_malloc();
 
     char *pdn_name = argv[iarg];
   
-    read_games(db_name, pdn_name);
+    my_sqlite3_t db;
+
+    construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+
+    db.MS_verbose = 0;
+
+    read_games(&db, pdn_name);
+
+    close_my_sqlite3(&db);
   }
-  else if (compat_strcasecmp(argv[iarg], "gen_book") == 0)
+  else if (compat_strcasecmp(argv[iarg], "add_evaluations2book") == 0)
   {
     iarg++;
 
@@ -3205,10 +3281,16 @@ check_my_malloc();
 
     iarg++;
 
-    int centi_seconds = INVALID;
+    int centi_seconds;
+
+    HARDBUG(my_sscanf(argv[iarg], "%d", &centi_seconds) != 1)
+
+    HARDBUG(centi_seconds < 1)
+
+    int arg_add_moves = 0;
 
     if (argv[iarg] != NULL)
-      HARDBUG(sscanf(argv[iarg], "%d", &centi_seconds) != 1)
+      HARDBUG(my_sscanf(argv[iarg], "%d", &arg_add_moves) != 1)
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -3217,8 +3299,54 @@ check_my_malloc();
 
       construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
 
-      gen_book(&db, centi_seconds);
+      add_evaluations2book(&db, centi_seconds, arg_add_moves);
 
+      close_my_sqlite3(&db);
+    }
+  }
+  else if (compat_strcasecmp(argv[iarg], "expand_book") == 0)
+  {
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+ 
+    char *db_name = argv[iarg];
+
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    char *fen = argv[iarg];
+
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    int depth;
+   
+    HARDBUG(my_sscanf(argv[iarg], "%d", &depth) != 1)
+
+    HARDBUG(depth < 0)
+
+    iarg++;
+
+    HARDBUG(argv[iarg] == NULL)
+
+    int centi_seconds;
+
+    HARDBUG(my_sscanf(argv[iarg], "%d", &centi_seconds) != 1)
+
+    HARDBUG(centi_seconds < 1)
+
+    my_sqlite3_t db;
+
+    if ((my_mpi_globals.MMG_nslaves == 0) or
+        (my_mpi_globals.MMG_id_slave != INVALID))
+    {
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+
+      expand_book(&db, fen, depth, centi_seconds);
+  
       close_my_sqlite3(&db);
     }
   }
@@ -3236,64 +3364,6 @@ check_my_malloc();
 
     walk_book(db_name, fen);
   }
-  else if (compat_strcasecmp(argv[iarg], "add2book") == 0)
-  {
-    iarg++;
-
-    HARDBUG(argv[iarg] == NULL)
- 
-    char *db_name = argv[iarg];
-
-    iarg++;
-
-    HARDBUG(argv[iarg] == NULL)
-
-    char *fen = argv[iarg];
-
-    iarg++;
-
-    HARDBUG(argv[iarg] == NULL)
-
-    int depth_max;
-   
-    HARDBUG(sscanf(argv[iarg], "%d", &depth_max) != 1)
-
-    HARDBUG(depth_max < 1)
-
-    iarg++;
-
-    HARDBUG(argv[iarg] == NULL)
-
-    int centi_seconds1;
-
-    HARDBUG(sscanf(argv[iarg], "%d", &centi_seconds1) != 1)
-
-    HARDBUG(centi_seconds1 < 1)
-
-    iarg++;
-
-    HARDBUG(argv[iarg] == NULL)
-
-    int centi_seconds2;
-
-    HARDBUG(sscanf(argv[iarg], "%d", &centi_seconds2) != 1)
-
-    HARDBUG(centi_seconds2 < 1)
-
-    HARDBUG(centi_seconds2 <= centi_seconds1)
-
-    my_sqlite3_t db;
-
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
-    {
-      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
-
-      add2book(&db, fen, depth_max, centi_seconds1, centi_seconds2);
-  
-      close_my_sqlite3(&db);
-    }
-  }
   else if (compat_strcasecmp(argv[iarg], "gen_db") == 0)
   {
     iarg++;
@@ -3308,16 +3378,16 @@ check_my_malloc();
  
     i64_t npositions;
 
-    HARDBUG(sscanf(argv[iarg], "%lld", &npositions) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
  
     int mcts_depth;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
-    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
@@ -3337,26 +3407,6 @@ check_my_malloc();
       close_my_sqlite3(&db);
     }
   }
-  else if (compat_strcasecmp(argv[iarg], "gen_lmr") == 0)
-  {
-    iarg++;
-
-    HARDBUG(argv[iarg] == NULL)
- 
-    char *fen = argv[iarg];
-
-    iarg++;
-
-    HARDBUG(argv[iarg] == NULL)
-
-    int seconds;
-   
-    HARDBUG(sscanf(argv[iarg], "%d", &seconds) != 1)
-
-    HARDBUG(seconds < 1)
-
-    gen_lmr(fen, seconds);
-  }
   else if (compat_strcasecmp(argv[iarg], "update_db") == 0)
   {
     iarg++;
@@ -3371,9 +3421,9 @@ check_my_malloc();
  
     int mcts_depth;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
-    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
@@ -3407,16 +3457,16 @@ check_my_malloc();
  
     int mcts_depth;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &mcts_depth) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
  
     int frequency;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &frequency) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &frequency) != 1)
 
-    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
@@ -3444,7 +3494,7 @@ check_my_malloc();
     HARDBUG(argv[iarg] == NULL)
    
     char name[MY_LINE_MAX];
-    HARDBUG(sscanf(argv[iarg], "%s", name) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%s", name) != 1)
 
     //colour
 
@@ -3452,7 +3502,7 @@ check_my_malloc();
     HARDBUG(argv[iarg] == NULL)
 
     char colour[MY_LINE_MAX];
-    HARDBUG(sscanf(argv[iarg], "%s", colour) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%s", colour) != 1)
 
     //game_minutes
 
@@ -3460,7 +3510,7 @@ check_my_malloc();
     HARDBUG(argv[iarg] == NULL)
 
     int game_minutes;
-    HARDBUG(sscanf(argv[iarg], "%d", &game_minutes) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &game_minutes) != 1)
 
     //used_minutes
 
@@ -3468,7 +3518,7 @@ check_my_malloc();
     HARDBUG(argv[iarg] == NULL)
 
     int used_minutes;
-    HARDBUG(sscanf(argv[iarg], "%d", &used_minutes) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &used_minutes) != 1)
 
     options.mode = GAME_MODE;
 
@@ -3486,7 +3536,7 @@ check_my_malloc();
 
         CSTRING(canswer, strlen(line))
 
-        if (sscanf(line, "%s", canswer) != 1) strcpy(canswer, "y");
+        if (my_sscanf(line, "%s", canswer) != 1) strcpy(canswer, "y");
 
         if (*canswer == 'y')
         {
@@ -3510,7 +3560,7 @@ check_my_malloc();
 
       CSTRING(canswer, strlen(line))
 
-      if (sscanf(line, "%s", canswer) != 1)
+      if (my_sscanf(line, "%s", canswer) != 1)
       {
         PRINTF("\neh?\n");
 
@@ -3571,9 +3621,9 @@ check_my_malloc();
     HARDBUG(argv[iarg] == NULL)
 
     i64_t npositions;
-    HARDBUG(sscanf(argv[iarg], "%lld", &npositions) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
 
-    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
@@ -3594,43 +3644,41 @@ check_my_malloc();
 
     int nman_min;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &nman_min) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nman_min) != 1)
 
     iarg++;
     if (argv[iarg] == NULL) FATAL("nman_max argument missing", EXIT_FAILURE)
 
     int nman_max;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &nman_max) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nman_max) != 1)
 
     iarg++;
     if (argv[iarg] == NULL) FATAL("nkings_min argument missing", EXIT_FAILURE)
 
     int nkings_min;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &nkings_min) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nkings_min) != 1)
 
     iarg++;
     if (argv[iarg] == NULL) FATAL("nkings_max argument missing", EXIT_FAILURE)
 
     int nkings_max;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &nkings_max) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nkings_max) != 1)
 
     //
 
     iarg++;
     if (argv[iarg] == NULL) FATAL("file argument missing", EXIT_FAILURE)
 
-    i64_t memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
     //int nthreads_slaves =
     //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     //HARDBUG(nthreads_slaves > physical_cpus)
-
-    load_network = FALSE;
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -3710,14 +3758,14 @@ check_my_malloc();
 
     int level;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &level) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &level) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
     int nblock;
 
-    HARDBUG(sscanf(argv[iarg], "%d", &nblock) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nblock) != 1)
 
     recompress_endgame(name, level, nblock);
   }

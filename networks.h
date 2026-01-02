@@ -1,21 +1,30 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #ifndef NetworksH
 #define NetworksH
 
 //network.c
 
-#define NETWORK_EMBEDDING_SUM           1
-#define NETWORK_EMBEDDING_SUM2          2
-#define NETWORK_EMBEDDING_CONCAT        3
+#define NETWORK_EMBEDDING_SUM               1
+#define NETWORK_EMBEDDING_SUM2              2
+#define NETWORK_EMBEDDING_SUM2PRODUCT       4
+#define NETWORK_EMBEDDING_SUM2PRODUCTCONCAT 5
+#define NETWORK_EMBEDDING_CONCAT            6
 
-#define NETWORK_ACTIVATION_RELU6        3
-#define NETWORK_ACTIVATION_TANH         4
-#define NETWORK_ACTIVATION_RSQRT        5
-#define NETWORK_ACTIVATION_LINEAR       6
-#define NETWORK_ACTIVATION_SIGMOID      7
+#define NETWORK_ACTIVATION_RELU6            7
+#define NETWORK_ACTIVATION_TANH             8
+#define NETWORK_ACTIVATION_RSQRT            9
+#define NETWORK_ACTIVATION_GELU             10
+#define NETWORK_ACTIVATION_GELUV2           11
+#define NETWORK_ACTIVATION_LINEAR           12
+#define NETWORK_ACTIVATION_SIGMOID          13
 
-#define NINPUTS_MAX 2048
-#define NLAYERS_MAX 8
+#define NINPUTS_MAX   2048
+#define NMATERIAL_MAX 8
+#define NLAYERS_MAX   8
+
+#define COMBINED_KING_MAX 5
+#define DELTA_MAN_MAX     10
+#define DELTA_KING_MAX    5
 
 typedef struct
 {
@@ -44,13 +53,15 @@ typedef struct
   int NS_loaded;
 
   double NS_network2material_score;
+  int NS_nmaterial;
   int NS_embedding;
+  int NS_activation_inputs;
   int NS_activation;
   int NS_activation_last;
   int NS_nman_min;  
   int NS_nman_max;
 
-  material_shared_t NS_material[4];
+  material_shared_t NS_material[NMATERIAL_MAX];
 
   int NS_nlayers;
 
@@ -60,21 +71,22 @@ typedef struct
 typedef struct
 {
   patterns_thread_t NT_patterns;
-  scaled_double_t *NT_inputs;
+  ALIGN64(scaled_double_t NT_inputs[NINPUTS_MAX]);
   layer_thread_t NT_layers[NLAYERS_MAX];
 } network_thread_t;
 
-extern int load_network;
 extern network_shared_t network_shared;
 
 void construct_network_shared(network_shared_t *, int);
 void construct_network_thread(network_thread_t *, int);
 int base3_index(const int32_t *, int);
-void vadd_aba(int, scaled_double_t *restrict, scaled_double_t *restrict);
-void vcopy_ab(int n, scaled_double_t *, scaled_double_t *b);
+void vcopy_a2b(int n, scaled_double_t *, scaled_double_t *);
+void vadd_ab2a(int, scaled_double_t *restrict, scaled_double_t *restrict);
+void vmul_ab2a(int, scaled_double_t *restrict, scaled_double_t *restrict);
+void vmul_ab2c(int, scaled_double_t *restrict, scaled_double_t *restrict,
+  scaled_double_t *restrict);
 double return_network_score_scaled(network_thread_t *);
 double return_network_score_double(network_thread_t *);
-void board2network(board_t *);
 void fen2network(char *, i64_t);
 void fen2csv(char *, int, int, int, int);
 void init_networks(void);

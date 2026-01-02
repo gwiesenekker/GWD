@@ -1,7 +1,21 @@
-//SCU REVISION 7.902 di 26 aug 2025  4:15:00 CEST
+//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
 #include "globals.h"
 
 #undef USE_RECIPROCAL
+#define USE_ERF
+
+#define APPEND_MATERIAL_COMBINED
+#undef APPEND_MATERIAL_DELTA
+
+#define TAG "w2m-embed-patterns-wmbmwkbk"
+
+#ifdef APPEND_MATERIAL_COMBINED
+#define TAG "w2m-embed-patterns-wmbmwkbk-combinedv2"
+#endif
+
+#ifdef APPEND_MATERIAL_DELTA
+#define TAG "w2m-embed-patterns-wmbmwkbk-delta"
+#endif
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
 
@@ -24,13 +38,13 @@
 
 #endif
 
-int load_network = TRUE;
 network_shared_t network_shared;
 
 //for binary fen
 
 typedef i32_t bin_t;
 
+local int load_network = TRUE;
 local i8_t base64_table[256];
 
 void init_base64_table(void)
@@ -330,7 +344,7 @@ void construct_network_shared(network_shared_t *self, int arg_verbose)
   int found = FALSE;
 
   cJSON *directory;
-  char *directory_name;
+  char *directory_name = "NULL";
 
   cJSON_ArrayForEach(directory, directories)
   {
@@ -368,17 +382,7 @@ void construct_network_shared(network_shared_t *self, int arg_verbose)
 
   PRINTF("directory_name=%s\n", directory_name);
 
-  cJSON *network2material_score_cjson =
-    cJSON_GetObjectItem(directory, CJSON_NEURAL2MATERIAL_SCORE_ID);
-
-  HARDBUG(!cJSON_IsNumber(network2material_score_cjson))
-
-  network->NS_network2material_score =
-   cJSON_GetNumberValue(network2material_score_cjson);
-
-  if (arg_verbose)
-    PRINTF("network->NS_network2material_score=%.2f\n",
-           network->NS_network2material_score);
+  //shape
 
   cJSON *value_cjson = cJSON_GetObjectItem(directory, CJSON_SHAPE_ID);
 
@@ -389,7 +393,35 @@ void construct_network_shared(network_shared_t *self, int arg_verbose)
   network->NS_bshape = bfromcstr(svalue);
 
   if (arg_verbose) PRINTF("shape=%s\n", bdata(network->NS_bshape));
+
+  //network2material_score
  
+  value_cjson =
+    cJSON_GetObjectItem(directory, CJSON_NETWORK2MATERIAL_SCORE_ID);
+
+  HARDBUG(!cJSON_IsNumber(value_cjson))
+
+  network->NS_network2material_score = cJSON_GetNumberValue(value_cjson);
+
+  if (arg_verbose)
+    PRINTF("network->NS_network2material_score=%.2f\n",
+           network->NS_network2material_score);
+
+  //nmaterial
+
+  value_cjson = cJSON_GetObjectItem(directory, CJSON_NMATERIAL_ID);
+
+  HARDBUG(!cJSON_IsNumber(value_cjson))
+
+  network->NS_nmaterial = cJSON_GetNumberValue(value_cjson);
+
+  HARDBUG((network->NS_nmaterial != 4) and
+          (network->NS_nmaterial != 5) and
+          (network->NS_nmaterial != 7))
+
+  if (arg_verbose)
+    PRINTF("network->NS_nmaterial=%d\n", network->NS_nmaterial);
+
   //embedding
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_EMBEDDING_ID);
@@ -402,6 +434,10 @@ void construct_network_shared(network_shared_t *self, int arg_verbose)
     network->NS_embedding = NETWORK_EMBEDDING_SUM;
   else if (compat_strcasecmp(svalue, "sum2") == 0)
     network->NS_embedding = NETWORK_EMBEDDING_SUM2;
+  else if (compat_strcasecmp(svalue, "sum2product") == 0)
+    network->NS_embedding = NETWORK_EMBEDDING_SUM2PRODUCT;
+  else if (compat_strcasecmp(svalue, "sum2productconcat") == 0)
+    network->NS_embedding = NETWORK_EMBEDDING_SUM2PRODUCTCONCAT;
   else if (compat_strcasecmp(svalue, "concat") == 0)
     network->NS_embedding = NETWORK_EMBEDDING_CONCAT;
   else
@@ -413,10 +449,55 @@ void construct_network_shared(network_shared_t *self, int arg_verbose)
       PRINTF("embedding=SUM\n");
     else if (network->NS_embedding == NETWORK_EMBEDDING_SUM2)
       PRINTF("embedding=SUM2\n");
+    else if (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT)
+      PRINTF("embedding=SUM2PRODUCT\n");
+    else if (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT)
+      PRINTF("embedding=SUM2PRODUCTCONCAT\n");
     else if (network->NS_embedding == NETWORK_EMBEDDING_CONCAT)
       PRINTF("embedding=CONCAT\n");
     else
       FATAL("unknown embedding option", EXIT_FAILURE)
+  }
+
+  //activation_inputs
+
+  value_cjson = cJSON_GetObjectItem(directory, CJSON_ACTIVATION_INPUTS_ID);
+
+  HARDBUG(!cJSON_IsString(value_cjson));
+
+  svalue = cJSON_GetStringValue(value_cjson);
+
+  if (compat_strcasecmp(svalue, "relu6") == 0)
+    network->NS_activation_inputs = NETWORK_ACTIVATION_RELU6;
+  else if (compat_strcasecmp(svalue, "tanh") == 0)
+    network->NS_activation_inputs = NETWORK_ACTIVATION_TANH;
+  else if (compat_strcasecmp(svalue, "rsqrt") == 0)
+    network->NS_activation_inputs = NETWORK_ACTIVATION_RSQRT;
+  else if (compat_strcasecmp(svalue, "gelu") == 0)
+    network->NS_activation_inputs = NETWORK_ACTIVATION_GELU;
+  else if (compat_strcasecmp(svalue, "geluv2") == 0)
+    network->NS_activation_inputs = NETWORK_ACTIVATION_GELUV2;
+  else if (compat_strcasecmp(svalue, "linear") == 0)
+    network->NS_activation_inputs = NETWORK_ACTIVATION_LINEAR;
+  else
+    FATAL("unknown activation_inputs option", EXIT_FAILURE)
+
+  if (arg_verbose)
+  {
+    if (network->NS_activation_inputs == NETWORK_ACTIVATION_RELU6)
+      PRINTF("activation_inputs=RELU6\n");
+    else if (network->NS_activation_inputs == NETWORK_ACTIVATION_TANH)
+      PRINTF("activation_inputs=TANH\n");
+    else if (network->NS_activation_inputs == NETWORK_ACTIVATION_RSQRT)
+      PRINTF("activation_inputs=RSQRT\n");
+    else if (network->NS_activation_inputs == NETWORK_ACTIVATION_GELU)
+      PRINTF("activation_inputs=GELU\n");
+    else if (network->NS_activation_inputs == NETWORK_ACTIVATION_GELUV2)
+      PRINTF("activation_inputs=GELUV2\n");
+    else if (network->NS_activation_inputs == NETWORK_ACTIVATION_LINEAR)
+      PRINTF("activation_inputs=LINEAR\n");
+    else
+      FATAL("unknown activation_inputs option", EXIT_FAILURE)
   }
 
   //activation
@@ -433,6 +514,10 @@ void construct_network_shared(network_shared_t *self, int arg_verbose)
     network->NS_activation = NETWORK_ACTIVATION_TANH;
   else if (compat_strcasecmp(svalue, "rsqrt") == 0)
     network->NS_activation = NETWORK_ACTIVATION_RSQRT;
+  else if (compat_strcasecmp(svalue, "gelu") == 0)
+    network->NS_activation = NETWORK_ACTIVATION_GELU;
+  else if (compat_strcasecmp(svalue, "geluv2") == 0)
+    network->NS_activation = NETWORK_ACTIVATION_GELUV2;
   else
     FATAL("unknown activation option", EXIT_FAILURE)
 
@@ -444,6 +529,10 @@ void construct_network_shared(network_shared_t *self, int arg_verbose)
       PRINTF("activation=TANH\n");
     else if (network->NS_activation == NETWORK_ACTIVATION_RSQRT)
       PRINTF("activation=RSQRT\n");
+    else if (network->NS_activation == NETWORK_ACTIVATION_GELU)
+      PRINTF("activation=GELU\n");
+    else if (network->NS_activation == NETWORK_ACTIVATION_GELUV2)
+      PRINTF("activation=GELUV2\n");
     else
       FATAL("unknown activation option", EXIT_FAILURE)
   }
@@ -517,7 +606,8 @@ void construct_network_shared(network_shared_t *self, int arg_verbose)
 
   construct_patterns_shared(&(patterns_shared), bdata(network->NS_bshape));
 
-PRINTF("load_network=%d\n", load_network);
+  PRINTF("load_network=%d\n", load_network);
+
   if (!load_network) return;
 
   network->NS_ninputs_patterns = 0;
@@ -556,7 +646,9 @@ PRINTF("load_network=%d\n", load_network);
     mark_pointer_read_only(with->PS_weights_nstatesxnembed[0]);
 
     if ((network->NS_embedding == NETWORK_EMBEDDING_SUM) or
-        (network->NS_embedding == NETWORK_EMBEDDING_SUM2))
+        (network->NS_embedding == NETWORK_EMBEDDING_SUM2) or
+        (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
+        (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT))
     {
       with->PS_offset = 0;
 
@@ -587,7 +679,7 @@ PRINTF("load_network=%d\n", load_network);
 
   //load the material
 
-  for (int imaterial = 0; imaterial < 4; imaterial++)
+  for (int imaterial = 0; imaterial < network->NS_nmaterial; imaterial++)
   {
     material_shared_t *with = &(network->NS_material[imaterial]);
 
@@ -601,7 +693,27 @@ PRINTF("load_network=%d\n", load_network);
 
     HARDBUG(file == NULL)
 
-    with->MS_nstates = 21;
+    if (network->NS_nmaterial == 4)
+    {
+      with->MS_nstates = 21; 
+    }
+    else if (network->NS_nmaterial == 5)
+    {
+      if (imaterial < 4)
+        with->MS_nstates = 21;
+      else
+        with->MS_nstates = 21 * 6 * 21 * 6; 
+    }
+    else if (network->NS_nmaterial == 7)
+    {
+      if (imaterial < 6)
+        with->MS_nstates = 21;
+      else
+        with->MS_nstates = 21 * 11;
+    }
+    else
+      FATAL("network->NS_nmaterial out of range", EXIT_FAILURE)
+
     with->MS_nembed = INVALID;
 
     read_2d_csv_base64(file, &(with->MS_nstates), &(with->MS_nembed),
@@ -624,13 +736,21 @@ PRINTF("load_network=%d\n", load_network);
       else
         HARDBUG(with->MS_nembed != network->NS_ninputs_material)
     }
-    else if (network->NS_embedding == NETWORK_EMBEDDING_SUM2)
+    else if ((network->NS_embedding == NETWORK_EMBEDDING_SUM2) or
+             (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
+             (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT))
     {
       with->MS_offset = network->NS_ninputs_patterns;
 
       if (network->NS_ninputs_material == 0)
       {
         network->NS_ninputs_material = with->MS_nembed; //first
+
+        if ((network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
+            (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT))
+        {
+          HARDBUG(network->NS_ninputs_material != network->NS_ninputs_patterns)
+        }
 
         network->NS_ninputs += with->MS_nembed;
       }
@@ -652,9 +772,24 @@ PRINTF("load_network=%d\n", load_network);
     iweight++;
   }
 
+  if (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT)
+  {
+    HARDBUG(network->NS_ninputs_patterns != network->NS_ninputs_material)
+
+    network->NS_ninputs = network->NS_ninputs_patterns;
+  }
+  else if (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT)
+  {
+    HARDBUG(network->NS_ninputs_patterns != network->NS_ninputs_material)
+
+    network->NS_ninputs += network->NS_ninputs_patterns;
+  }
+
   PRINTF("network->NS_ninputs_patterns=%d\n", network->NS_ninputs_patterns);
   PRINTF("network->NS_ninputs_material=%d\n", network->NS_ninputs_material);
   PRINTF("network->NS_ninputs=%d\n", network->NS_ninputs);
+
+  HARDBUG(network->NS_ninputs >= NINPUTS_MAX)
 
   //read the dense network
 
@@ -728,7 +863,9 @@ PRINTF("load_network=%d\n", load_network);
   }
 
   if ((network->NS_embedding == NETWORK_EMBEDDING_SUM) or
-      (network->NS_embedding == NETWORK_EMBEDDING_SUM2))
+      (network->NS_embedding == NETWORK_EMBEDDING_SUM2) or
+      (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
+      (network->NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT))
   {
     for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
          ipattern++)
@@ -739,7 +876,7 @@ PRINTF("load_network=%d\n", load_network);
       with_pattern_shared->PS_sum_nstatesxnoutputs = NULL;
     }
 
-    for (int imaterial = 0; imaterial < 4; imaterial++)
+    for (int imaterial = 0; imaterial < network->NS_nmaterial; imaterial++)
     {
       material_shared_t *with_material_shared =
         &(network->NS_material[imaterial]);
@@ -786,7 +923,7 @@ PRINTF("load_network=%d\n", load_network);
       mark_pointer_read_only(sum_nstatesxnoutputs);
     }
 
-    for (int imaterial = 0; imaterial < 4; imaterial++)
+    for (int imaterial = 0; imaterial < network->NS_nmaterial; imaterial++)
     {
       material_shared_t *with_material_shared =
         &(network->NS_material[imaterial]);
@@ -824,8 +961,8 @@ void construct_network_thread(network_thread_t *self, int arg_verbose)
 {
   network_thread_t *object = self;
 
-  MY_MALLOC_BY_TYPE(object->NT_inputs, scaled_double_t,
-                    network_shared.NS_ninputs);
+  //MY_MALLOC_BY_TYPE(object->NT_inputs, scaled_double_t,
+  //                  network_shared.NS_ninputs);
 
   for (int ilayer = 0; ilayer < network_shared.NS_nlayers; ilayer++)
   {
@@ -850,7 +987,7 @@ local scaled_double_t dot_double(int n, scaled_double_t *restrict a,
   return(DOUBLE2SCALED(s));
 }
 
-void vcopy_ab(int n, scaled_double_t *restrict a,
+void vcopy_a2b(int n, scaled_double_t *restrict a,
   scaled_double_t *restrict b)
 {
 #ifdef USE_AVX2_INTRINSICS
@@ -884,8 +1021,8 @@ void vcopy_ab(int n, scaled_double_t *restrict a,
 #endif
 }
 
-void vadd_cab(int n, scaled_double_t *restrict c,
-  scaled_double_t *restrict a, scaled_double_t *restrict b)
+local void vadd_ab2c(int n, scaled_double_t *restrict a,
+  scaled_double_t *restrict b, scaled_double_t *restrict c)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -928,7 +1065,51 @@ void vadd_cab(int n, scaled_double_t *restrict c,
   END_BLOCK
 }
 
-void vadd_aba(int n, scaled_double_t *restrict a,
+void vmul_ab2c(int n, scaled_double_t *restrict a,
+  scaled_double_t *restrict b, scaled_double_t *restrict c)
+{
+  BEGIN_BLOCK(__FUNC__)
+
+#ifdef USE_AVX2_INTRINSICS
+  if (n < 8)
+#endif
+  {
+    for (int i = 0; i < n; i++) c[i] = a[i] * b[i];
+  }
+
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+    SOFTBUG((n % 8) != 0)
+
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
+    {
+      __m256 va = _mm256_load_ps(a);
+      __m256 vb = _mm256_load_ps(b);
+  
+      __m256 vc = _mm256_mul_ps(va, vb);
+
+      _mm256_store_ps(c, vc);
+    }
+#else
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
+    {
+      __m256i va = _mm256_load_si256((__m256i *)a);
+      __m256i vb = _mm256_load_si256((__m256i *)b);
+
+      __m256i vc = _mm256_mullo_epi32(va, vb);
+
+      _mm256_store_si256((__m256i *)c, vc);
+    }
+#endif
+  }
+#endif
+
+  END_BLOCK
+}
+
+void vadd_ab2a(int n, scaled_double_t *restrict a,
   scaled_double_t *restrict b)
 {
   BEGIN_BLOCK(__FUNC__)
@@ -962,6 +1143,50 @@ void vadd_aba(int n, scaled_double_t *restrict a,
       const __m256i vb = _mm256_load_si256((__m256i *)b);
 
       const __m256i vs = _mm256_add_epi32(va, vb);
+
+      _mm256_store_si256((__m256i *)a, vs);
+    }
+#endif
+  }
+#endif
+
+  END_BLOCK
+}
+
+void vmul_ab2a(int n, scaled_double_t *restrict a,
+  scaled_double_t *restrict b)
+{
+  BEGIN_BLOCK(__FUNC__)
+
+#ifdef USE_AVX2_INTRINSICS
+  if (n < 8)
+#endif
+  {
+    for (int i = 0; i < n; i++) a[i] *= b[i];
+  }
+
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+    SOFTBUG((n % 8) != 0)
+
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    for (const scaled_double_t *z = a + n ; a < z; a += 8, b += 8)
+    {
+      const __m256 va = _mm256_load_ps(a);
+      const __m256 vb = _mm256_load_ps(b);
+  
+      const __m256 vs = _mm256_mul_ps(va, vb);
+  
+      _mm256_store_ps(a, vs);
+    }
+#else
+    for (const i32_t *z = a + n ; a < z; a += 8, b += 8)
+    {
+      const __m256i va = _mm256_load_si256((__m256i *)a);
+      const __m256i vb = _mm256_load_si256((__m256i *)b);
+
+      const __m256i vs = _mm256_mullo_epi32(va, vb);
 
       _mm256_store_si256((__m256i *)a, vs);
     }
@@ -1237,39 +1462,181 @@ local void activation_rsqrt_double(int n,
                          sqrt(1.0 + SCALED2DOUBLE(a[i]) * SCALED2DOUBLE(a[i]));
 }
 
-local void activation_scaled(int n,
+local void activation_gelu_scaled(int n,
   scaled_double_t *restrict a, scaled_double_t *restrict b)
 {
-  if (network_shared.NS_activation == NETWORK_ACTIVATION_RELU6)
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+#ifdef USE_ERF
+  const float c = 0.707107f;
+#else
+  const float k = 0.797884f;
+  const float c = 0.044715f;
+#endif
+
+  for (int i = 0; i < n; i++)
+  {
+    float af = a[i];
+
+#ifdef USE_ERF
+    b[i] = 0.5f * af * (1.0f + erff(c * af));
+#else
+    float af2 = af * af;
+      
+    b[i] = 0.5f * af * (1.0f + tanhf(k * (af + c * af * af2)));
+#endif
+  }
+#else
+#error not implemented
+#endif
+}
+
+local void activation_gelu_double(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+#ifdef USE_ERF
+  const float c = 0.707107f;
+#else
+  const double k = 0.797884;
+  const double c = 0.044715;
+#endif
+
+  for (int i = 0; i < n; i++)
+  {
+    double ad = a[i];
+#ifdef USE_ERF
+    b[i] = 0.5f * ad * (1.0f + erf(c * ad));
+#else
+    double ad2 = ad * ad;
+      
+    b[i] = DOUBLE2SCALED(0.5 * ad * (1.0 + tanhf(k * (ad + c * ad * ad2))));
+#endif
+  }
+}
+
+local void activation_geluv2_scaled(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+#ifdef USE_AVX2_INTRINSICS
+  if ((n < 8) or TRUE)
+#endif
+  {
+    const float p = 0.544790f;
+
+    for (int i = 0; i < n; i++)
+    {
+      float af = a[i];
+      float af2 = af * af;
+          
+      b[i] = 0.5f * af * (1.0f + af / sqrtf(p + af2));
+    }
+  }
+#ifdef USE_AVX2_INTRINSICS
+  else
+  {
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+    const __m256 p = _mm256_set1_ps(0.544790f);
+    const __m256 half = _mm256_set1_ps(0.5f);
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 three_halfs = _mm256_set1_ps(1.5f);
+
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256 va = _mm256_load_ps(a);
+
+      __m256 va2p = _mm256_add_ps(p, _mm256_mul_ps(va, va));
+
+      __m256 rsqrt = _mm256_rsqrt_ps(va2p);
+
+      //needed for Newton-Raphson
+
+      __m256 rsqrt2 = _mm256_mul_ps(rsqrt, rsqrt);
+
+      rsqrt = _mm256_mul_ps(rsqrt,
+                _mm256_sub_ps(three_halfs,
+                  _mm256_mul_ps(half, _mm256_mul_ps(va2p, rsqrt2))));
+
+      __m256 vp = _mm256_add_ps(one, _mm256_mul_ps(va, rsqrt));
+      
+      _mm256_store_ps(b, _mm256_mul_ps(_mm256_mul_ps(half, va), vp));
+    }
+#else
+#error not implemented
+#endif
+  }
+#endif
+}
+
+local void activation_geluv2_double(int n,
+  scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+  const double p = 0.544790;
+
+  for (int i = 0; i < n; i++)
+  {
+    double ad = a[i];
+    double ad2 = ad * ad;
+      
+    b[i] = DOUBLE2SCALED(0.5 * ad * (1.0 + ad / sqrt(p + ad2)));
+  }
+}
+
+local void activation_scaled(int arg_activation, 
+  int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
+{
+  if (arg_activation == NETWORK_ACTIVATION_RELU6)
   {
     activation_clipped_relu_scaled(n, a, b);
   }
-  else if (network_shared.NS_activation == NETWORK_ACTIVATION_TANH)
+  else if (arg_activation == NETWORK_ACTIVATION_TANH)
   {
     activation_tanh_scaled(n, a, b);
   }
-  else if (network_shared.NS_activation == NETWORK_ACTIVATION_RSQRT)
+  else if (arg_activation == NETWORK_ACTIVATION_RSQRT)
   {
     activation_rsqrt_scaled(n, a, b);
+  }
+  else if (arg_activation == NETWORK_ACTIVATION_GELU)
+  {
+    activation_gelu_scaled(n, a, b);
+  }
+  else if (arg_activation == NETWORK_ACTIVATION_GELUV2)
+  {
+    activation_geluv2_scaled(n, a, b);
+  }
+  else if (arg_activation == NETWORK_ACTIVATION_LINEAR)
+  {
+    vcopy_a2b(n, a, b);
   }
   else
     FATAL("unknown activation option", EXIT_FAILURE)
 }
 
-local void activation_double(int n,
-  scaled_double_t *restrict a, scaled_double_t *restrict b)
+local void activation_double(int arg_activation,
+  int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
 {
-  if (network_shared.NS_activation == NETWORK_ACTIVATION_RELU6)
+  if (arg_activation == NETWORK_ACTIVATION_RELU6)
   {
     activation_clipped_relu_double(n, a, b);
   }
-  else if (network_shared.NS_activation == NETWORK_ACTIVATION_TANH)
+  else if (arg_activation == NETWORK_ACTIVATION_TANH)
   {
     activation_tanh_double(n, a, b);
   }
-  else if (network_shared.NS_activation == NETWORK_ACTIVATION_RSQRT)
+  else if (arg_activation == NETWORK_ACTIVATION_RSQRT)
   {
     activation_rsqrt_double(n, a, b);
+  }
+  else if (arg_activation == NETWORK_ACTIVATION_GELU)
+  {
+    activation_gelu_double(n, a, b);
+  }
+  else if (arg_activation == NETWORK_ACTIVATION_GELUV2)
+  {
+    activation_geluv2_double(n, a, b);
+  }
+  else if (arg_activation == NETWORK_ACTIVATION_LINEAR)
+  {
+    vcopy_a2b(n, a, b);
   }
   else
     FATAL("unknown activation option", EXIT_FAILURE)
@@ -1304,11 +1671,14 @@ double return_network_score_scaled(network_thread_t *arg_network)
   layer_thread_t *with_current_thread = arg_network->NT_layers;
 
   if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
-      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2))
+      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2) or
+      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
+      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT))
   {
     ALIGN64(scaled_double_t activated_inputs[NINPUTS_MAX]);
 
-    activation_scaled(network_shared.NS_ninputs,
+    activation_scaled(network_shared.NS_activation_inputs,
+                      network_shared.NS_ninputs,
                       arg_network->NT_inputs, activated_inputs);
 
     for (int i = 0; i < with_current->LS_noutputs; i++)
@@ -1324,12 +1694,14 @@ double return_network_score_scaled(network_thread_t *arg_network)
 
   BEGIN_BLOCK("Ax+b-and-activation-first-layer")
 
-  vadd_cab(with_current->LS_noutputs, with_current_thread->LT_sum,
-           with_current_thread->LT_dot, with_current->LS_bias);
+  vadd_ab2c(with_current->LS_noutputs,
+            with_current_thread->LT_dot, with_current->LS_bias,
+            with_current_thread->LT_sum);
   
   BEGIN_BLOCK("Ax+b-and-activation-first-layer-activation")
 
-  activation_scaled(with_current->LS_noutputs,
+  activation_scaled(network_shared.NS_activation,
+    with_current->LS_noutputs,
     with_current_thread->LT_sum, with_current_thread->LT_outputs);
 
   END_BLOCK
@@ -1353,14 +1725,16 @@ double return_network_score_scaled(network_thread_t *arg_network)
                    with_current->LS_weights_noutputsxninputs[i]);
     }
 
-    vadd_cab(with_current->LS_noutputs, with_current_thread->LT_sum,
-             with_current_thread->LT_dot, with_current->LS_bias);
+    vadd_ab2c(with_current->LS_noutputs,
+              with_current_thread->LT_dot, with_current->LS_bias,
+              with_current_thread->LT_sum);
 
     if (ilayer < (network_shared.NS_nlayers - 1))
     {
       BEGIN_BLOCK("Ax+b-and-activation-other-layers-activation")
 
-      activation_scaled(with_current->LS_noutputs,
+      activation_scaled(network_shared.NS_activation,
+        with_current->LS_noutputs,
         with_current_thread->LT_sum, with_current_thread->LT_outputs);
 
       END_BLOCK
@@ -1406,11 +1780,14 @@ double return_network_score_double(network_thread_t *arg_network)
   layer_thread_t *with_current_thread = arg_network->NT_layers;
 
   if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
-      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2))
+      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2) or
+      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
+      (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT))
   {
     scaled_double_t activated_inputs[NINPUTS_MAX];
 
-    activation_double(network_shared.NS_ninputs,
+    activation_double(network_shared.NS_activation_inputs,
+                      network_shared.NS_ninputs,
                       arg_network->NT_inputs, activated_inputs);
 
     for (int i = 0; i < with_current->LS_noutputs; i++)
@@ -1434,7 +1811,8 @@ double return_network_score_double(network_thread_t *arg_network)
     }
   }
 
-  activation_double(with_current->LS_noutputs,
+  activation_double(network_shared.NS_activation,
+    with_current->LS_noutputs,
     with_current_thread->LT_sum, with_current_thread->LT_outputs);
 
   for (int ilayer = 1; ilayer < network_shared.NS_nlayers; ilayer++)
@@ -1456,7 +1834,8 @@ double return_network_score_double(network_thread_t *arg_network)
 
     if (ilayer < (network_shared.NS_nlayers - 1))
     {
-      activation_double(with_current->LS_noutputs,
+      activation_double(network_shared.NS_activation,
+        with_current->LS_noutputs,
         with_current_thread->LT_sum, with_current_thread->LT_outputs);
     }
     else
@@ -1483,99 +1862,6 @@ double return_network_score_double(network_thread_t *arg_network)
     arg_network->NT_layers + network_shared.NS_nlayers - 1;
 
   return(SCALED2DOUBLE(with_thread->LT_outputs[0]));
-}
-
-//assumes board2pattern has been called
-
-void board2network(board_t *object)
-{
-  check_board_patterns_thread(object, (char *) __FUNC__, TRUE);
-
-  network_thread_t *network_thread = &(object->B_network_thread);
-
-  patterns_thread_t *with_patterns_thread = &(network_thread->NT_patterns);
-
-  for (int input = 0; input < network_shared.NS_ninputs; input++)
-    network_thread->NT_inputs[input] = 0;
-
-  layer_shared_t *with_current = network_shared.NS_layers;
-  layer_thread_t *with_current_thread = network_thread->NT_layers;
-
-  for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
-    with_current_thread->LT_dot[ioutput] = 0;
-
-  for (int ipattern = 0; ipattern < patterns_shared.PS_npatterns; ipattern++)
-  {
-    pattern_shared_t *with_pattern_shared =
-      patterns_shared.PS_patterns + ipattern;
-
-    pattern_thread_t *with_pattern_thread =
-      with_patterns_thread->PT_patterns + ipattern;
-
-    int istate = base3_index(with_pattern_thread->PT_embed,
-                             with_pattern_shared->PS_nlinear);
-
-    if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
-        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2))
-    {
-      vadd_aba(with_pattern_shared->PS_nembed,
-               network_thread->NT_inputs + with_pattern_shared->PS_offset,
-               with_pattern_shared->PS_weights_nstatesxnembed[istate]);
-    }
-    else if (network_shared.NS_embedding == NETWORK_EMBEDDING_CONCAT) 
-    {
-      vcopy_ab(with_pattern_shared->PS_nembed,
-               with_pattern_shared->PS_weights_nstatesxnembed[istate],
-               network_thread->NT_inputs + with_pattern_shared->PS_offset);
-
-      vadd_aba(with_current->LS_noutputs, with_current_thread->LT_dot,
-               with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
-    }
-    else  
-      FATAL("unknown embedding", EXIT_FAILURE)
-
-  }
-
-  int nwhite_man = BIT_COUNT(object->B_white_man_bb);
-  int nblack_man = BIT_COUNT(object->B_black_man_bb);
-  int nwhite_king = BIT_COUNT(object->B_white_king_bb);
-  int nblack_king = BIT_COUNT(object->B_black_king_bb);
-
-  for (int imaterial = 0; imaterial < 4; imaterial++)
-  {
-    int istate;
-
-    if (imaterial == 0)
-      istate = nwhite_man;
-    else if (imaterial == 1)
-      istate = nblack_man;
-    else if (imaterial == 2)
-      istate = nwhite_king;
-    else
-      istate = nblack_king;
-
-    material_shared_t *with_material_shared =
-      &(network_shared.NS_material[imaterial]);
-
-    if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
-        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2))
-    {
-      vadd_aba(with_material_shared->MS_nembed,
-               network_thread->NT_inputs + with_material_shared->MS_offset,
-               with_material_shared->MS_weights_nstatesxnembed[istate]);
-    }
-    else if (network_shared.NS_embedding == NETWORK_EMBEDDING_CONCAT)
-    {
-      vcopy_ab(with_material_shared->MS_nembed,
-               with_material_shared->MS_weights_nstatesxnembed[istate],
-               network_thread->NT_inputs + with_material_shared->MS_offset);
-
-      vadd_aba(with_current->LS_noutputs, with_current_thread->LT_dot,
-               with_material_shared->MS_sum[istate]);
-    }
-    else
-      FATAL("unknown embedding", EXIT_FAILURE)
-  }
 }
 
 local void heap_sort_double(i64_t n, i64_t *p, double *a)
@@ -1738,7 +2024,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     double result;
 
-    HARDBUG(sscanf(bdata(bline), "%s {%lf", cfen, &result) != 2)
+    HARDBUG(my_sscanf(bdata(bline), "%s {%lf", cfen, &result) != 2)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
@@ -1759,7 +2045,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     construct_moves_list(&moves_list);
 
-    gen_moves(with, &moves_list, FALSE);
+    gen_moves(with, &moves_list);
 
     if ((moves_list.ML_nmoves <= 1) or (moves_list.ML_ncaptx > 0))
     {
@@ -1772,8 +2058,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     int mat_score = return_material_score(with);
 
-    score_scaled[ifen] =
-      return_network_score_scaled(&(with->B_network_thread));
+    return_score_from_board(with, score_scaled + ifen);
 
     score_double[ifen] =
       return_network_score_double(&(with->B_network_thread));
@@ -2012,7 +2297,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     double result;
 
-    HARDBUG(sscanf(bdata(bline), "%s {%lf", cfen, &result) != 2)
+    HARDBUG(my_sscanf(bdata(bline), "%s {%lf", cfen, &result) != 2)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
@@ -2024,7 +2309,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     construct_moves_list(&moves_list);
 
-    gen_moves(with, &moves_list, FALSE);
+    gen_moves(with, &moves_list);
 
     if ((moves_list.ML_nmoves <= 1) or (moves_list.ML_ncaptx > 0))
     {
@@ -2098,8 +2383,6 @@ void fen2network(char *arg_name, i64_t arg_npositions)
    nfactor, factor, factor2man_score);
 }
 
-#define TAG "w2m-embed-patterns-wmbmwkbk"
-
 local void append_fen(board_t *self, 
   bstring arg_bfen, double arg_result,
   fbuffer_t *arg_fcsv, fbuffer_t *arg_ffen)
@@ -2110,9 +2393,11 @@ local void append_fen(board_t *self,
   patterns_thread_t *with_patterns_thread =
      &(self->B_network_thread.NT_patterns);
 
-  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns; ipattern++)
+  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
+       ipattern++)
   {
-    pattern_shared_t *with_pattern_shared = with_patterns_shared->PS_patterns + ipattern;
+    pattern_shared_t *with_pattern_shared =
+      with_patterns_shared->PS_patterns + ipattern;
 
     pattern_thread_t *with_pattern_thread =
       with_patterns_thread->PT_patterns + ipattern;
@@ -2133,6 +2418,16 @@ local void append_fen(board_t *self,
   int nblack_man = BIT_COUNT(object->B_black_man_bb);
   int nwhite_king = BIT_COUNT(object->B_white_king_bb);
   int nblack_king = BIT_COUNT(object->B_black_king_bb);
+
+  int delta_man = nwhite_man - nblack_man;
+  if (delta_man < -DELTA_MAN_MAX) delta_man = -DELTA_MAN_MAX;
+  if (delta_man > DELTA_MAN_MAX) delta_man = DELTA_MAN_MAX;
+  delta_man += DELTA_MAN_MAX;
+
+  int delta_king = nwhite_king - nblack_king;
+  if (delta_king < -DELTA_KING_MAX) delta_king = -DELTA_KING_MAX;
+  if (delta_king > DELTA_KING_MAX) delta_king = DELTA_KING_MAX;
+  delta_king += DELTA_KING_MAX;
 
   int input = nwhite_man;
 
@@ -2157,6 +2452,43 @@ local void append_fen(board_t *self,
   ibin = input;
 
   append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+
+#ifdef APPEND_MATERIAL_COMBINED
+  int mwhite_king = nwhite_king;
+  int mblack_king = nblack_king;
+
+  if (mwhite_king > COMBINED_KING_MAX) mwhite_king = COMBINED_KING_MAX;
+  if (mblack_king > COMBINED_KING_MAX) mblack_king = COMBINED_KING_MAX;
+
+  input =
+    (nwhite_man * (COMBINED_KING_MAX + 1) + mwhite_king) * 
+    21 * (COMBINED_KING_MAX + 1) +
+    nblack_man * (COMBINED_KING_MAX + 1) + mblack_king;
+
+  ibin = input;
+
+  append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+#endif
+
+#ifdef APPEND_MATERIAL_DELTA
+  input = delta_man;
+
+  ibin = input;
+
+  append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+
+  input = delta_king;
+
+  ibin = input;
+
+  append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+
+  input = delta_man  * (2 * DELTA_KING_MAX + 1) + delta_king;
+
+  ibin = input;
+
+  append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+#endif
 
 //PRINTF("material=%d\n", input);
 
@@ -2329,7 +2661,7 @@ void fen2csv(char *arg_name, int arg_nman_min, int arg_nman_max,
 
     //ARES convention
 
-    HARDBUG(sscanf(bdata(bline), "%s {%lf}", cfen, &result) != 2)
+    HARDBUG(my_sscanf(bdata(bline), "%s {%lf}", cfen, &result) != 2)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
@@ -2369,7 +2701,7 @@ void fen2csv(char *arg_name, int arg_nman_min, int arg_nman_max,
 
     moves_list_t moves_list;
 
-    gen_moves(with, &moves_list, FALSE);
+    gen_moves(with, &moves_list);
 
     if ((moves_list.ML_nmoves <= 1) or
         (moves_list.ML_ncaptx > 0))
@@ -2400,7 +2732,7 @@ void fen2csv(char *arg_name, int arg_nman_min, int arg_nman_max,
     {
       int delta_nman = nwhite_man - nblack_man;
       int delta_nkings = nwhite_kings - nblack_kings;
-      int nman = nwhite_man + nblack_man;
+      nman = nwhite_man + nblack_man;
 
       double result_wtm = result;
 
