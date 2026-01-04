@@ -1,30 +1,31 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef NetworksH
 #define NetworksH
 
-//network.c
+// network.c
 
-#define NETWORK_EMBEDDING_SUM               1
-#define NETWORK_EMBEDDING_SUM2              2
-#define NETWORK_EMBEDDING_SUM2PRODUCT       4
+#define NETWORK_EMBEDDING_SUM 1
+#define NETWORK_EMBEDDING_SUM2 2
+#define NETWORK_EMBEDDING_SUM2PRODUCT 4
 #define NETWORK_EMBEDDING_SUM2PRODUCTCONCAT 5
-#define NETWORK_EMBEDDING_CONCAT            6
+#define NETWORK_EMBEDDING_CONCAT 6
 
-#define NETWORK_ACTIVATION_RELU6            7
-#define NETWORK_ACTIVATION_TANH             8
-#define NETWORK_ACTIVATION_RSQRT            9
-#define NETWORK_ACTIVATION_GELU             10
-#define NETWORK_ACTIVATION_GELUV2           11
-#define NETWORK_ACTIVATION_LINEAR           12
-#define NETWORK_ACTIVATION_SIGMOID          13
+#define NETWORK_ACTIVATION_RELU6 7
+#define NETWORK_ACTIVATION_TANH 8
+#define NETWORK_ACTIVATION_RSQRT 9
+#define NETWORK_ACTIVATION_GELU 10
+#define NETWORK_ACTIVATION_GELUV2 11
+#define NETWORK_ACTIVATION_LINEAR 12
+#define NETWORK_ACTIVATION_SIGMOID 13
 
-#define NINPUTS_MAX   2048
+#define NINPUTS_MAX 2048
 #define NMATERIAL_MAX 8
-#define NLAYERS_MAX   8
+#define NLAYERS_MAX 8
 
 #define COMBINED_KING_MAX 5
-#define DELTA_MAN_MAX     10
-#define DELTA_KING_MAX    5
+#define DELTA_MAN_MAX 10
+#define DELTA_KING_MAX 5
 
 typedef struct
 {
@@ -44,7 +45,7 @@ typedef struct
 } layer_thread_t;
 
 typedef struct
-{  
+{
   bstring NS_bshape;
 
   int NS_ninputs_patterns;
@@ -58,7 +59,7 @@ typedef struct
   int NS_activation_inputs;
   int NS_activation;
   int NS_activation_last;
-  int NS_nman_min;  
+  int NS_nman_min;
   int NS_nman_max;
 
   material_shared_t NS_material[NMATERIAL_MAX];
@@ -83,8 +84,10 @@ int base3_index(const int32_t *, int);
 void vcopy_a2b(int n, scaled_double_t *, scaled_double_t *);
 void vadd_ab2a(int, scaled_double_t *restrict, scaled_double_t *restrict);
 void vmul_ab2a(int, scaled_double_t *restrict, scaled_double_t *restrict);
-void vmul_ab2c(int, scaled_double_t *restrict, scaled_double_t *restrict,
-  scaled_double_t *restrict);
+void vmul_ab2c(int,
+               scaled_double_t *restrict,
+               scaled_double_t *restrict,
+               scaled_double_t *restrict);
 double return_network_score_scaled(network_thread_t *);
 double return_network_score_double(network_thread_t *);
 void fen2network(char *, i64_t);
@@ -92,4 +95,3 @@ void fen2csv(char *, int, int, int, int);
 void init_networks(void);
 
 #endif
-

@@ -1,8 +1,9 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 typedef struct
-{ 
+{
   ui64_t SCS_key;
   i32_t SCS_score;
   ui32_t SCS_crc32;
@@ -13,19 +14,19 @@ local score_cache_slot_t score_cache_slot_default;
 local score_cache_slot_t *score_cache[NCOLOUR_ENUM];
 
 local int probe_score_cache(search_t *object,
-  score_cache_slot_t *arg_score_cache,
-  score_cache_slot_t *arg_score_cache_slot)
+                            score_cache_slot_t *arg_score_cache,
+                            score_cache_slot_t *arg_score_cache_slot)
 {
   int result = FALSE;
 
-  *arg_score_cache_slot = 
-    arg_score_cache[object->S_board.B_key % nscore_cache_entries];
+  *arg_score_cache_slot =
+      arg_score_cache[object->S_board.B_key % nscore_cache_entries];
 
   ui32_t crc32 = 0xFFFFFFFF;
   crc32 = HW_CRC32_U64(crc32, arg_score_cache_slot->SCS_key);
   crc32 = HW_CRC32_U32(crc32, arg_score_cache_slot->SCS_score);
   crc32 = ~crc32;
-    
+
   if (crc32 != arg_score_cache_slot->SCS_crc32)
   {
     object->S_total_score_cache_crc32_errors++;
@@ -34,24 +35,23 @@ local int probe_score_cache(search_t *object,
   }
   else if (arg_score_cache_slot->SCS_key == object->S_board.B_key)
   {
-      result = TRUE;
+    result = TRUE;
   }
-   
-  return(result);
+
+  return (result);
 }
 
 local void update_score_cache(search_t *object,
-  score_cache_slot_t *arg_score_cache,
-  score_cache_slot_t *arg_score_cache_slot)
+                              score_cache_slot_t *arg_score_cache,
+                              score_cache_slot_t *arg_score_cache_slot)
 {
-  arg_score_cache[object->S_board.B_key % nscore_cache_entries] = 
-    *arg_score_cache_slot;
+  arg_score_cache[object->S_board.B_key % nscore_cache_entries] =
+      *arg_score_cache_slot;
 }
 
 #undef GEN_CSV
 
-int return_score_from_board(board_t *object,
-  double_t *arg_network_score_scaled)
+int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
 {
   int result = 0;
 
@@ -75,14 +75,14 @@ int return_score_from_board(board_t *object,
        ipattern++)
   {
     pattern_shared_t *with_pattern_shared =
-      with_patterns_shared->PS_patterns + ipattern;
+        with_patterns_shared->PS_patterns + ipattern;
 
     pattern_thread_t *with_pattern_thread =
-      with_patterns_thread->PT_patterns + ipattern;
-  
+        with_patterns_thread->PT_patterns + ipattern;
+
     int istate = base3_index(with_pattern_thread->PT_embed,
                              with_pattern_shared->PS_nlinear);
-  
+
     if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
         (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2) or
         (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
@@ -99,7 +99,8 @@ int return_score_from_board(board_t *object,
                   with_pattern_shared->PS_weights_nstatesxnembed[istate],
                   network_thread->NT_inputs + with_pattern_shared->PS_offset);
 
-      vadd_ab2a(with_current->LS_noutputs, with_current_thread->LT_dot,
+      vadd_ab2a(with_current->LS_noutputs,
+                with_current_thread->LT_dot,
                 with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
     }
     else
@@ -112,17 +113,20 @@ int return_score_from_board(board_t *object,
   int nblack_king = BIT_COUNT(object->B_black_king_bb);
 
   int delta_man = nwhite_man - nblack_man;
-  if (delta_man < -DELTA_MAN_MAX) delta_man = -DELTA_MAN_MAX;
-  if (delta_man > DELTA_MAN_MAX) delta_man = DELTA_MAN_MAX;
+  if (delta_man < -DELTA_MAN_MAX)
+    delta_man = -DELTA_MAN_MAX;
+  if (delta_man > DELTA_MAN_MAX)
+    delta_man = DELTA_MAN_MAX;
   delta_man += DELTA_MAN_MAX;
-  
+
   int delta_king = nwhite_king - nblack_king;
-  if (delta_king < -DELTA_KING_MAX) delta_king = -DELTA_KING_MAX;
-  if (delta_king > DELTA_KING_MAX) delta_king = DELTA_KING_MAX;
+  if (delta_king < -DELTA_KING_MAX)
+    delta_king = -DELTA_KING_MAX;
+  if (delta_king > DELTA_KING_MAX)
+    delta_king = DELTA_KING_MAX;
   delta_king += DELTA_KING_MAX;
-    
-  for (int imaterial = 0; imaterial < network_shared.NS_nmaterial;
-       imaterial++)
+
+  for (int imaterial = 0; imaterial < network_shared.NS_nmaterial; imaterial++)
   {
     int istate;
 
@@ -139,18 +143,19 @@ int return_score_from_board(board_t *object,
       if (network_shared.NS_nmaterial == 5)
       {
         HARDBUG(imaterial != 4)
-  
+
         int mwhite_king = nwhite_king;
         int mblack_king = nblack_king;
 
-        if (mwhite_king > COMBINED_KING_MAX) mwhite_king = COMBINED_KING_MAX;
-        if (mblack_king > COMBINED_KING_MAX) mblack_king = COMBINED_KING_MAX;
+        if (mwhite_king > COMBINED_KING_MAX)
+          mwhite_king = COMBINED_KING_MAX;
+        if (mblack_king > COMBINED_KING_MAX)
+          mblack_king = COMBINED_KING_MAX;
 
-        istate = 
-          (nwhite_man * (COMBINED_KING_MAX + 1) + mwhite_king) * 
-          21 * (COMBINED_KING_MAX + 1) +
-          nblack_man * (COMBINED_KING_MAX + 1) + mblack_king;
-      } 
+        istate = (nwhite_man * (COMBINED_KING_MAX + 1) + mwhite_king) * 21 *
+                     (COMBINED_KING_MAX + 1) +
+                 nblack_man * (COMBINED_KING_MAX + 1) + mblack_king;
+      }
       else if (network_shared.NS_nmaterial == 7)
       {
         if (imaterial == 4)
@@ -158,13 +163,13 @@ int return_score_from_board(board_t *object,
         else if (imaterial == 5)
           istate = delta_king;
         else
-          istate = delta_man  * (2 * DELTA_KING_MAX + 1) + delta_king;
+          istate = delta_man * (2 * DELTA_KING_MAX + 1) + delta_king;
       }
     }
 
     material_shared_t *with_material_shared =
-      &(network_shared.NS_material[imaterial]);
-  
+        &(network_shared.NS_material[imaterial]);
+
     if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
         (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2) or
         (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
@@ -181,13 +186,13 @@ int return_score_from_board(board_t *object,
                   with_material_shared->MS_weights_nstatesxnembed[istate],
                   network_thread->NT_inputs + with_material_shared->MS_offset);
 
-      vadd_ab2a(with_current->LS_noutputs, with_current_thread->LT_dot,
+      vadd_ab2a(with_current->LS_noutputs,
+                with_current_thread->LT_dot,
                 with_material_shared->MS_sum[istate]);
     }
     else
       FATAL("unknown embedding", EXIT_FAILURE)
   }
-
 
   if (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT)
   {
@@ -198,8 +203,7 @@ int return_score_from_board(board_t *object,
 
     vmul_ab2a(network_shared.NS_ninputs_patterns,
               network_thread->NT_inputs,
-              network_thread->NT_inputs +
-                network_shared.NS_ninputs_patterns);
+              network_thread->NT_inputs + network_shared.NS_ninputs_patterns);
   }
   else if (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT)
   {
@@ -208,60 +212,61 @@ int return_score_from_board(board_t *object,
 
     vmul_ab2c(network_shared.NS_ninputs_patterns,
               network_thread->NT_inputs,
-              network_thread->NT_inputs +
-                network_shared.NS_ninputs_patterns,
-              network_thread->NT_inputs +
-                network_shared.NS_ninputs_patterns +
-                network_shared.NS_ninputs_material);
+              network_thread->NT_inputs + network_shared.NS_ninputs_patterns,
+              network_thread->NT_inputs + network_shared.NS_ninputs_patterns +
+                  network_shared.NS_ninputs_material);
   }
 
   double network_score_scaled =
-    return_network_score_scaled(&(object->B_network_thread));
+      return_network_score_scaled(&(object->B_network_thread));
 
   if (arg_network_score_scaled != NULL)
     *arg_network_score_scaled = network_score_scaled;
 
 #ifdef DEBUG
-    static int n = 0;
+  static int n = 0;
 
-    double network_score_double =
+  double network_score_double =
       return_network_score_double(&(object->B_network_thread));
-  
-    n++;
 
-    if (n < 99)
-      PRINTF("network_score_scaled=%.6f network_score_double=%.6f\n",
-             network_score_scaled, network_score_double);
+  n++;
 
-    if (fabs(network_score_scaled - network_score_double) > 0.001)
-    {
-      my_printf(object->B_my_printf,
-        "WARNING network_score_scaled=%.6f network_score_double=%.6f\n",
-        network_score_scaled, network_score_double);
-    }
+  if (n < 99)
+    PRINTF("network_score_scaled=%.6f network_score_double=%.6f\n",
+           network_score_scaled,
+           network_score_double);
+
+  if (fabs(network_score_scaled - network_score_double) > 0.001)
+  {
+    my_printf(object->B_my_printf,
+              "WARNING network_score_scaled=%.6f network_score_double=%.6f\n",
+              network_score_scaled,
+              network_score_double);
+  }
 #endif
 
   result =
-    round(network_score_scaled * network_shared.NS_network2material_score);
- 
-  if (IS_BLACK(object->B_colour2move)) result = -result;
+      round(network_score_scaled * network_shared.NS_network2material_score);
+
+  if (IS_BLACK(object->B_colour2move))
+    result = -result;
 
 #ifdef GEN_CSV
   if ((BIT_COUNT(object->B_black_king_bb) == 0) and
       (BIT_COUNT(object->B_white_king_bb) == 0))
-  { 
+  {
     static int ncsv = 0;
 
     PRINTF("CSV %d,%d\n", material_score, result);
     ncsv++;
-    HARDBUG(ncsv > 1000000) 
+    HARDBUG(ncsv > 1000000)
   }
 #endif
 
   SOFTBUG(result < (SCORE_LOST + NODE_MAX))
   SOFTBUG(result > (SCORE_WON - NODE_MAX))
 
-  return(result);
+  return (result);
 }
 
 int return_score(search_t *object)
@@ -281,11 +286,11 @@ int return_score(search_t *object)
   {
     if (probe_score_cache(object, score_cache[my_colour], &score_cache_slot))
     {
-       ++(object->S_total_score_cache_hits);
-       
-       result = score_cache_slot.SCS_score;
+      ++(object->S_total_score_cache_hits);
 
-       return(result);
+      result = score_cache_slot.SCS_score;
+
+      return (result);
     }
   }
 
@@ -309,7 +314,7 @@ int return_score(search_t *object)
     {
       score_cache_slot.SCS_key = object->S_board.B_key;
       score_cache_slot.SCS_score = result;
-  
+
       ui32_t crc32 = 0xFFFFFFFF;
       crc32 = HW_CRC32_U64(crc32, score_cache_slot.SCS_key);
       crc32 = HW_CRC32_U32(crc32, score_cache_slot.SCS_score);
@@ -322,17 +327,16 @@ int return_score(search_t *object)
   SOFTBUG(result < (SCORE_LOST + NODE_MAX))
   SOFTBUG(result > (SCORE_WON - NODE_MAX))
 
-  return(result);
+  return (result);
 }
 
 int return_npieces(board_t *self)
 {
   board_t *object = self;
 
-  return(BIT_COUNT(object->B_white_man_bb) +
-         BIT_COUNT(object->B_white_king_bb) +
-         BIT_COUNT(object->B_black_man_bb) +
-         BIT_COUNT(object->B_black_king_bb));
+  return (
+      BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
+      BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb));
 }
 
 int return_material_score(board_t *self)
@@ -347,9 +351,9 @@ int return_material_score(board_t *self)
   int material_score = (nwhite_man - nblack_man) * SCORE_MAN +
                        (nwhite_king - nblack_king) * SCORE_KING;
   if (IS_WHITE(object->B_colour2move))
-    return(material_score);
+    return (material_score);
   else
-    return(-material_score);
+    return (-material_score);
 }
 
 local void clear_score_caches(void)
@@ -368,7 +372,7 @@ local void clear_score_caches(void)
 void init_score(void)
 {
   PRINTF("sizeof(score_cache_slot_t)=%lld\n",
-         (i64_t) sizeof(score_cache_slot_t));
+         (i64_t)sizeof(score_cache_slot_t));
 
   score_cache[WHITE_ENUM] = NULL;
   score_cache[BLACK_ENUM] = NULL;
@@ -379,25 +383,27 @@ void init_score(void)
   {
     i64_t score_cache_size = options.score_cache_size * MBYTE / 2;
 
-    nscore_cache_entries = 
-      first_prime_below(roundf(score_cache_size / sizeof(score_cache_slot_t)));
-  
+    nscore_cache_entries = first_prime_below(
+        roundf(score_cache_size / sizeof(score_cache_slot_t)));
+
     HARDBUG(nscore_cache_entries < 3)
-  
+
     PRINTF("nscore_cache_entries=%lld\n", nscore_cache_entries);
-  
+
     score_cache_slot_default.SCS_key = 0;
     score_cache_slot_default.SCS_score = SCORE_MINUS_INFINITY;
-  
+
     ui32_t crc32 = 0xFFFFFFFF;
     crc32 = HW_CRC32_U64(crc32, score_cache_slot_default.SCS_key);
     crc32 = HW_CRC32_U32(crc32, score_cache_slot_default.SCS_score);
     score_cache_slot_default.SCS_crc32 = ~crc32;
-  
-    MY_MALLOC_BY_TYPE(score_cache[WHITE_ENUM], score_cache_slot_t,
+
+    MY_MALLOC_BY_TYPE(score_cache[WHITE_ENUM],
+                      score_cache_slot_t,
                       nscore_cache_entries)
-  
-    MY_MALLOC_BY_TYPE(score_cache[BLACK_ENUM], score_cache_slot_t,
+
+    MY_MALLOC_BY_TYPE(score_cache[BLACK_ENUM],
+                      score_cache_slot_t,
                       nscore_cache_entries)
 
     clear_score_caches();

@@ -1,10 +1,11 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef CachesH
 #define CachesH
 
-#define CACHE_ENTRY_KEY_TYPE_UI32_T  1
-#define CACHE_ENTRY_KEY_TYPE_I64_T   2
-#define CACHE_ENTRY_KEY_TYPE_UI64_T  3
+#define CACHE_ENTRY_KEY_TYPE_UI32_T 1
+#define CACHE_ENTRY_KEY_TYPE_I64_T 2
+#define CACHE_ENTRY_KEY_TYPE_UI64_T 3
 
 typedef struct
 {
@@ -23,7 +24,7 @@ typedef struct
   void *C_entry_key_default;
 
   void *C_entry_values;
- 
+
   i64_t C_nentries;
 
   i64_t C_nhits;
@@ -45,4 +46,3 @@ void construct_cache(void *, char *, i64_t, int, void *, size_t, void *);
 void test_caches(void);
 
 #endif
-

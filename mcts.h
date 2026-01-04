@@ -1,13 +1,14 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef MctsH
 #define MctsH
 
-#define MCTS_SCORE_WON  (1.0)
+#define MCTS_SCORE_WON (1.0)
 #define MCTS_SCORE_DRAW (0.0)
 #define MCTS_SCORE_LOST (-1.0)
 
 #define MCTS_THRESHOLD_LOST (-2 * SCORE_MAN)
-#define MCTS_THRESHOLD_WON  (2 * SCORE_MAN)
+#define MCTS_THRESHOLD_WON (2 * SCORE_MAN)
 
 #define MCTS_PLY_MAX 150
 
@@ -21,10 +22,9 @@ extern mcts_globals_t mcts_globals;
 
 int mcts_search(search_t *, int, int, int, moves_list_t *, int *, int);
 
-double mcts_shoot_outs(search_t *, int, int *, int, double,
-  int *, int *, int *);
+double
+mcts_shoot_outs(search_t *, int, int *, int, double, int *, int *, int *);
 
 void init_mcts(void);
 
 #endif
-

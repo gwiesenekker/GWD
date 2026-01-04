@@ -1,9 +1,10 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef UtilsH
 #define UtilsH
 
 #define NANO_SECONDS 1000000000
-#define DECI_SECOND  0.1
+#define DECI_SECOND 0.1
 #define CENTI_SECOND 0.01
 #define MILLI_SECOND 0.001
 #define MICRO_SECOND 0.000001
@@ -26,4 +27,3 @@ void init_utils(void);
 void test_utils(void);
 
 #endif
-

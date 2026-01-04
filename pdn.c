@@ -1,59 +1,63 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
-#define NAG            '$'
+#define NAG '$'
 
-#define RESULT_WON     "1-0"
-#define RESULT_DRAW    "1/2-1/2"
-#define RESULT_LOST    "0-1"
+#define RESULT_WON "1-0"
+#define RESULT_DRAW "1/2-1/2"
+#define RESULT_LOST "0-1"
 #define RESULT_UNKNOWN "*"
 
-#define TOKEN_SKIP    0
-#define TOKEN_MOVE    1
-#define TOKEN_WON     2
-#define TOKEN_DRAW    3
-#define TOKEN_LOST    4
+#define TOKEN_SKIP 0
+#define TOKEN_MOVE 1
+#define TOKEN_WON 2
+#define TOKEN_DRAW 3
+#define TOKEN_LOST 4
 #define TOKEN_UNKNOWN 5
 
-#define NPLY_PAUSE    10
+#define NPLY_PAUSE 10
 
-local int get_next_token(bstring arg_bstring, int *arg_ichar,
-  bstring arg_btoken)
+local int
+get_next_token(bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
 {
   int result = INVALID;
 
   HARDBUG(bassigncstr(arg_btoken, "NULL") == BSTR_ERR)
 
-  while((*arg_ichar < blength(arg_bstring)) and
-        (bchar(arg_bstring, *arg_ichar) == ' ')) (*arg_ichar)++;
+  while ((*arg_ichar < blength(arg_bstring)) and
+         (bchar(arg_bstring, *arg_ichar) == ' '))
+    (*arg_ichar)++;
 
-  if (*arg_ichar >= blength(arg_bstring)) return(result);
+  if (*arg_ichar >= blength(arg_bstring))
+    return (result);
 
   int jchar = *arg_ichar;
 
-  if (strncmp(bdata(arg_bstring) + jchar, RESULT_WON,
-              strlen(RESULT_WON)) == 0)
+  if (strncmp(bdata(arg_bstring) + jchar, RESULT_WON, strlen(RESULT_WON)) == 0)
   {
     jchar += strlen("1-0");
 
     result = TOKEN_WON;
-
   }
-  else if (strncmp(bdata(arg_bstring) + jchar, RESULT_DRAW,
+  else if (strncmp(bdata(arg_bstring) + jchar,
+                   RESULT_DRAW,
                    strlen(RESULT_DRAW)) == 0)
   {
     jchar += strlen("1/2-1/2");
 
     result = TOKEN_DRAW;
   }
-  else if (strncmp(bdata(arg_bstring) + jchar, RESULT_LOST,
+  else if (strncmp(bdata(arg_bstring) + jchar,
+                   RESULT_LOST,
                    strlen(RESULT_LOST)) == 0)
   {
     jchar += strlen("0-1");
 
     result = TOKEN_LOST;
   }
-  else if (strncmp(bdata(arg_bstring) + jchar, RESULT_UNKNOWN,
+  else if (strncmp(bdata(arg_bstring) + jchar,
+                   RESULT_UNKNOWN,
                    strlen(RESULT_UNKNOWN)) == 0)
   {
     jchar += strlen("*");
@@ -64,28 +68,33 @@ local int get_next_token(bstring arg_bstring, int *arg_ichar,
            (bchar(arg_bstring, jchar) == '[') or
            (bchar(arg_bstring, jchar) == '(') or
            (bchar(arg_bstring, jchar) == '{'))
-  {  
+  {
     char bopen = bchar(arg_bstring, jchar);
 
     char bclose = '"';
 
-    if (bopen == '[') bclose = ']';
+    if (bopen == '[')
+      bclose = ']';
 
-    if (bopen == '(') bclose = ')';
+    if (bopen == '(')
+      bclose = ')';
 
-    if (bopen == '{') bclose = '}';
-    
+    if (bopen == '{')
+      bclose = '}';
+
     jchar++;
 
     int nest = 1;
 
-    while(jchar < blength(arg_bstring)) 
+    while (jchar < blength(arg_bstring))
     {
-      if (bchar(arg_bstring, jchar) == bopen) ++nest;
+      if (bchar(arg_bstring, jchar) == bopen)
+        ++nest;
 
       if (bchar(arg_bstring, jchar) == bclose)
       {
-        if (--nest == 0) break;
+        if (--nest == 0)
+          break;
       }
 
       jchar++;
@@ -101,42 +110,46 @@ local int get_next_token(bstring arg_bstring, int *arg_ichar,
     jchar++;
 
     while ((jchar < blength(arg_bstring)) and
-           isdigit(bchar(arg_bstring, jchar))) jchar++;
+           isdigit(bchar(arg_bstring, jchar)))
+      jchar++;
 
     result = TOKEN_SKIP;
   }
   else
   {
-    //move number or move
+    // move number or move
 
-    //read until space or '.'
-  
+    // read until space or '.'
+
     while (jchar < blength(arg_bstring))
     {
-      if (bchar(arg_bstring, jchar) == ' ') break;
-      if (bchar(arg_bstring, jchar) == '.') break;
-  
+      if (bchar(arg_bstring, jchar) == ' ')
+        break;
+      if (bchar(arg_bstring, jchar) == '.')
+        break;
+
       jchar++;
     }
-  
+
     result = TOKEN_MOVE;
 
-    if ((jchar < blength(arg_bstring)) and
-        (bchar(arg_bstring, jchar) == '.'))
+    if ((jchar < blength(arg_bstring)) and (bchar(arg_bstring, jchar) == '.'))
     {
       jchar++;
-    
+
       result = TOKEN_SKIP;
     }
   }
 
   HARDBUG(jchar <= *arg_ichar)
 
-  HARDBUG(bassignmidstr(arg_btoken, arg_bstring, *arg_ichar, jchar - *arg_ichar) == BSTR_ERR)
+  HARDBUG(
+      bassignmidstr(arg_btoken, arg_bstring, *arg_ichar, jchar - *arg_ichar) ==
+      BSTR_ERR)
 
   *arg_ichar = jchar;
 
-  return(result);
+  return (result);
 }
 
 void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
@@ -161,24 +174,44 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
 
   bucket_t bucket_nblocked[NPIECES_MAX + 1];
 
-  construct_bucket(&bucket_nman, "bucket_nman",
-                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+  construct_bucket(&bucket_nman,
+                   "bucket_nman",
+                   1,
+                   0,
+                   NPIECES_MAX,
+                   BUCKET_LINEAR);
 
-  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
-    construct_bucket(bucket_rows + npieces, "bucket_rows",
-                     1, 0, 9, BUCKET_LINEAR);
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
+    construct_bucket(bucket_rows + npieces,
+                     "bucket_rows",
+                     1,
+                     0,
+                     9,
+                     BUCKET_LINEAR);
 
-  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
-    construct_bucket(bucket_kings + npieces, "bucket_kings",
-                     1, 0, NPIECES_MAX, BUCKET_LINEAR);
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
+    construct_bucket(bucket_kings + npieces,
+                     "bucket_kings",
+                     1,
+                     0,
+                     NPIECES_MAX,
+                     BUCKET_LINEAR);
 
-  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
-    construct_bucket(bucket_nmoves + npieces, "bucket_nmoves",
-                     1, 0, NMOVES_MAX, BUCKET_LINEAR);
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
+    construct_bucket(bucket_nmoves + npieces,
+                     "bucket_nmoves",
+                     1,
+                     0,
+                     NMOVES_MAX,
+                     BUCKET_LINEAR);
 
-  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
-    construct_bucket(bucket_nblocked + npieces, "bucket_nblocked",
-                     1, 0, NMOVES_MAX, BUCKET_LINEAR);
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
+    construct_bucket(bucket_nblocked + npieces,
+                     "bucket_nblocked",
+                     1,
+                     0,
+                     NMOVES_MAX,
+                     BUCKET_LINEAR);
 
   i64_t ngames = 0;
   i64_t nerrors = 0;
@@ -194,43 +227,49 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
   BSTRING(bfen)
 
   BSTRING(bmove)
- 
+
   construct_game_state(&game_state);
 
-  while(TRUE)
+  while (TRUE)
   {
     int itoken = INVALID;
 
-    //read game into game_state
+    // read game into game_state
 
     game_state.clear_moves(&game_state);
 
-    while(TRUE)
+    while (TRUE)
     {
-      //read tokens until result
+      // read tokens until result
 
       itoken = get_next_token(string, &ichar, btoken);
 
-      if (itoken == INVALID) break;
+      if (itoken == INVALID)
+        break;
 
-      //PRINTF("itoken=%d btoken=%s\n", itoken, bdata(btoken));
+      // PRINTF("itoken=%d btoken=%s\n", itoken, bdata(btoken));
 
-      if (itoken == TOKEN_SKIP) continue;
+      if (itoken == TOKEN_SKIP)
+        continue;
 
-      if (itoken != TOKEN_MOVE) break;
+      if (itoken != TOKEN_MOVE)
+        break;
 
       game_state.push_move(&game_state, bdata(btoken), "");
     }
 
-    if (itoken == INVALID) break;
+    if (itoken == INVALID)
+      break;
 
-    if (itoken == TOKEN_UNKNOWN) continue;
- 
+    if (itoken == TOKEN_UNKNOWN)
+      continue;
+
     ++ngames;
 
-    if ((ngames % 1000) == 0) PRINTF("ngames=%lld\n", ngames);
+    if ((ngames % 1000) == 0)
+      PRINTF("ngames=%lld\n", ngames);
 
-    //replay the game
+    // replay the game
 
     fen2board(with, game_state.get_starting_position(&game_state));
 
@@ -244,7 +283,7 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
 
       gen_moves(with, &moves_list);
 
-      //update statistics
+      // update statistics
 
       update_bucket(&bucket_nman, BIT_COUNT(with->B_black_man_bb));
 
@@ -255,12 +294,12 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
         if (with->B_black_man_bb & BITULL(ifield))
         {
           update_bucket(bucket_rows + BIT_COUNT(with->B_black_man_bb),
-            (i - 1) / 5);
+                        (i - 1) / 5);
         }
       }
 
       update_bucket(bucket_kings + BIT_COUNT(with->B_black_man_bb),
-        BIT_COUNT(with->B_black_king_bb));
+                    BIT_COUNT(with->B_black_king_bb));
 
       if (IS_WHITE(with->B_colour2move))
       {
@@ -279,24 +318,23 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
                       moves_list.ML_nblocked);
       }
 
-      //update book
+      // update book
 
 #ifdef DEBUG
       check_moves(with, &moves_list);
 #endif
 
-
       cJSON *move_string = cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
 
       HARDBUG(!cJSON_IsString(move_string))
-      
+
       HARDBUG(bassigncstr(bmove_string, cJSON_GetStringValue(move_string)) ==
               BSTR_ERR)
 
       int imove = INVALID;
 
       if ((imove = search_move(&moves_list, bmove_string)) == INVALID)
-      {  
+      {
         print_board(with);
 
         PRINTF("move not found: %s\n", bdata(bmove_string));
@@ -331,27 +369,32 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
           column = "ndraw";
         }
 
-        append_sql_buffer(arg_db,
-          "INSERT INTO positions (fen, frequency, %s) VALUES ('%s', 1, 1) "
-          "ON CONFLICT(fen) DO UPDATE SET "
-          "frequency = frequency + 1, %s = %s + 1;",
-          column, bdata(bfen), column, column);
+        append_sql_buffer(
+            arg_db,
+            "INSERT INTO positions (fen, frequency, %s) VALUES ('%s', 1, 1) "
+            "ON CONFLICT(fen) DO UPDATE SET "
+            "frequency = frequency + 1, %s = %s + 1;",
+            column,
+            bdata(bfen),
+            column,
+            column);
 
         move2bstring(&moves_list, imove, bmove);
 
         append_sql_buffer(arg_db,
-          "INSERT INTO moves "
-          "(position_id, move, frequency, %s) "
-          "VALUES ("
-            "(SELECT id FROM positions WHERE fen = '%s'), "
-            "'%s', 1, 1"
-          ") "
-          "ON CONFLICT(position_id, move) DO UPDATE SET "
-            "frequency = frequency + 1, %s = %s + 1;",
-          column,
-          bdata(bfen),
-          bdata(bmove),
-          column, column);
+                          "INSERT INTO moves "
+                          "(position_id, move, frequency, %s) "
+                          "VALUES ("
+                          "(SELECT id FROM positions WHERE fen = '%s'), "
+                          "'%s', 1, 1"
+                          ") "
+                          "ON CONFLICT(position_id, move) DO UPDATE SET "
+                          "frequency = frequency + 1, %s = %s + 1;",
+                          column,
+                          bdata(bfen),
+                          bdata(bmove),
+                          column,
+                          column);
       }
 
       do_move(with, imove, &moves_list, FALSE);
@@ -365,7 +408,7 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
   BDESTROY(bmove)
 
   BDESTROY(bfen)
- 
+
   BDESTROY(bmove_string)
 
   BDESTROY(btoken)
@@ -374,8 +417,7 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
 
   PRINTF("cleaning up..\n");
 
-  const char *sql = 
-    "DELETE FROM positions WHERE frequency = 1;";
+  const char *sql = "DELETE FROM positions WHERE frequency = 1;";
 
   HARDBUG(execute_sql(arg_db->MS_db, sql, FALSE) != SQLITE_OK)
 
@@ -384,43 +426,44 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
   PRINTF("..done\n");
 
   HARDBUG(execute_sql(arg_db->MS_db,
-    "INSERT INTO evaluations (move_id, evaluation) "
-    "SELECT "
-      "m.id, "
-      "CAST(ROUND(1000.0 * "
-        "CASE WHEN (m.nwon + m.nlost) > 0 "
-        "THEN (m.nwon - m.nlost) * 1.0 / (m.nwon + m.nlost) "
-        "ELSE 0.0 "
-        "END"
-      ") AS INTEGER) "
-    "FROM moves m WHERE 1 "
-    "ON CONFLICT(move_id) DO UPDATE SET "
-      "evaluation = excluded.evaluation;", FALSE) != SQLITE_OK)
+                      "INSERT INTO evaluations (move_id, evaluation) "
+                      "SELECT "
+                      "m.id, "
+                      "CAST(ROUND(1000.0 * "
+                      "CASE WHEN (m.nwon + m.nlost) > 0 "
+                      "THEN (m.nwon - m.nlost) * 1.0 / (m.nwon + m.nlost) "
+                      "ELSE 0.0 "
+                      "END"
+                      ") AS INTEGER) "
+                      "FROM moves m WHERE 1 "
+                      "ON CONFLICT(move_id) DO UPDATE SET "
+                      "evaluation = excluded.evaluation;",
+                      FALSE) != SQLITE_OK)
 
   printf_bucket(&bucket_nman);
 
-  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
   {
     PRINTF("npieces=%d\n", npieces);
 
     printf_bucket(bucket_rows + npieces);
   }
 
-  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
   {
     PRINTF("npieces=%d\n", npieces);
 
     printf_bucket(bucket_kings + npieces);
   }
 
-  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
   {
     PRINTF("npieces=%d\n", npieces);
 
     printf_bucket(bucket_nmoves + npieces);
   }
 
-  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)  
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
   {
     PRINTF("npieces=%d\n", npieces);
 
@@ -448,8 +491,8 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
   construct_search(&search, STDOUT, NULL);
 
   search_t *with = &search;
-  
-  i64_t ntodo = arg_npositions; 
+
+  i64_t ntodo = arg_npositions;
 
   if (my_mpi_globals.MMG_nslaves > 0)
     ntodo = arg_npositions / my_mpi_globals.MMG_nslaves + 1;
@@ -473,7 +516,7 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
   construct_game_state(&game_state);
 
-  while(ndone < ntodo)
+  while (ndone < ntodo)
   {
     ++ngames;
 
@@ -483,8 +526,8 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
     PRINTF("auto play\n");
 
-    //auto play 
-    //no time limit
+    // auto play
+    // no time limit
 
     mcts_globals.mcts_globals_time_limit = 0.0;
 
@@ -492,17 +535,19 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
     int best_score = SCORE_PLUS_INFINITY;
 
-    while(TRUE)
+    while (TRUE)
     {
-      if (nply == MCTS_PLY_MAX) break;
- 
+      if (nply == MCTS_PLY_MAX)
+        break;
+
       moves_list_t moves_list;
 
       construct_moves_list(&moves_list);
 
       gen_moves(&(with->S_board), &moves_list);
 
-      if (moves_list.ML_nmoves == 0) break;
+      if (moves_list.ML_nmoves == 0)
+        break;
 
       int best_pv;
 
@@ -510,19 +555,29 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
       int root_score = return_material_score(&(with->S_board));
 
-      if (nply > NPLY_PAUSE) pause_my_printf(with->S_my_printf);
+      if (nply > NPLY_PAUSE)
+        pause_my_printf(with->S_my_printf);
 
-      best_score = mcts_search(with, root_score, 0, arg_mcts_depth,
-        &moves_list, &best_pv, TRUE);
+      best_score = mcts_search(with,
+                               root_score,
+                               0,
+                               arg_mcts_depth,
+                               &moves_list,
+                               &best_pv,
+                               TRUE);
 
-      if (best_pv == INVALID) break;
-    
+      if (best_pv == INVALID)
+        break;
+
       move2bstring(&moves_list, best_pv, bmove_string);
 
       print_board(&(with->S_board));
 
       PRINTF("nply=%d best_move=%s root_score=%d best_score=%d\n",
-        nply, bdata(bmove_string), root_score, best_score);
+             nply,
+             bdata(bmove_string),
+             root_score,
+             best_score);
 
       game_state.push_move(&game_state, bdata(bmove_string), "");
 
@@ -544,11 +599,13 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
       ++ngames_failed;
 
       PRINTF("ngames=%lld ngames_failed=%lld (%.2f%%)\n",
-        ngames, ngames_failed, ngames_failed * 100.0 / ngames);
+             ngames,
+             ngames_failed,
+             ngames_failed * 100.0 / ngames);
 
       continue;
     }
-    
+
     int result = INVALID;
 
     if (egtb_mate == INVALID)
@@ -560,13 +617,14 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
 
     HARDBUG(result == INVALID)
 
-    //result as seen from white
+    // result as seen from white
 
-    if (IS_BLACK(with->S_board.B_colour2move)) result = 2 - result;
+    if (IS_BLACK(with->S_board.B_colour2move))
+      result = 2 - result;
 
     PRINTF("replay\n");
 
-    //loop over all moves
+    // loop over all moves
 
     fen2board(&(with->S_board), game_state.get_starting_position(&game_state));
 
@@ -588,29 +646,32 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
             (IS_BLACK(with->S_board.B_colour2move) and (result == 0)))
         {
           append_sql_buffer(arg_db,
-            "INSERT INTO positions (fen, frequency, nwon) VALUES ('%s', 1, 1) "
-            "ON CONFLICT(fen) DO UPDATE SET "
-            "frequency = frequency + 1, nwon = nwon + 1;",
-            bdata(bfen));
+                            "INSERT INTO positions (fen, frequency, nwon) "
+                            "VALUES ('%s', 1, 1) "
+                            "ON CONFLICT(fen) DO UPDATE SET "
+                            "frequency = frequency + 1, nwon = nwon + 1;",
+                            bdata(bfen));
         }
         else if ((IS_WHITE(with->S_board.B_colour2move) and (result == 0)) or
                  (IS_BLACK(with->S_board.B_colour2move) and (result == 2)))
         {
           append_sql_buffer(arg_db,
-            "INSERT INTO positions (fen, frequency, nlost) VALUES ('%s', 1, 1) "
-            "ON CONFLICT(fen) DO UPDATE SET "
-            "frequency = frequency + 1, nlost = nlost + 1;",
-            bdata(bfen));
+                            "INSERT INTO positions (fen, frequency, nlost) "
+                            "VALUES ('%s', 1, 1) "
+                            "ON CONFLICT(fen) DO UPDATE SET "
+                            "frequency = frequency + 1, nlost = nlost + 1;",
+                            bdata(bfen));
         }
         else
         {
           HARDBUG(result != 1)
 
           append_sql_buffer(arg_db,
-            "INSERT INTO positions (fen, frequency, ndraw) VALUES ('%s', 1, 1) "
-            "ON CONFLICT(fen) DO UPDATE SET "
-            "frequency = frequency + 1, ndraw = ndraw + 1;",
-            bdata(bfen));
+                            "INSERT INTO positions (fen, frequency, ndraw) "
+                            "VALUES ('%s', 1, 1) "
+                            "ON CONFLICT(fen) DO UPDATE SET "
+                            "frequency = frequency + 1, ndraw = ndraw + 1;",
+                            bdata(bfen));
         }
 
         update_progress(&progress);
@@ -644,13 +705,20 @@ void gen_db(my_sqlite3_t *arg_db, i64_t arg_npositions, int arg_mcts_depth)
   BDESTROY(bmove_string)
 
   PRINTF("generating %lld positions took %.2f seconds\n",
-    ndone, return_my_timer(&timer, FALSE));
- 
-  my_mpi_barrier_v3("after gen", my_mpi_globals.MMG_comm_slaves,
-                    SEMKEY_GEN_DB_BARRIER, TRUE);
+         ndone,
+         return_my_timer(&timer, FALSE));
 
-  my_mpi_allreduce(MPI_IN_PLACE, &ndone, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_barrier_v3("after gen",
+                    my_mpi_globals.MMG_comm_slaves,
+                    my_mpi_globals.MMG_semkey_gen_db_barrier,
+                    TRUE);
+
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &ndone,
+                   1,
+                   MPI_LONG_LONG_INT,
+                   MPI_SUM,
+                   my_mpi_globals.MMG_comm_slaves);
 
   PRINTF("my_mpi_all_reduce(ndone)=%lld\n", ndone);
 }
@@ -687,8 +755,10 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
 
   HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
 
-  my_mpi_barrier_v3("after query ids", my_mpi_globals.MMG_comm_slaves,
-                    SEMKEY_UPDATE_DB_BARRIER, FALSE);
+  my_mpi_barrier_v3("after query ids",
+                    my_mpi_globals.MMG_comm_slaves,
+                    my_mpi_globals.MMG_semkey_update_db_barrier,
+                    FALSE);
 
   PRINTF("npositions=%lld\n", npositions);
 
@@ -728,7 +798,8 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
     if (my_mpi_globals.MMG_nslaves > 0)
     {
       if ((iposition % my_mpi_globals.MMG_nslaves) !=
-          my_mpi_globals.MMG_id_slave) continue;
+          my_mpi_globals.MMG_id_slave)
+        continue;
     }
 
     update_progress(&progress);
@@ -742,14 +813,14 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
     sql = "SELECT fen FROM positions WHERE id = ?;";
 
     my_sqlite3_prepare_v2(arg_db->MS_db, sql, &stmt);
-  
+
     HARDBUG(my_sqlite3_bind_int64(stmt, 1, id) != SQLITE_OK)
-  
+
     HARDBUG((rc = execute_sql(arg_db->MS_db, stmt, TRUE)) != SQLITE_ROW)
-  
+
     const unsigned char *fen = my_sqlite3_column_text(stmt, 0);
 
-    HARDBUG(bassigncstr(bfen, (char *) fen) == BSTR_ERR)
+    HARDBUG(bassigncstr(bfen, (char *)fen) == BSTR_ERR)
 
     HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
 
@@ -765,57 +836,70 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
 
     for (igame = 1; igame <= NGAMES; ++igame)
     {
-      fen2board(&(with->S_board), game_state.get_starting_position(&game_state));
+      fen2board(&(with->S_board),
+                game_state.get_starting_position(&game_state));
 
       game_state.clear_moves(&game_state);
-  
+
       PRINTF("igame=%d auto play\n", igame);
 
-      //auto play 
-      //no time limit
-  
-      mcts_globals.mcts_globals_time_limit = 0.0;
-  
-      int nply = 0;
-  
-      int best_score = SCORE_PLUS_INFINITY;
-  
-      while(TRUE)
-      {
-        if (nply == MCTS_PLY_MAX) break;
-   
-        moves_list_t moves_list;
-  
-        construct_moves_list(&moves_list);
-  
-        gen_moves(&(with->S_board), &moves_list);
-  
-        if (moves_list.ML_nmoves == 0) break;
-  
-        int best_pv;
-  
-        reset_my_timer(&(with->S_timer));
-  
-        int root_score = return_material_score(&(with->S_board));
-  
-        if (nply > NPLY_PAUSE) pause_my_printf(with->S_my_printf);
+      // auto play
+      // no time limit
 
-        best_score = mcts_search(with, root_score, 0, arg_mcts_depth,
-          &moves_list, &best_pv, TRUE);
-  
-        if (best_pv == INVALID) break;
-      
+      mcts_globals.mcts_globals_time_limit = 0.0;
+
+      int nply = 0;
+
+      int best_score = SCORE_PLUS_INFINITY;
+
+      while (TRUE)
+      {
+        if (nply == MCTS_PLY_MAX)
+          break;
+
+        moves_list_t moves_list;
+
+        construct_moves_list(&moves_list);
+
+        gen_moves(&(with->S_board), &moves_list);
+
+        if (moves_list.ML_nmoves == 0)
+          break;
+
+        int best_pv;
+
+        reset_my_timer(&(with->S_timer));
+
+        int root_score = return_material_score(&(with->S_board));
+
+        if (nply > NPLY_PAUSE)
+          pause_my_printf(with->S_my_printf);
+
+        best_score = mcts_search(with,
+                                 root_score,
+                                 0,
+                                 arg_mcts_depth,
+                                 &moves_list,
+                                 &best_pv,
+                                 TRUE);
+
+        if (best_pv == INVALID)
+          break;
+
         move2bstring(&moves_list, best_pv, bmove_string);
-  
+
         print_board(&(with->S_board));
-  
+
         PRINTF("nply=%d best_move=%s root_score=%d best_score=%d\n",
-          nply, bdata(bmove_string), root_score, best_score);
-  
+               nply,
+               bdata(bmove_string),
+               root_score,
+               best_score);
+
         game_state.push_move(&game_state, bdata(bmove_string), "");
-  
+
         ++nply;
-  
+
         do_move(&(with->S_board), best_pv, &moves_list, FALSE);
       }
 
@@ -830,7 +914,7 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
       if (egtb_mate == ENDGAME_UNKNOWN)
       {
         PRINTF("igame=%d failed\n", igame);
-  
+
         continue;
       }
 
@@ -846,8 +930,8 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
       PRINTF("deleting fen=%s\n", bdata(bfen));
 
       append_sql_buffer(arg_db,
-        "DELETE FROM positions where fen = '%s';",
-        bdata(bfen));
+                        "DELETE FROM positions where fen = '%s';",
+                        bdata(bfen));
 
       continue;
     }
@@ -863,13 +947,14 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
 
     HARDBUG(result == INVALID)
 
-    //result as seen from white
+    // result as seen from white
 
-    if (IS_BLACK(with->S_board.B_colour2move)) result = 2 - result;
+    if (IS_BLACK(with->S_board.B_colour2move))
+      result = 2 - result;
 
     PRINTF("replay\n");
 
-    //loop over all moves
+    // loop over all moves
 
     fen2board(&(with->S_board), game_state.get_starting_position(&game_state));
 
@@ -892,29 +977,31 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
         if ((IS_WHITE(with->S_board.B_colour2move) and (result == 2)) or
             (IS_BLACK(with->S_board.B_colour2move) and (result == 0)))
         {
-          append_sql_buffer(arg_db,
-            "UPDATE positions SET "
-            "frequency = frequency + 1, nwon = nwon + 1 WHERE fen = '%s';",
-            bdata(bfen));
+          append_sql_buffer(
+              arg_db,
+              "UPDATE positions SET "
+              "frequency = frequency + 1, nwon = nwon + 1 WHERE fen = '%s';",
+              bdata(bfen));
         }
         else if ((IS_WHITE(with->S_board.B_colour2move) and (result == 0)) or
                  (IS_BLACK(with->S_board.B_colour2move) and (result == 2)))
         {
-          append_sql_buffer(arg_db,
-            "UPDATE positions SET "
-            "frequency = frequency + 1, nlost = nlost + 1 WHERE fen = '%s';",
-            bdata(bfen));
+          append_sql_buffer(
+              arg_db,
+              "UPDATE positions SET "
+              "frequency = frequency + 1, nlost = nlost + 1 WHERE fen = '%s';",
+              bdata(bfen));
         }
         else
         {
           HARDBUG(result != 1)
 
-          append_sql_buffer(arg_db,
-            "UPDATE positions SET "
-            "frequency = frequency + 1, ndraw = ndraw + 1 WHERE fen = '%s';",
-            bdata(bfen));
+          append_sql_buffer(
+              arg_db,
+              "UPDATE positions SET "
+              "frequency = frequency + 1, ndraw = ndraw + 1 WHERE fen = '%s';",
+              bdata(bfen));
         }
-
       }
 
       cJSON *move_string = cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
@@ -945,13 +1032,20 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
   BDESTROY(bmove_string)
 
   PRINTF("updating %lld positions took %.2f seconds\n",
-    ntodo, return_my_timer(&timer, FALSE));
- 
-  my_mpi_barrier_v3("after update", my_mpi_globals.MMG_comm_slaves,
-                    SEMKEY_UPDATE_DB_BARRIER, TRUE);
+         ntodo,
+         return_my_timer(&timer, FALSE));
 
-  my_mpi_allreduce(MPI_IN_PLACE, &ntodo, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_barrier_v3("after update",
+                    my_mpi_globals.MMG_comm_slaves,
+                    my_mpi_globals.MMG_semkey_update_db_barrier,
+                    TRUE);
+
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &ntodo,
+                   1,
+                   MPI_LONG_LONG_INT,
+                   MPI_SUM,
+                   my_mpi_globals.MMG_comm_slaves);
 
   PRINTF("my_mpi_all_reduce(ntodo)=%lld\n", ntodo);
 }
@@ -989,8 +1083,10 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 
   HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
 
-  my_mpi_barrier_v3("after query ids", my_mpi_globals.MMG_comm_slaves,
-                    SEMKEY_UPDATE_DB_BARRIER, FALSE);
+  my_mpi_barrier_v3("after query ids",
+                    my_mpi_globals.MMG_comm_slaves,
+                    my_mpi_globals.MMG_semkey_update_db_barrier,
+                    FALSE);
 
   PRINTF("npositions=%lld\n", npositions);
 
@@ -1026,7 +1122,8 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
     if (my_mpi_globals.MMG_nslaves > 0)
     {
       if ((iposition % my_mpi_globals.MMG_nslaves) !=
-          my_mpi_globals.MMG_id_slave) continue;
+          my_mpi_globals.MMG_id_slave)
+        continue;
     }
 
     update_progress(&progress);
@@ -1040,14 +1137,14 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
     sql = "SELECT fen, frequency FROM positions WHERE id = ?;";
 
     my_sqlite3_prepare_v2(arg_db->MS_db, sql, &stmt);
-  
+
     HARDBUG(my_sqlite3_bind_int64(stmt, 1, id) != SQLITE_OK)
-  
+
     HARDBUG((rc = execute_sql(arg_db->MS_db, stmt, TRUE)) != SQLITE_ROW)
-  
+
     const unsigned char *fen = my_sqlite3_column_text(stmt, 0);
 
-    HARDBUG(bassigncstr(bfen, (char *) fen) == BSTR_ERR)
+    HARDBUG(bassigncstr(bfen, (char *)fen) == BSTR_ERR)
 
     int frequency = my_sqlite3_column_int(stmt, 1);
 
@@ -1056,7 +1153,10 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
     HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
 
     PRINTF("iposition=%lld id=%lld frequency=%d fen=%s\n$",
-           iposition, id, frequency, bdata(bfen));
+           iposition,
+           id,
+           frequency,
+           bdata(bfen));
 
     fen2board(&(with->S_board), bdata(bfen));
 
@@ -1066,14 +1166,23 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
     int ndraw = 0;
     int nlost = 0;
 
-    double mcts_result =
-      mcts_shoot_outs(with, 0, &nshoot_outs,
-      arg_mcts_depth, 0.0, &nwon, &ndraw, &nlost);
+    double mcts_result = mcts_shoot_outs(with,
+                                         0,
+                                         &nshoot_outs,
+                                         arg_mcts_depth,
+                                         0.0,
+                                         &nwon,
+                                         &ndraw,
+                                         &nlost);
 
     nshoot_outs = nwon + ndraw + nlost;
 
     PRINTF("nshoot_outs=%d nwon=%d ndraw=%d nlost=%d mcts_result=%.6f\n$",
-           nshoot_outs, nwon, ndraw, nlost, mcts_result);
+           nshoot_outs,
+           nwon,
+           ndraw,
+           nlost,
+           mcts_result);
 
     HARDBUG(nshoot_outs > (arg_frequency - frequency))
 
@@ -1084,12 +1193,17 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
       PRINTF("WARNING: nshoot_outs < (arg_frequency - frequency)\n");
     }
 
-    append_sql_buffer(arg_db,
-      "UPDATE positions SET "
-      "frequency = frequency + %d,"
-      "nwon = nwon + %d, ndraw = ndraw + %d, nlost = nlost + %d "
-      "WHERE fen = '%s';",
-      nshoot_outs, nwon, ndraw, nlost, bdata(bfen));
+    append_sql_buffer(
+        arg_db,
+        "UPDATE positions SET "
+        "frequency = frequency + %d,"
+        "nwon = nwon + %d, ndraw = ndraw + %d, nlost = nlost + %d "
+        "WHERE fen = '%s';",
+        nshoot_outs,
+        nwon,
+        ndraw,
+        nlost,
+        bdata(bfen));
   }
 
   finalize_progress(&progress);
@@ -1101,14 +1215,20 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
   BDESTROY(bmove_string)
 
   PRINTF("updating %lld positions took %.2f seconds\n",
-    ntodo, return_my_timer(&timer, FALSE));
- 
-  my_mpi_barrier_v3("after update_v2", my_mpi_globals.MMG_comm_slaves,
-                    SEMKEY_UPDATE_DB_BARRIER, TRUE);
+         ntodo,
+         return_my_timer(&timer, FALSE));
 
-  my_mpi_allreduce(MPI_IN_PLACE, &ntodo, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_barrier_v3("after update_v2",
+                    my_mpi_globals.MMG_comm_slaves,
+                    my_mpi_globals.MMG_semkey_update_db_barrier,
+                    TRUE);
+
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &ntodo,
+                   1,
+                   MPI_LONG_LONG_INT,
+                   MPI_SUM,
+                   my_mpi_globals.MMG_comm_slaves);
 
   PRINTF("my_mpi_all_reduce(ntodo)=%lld\n", ntodo);
 }
-

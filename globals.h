@@ -1,11 +1,12 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef GlobalsH
 #define GlobalsH
 
-#define PROGRAM  gwd7
-#define REVISION "8.0098"
+#define PROGRAM gwd7
+#define REVISION "8.100"
 
-//generic includes
+// generic includes
 
 #include <stdio.h>
 #include <stdint.h>
@@ -16,11 +17,11 @@
 #include <math.h>
 #include <stdarg.h>
 
-//specific includes
+// specific includes
 
 #ifdef USE_VALGRIND
 #include <valgrind/valgrind.h>
-#include <sys/syscall.h>  
+#include <sys/syscall.h>
 #else
 #define RUNNING_ON_VALGRIND 0
 #endif
@@ -29,131 +30,140 @@
 #include <mpi.h>
 #endif
 
-//forward
+// forward
 
-#undef LINE_MAX     //dirent.h
-#define LINE_MAX    do_not_use_LINE_MAX
+#undef LINE_MAX // dirent.h
+#define LINE_MAX do_not_use_LINE_MAX
 #define MY_LINE_MAX 8192
 
-typedef long long          i64_t;
+typedef long long i64_t;
 typedef unsigned long long ui64_t;
 
 #include "compat.h"
 
-//generic defines
+// generic defines
 
 #define INVALID (-1)
 #define FALSE 0
-#define TRUE  1
+#define TRUE 1
 
-#define KBYTE   1024
-#define MBYTE   1048576
-#define GBYTE   1073741824LL
-//#define TBYTE   1099511627776LL
-#define S_MAX   32767
-#define S_MIN   (-S_MAX)
-#define L_MAX   2147483647L
-#define L_MIN   (-L_MAX)
-#define LL_MAX  9223372036854775807LL
-#define LL_MIN  (-LL_MAX)
-#define UL_MAX  4294967296ULL
+#define KBYTE 1024
+#define MBYTE 1048576
+#define GBYTE 1073741824LL
+// #define TBYTE   1099511627776LL
+#define S_MAX 32767
+#define S_MIN (-S_MAX)
+#define L_MAX 2147483647L
+#define L_MIN (-L_MAX)
+#define LL_MAX 9223372036854775807LL
+#define LL_MIN (-LL_MAX)
+#define UL_MAX 4294967296ULL
 #define ULL_MAX 18446744073709551615ULL
 
-#define EPS_REAL   1.0e-3
+#define EPS_REAL 1.0e-3
 #define EPS_DOUBLE 1.0e-6
 
-//specific defines
+// specific defines
 
 #define USE_HARDWARE_CRC32
 #define USE_HARDWARE_RAND
 
-#define BOARD_MAX   66
-#define NODE_MAX    1024
+#define BOARD_MAX 66
+#define NODE_MAX 1024
 #define NPIECES_MAX 20
 
-#define CJSON_PARAMETERS_ID             "parameters"
-#define CJSON_TWEAKS_ID                 "tweaks"
-#define CJSON_SHAPE_ID                  "shape"
+#define CJSON_PARAMETERS_ID "parameters"
+#define CJSON_TWEAKS_ID "tweaks"
+#define CJSON_SHAPE_ID "shape"
 #define CJSON_NETWORK2MATERIAL_SCORE_ID "network2material_score"
-#define CJSON_NMATERIAL_ID              "nmaterial"
-#define CJSON_EMBEDDING_ID              "embedding"
-#define CJSON_ACTIVATION_INPUTS_ID      "activation_inputs"
-#define CJSON_ACTIVATION_ID             "activation"
-#define CJSON_ACTIVATION_LAST_ID        "activation_last"
-#define CJSON_NMAN_MIN_ID               "nman_min"
-#define CJSON_NMAN_MAX_ID               "nman_max"
+#define CJSON_NMATERIAL_ID "nmaterial"
+#define CJSON_EMBEDDING_ID "embedding"
+#define CJSON_ACTIVATION_INPUTS_ID "activation_inputs"
+#define CJSON_ACTIVATION_ID "activation"
+#define CJSON_ACTIVATION_LAST_ID "activation_last"
+#define CJSON_NMAN_MIN_ID "nman_min"
+#define CJSON_NMAN_MAX_ID "nman_max"
 
-#define CJSON_EVENT_ID             "event"
-#define CJSON_DATE_ID              "date"
-#define CJSON_WHITE_ID             "white"
-#define CJSON_BLACK_ID             "black"
-#define CJSON_RESULT_ID            "result"
+#define CJSON_EVENT_ID "event"
+#define CJSON_DATE_ID "date"
+#define CJSON_WHITE_ID "white"
+#define CJSON_BLACK_ID "black"
+#define CJSON_RESULT_ID "result"
 #define CJSON_STARTING_POSITION_ID "FEN"
-#define CJSON_TIME_ID              "time"
-#define CJSON_DEPTH_ID             "depth"
+#define CJSON_TIME_ID "time"
+#define CJSON_DEPTH_ID "depth"
 
-#define CJSON_MOVES_ID             "moves"
-#define CJSON_MOVE_STRING_ID       "move_string"
-#define CJSON_COMMENT_STRING_ID    "comment_string"
+#define CJSON_MOVES_ID "moves"
+#define CJSON_MOVE_STRING_ID "move_string"
+#define CJSON_COMMENT_STRING_ID "comment_string"
 
-#define CJSON_HUB_CLIENT_DIR       "dir"
-#define CJSON_HUB_CLIENT_EXE       "exe"
-#define CJSON_HUB_CLIENT_ARG       "arg"
+#define CJSON_HUB_CLIENT_DIR "dir"
+#define CJSON_HUB_CLIENT_EXE "exe"
+#define CJSON_HUB_CLIENT_ARG "arg"
 
-#define CJSON_POSITIONS_ID         "positions"
-#define CJSON_POSITION_ID          "position"
-#define CJSON_BOARD_STRING_ID      "B_string"
-#define CJSON_MOVE_SCORE_ID        "move_score"
-#define CJSON_WON_ID               "won"
-#define CJSON_DRAW_ID              "draw"
-#define CJSON_LOST_ID              "lost"
-#define CJSON_INVALID_ID           "?"
-#define CJSON_SCORE_ID             "score"
-#define CJSON_FEN_ID               "FEN"
-#define CJSON_PV_ID                "pv"
-#define CJSON_HUB_PV_ID            "hub_pv"
+#define CJSON_POSITIONS_ID "positions"
+#define CJSON_POSITION_ID "position"
+#define CJSON_BOARD_STRING_ID "B_string"
+#define CJSON_MOVE_SCORE_ID "move_score"
+#define CJSON_WON_ID "won"
+#define CJSON_DRAW_ID "draw"
+#define CJSON_LOST_ID "lost"
+#define CJSON_INVALID_ID "?"
+#define CJSON_SCORE_ID "score"
+#define CJSON_FEN_ID "FEN"
+#define CJSON_PV_ID "pv"
+#define CJSON_HUB_PV_ID "hub_pv"
 
-#define CJSON_CSV_ID               "csv"
-#define CJSON_CSV_PATH_ID          "path"
-#define CJSON_CSV_COLUMNS_ID       "columns"
+#define CJSON_CSV_ID "csv"
+#define CJSON_CSV_PATH_ID "path"
+#define CJSON_CSV_COLUMNS_ID "columns"
 
-#define CJSON_DIRECTORIES_ID       "directories"
-#define CJSON_DIRECTORY_NAME_ID    "name"
-#define CJSON_FILES_ID             "files"
-#define CJSON_FILE_NAME_ID         "name"
-#define CJSON_FILE_LINES_ID        "lines"
-#define CJSON_FILE_ROWS_ID         "rows"
-#define CJSON_FILE_COLS_ID         "cols"
-#define CJSON_FILE_DATA_ID         "data"
+#define CJSON_DIRECTORIES_ID "directories"
+#define CJSON_DIRECTORY_NAME_ID "name"
+#define CJSON_FILES_ID "files"
+#define CJSON_FILE_NAME_ID "name"
+#define CJSON_FILE_LINES_ID "lines"
+#define CJSON_FILE_ROWS_ID "rows"
+#define CJSON_FILE_COLS_ID "cols"
+#define CJSON_FILE_DATA_ID "data"
 
-//generic macro's
+// generic macro's
 
 #define local static
-#define and   &&
-#define or    ||
+#define and &&
+#define or ||
 #define index DO_NOT_USE_INDEX
 
-#define cat2(x, y)    x ## y
-#define cat3(x, y, z) x ## y ## z
+#define cat2(x, y) x##y
+#define cat3(x, y, z) x##y##z
 
 #define __FUNC__ __func__
 
-#define BIT(X)    (1U << (X))
+#define BIT(X) (1U << (X))
 #define BITULL(X) (1ULL << (X))
-#define MASK(X)   (~(~0U << (X)))
+#define MASK(X) (~(~0U << (X)))
 
 #define PRINTF(...) my_printf(STDOUT, __VA_ARGS__)
 
 #ifdef __cppcheck__
-#define FATAL(X, C) {fprintf(stderr, "%s\n", #X); exit(C);}
+#define FATAL(X, C)              \
+  {                              \
+    fprintf(stderr, "%s\n", #X); \
+    exit(C);                     \
+  }
 #else
-#define FATAL(X, C) {\
-  zzzzzz_invocation++;\
-  zzzzzz(__FILE__, __FUNC__, (int) __LINE__, X, C);\
-}
+#define FATAL(X, C)                                  \
+  {                                                  \
+    zzzzzz_invocation++;                             \
+    zzzzzz(__FILE__, __FUNC__, (int)__LINE__, X, C); \
+  }
 #endif
 
-#define HARDBUG(X) {if (X) FATAL(#X, EXIT_FAILURE)}
+#define HARDBUG(X)            \
+  {                           \
+    if (X)                    \
+      FATAL(#X, EXIT_FAILURE) \
+  }
 
 #ifdef DEBUG
 #define SOFTBUG(X) HARDBUG(X)
@@ -161,8 +171,8 @@ typedef unsigned long long ui64_t;
 #define SOFTBUG(X)
 #endif
 
-#define REALLOC(P, T, N)\
-  HARDBUG(((P) = (T *) realloc((P), sizeof(T) * (N))) == NULL)
+#define REALLOC(P, T, N) \
+  HARDBUG(((P) = (T *)realloc((P), sizeof(T) * (N))) == NULL)
 
 #define FREAD(F, P, T, N) HARDBUG(fread(P, sizeof(T), N, F) != N)
 #define FWRITE(F, P, T, N) HARDBUG(fwrite(P, sizeof(T), N, F) != N)
@@ -170,19 +180,28 @@ typedef unsigned long long ui64_t;
 #define FBOFO(F) HARDBUG(compat_fseeko(F, 0, SEEK_SET) != 0)
 #define FEOFO(F) HARDBUG(compat_fseeko(F, 0, SEEK_END) != 0)
 #define FTELLO(F, X) HARDBUG(((X) = ftello(F)) < 0)
-#define FCLOSE(F) {HARDBUG(fclose(F) == EOF) (F) = NULL;}
+#define FCLOSE(F)                        \
+  {                                      \
+    HARDBUG(fclose(F) == EOF)(F) = NULL; \
+  }
 
 #define STRNCAT(A, B) strncat(A, B, MY_LINE_MAX - 1 - strlen(A))
 
-//specific macro's
+// specific macro's
 
 #define HASH_KEY_EQ(A, B) (A == B)
 
-#define CLR_HASH_KEY(A) {A = 0ULL;}
+#define CLR_HASH_KEY(A) \
+  {                     \
+    A = 0ULL;           \
+  }
 
 #define HASH_KEY_ZERO(A) (A == 0ULL)
 
-#define XOR_HASH_KEY(A, B) {A ^= B;}
+#define XOR_HASH_KEY(A, B) \
+  {                        \
+    A ^= B;                \
+  }
 
 #define MOD_HASH_KEY(A, B) ((A) % (B))
 
@@ -194,23 +213,23 @@ typedef unsigned long long ui64_t;
 
 #define HASH_KEY_LE(A, B) (A <= B)
 
-//generic typedefs
+// generic typedefs
 
-typedef int8_t   i8_t;
-typedef uint8_t  ui8_t;
-typedef int16_t  i16_t;
+typedef int8_t i8_t;
+typedef uint8_t ui8_t;
+typedef int16_t i16_t;
 typedef uint16_t ui16_t;
-typedef int32_t  i32_t;
+typedef int32_t i32_t;
 typedef uint32_t ui32_t;
 
-//specific typedefs
+// specific typedefs
 
 typedef ui64_t hash_key_t;
 typedef struct board board_t;
 
 #define SCALED_DOUBLE_FLOAT 1
-#define SCALED_DOUBLE_I32   2
-#define SCALED_DOUBLE_T     SCALED_DOUBLE_FLOAT
+#define SCALED_DOUBLE_I32 2
+#define SCALED_DOUBLE_T SCALED_DOUBLE_FLOAT
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
 typedef float scaled_double_t;
@@ -218,7 +237,7 @@ typedef float scaled_double_t;
 typedef i32_t scaled_double_t;
 #endif
 
-//I have to get rid of this!
+// I have to get rid of this!
 
 extern void *STDOUT;
 
@@ -263,4 +282,3 @@ extern void *STDOUT;
 #include "score.h"
 
 #endif
-

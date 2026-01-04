@@ -1,10 +1,11 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef MainH
 #define MainH
 
-//options
+// options
 
-#define GAME_MODE  1
+#define GAME_MODE 1
 
 #define NTROUBLE_MAX 1024
 
@@ -29,7 +30,7 @@ typedef struct
   int time_control_sigma;
   int time_control_method;
 
-  //TO DO this should be moved out of options
+  // TO DO this should be moved out of options
 
   int time_ntrouble;
   double time_trouble[NTROUBLE_MAX];
@@ -95,7 +96,7 @@ typedef struct
   int lazy_smp_policy;
 
   char ipc_dir[MY_LINE_MAX];
- 
+
   char egtb_dir[MY_LINE_MAX];
   char egtb_dir_wdl[MY_LINE_MAX];
   char egtb_ram[MY_LINE_MAX];
@@ -139,4 +140,3 @@ void results2csv(int, int, int, int);
 int main(int argc, char **argv);
 
 #endif
-

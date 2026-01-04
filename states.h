@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef StatesH
 #define StatesH
 
@@ -8,7 +9,7 @@ typedef struct game_state
 
   char string[MY_LINE_MAX];
 
-  void (*printf_game_state)(struct game_state  *);
+  void (*printf_game_state)(struct game_state *);
   void (*set_game_state)(struct game_state *, char *);
   void (*set_event)(struct game_state *, char *);
   void (*set_date)(struct game_state *, char *);
@@ -57,4 +58,3 @@ void *reset_state(state_t *);
 void test_states(void);
 
 #endif
-

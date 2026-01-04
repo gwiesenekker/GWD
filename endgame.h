@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef EndgameH
 #define EndgameH
 
@@ -6,8 +7,8 @@
 #define NPAGE_ENTRIES 256
 
 #define NENDGAME_MAX 7
-#define MATE_MAX     512
-#define MATE_DRAW    (-1)
+#define MATE_MAX 512
+#define MATE_DRAW (-1)
 #define MATE_INVALID (-32768)
 
 #define ENDGAME_UNKNOWN 32767
@@ -30,4 +31,3 @@ void fin_endgame(void);
 void recompress_endgame(char *, int, int);
 
 #endif
-

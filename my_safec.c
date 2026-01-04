@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 /*
@@ -29,7 +30,7 @@ int my_sscanf_s(const char *arg_src, size_t arg_limit, char *arg_dst)
   }
   arg_dst[i] = '\0';
 
-  if ((arg_src[i] == '\0') or my_isspace(arg_src[i])) 
+  if ((arg_src[i] == '\0') or my_isspace(arg_src[i]))
     return(1);
   else
     return(-1);
@@ -48,6 +49,5 @@ int my_sscanf(const char *str, const char *format, ...)
 
   va_end(ap);
 
-  return(rc);
+  return (rc);
 }
-

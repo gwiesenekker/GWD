@@ -1,10 +1,11 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 void clear_stats(void *self)
 {
   stats_t *object = self;
- 
+
   object->S_n = 0;
 
   object->S_min = 0.0;
@@ -36,7 +37,8 @@ void mean_sigma(void *self)
 {
   stats_t *object = self;
 
-  if (object->S_n == 0) return;
+  if (object->S_n == 0)
+    return;
 
   object->S_mean = object->S_mean_welford;
   object->S_sigma = sqrt(object->S_sigma_welford / object->S_n);
@@ -61,30 +63,67 @@ void printf_stats(void *self)
 
 void my_stats_aggregate(void *self, MPI_Comm arg_comm)
 {
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   stats_t *object = self;
 
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_n), 1,
-    MPI_LONG_LONG_INT, MPI_SUM, arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_n),
+                   1,
+                   MPI_LONG_LONG_INT,
+                   MPI_SUM,
+                   arg_comm);
 
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_min), 1,
-    MPI_DOUBLE, MPI_SUM, arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_max), 1,
-    MPI_DOUBLE, MPI_SUM, arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_mean_welford), 1,
-    MPI_DOUBLE, MPI_SUM, arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_sigma_welford), 1,
-    MPI_DOUBLE, MPI_SUM, arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_min),
+                   1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_max),
+                   1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_mean_welford),
+                   1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_sigma_welford),
+                   1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   arg_comm);
 
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_sum), 1,
-    MPI_DOUBLE, MPI_SUM, arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_sum2), 1,
-    MPI_DOUBLE, MPI_SUM, arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_mean_sum), 1,
-    MPI_DOUBLE, MPI_SUM, arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE, &(object->S_sigma_sum2), 1,
-    MPI_DOUBLE, MPI_SUM, arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_sum),
+                   1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_sum2),
+                   1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_mean_sum),
+                   1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   arg_comm);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &(object->S_sigma_sum2),
+                   1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   arg_comm);
 }
 
 #define N 100000

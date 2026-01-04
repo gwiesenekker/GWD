@@ -1,13 +1,19 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 mcts_globals_t mcts_globals;
 
 local my_random_t mcts_random;
 
-local int mcts_quiescence(search_t *object, int arg_nply,
-  int arg_my_alpha, int arg_my_beta, int arg_node_type,
-  moves_list_t *arg_moves_list, int *arg_best_pv, int arg_all_moves)
+local int mcts_quiescence(search_t *object,
+                          int arg_nply,
+                          int arg_my_alpha,
+                          int arg_my_beta,
+                          int arg_node_type,
+                          moves_list_t *arg_moves_list,
+                          int *arg_best_pv,
+                          int arg_all_moves)
 {
   PUSH_NAME(__FUNC__)
 
@@ -17,7 +23,8 @@ local int mcts_quiescence(search_t *object, int arg_nply,
 
   HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and ((arg_my_beta - arg_my_alpha) != 1))
+  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
+          ((arg_my_beta - arg_my_alpha) != 1))
 
   colour_enum my_colour;
 
@@ -35,7 +42,8 @@ local int mcts_quiescence(search_t *object, int arg_nply,
     if ((mcts_globals.mcts_globals_nodes++ % 100) == 0)
     {
       if (return_my_timer(&(object->S_timer), FALSE) >=
-          fabs(mcts_globals.mcts_globals_time_limit)) goto label_return;
+          fabs(mcts_globals.mcts_globals_time_limit))
+        goto label_return;
     }
   }
 
@@ -46,7 +54,7 @@ local int mcts_quiescence(search_t *object, int arg_nply,
     goto label_return;
   }
 
-  //check endgame
+  // check endgame
 
   int wdl;
 
@@ -83,7 +91,7 @@ local int mcts_quiescence(search_t *object, int arg_nply,
     construct_moves_list(&my_moves_list);
 
     gen_moves(&(object->S_board), &my_moves_list);
-  
+
     arg_moves_list = &my_moves_list;
   }
 
@@ -99,7 +107,7 @@ local int mcts_quiescence(search_t *object, int arg_nply,
     if (arg_moves_list->ML_ncaptx > 0)
     {
       arg_all_moves = TRUE;
-    } 
+    }
     else if (arg_moves_list->ML_nmoves <= 2)
     {
       arg_all_moves = TRUE;
@@ -107,7 +115,7 @@ local int mcts_quiescence(search_t *object, int arg_nply,
     else
     {
       int nextend = 0;
-  
+
       for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
       {
         if (MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[imove]))
@@ -127,7 +135,8 @@ local int mcts_quiescence(search_t *object, int arg_nply,
   {
     best_score = return_material_score(&(object->S_board));
 
-    if (best_score >= arg_my_beta) goto label_return;
+    if (best_score >= arg_my_beta)
+      goto label_return;
   }
 
   int moves_weight[NMOVES_MAX];
@@ -140,16 +149,18 @@ local int mcts_quiescence(search_t *object, int arg_nply,
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
     int jmove = 0;
-   
+
     for (int kmove = 1; kmove < arg_moves_list->ML_nmoves; kmove++)
     {
-      if (moves_weight[kmove] == L_MIN) continue;
-      
-      if (moves_weight[kmove] > moves_weight[jmove]) jmove = kmove;
+      if (moves_weight[kmove] == L_MIN)
+        continue;
+
+      if (moves_weight[kmove] > moves_weight[jmove])
+        jmove = kmove;
     }
 
     HARDBUG(moves_weight[jmove] == L_MIN)
-  
+
     moves_weight[jmove] = L_MIN;
 
     if (!arg_all_moves)
@@ -159,7 +170,7 @@ local int mcts_quiescence(search_t *object, int arg_nply,
     }
 
     int temp_alpha;
-  
+
     if (best_score < arg_my_alpha)
       temp_alpha = arg_my_alpha;
     else
@@ -173,9 +184,14 @@ local int mcts_quiescence(search_t *object, int arg_nply,
     {
       do_move(&(object->S_board), jmove, arg_moves_list, TRUE);
 
-      temp_score = -mcts_quiescence(object, arg_nply,
-        -arg_my_beta, -temp_alpha,
-        arg_node_type, NULL, &temp_pv, FALSE);
+      temp_score = -mcts_quiescence(object,
+                                    arg_nply,
+                                    -arg_my_beta,
+                                    -temp_alpha,
+                                    arg_node_type,
+                                    NULL,
+                                    &temp_pv,
+                                    FALSE);
 
       undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
     }
@@ -185,9 +201,14 @@ local int mcts_quiescence(search_t *object, int arg_nply,
       {
         do_move(&(object->S_board), jmove, arg_moves_list, TRUE);
 
-        temp_score = -mcts_quiescence(object, arg_nply,
-          -arg_my_beta, -temp_alpha,
-          arg_node_type, NULL, &temp_pv, FALSE);
+        temp_score = -mcts_quiescence(object,
+                                      arg_nply,
+                                      -arg_my_beta,
+                                      -temp_alpha,
+                                      arg_node_type,
+                                      NULL,
+                                      &temp_pv,
+                                      FALSE);
 
         undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
       }
@@ -197,18 +218,27 @@ local int mcts_quiescence(search_t *object, int arg_nply,
 
         do_move(&(object->S_board), jmove, arg_moves_list, TRUE);
 
-        temp_score = -mcts_quiescence(object, arg_nply,
-          -temp_beta, -temp_alpha,
-          MINIMAL_WINDOW_BIT, NULL, &temp_pv, FALSE);
+        temp_score = -mcts_quiescence(object,
+                                      arg_nply,
+                                      -temp_beta,
+                                      -temp_alpha,
+                                      MINIMAL_WINDOW_BIT,
+                                      NULL,
+                                      &temp_pv,
+                                      FALSE);
 
-        //if time-limit temp_score = -(SCORE_PLUS_INFINITY))
+        // if time-limit temp_score = -(SCORE_PLUS_INFINITY))
 
         if ((temp_score >= temp_beta) and (temp_score < arg_my_beta))
         {
-          temp_score = -mcts_quiescence(object, arg_nply,
-            -arg_my_beta, -temp_score,
-            arg_node_type, NULL, &temp_pv, FALSE);
-
+          temp_score = -mcts_quiescence(object,
+                                        arg_nply,
+                                        -arg_my_beta,
+                                        -temp_score,
+                                        arg_node_type,
+                                        NULL,
+                                        &temp_pv,
+                                        FALSE);
         }
 
         undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
@@ -227,29 +257,35 @@ local int mcts_quiescence(search_t *object, int arg_nply,
     if (temp_score > best_score)
     {
       best_score = temp_score;
-  
+
       *arg_best_pv = jmove;
     }
-  
-    if (best_score >= arg_my_beta) break;
-  } //imove
 
-  //we always assigned best_score
+    if (best_score >= arg_my_beta)
+      break;
+  } // imove
+
+  // we always assigned best_score
   //*best_pv can be invalid, for example if (!all_moves) and
-  //move scores are below alpha
+  // move scores are below alpha
 
   HARDBUG(best_score == SCORE_MINUS_INFINITY)
-   
-  label_return:
+
+label_return:
 
   POP_NAME(__FUNC__)
 
-  return(best_score);
+  return (best_score);
 }
 
-local int mcts_alpha_beta(search_t *object, int arg_nply,
-  int arg_my_alpha, int arg_my_beta, int arg_my_depth,
-  int arg_node_type, moves_list_t *arg_moves_list, int *arg_best_pv)
+local int mcts_alpha_beta(search_t *object,
+                          int arg_nply,
+                          int arg_my_alpha,
+                          int arg_my_beta,
+                          int arg_my_depth,
+                          int arg_node_type,
+                          moves_list_t *arg_moves_list,
+                          int *arg_best_pv)
 {
   PUSH_NAME(__FUNC__)
 
@@ -261,7 +297,8 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
 
   HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and ((arg_my_beta - arg_my_alpha) != 1))
+  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
+          ((arg_my_beta - arg_my_alpha) != 1))
 
   colour_enum my_colour;
 
@@ -279,14 +316,21 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
     if ((mcts_globals.mcts_globals_nodes++ % 100) == 0)
     {
       if (return_my_timer(&(object->S_timer), FALSE) >=
-          fabs(mcts_globals.mcts_globals_time_limit)) goto label_return;
+          fabs(mcts_globals.mcts_globals_time_limit))
+        goto label_return;
     }
   }
 
   if ((arg_my_depth == 0) or (arg_nply >= MCTS_PLY_MAX))
   {
-    best_score = mcts_quiescence(object, INVALID, arg_my_alpha, arg_my_beta,
-      arg_node_type, NULL, arg_best_pv, FALSE);
+    best_score = mcts_quiescence(object,
+                                 INVALID,
+                                 arg_my_alpha,
+                                 arg_my_beta,
+                                 arg_node_type,
+                                 NULL,
+                                 arg_best_pv,
+                                 FALSE);
 
     goto label_return;
   }
@@ -298,7 +342,7 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
     goto label_return;
   }
 
-  //check endgame
+  // check endgame
 
   int wdl;
 
@@ -357,27 +401,30 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
 
   int your_depth = arg_my_depth;
 
-  if (arg_moves_list->ML_ncaptx == 0) your_depth = arg_my_depth - 1;
+  if (arg_moves_list->ML_ncaptx == 0)
+    your_depth = arg_my_depth - 1;
 
   HARDBUG(your_depth < 0)
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
     int jmove = 0;
-   
+
     for (int kmove = 1; kmove < arg_moves_list->ML_nmoves; kmove++)
     {
-      if (moves_weight[kmove] == L_MIN) continue;
-      
-      if (moves_weight[kmove] > moves_weight[jmove]) jmove = kmove;
+      if (moves_weight[kmove] == L_MIN)
+        continue;
+
+      if (moves_weight[kmove] > moves_weight[jmove])
+        jmove = kmove;
     }
 
     HARDBUG(moves_weight[jmove] == L_MIN)
-  
+
     moves_weight[jmove] = L_MIN;
 
     int temp_alpha;
-  
+
     if (best_score < arg_my_alpha)
       temp_alpha = arg_my_alpha;
     else
@@ -393,9 +440,14 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
 
       do_move(&(object->S_board), jmove, arg_moves_list, TRUE);
 
-      temp_score = -mcts_alpha_beta(object, arg_nply,
-        -arg_my_beta, -arg_my_alpha, your_depth,
-        arg_node_type, NULL, &temp_pv);
+      temp_score = -mcts_alpha_beta(object,
+                                    arg_nply,
+                                    -arg_my_beta,
+                                    -arg_my_alpha,
+                                    your_depth,
+                                    arg_node_type,
+                                    NULL,
+                                    &temp_pv);
 
       undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
     }
@@ -405,9 +457,14 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
       {
         do_move(&(object->S_board), jmove, arg_moves_list, TRUE);
 
-        temp_score = -mcts_alpha_beta(object, arg_nply,
-          -arg_my_beta, -temp_alpha, your_depth,
-          arg_node_type, NULL, &temp_pv);
+        temp_score = -mcts_alpha_beta(object,
+                                      arg_nply,
+                                      -arg_my_beta,
+                                      -temp_alpha,
+                                      your_depth,
+                                      arg_node_type,
+                                      NULL,
+                                      &temp_pv);
 
         undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
       }
@@ -417,62 +474,77 @@ local int mcts_alpha_beta(search_t *object, int arg_nply,
 
         do_move(&(object->S_board), jmove, arg_moves_list, TRUE);
 
-        temp_score = -mcts_alpha_beta(object, arg_nply,
-          -temp_beta, -temp_alpha, your_depth,
-          MINIMAL_WINDOW_BIT, NULL, &temp_pv);
+        temp_score = -mcts_alpha_beta(object,
+                                      arg_nply,
+                                      -temp_beta,
+                                      -temp_alpha,
+                                      your_depth,
+                                      MINIMAL_WINDOW_BIT,
+                                      NULL,
+                                      &temp_pv);
 
         if ((temp_score >= temp_beta) and (temp_score < arg_my_beta))
         {
-          temp_score = -mcts_alpha_beta(object, arg_nply,
-            -arg_my_beta, -temp_score, your_depth,
-            arg_node_type, NULL, &temp_pv);
-
+          temp_score = -mcts_alpha_beta(object,
+                                        arg_nply,
+                                        -arg_my_beta,
+                                        -temp_score,
+                                        your_depth,
+                                        arg_node_type,
+                                        NULL,
+                                        &temp_pv);
         }
 
         undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
       }
-    } //IS_MINIMAL_WINDOW
-  
+    } // IS_MINIMAL_WINDOW
+
     HARDBUG(temp_score == SCORE_PLUS_INFINITY)
 
     if (temp_score == SCORE_MINUS_INFINITY)
     {
       best_score = -temp_score;
-  
+
       goto label_return;
     }
 
     if (temp_score > best_score)
     {
       best_score = temp_score;
-  
+
       *arg_best_pv = jmove;
     }
-  
-    if (best_score >= arg_my_beta) goto label_break;
-  } //imove
 
-  label_break:
-  
-  //we always searched move 0
+    if (best_score >= arg_my_beta)
+      goto label_break;
+  } // imove
+
+label_break:
+
+  // we always searched move 0
 
   HARDBUG(*arg_best_pv == INVALID)
 
   HARDBUG(best_score == SCORE_MINUS_INFINITY)
-   
-  label_return:
+
+label_return:
 
   POP_NAME(__FUNC__)
 
-  return(best_score);
+  return (best_score);
 }
 
-//mcts_search returns SCORE_PLUS_INFINITY in case of time limit
-//returns INVALID for best_pv in case of time limit, EGTB hit,
-//draw by repetition or lost because of no moves
+// mcts_search returns SCORE_PLUS_INFINITY in case of time limit
+// returns INVALID for best_pv in case of time limit, EGTB hit,
+// draw by repetition or lost because of no moves
 
-int mcts_search(search_t *object, int arg_root_score, int arg_nply,
-  int arg_mcts_depth, moves_list_t *arg_moves_list, int *arg_best_pv, int arg_verbose)
+int mcts_search(search_t *object,
+                int arg_root_score,
+                int arg_nply,
+                int arg_mcts_depth,
+                moves_list_t *arg_moves_list,
+                int *arg_best_pv,
+                int arg_verbose)
 {
   PUSH_NAME(__FUNC__)
 
@@ -481,7 +553,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
 
   BSTRING(bmove_string)
 
-  //check endgame
+  // check endgame
 
   int wdl;
 
@@ -540,7 +612,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
 
   int ntrouble = 0;
 
-  while(TRUE)
+  while (TRUE)
   {
     int jmove = sort[0];
 
@@ -554,11 +626,17 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
     int temp_score = SCORE_PLUS_INFINITY;
     int temp_pv = INVALID;
 
-    temp_score = -mcts_alpha_beta(object, arg_nply + 1,
-      -beta, -alpha, depth - 1, 
-      PV_BIT, NULL, &temp_pv);
+    temp_score = -mcts_alpha_beta(object,
+                                  arg_nply + 1,
+                                  -beta,
+                                  -alpha,
+                                  depth - 1,
+                                  PV_BIT,
+                                  NULL,
+                                  &temp_pv);
 
-    if (temp_score == SCORE_MINUS_INFINITY) temp_score = SCORE_PLUS_INFINITY;
+    if (temp_score == SCORE_MINUS_INFINITY)
+      temp_score = SCORE_PLUS_INFINITY;
 
     if (temp_score == SCORE_PLUS_INFINITY)
     {
@@ -574,7 +652,7 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
         goto label_return;
       }
 
-      //return best result until now
+      // return best result until now
       goto label_break;
     }
 
@@ -583,14 +661,19 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
 
     if (best_score >= beta)
     {
-      while(TRUE)
+      while (TRUE)
       {
         alpha = best_score;
         beta = best_score + window;
 
-        temp_score = -mcts_alpha_beta(object, arg_nply + 1,
-          -beta, -alpha, depth - 1, 
-          PV_BIT, NULL, &temp_pv);
+        temp_score = -mcts_alpha_beta(object,
+                                      arg_nply + 1,
+                                      -beta,
+                                      -alpha,
+                                      depth - 1,
+                                      PV_BIT,
+                                      NULL,
+                                      &temp_pv);
 
         if (temp_score == SCORE_MINUS_INFINITY)
           temp_score = SCORE_PLUS_INFINITY;
@@ -600,37 +683,43 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
           HARDBUG(mcts_globals.mcts_globals_time_limit == 0.0)
 
           undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
-    
+
           if (mcts_globals.mcts_globals_time_limit < 0.0)
           {
             best_score = SCORE_PLUS_INFINITY;
             *arg_best_pv = INVALID;
-    
+
             goto label_return;
           }
-    
-          //return best result until now
+
+          // return best result until now
           goto label_break;
         }
 
         best_score = temp_score;
         *arg_best_pv = jmove;
 
-        if (best_score < beta) break;
+        if (best_score < beta)
+          break;
 
         window *= 2;
       }
     }
     else if (best_score <= alpha)
     {
-      while(TRUE)
+      while (TRUE)
       {
         alpha = best_score - window;
         beta = best_score;
 
-        temp_score = -mcts_alpha_beta(object, arg_nply + 1,
-          -beta, -alpha, depth - 1, 
-          PV_BIT, NULL, &temp_pv);
+        temp_score = -mcts_alpha_beta(object,
+                                      arg_nply + 1,
+                                      -beta,
+                                      -alpha,
+                                      depth - 1,
+                                      PV_BIT,
+                                      NULL,
+                                      &temp_pv);
 
         if (temp_score == SCORE_MINUS_INFINITY)
           temp_score = SCORE_PLUS_INFINITY;
@@ -640,23 +729,24 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
           HARDBUG(mcts_globals.mcts_globals_time_limit == 0.0)
 
           undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
-    
+
           if (mcts_globals.mcts_globals_time_limit < 0.0)
           {
             best_score = SCORE_PLUS_INFINITY;
             *arg_best_pv = INVALID;
-    
+
             goto label_return;
           }
-    
-          //return best result until now
+
+          // return best result until now
           goto label_break;
         }
 
         best_score = temp_score;
         *arg_best_pv = jmove;
 
-        if (best_score > alpha) break;
+        if (best_score > alpha)
+          break;
 
         window *= 2;
       }
@@ -667,13 +757,16 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
     undo_move(&(object->S_board), *arg_best_pv, arg_moves_list, TRUE);
 
     if ((arg_nply == 0) and arg_verbose)
-    { 
+    {
       print_board(&(object->S_board));
 
       move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-      my_printf(object->S_my_printf, "depth=%d move=%s best_score=%d\n",
-                depth, bdata(bmove_string), best_score);
+      my_printf(object->S_my_printf,
+                "depth=%d move=%s best_score=%d\n",
+                depth,
+                bdata(bmove_string),
+                best_score);
     }
 
     for (int imove = 1; imove < arg_moves_list->ML_nmoves; imove++)
@@ -685,27 +778,33 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
 
       do_move(&(object->S_board), jmove, arg_moves_list, TRUE);
 
-      temp_score = -mcts_alpha_beta(object, arg_nply + 1,
-        -beta, -alpha, depth - 1, 
-        MINIMAL_WINDOW_BIT, NULL, &temp_pv);
-  
-      if (temp_score == SCORE_MINUS_INFINITY) temp_score = SCORE_PLUS_INFINITY;
-  
+      temp_score = -mcts_alpha_beta(object,
+                                    arg_nply + 1,
+                                    -beta,
+                                    -alpha,
+                                    depth - 1,
+                                    MINIMAL_WINDOW_BIT,
+                                    NULL,
+                                    &temp_pv);
+
+      if (temp_score == SCORE_MINUS_INFINITY)
+        temp_score = SCORE_PLUS_INFINITY;
+
       if (temp_score == SCORE_PLUS_INFINITY)
       {
         HARDBUG(mcts_globals.mcts_globals_time_limit == 0.0)
 
         undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
-  
+
         if (mcts_globals.mcts_globals_time_limit < 0.0)
         {
           best_score = SCORE_PLUS_INFINITY;
           *arg_best_pv = INVALID;
-  
+
           goto label_return;
         }
-  
-        //return best result until now
+
+        // return best result until now
         goto label_break;
       }
 
@@ -728,98 +827,118 @@ int mcts_search(search_t *object, int arg_root_score, int arg_nply,
       {
         move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-        my_printf(object->S_my_printf, "depth=%d move=%s best_score>=%d\n",
-                  depth, bdata(bmove_string), best_score);
+        my_printf(object->S_my_printf,
+                  "depth=%d move=%s best_score>=%d\n",
+                  depth,
+                  bdata(bmove_string),
+                  best_score);
       }
 
       window = SCORE_MAN / 4;
 
-      while(TRUE)
+      while (TRUE)
       {
         alpha = best_score;
         beta = best_score + window;
-  
-        temp_score = -mcts_alpha_beta(object, arg_nply + 1,
-          -beta, -alpha, depth - 1, 
-          PV_BIT, NULL, &temp_pv);
-  
+
+        temp_score = -mcts_alpha_beta(object,
+                                      arg_nply + 1,
+                                      -beta,
+                                      -alpha,
+                                      depth - 1,
+                                      PV_BIT,
+                                      NULL,
+                                      &temp_pv);
+
         if (temp_score == SCORE_MINUS_INFINITY)
           temp_score = SCORE_PLUS_INFINITY;
-  
+
         if (temp_score == SCORE_PLUS_INFINITY)
         {
           HARDBUG(mcts_globals.mcts_globals_time_limit == 0.0)
 
           undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
-    
+
           if (mcts_globals.mcts_globals_time_limit < 0.0)
           {
             best_score = SCORE_PLUS_INFINITY;
             *arg_best_pv = INVALID;
-    
+
             goto label_return;
           }
-    
-          //return best result until now
+
+          // return best result until now
           goto label_break;
         }
-  
+
         best_score = temp_score;
         *arg_best_pv = jmove;
-  
-        if (best_score < beta) break;
-  
+
+        if (best_score < beta)
+          break;
+
         window *= 2;
-      }//while(TRUE)
+      } // while(TRUE)
 
       if ((arg_nply == 0) and arg_verbose)
       {
         move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-        my_printf(object->S_my_printf, "depth=%d move=%s best_score==%d\n",
-                  depth, bdata(bmove_string), best_score);
+        my_printf(object->S_my_printf,
+                  "depth=%d move=%s best_score==%d\n",
+                  depth,
+                  bdata(bmove_string),
+                  best_score);
       }
 
       undo_move(&(object->S_board), jmove, arg_moves_list, TRUE);
-    }//for (int imove
+    } // for (int imove
 
     if ((arg_nply == 0) and arg_verbose)
     {
       move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-      my_printf(object->S_my_printf, "depth=%d move=%s best_score===%d\n",
-                depth, bdata(bmove_string), best_score);
+      my_printf(object->S_my_printf,
+                "depth=%d move=%s best_score===%d\n",
+                depth,
+                bdata(bmove_string),
+                best_score);
     }
 
     if (depth >= arg_mcts_depth)
     {
-      if (best_score >= 0) break;
+      if (best_score >= 0)
+        break;
 
-      if (ntrouble > 1) break;
+      if (ntrouble > 1)
+        break;
 
       ntrouble++;
     }
 
     ++depth;
-  }//depth
+  } // depth
 
-  label_break:
+label_break:
 
   if ((arg_nply == 0) and arg_verbose)
   {
     move2bstring(arg_moves_list, *arg_best_pv, bmove_string);
 
-    my_printf(object->S_my_printf, "depth=%d move=%s best_score====%d\n",
-              depth, bdata(bmove_string), best_score);
+    my_printf(object->S_my_printf,
+              "depth=%d move=%s best_score====%d\n",
+              depth,
+              bdata(bmove_string),
+              best_score);
   }
 
-  label_return:
+label_return:
 
   BDESTROY(bmove_string)
 
   POP_NAME(__FUNC__)
 
-  return(best_score);
+  return (best_score);
 }
 
 local int mcts_shoot_out(search_t *object, int arg_nply, int arg_mcts_depth)
@@ -837,7 +956,7 @@ local int mcts_shoot_out(search_t *object, int arg_nply, int arg_mcts_depth)
 
   gen_moves(&(object->S_board), &moves_list);
 
-  //local time limit
+  // local time limit
 
   if (mcts_globals.mcts_globals_time_limit > 0.0)
     reset_my_timer(&(object->S_timer));
@@ -845,10 +964,16 @@ local int mcts_shoot_out(search_t *object, int arg_nply, int arg_mcts_depth)
   int best_score = SCORE_PLUS_INFINITY;
   int best_pv = INVALID;
 
-  best_score = mcts_search(object, 0, arg_nply, arg_mcts_depth,
-    &moves_list, &best_pv, TRUE);
+  best_score = mcts_search(object,
+                           0,
+                           arg_nply,
+                           arg_mcts_depth,
+                           &moves_list,
+                           &best_pv,
+                           TRUE);
 
-  if ((best_pv == INVALID) or (arg_nply >= MCTS_PLY_MAX)) goto label_return;
+  if ((best_pv == INVALID) or (arg_nply >= MCTS_PLY_MAX))
+    goto label_return;
 
   HARDBUG(best_pv >= moves_list.ML_nmoves)
 
@@ -858,21 +983,27 @@ local int mcts_shoot_out(search_t *object, int arg_nply, int arg_mcts_depth)
 
   undo_move(&(object->S_board), best_pv, &moves_list, TRUE);
 
-  if (best_score == SCORE_MINUS_INFINITY) best_score = SCORE_PLUS_INFINITY;
+  if (best_score == SCORE_MINUS_INFINITY)
+    best_score = SCORE_PLUS_INFINITY;
 
-  label_return:
+label_return:
 
   if (best_score == SCORE_PLUS_INFINITY)
   {
     HARDBUG(mcts_globals.mcts_globals_time_limit >= 0.0)
   }
 
-  return(best_score);
+  return (best_score);
 }
 
-double mcts_shoot_outs(search_t *object, int arg_nply,
-  int *arg_nshoot_outs, int arg_mcts_depth, double arg_mcts_time_limit,
-  int *arg_nwon, int *arg_ndraw, int *arg_nlost)
+double mcts_shoot_outs(search_t *object,
+                       int arg_nply,
+                       int *arg_nshoot_outs,
+                       int arg_mcts_depth,
+                       double arg_mcts_time_limit,
+                       int *arg_nwon,
+                       int *arg_ndraw,
+                       int *arg_nlost)
 {
   options.material_only = TRUE;
 
@@ -881,14 +1012,15 @@ double mcts_shoot_outs(search_t *object, int arg_nply,
   HARDBUG(*arg_nshoot_outs < 1)
 
   my_timer_t mcts_timer;
-  
+
   construct_my_timer(&mcts_timer, "mcts_timer", STDOUT, FALSE);
 
   reset_my_timer(&mcts_timer);
 
-  //global time limit
+  // global time limit
 
-  if (arg_mcts_time_limit < 0.0) reset_my_timer(&(object->S_timer));
+  if (arg_mcts_time_limit < 0.0)
+    reset_my_timer(&(object->S_timer));
 
   double result = 0.0;
 
@@ -896,9 +1028,12 @@ double mcts_shoot_outs(search_t *object, int arg_nply,
   int ndraw_local = 0;
   int nlost_local = 0;
 
-  if (arg_nwon == NULL) arg_nwon = &nwon_local;
-  if (arg_ndraw == NULL) arg_ndraw = &ndraw_local;
-  if (arg_nlost == NULL) arg_nlost = &nlost_local;
+  if (arg_nwon == NULL)
+    arg_nwon = &nwon_local;
+  if (arg_ndraw == NULL)
+    arg_ndraw = &ndraw_local;
+  if (arg_nlost == NULL)
+    arg_nlost = &nlost_local;
 
   for (int ishoot_out = 0; ishoot_out < *arg_nshoot_outs; ishoot_out++)
   {
@@ -909,7 +1044,8 @@ double mcts_shoot_outs(search_t *object, int arg_nply,
       HARDBUG(arg_mcts_time_limit >= 0.0)
 
       my_printf(object->S_my_printf,
-                "time limit in mcts_shoot_outs ishoot_out=%d!\n", ishoot_out);
+                "time limit in mcts_shoot_outs ishoot_out=%d!\n",
+                ishoot_out);
 
       *arg_nshoot_outs = ishoot_out;
 
@@ -928,16 +1064,21 @@ double mcts_shoot_outs(search_t *object, int arg_nply,
     my_printf(object->S_my_printf, "WARNING: *nshoot_outs == 0\n");
 
   if ((*arg_nwon + *arg_nlost) > 0)
-    result = (double) (*arg_nwon - *arg_nlost) / (*arg_nwon + *arg_nlost);
+    result = (double)(*arg_nwon - *arg_nlost) / (*arg_nwon + *arg_nlost);
 
-  my_printf(object->S_my_printf, "*nshoot_outs=%d time=%.2f"
+  my_printf(object->S_my_printf,
+            "*nshoot_outs=%d time=%.2f"
             " *nwon=%d *nlost=%d *ndraw=%d result=%.6f"
             " (%.2f shoot_outs/second)\n",
-         *arg_nshoot_outs, return_my_timer(&mcts_timer, FALSE),
-         *arg_nwon, *arg_nlost, *arg_ndraw, result,
-         *arg_nshoot_outs / return_my_timer(&mcts_timer, FALSE));
+            *arg_nshoot_outs,
+            return_my_timer(&mcts_timer, FALSE),
+            *arg_nwon,
+            *arg_nlost,
+            *arg_ndraw,
+            result,
+            *arg_nshoot_outs / return_my_timer(&mcts_timer, FALSE));
 
-  return(result);
+  return (result);
 }
 
 void init_mcts(void)

@@ -1,17 +1,18 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef MovesH
 #define MovesH
 
-#define NMOVES_MAX       128
+#define NMOVES_MAX 128
 #define MOVE_STRING_MAX 128
 
-#define MOVE_DO_NOT_REDUCE_BIT        BIT(0)
+#define MOVE_DO_NOT_REDUCE_BIT BIT(0)
 #define MOVE_EXTEND_IN_QUIESCENCE_BIT BIT(1)
-#define MOVE_KING_BIT                 BIT(2)
+#define MOVE_KING_BIT BIT(2)
 
-#define MOVE_DO_NOT_REDUCE(F)        ((F) & MOVE_DO_NOT_REDUCE_BIT)
+#define MOVE_DO_NOT_REDUCE(F) ((F) & MOVE_DO_NOT_REDUCE_BIT)
 #define MOVE_EXTEND_IN_QUIESCENCE(F) ((F) & MOVE_EXTEND_IN_QUIESCENCE_BIT)
-#define MOVE_KING(F)                 ((F) & MOVE_KING_BIT)
+#define MOVE_KING(F) ((F) & MOVE_KING_BIT)
 
 typedef struct
 {
@@ -47,4 +48,3 @@ void construct_moves_list(void *);
 void fprintf_moves_list(void *, my_printf_t *, int);
 
 #endif
-

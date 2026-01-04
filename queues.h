@@ -1,24 +1,25 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef QueuesH
 #define QueuesH
 
-#define NMESSAGES_MAX   1024
+#define NMESSAGES_MAX 1024
 
-#define MESSAGE_SOLVE          1
-#define MESSAGE_EXIT_THREAD    2 
-#define MESSAGE_ABORT_SEARCH   3
-#define MESSAGE_READY          4
-#define MESSAGE_INFO           5
-#define MESSAGE_FEN            6
-#define MESSAGE_STATE          7
-#define MESSAGE_BOARD          8
-#define MESSAGE_MOVE           9
-#define MESSAGE_GO            10
-#define MESSAGE_RESULT        11
-#define MESSAGE_LAST          12
+#define MESSAGE_SOLVE 1
+#define MESSAGE_EXIT_THREAD 2
+#define MESSAGE_ABORT_SEARCH 3
+#define MESSAGE_READY 4
+#define MESSAGE_INFO 5
+#define MESSAGE_FEN 6
+#define MESSAGE_STATE 7
+#define MESSAGE_BOARD 8
+#define MESSAGE_MOVE 9
+#define MESSAGE_GO 10
+#define MESSAGE_RESULT 11
+#define MESSAGE_LAST 12
 
-#define MESSAGE_SEARCH_FIRST  15
-#define MESSAGE_SEARCH_AHEAD  16
+#define MESSAGE_SEARCH_FIRST 15
+#define MESSAGE_SEARCH_AHEAD 16
 #define MESSAGE_SEARCH_SECOND 17
 
 typedef struct
@@ -53,4 +54,3 @@ int dequeue(void *, message_t *);
 void test_queues(void);
 
 #endif
-

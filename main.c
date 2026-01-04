@@ -1,12 +1,13 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
-#define GWD_JSON       "gwd.json"
+#define GWD_JSON "gwd.json"
 #define OVERRIDES_JSON "overrides.json"
 
-#define NMAN_MIN              4
-#define PROBABILITY_EQUAL     0.5
-#define NPIECES_MIN           7
+#define NMAN_MIN 4
+#define PROBABILITY_EQUAL 0.5
+#define NPIECES_MIN 7
 
 void *STDOUT;
 
@@ -14,7 +15,7 @@ my_random_t main_random;
 
 queue_t main_queue;
 
-//options
+// options
 
 options_t options;
 
@@ -23,7 +24,7 @@ local void solve_problems(char *arg_name)
   BEGIN_BLOCK(__FUNC__)
 
   FILE *ftmp;
-  
+
   HARDBUG((ftmp = fopen("tmp.fen", "w")) == NULL)
 
   search_t search;
@@ -32,7 +33,7 @@ local void solve_problems(char *arg_name)
 
   search_t *with = &search;
 
-  //print_board(&(with->S_board));
+  // print_board(&(with->S_board));
 
   my_bstream_t my_bstream;
 
@@ -48,9 +49,12 @@ local void solve_problems(char *arg_name)
   {
     bstring bline = my_bstream.BS_bline;
 
-    if (bchar(bline, 0) == '*') break;
-    if (bchar(bline, 0) == '#') continue;
-    if (strncmp(bdata(bline), "//", 2) == 0) continue;
+    if (bchar(bline, 0) == '*')
+      break;
+    if (bchar(bline, 0) == '#')
+      continue;
+    if (strncmp(bdata(bline), "//", 2) == 0)
+      continue;
 
     CSTRING(cfen, blength(bline))
 
@@ -87,13 +91,16 @@ local void solve_problems(char *arg_name)
 
     if (moves_list.ML_nmoves > 0)
     {
-      //options.hub=1;
+      // options.hub=1;
 
-      do_search(with, &moves_list,
-        INVALID, INVALID, SCORE_MINUS_INFINITY, FALSE);
+      do_search(with,
+                &moves_list,
+                INVALID,
+                INVALID,
+                SCORE_MINUS_INFINITY,
+                FALSE);
 
-      if ((with->S_best_score -
-           with->S_root_simple_score) > (SCORE_MAN / 2))
+      if ((with->S_best_score - with->S_root_simple_score) > (SCORE_MAN / 2))
       {
         ++nsolved;
         PRINTF("solved problem #%d\n", nproblems);
@@ -117,7 +124,9 @@ local void solve_problems(char *arg_name)
 }
 
 local void solve_problems_mcts(char *arg_name,
-  int arg_nshoot_outs, int arg_mcts_depth, double arg_mcts_time_limit)
+                               int arg_nshoot_outs,
+                               int arg_mcts_depth,
+                               double arg_mcts_time_limit)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -127,7 +136,7 @@ local void solve_problems_mcts(char *arg_name,
 
   search_t *with = &search;
 
-  //print_board(&(with->S_board));
+  // print_board(&(with->S_board));
 
   fbuffer_t fcsv;
 
@@ -150,8 +159,10 @@ local void solve_problems_mcts(char *arg_name,
   {
     bstring bline = my_bstream.BS_bline;
 
-    if (bchar(bline, 0) == '*') break;
-    if (bchar(bline, 0) == '#') continue;
+    if (bchar(bline, 0) == '*')
+      break;
+    if (bchar(bline, 0) == '#')
+      continue;
 
     ++nproblems;
 
@@ -159,8 +170,7 @@ local void solve_problems_mcts(char *arg_name,
 
     double result;
 
-    HARDBUG(my_sscanf(bdata(bline), "%s {%lf}",
-                      cfen, &result) != 2)
+    HARDBUG(my_sscanf(bdata(bline), "%s {%lf}", cfen, &result) != 2)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
@@ -170,7 +180,8 @@ local void solve_problems_mcts(char *arg_name,
 
     if ((my_mpi_globals.MMG_nslaves > 0) and
         (((nproblems - 1) % my_mpi_globals.MMG_nslaves) !=
-         my_mpi_globals.MMG_id_slave)) continue;
+         my_mpi_globals.MMG_id_slave))
+      continue;
 
     ++nproblems_mpi;
 
@@ -190,10 +201,14 @@ local void solve_problems_mcts(char *arg_name,
     {
       int nshoot_outs = arg_nshoot_outs;
 
-      double mcts_result =
-        mcts_shoot_outs(with, 0, &nshoot_outs,
-        arg_mcts_depth, arg_mcts_time_limit,
-        NULL, NULL, NULL);
+      double mcts_result = mcts_shoot_outs(with,
+                                           0,
+                                           &nshoot_outs,
+                                           arg_mcts_depth,
+                                           arg_mcts_time_limit,
+                                           NULL,
+                                           NULL,
+                                           NULL);
 
       PRINTF("mcts_result=%.6f\n", mcts_result);
 
@@ -209,9 +224,13 @@ local void solve_problems_mcts(char *arg_name,
 
   PRINTF("nproblems=%lld nproblems_mpi=%lld\n", nproblems, nproblems_mpi);
 
-  my_mpi_allreduce(MPI_IN_PLACE, &nproblems_mpi, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
-  
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &nproblems_mpi,
+                   1,
+                   MPI_LONG_LONG_INT,
+                   MPI_SUM,
+                   my_mpi_globals.MMG_comm_slaves);
+
   HARDBUG(nproblems != nproblems_mpi)
 
   BDESTROY(barg_name)
@@ -222,10 +241,11 @@ local void solve_problems_mcts(char *arg_name,
 local void solve_problems_multi_threaded(char *arg_name)
 {
   enqueue(return_thread_queue(thread_alpha_beta_master),
-    MESSAGE_SOLVE, arg_name);
+          MESSAGE_SOLVE,
+          arg_name);
 
-  while(TRUE)
-  { 
+  while (TRUE)
+  {
     message_t message;
 
     if (dequeue(&main_queue, &message) != INVALID)
@@ -258,13 +278,15 @@ local char *secs2string(int arg_t)
   HARDBUG((hours * 3600 + minutes * 60 + seconds) != arg_t)
 
   snprintf(string, MY_LINE_MAX, "%02d:%02d:%02d", hours, minutes, seconds);
-  return(string);
+  return (string);
 }
 
 #define GAME_MOVES 40
 
-void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
-  int arg_game_minutes, int arg_used_minutes)
+void play_game(char arg_name[MY_LINE_MAX],
+               char arg_colour[MY_LINE_MAX],
+               int arg_game_minutes,
+               int arg_used_minutes)
 {
   my_random_t play_random;
 
@@ -312,10 +334,11 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
   int ndone = 0;
 
-  while(TRUE)
+  while (TRUE)
   {
     enqueue(return_thread_queue(thread_alpha_beta_master),
-      MESSAGE_STATE, game_state.get_game_state(&game_state));
+            MESSAGE_STATE,
+            game_state.get_game_state(&game_state));
 
     state2board(&(with->S_board), &game_state);
 
@@ -336,7 +359,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
     if (with->S_board.B_colour2move == human_colour)
     {
-      //configure thread for pondering
+      // configure thread for pondering
 
       if (options.ponder)
       {
@@ -346,7 +369,8 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
         PRINTF("\nPondering..\n");
 
         enqueue(return_thread_queue(thread_alpha_beta_master),
-          MESSAGE_GO, "main/play_game");
+                MESSAGE_GO,
+                "main/play_game");
       }
 
       if (!automatic and options.sync_clock and (ndone % 9) == 0)
@@ -357,7 +381,8 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
         char line[MY_LINE_MAX];
 
-        if (fgets(line, MY_LINE_MAX, stdin) == NULL) goto label_return;
+        if (fgets(line, MY_LINE_MAX, stdin) == NULL)
+          goto label_return;
 
         int t;
 
@@ -366,7 +391,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
           game_time_used = game_time - t * 60.0;
 
           PRINTF("remaining %s minutes\n",
-            secs2string(round(game_time - game_time_used)));
+                 secs2string(round(game_time - game_time_used)));
         }
       }
 
@@ -374,11 +399,11 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
       double t1 = compat_time();
 
-      while(TRUE)
+      while (TRUE)
       {
         BSTRING(banswer)
 
-        if (automatic) 
+        if (automatic)
         {
           HARDBUG(bassigncstr(banswer, ".") == BSTR_ERR)
         }
@@ -394,7 +419,8 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
           char line[MY_LINE_MAX];
 
-          if (fgets(line, MY_LINE_MAX, stdin) == NULL) goto label_return;
+          if (fgets(line, MY_LINE_MAX, stdin) == NULL)
+            goto label_return;
 
           CSTRING(canswer, strlen(line))
 
@@ -416,7 +442,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
           continue;
         }
-   
+
         if (bchar(banswer, 0) == 'b')
         {
           BSTRING(book_move)
@@ -441,7 +467,8 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
         if (bchar(banswer, 0) == 'q')
         {
           enqueue(return_thread_queue(thread_alpha_beta_master),
-            MESSAGE_ABORT_SEARCH, "main/play_game");
+                  MESSAGE_ABORT_SEARCH,
+                  "main/play_game");
 
           goto label_return;
         }
@@ -480,7 +507,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
         break;
       }
-      
+
       double t2 = compat_time();
 
       double wait_time = t2 - t1;
@@ -495,19 +522,20 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
       ++ndone;
 
-      //cancel pondering and dequeue messages
+      // cancel pondering and dequeue messages
 
-      label_undo:
-   
+    label_undo:
+
       if (options.ponder)
       {
         enqueue(return_thread_queue(thread_alpha_beta_master),
-          MESSAGE_ABORT_SEARCH, "main/play_game");
+                MESSAGE_ABORT_SEARCH,
+                "main/play_game");
 
-        while(TRUE)
+        while (TRUE)
         {
           message_t message;
-         
+
           if (dequeue(&main_queue, &message) != INVALID)
           {
             if (message.message_id == MESSAGE_RESULT)
@@ -538,10 +566,10 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
         goto label_break;
       }
 
-      //check book move
- 
+      // check book move
+
       HARDBUG(bassigncstr(bbest_move, "NULL") == BSTR_ERR)
- 
+
       if (options.use_book)
         return_book_move(&(with->S_board), &moves_list, bbest_move);
 
@@ -554,33 +582,36 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
         goto label_break;
       }
 
-      //configure thread for search
+      // configure thread for search
 
-      options.time_limit =
-        (game_time - game_time_used) / GAME_MOVES;
+      options.time_limit = (game_time - game_time_used) / GAME_MOVES;
 
-      if (options.time_limit <= 0.1) options.time_limit = 0.1;
+      if (options.time_limit <= 0.1)
+        options.time_limit = 0.1;
 
       options.time_trouble[0] =
-        (game_time - game_time_used - options.time_limit) / GAME_MOVES;
+          (game_time - game_time_used - options.time_limit) / GAME_MOVES;
 
-      if (options.time_trouble[0] <= 0.1) options.time_trouble[0] = 0.1;
+      if (options.time_trouble[0] <= 0.1)
+        options.time_trouble[0] = 0.1;
 
-      options.time_trouble[1] =
-        (game_time - game_time_used -
-         options.time_limit - options.time_trouble[0]) / GAME_MOVES;
+      options.time_trouble[1] = (game_time - game_time_used -
+                                 options.time_limit - options.time_trouble[0]) /
+                                GAME_MOVES;
 
-      if (options.time_trouble[1] <= 0.1) options.time_trouble[1] = 0.1;
+      if (options.time_trouble[1] <= 0.1)
+        options.time_trouble[1] = 0.1;
 
       options.time_ntrouble = 2;
 
       enqueue(return_thread_queue(thread_alpha_beta_master),
-        MESSAGE_GO, "main/play_game");
+              MESSAGE_GO,
+              "main/play_game");
 
-      while(TRUE)
+      while (TRUE)
       {
         message_t message;
-        
+
         if (dequeue(&main_queue, &message) != INVALID)
         {
           if (message.message_id == MESSAGE_INFO)
@@ -593,8 +624,10 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
             CSTRING(cbest_move, blength(message.message_text))
 
-            HARDBUG(my_sscanf(bdata(message.message_text), "%s%d",
-                              cbest_move, &best_score) != 2)
+            HARDBUG(my_sscanf(bdata(message.message_text),
+                              "%s%d",
+                              cbest_move,
+                              &best_score) != 2)
 
             HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
 
@@ -604,13 +637,13 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
           }
           else
             FATAL("message.message_id error", EXIT_FAILURE)
-        } 
+        }
         compat_sleep(CENTI_SECOND);
       }
 
       double t2;
 
-      label_break:
+    label_break:
 
       t2 = compat_time();
 
@@ -624,8 +657,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
 
       PRINTF("remain %s\n", secs2string(round(game_time - game_time_used)));
 
-      PRINTF("\n* * * * * * * * * * %s %d\n\n",
-        bdata(bbest_move), best_score);
+      PRINTF("\n* * * * * * * * * * %s %d\n\n", bdata(bbest_move), best_score);
 
       char comment[MY_LINE_MAX];
 
@@ -636,7 +668,7 @@ void play_game(char arg_name[MY_LINE_MAX], char arg_colour[MY_LINE_MAX],
       BDESTROY(bbest_move)
     }
   }
-  label_return:
+label_return:
 
   game_state.save(&game_state, arg_name);
 
@@ -652,8 +684,9 @@ double weibull_shape(int arg_npieces)
   double sigma = 3.57;
   double offset = 1.87;
 
-  return(a * exp(-((arg_npieces - mu) * (arg_npieces - mu)) / (2 * sigma * sigma)) +
-         offset);
+  return (a * exp(-((arg_npieces - mu) * (arg_npieces - mu)) /
+                  (2 * sigma * sigma)) +
+          offset);
 }
 
 double weibull_scale(int arg_npieces)
@@ -662,10 +695,12 @@ double weibull_scale(int arg_npieces)
   double b = 0.12;
   double offset = 2.74;
 
-  return(a * exp(-b * arg_npieces) + offset);
+  return (a * exp(-b * arg_npieces) + offset);
 }
 
-int weibull_sample_row(double arg_probability, double arg_shape, double arg_scale)
+int weibull_sample_row(double arg_probability,
+                       double arg_shape,
+                       double arg_scale)
 {
   int result = INVALID;
 
@@ -675,13 +710,16 @@ int weibull_sample_row(double arg_probability, double arg_shape, double arg_scal
     result = 9;
   else
   {
-    result = round(arg_scale * pow(-log(1.0 - arg_probability), 1.0 / arg_shape));
-  
-    if (result < 1) result = 1;
-    if (result > 9) result = 9;
+    result =
+        round(arg_scale * pow(-log(1.0 - arg_probability), 1.0 / arg_shape));
+
+    if (result < 1)
+      result = 1;
+    if (result > 9)
+      result = 9;
   }
 
-  return(result - 1);
+  return (result - 1);
 }
 
 local void test_weibull(void)
@@ -690,29 +728,33 @@ local void test_weibull(void)
   {
     double shape = weibull_shape(npieces);
     double scale = weibull_scale(npieces);
-    
+
     for (int percentage = 1; percentage <= 99; ++percentage)
     {
       int row = weibull_sample_row(percentage / 100.0, shape, scale);
-  
-      PRINTF("npieces=%d percentage=%d row=%d\n",
-             npieces, percentage, row + 1);
+
+      PRINTF("npieces=%d percentage=%d row=%d\n", npieces, percentage, row + 1);
     }
   }
 }
 
-//10 pieces 25%
+// 10 pieces 25%
 local double probability_one_king(int arg_npieces)
 {
   double a = 0.83;
   double b = -0.12;
 
-  return(a * exp(b * arg_npieces));
+  return (a * exp(b * arg_npieces));
 }
 
-local int add_man_random(int arg_nwhite_man, int arg_nblack_man,
-  int arg_shape, int arg_scale, my_random_t *arg_random,
-  search_t *arg_with, char *arg_s, int *arg_best_score)
+local int add_man_random(int arg_nwhite_man,
+                         int arg_nblack_man,
+                         int arg_shape,
+                         int arg_scale,
+                         my_random_t *arg_random,
+                         search_t *arg_with,
+                         char *arg_s,
+                         int *arg_best_score)
 {
   int result = FALSE;
 
@@ -724,21 +766,20 @@ local int add_man_random(int arg_nwhite_man, int arg_nblack_man,
 
   reset_my_timer(&timer);
 
-  while(TRUE)
+  while (TRUE)
   {
     ++ntry;
 
-    for (int i = 1; i <= 50; ++i) arg_s[i] = *nn;
+    for (int i = 1; i <= 50; ++i)
+      arg_s[i] = *nn;
 
-    for (int iwhite_man = 1; iwhite_man <= arg_nwhite_man;
-         ++iwhite_man)
+    for (int iwhite_man = 1; iwhite_man <= arg_nwhite_man; ++iwhite_man)
     {
       int i = INVALID;
 
-      while(TRUE)
+      while (TRUE)
       {
-        double probability = return_my_random(arg_random) /
-                             (double) ULL_MAX;
+        double probability = return_my_random(arg_random) / (double)ULL_MAX;
 
         int irow = 9 - weibull_sample_row(probability, arg_shape, arg_scale);
         int icol = return_my_random(arg_random) % 5;
@@ -747,43 +788,43 @@ local int add_man_random(int arg_nwhite_man, int arg_nblack_man,
 
         HARDBUG(i > 50)
 
-        if (arg_s[i] == *nn) break;
+        if (arg_s[i] == *nn)
+          break;
       }
- 
+
       HARDBUG(i == INVALID)
 
       arg_s[i] = *wO;
     }
-  
-    for (int iblack_man = 1; iblack_man <= arg_nblack_man;
-         ++iblack_man)
+
+    for (int iblack_man = 1; iblack_man <= arg_nblack_man; ++iblack_man)
     {
       int i = INVALID;
 
-      while(TRUE)
+      while (TRUE)
       {
-        double probability = (return_my_random(arg_random) /
-                             (double) ULL_MAX);
+        double probability = (return_my_random(arg_random) / (double)ULL_MAX);
 
         int irow = weibull_sample_row(probability, arg_shape, arg_scale);
         int icol = return_my_random(arg_random) % 5;
- 
+
         i = irow * 5 + icol + 1;
 
         HARDBUG(i > 50)
 
-        if (arg_s[i] == *nn) break;
+        if (arg_s[i] == *nn)
+          break;
       }
- 
+
       HARDBUG(i == INVALID)
 
       arg_s[i] = *bO;
     }
 
     arg_s[51] = '\0';
-  
+
     string2board(&(arg_with->S_board), arg_s);
-  
+
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
@@ -799,23 +840,30 @@ local int add_man_random(int arg_nwhite_man, int arg_nblack_man,
         int root_score = return_material_score(&(arg_with->S_board));
 
         reset_my_timer(&(arg_with->S_timer));
-    
+
         int best_pv;
-    
-        *arg_best_score = mcts_search(arg_with, root_score, 0, MCTS_PLY_MAX, 
-                                      &moves_list, &best_pv, FALSE);
-    
+
+        *arg_best_score = mcts_search(arg_with,
+                                      root_score,
+                                      0,
+                                      MCTS_PLY_MAX,
+                                      &moves_list,
+                                      &best_pv,
+                                      FALSE);
+
         if (abs(root_score - *arg_best_score) <= (SCORE_MAN / 4))
-        { 
+        {
           result = TRUE;
         }
         else
-        { 
+        {
           if (ntry <= 10)
           {
             PRINTF("add_man_random rejected"
                    " ntry=%d root_score=%d *arg_best_score=%d\n",
-                   ntry, root_score, *arg_best_score);
+                   ntry,
+                   root_score,
+                   *arg_best_score);
           }
         }
       }
@@ -825,14 +873,16 @@ local int add_man_random(int arg_nwhite_man, int arg_nblack_man,
       if (ntry <= 10)
       {
         PRINTF("add_man_random rejected ntry=%d ncaptx=%d nmoves=%d\n",
-               ntry, moves_list.ML_ncaptx, moves_list.ML_nmoves);
+               ntry,
+               moves_list.ML_ncaptx,
+               moves_list.ML_nmoves);
       }
     }
 
     if (result)
     {
       PRINTF("add_man_random accepted ntry=%d\n", ntry);
-  
+
       break;
     }
 
@@ -844,7 +894,7 @@ local int add_man_random(int arg_nwhite_man, int arg_nblack_man,
     }
   }
 
-  return(result);
+  return (result);
 }
 
 int return_random_set_bit(my_random_t *arg_random, uint64_t arg_mask)
@@ -858,17 +908,21 @@ int return_random_set_bit(my_random_t *arg_random, uint64_t arg_mask)
   for (int jbit = 0; jbit < ibit; jbit++)
     arg_mask &= arg_mask - 1;
 
-  return(BIT_CTZ(arg_mask));
+  return (BIT_CTZ(arg_mask));
 }
 
-local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
-  my_random_t *arg_random, search_t *arg_with,
-  ui64_t *arg_white_kings_mask, ui64_t *arg_black_kings_mask,
-  char *arg_s, int *arg_best_score)
+local int add_kings_random(int arg_nwhite_kings,
+                           int arg_nblack_kings,
+                           my_random_t *arg_random,
+                           search_t *arg_with,
+                           ui64_t *arg_white_kings_mask,
+                           ui64_t *arg_black_kings_mask,
+                           char *arg_s,
+                           int *arg_best_score)
 {
   HARDBUG((arg_nwhite_kings + arg_nblack_kings) == 0)
 
-  //just to be sure
+  // just to be sure
 
   arg_s[51] = '\0';
 
@@ -885,68 +939,71 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
   ui64_t empty = 0;
 
   for (int isquare = 1; isquare <= 50; ++isquare)
-    if (arg_s[isquare] == *nn) empty |= BITULL(isquare);
+    if (arg_s[isquare] == *nn)
+      empty |= BITULL(isquare);
 
   HARDBUG(empty == 0)
 
-  while(TRUE)
+  while (TRUE)
   {
     ++ntry;
 
     int nwhite_kings = 0;
     int nblack_kings = 0;
-  
+
     int squares[NPIECES_MAX];
     int nsquares = 0;
 
     string2board(&(arg_with->S_board), arg_s);
 
-/*
-    PRINTF("before while\n");
-    print_board(&(arg_with->S_board));
-    PRINTF("white mask:");
-    for (int i = 1; i <= 50; ++i)
-      if (*arg_white_kings_mask & BITULL(i)) PRINTF(" %d", i);
-    PRINTF("\n");
-    PRINTF("black mask:");
-    for (int i = 1; i <= 50; ++i)
-      if (*arg_black_kings_mask & BITULL(i)) PRINTF(" %d", i);
-    PRINTF("\n");
-*/
+    /*
+        PRINTF("before while\n");
+        print_board(&(arg_with->S_board));
+        PRINTF("white mask:");
+        for (int i = 1; i <= 50; ++i)
+          if (*arg_white_kings_mask & BITULL(i)) PRINTF(" %d", i);
+        PRINTF("\n");
+        PRINTF("black mask:");
+        for (int i = 1; i <= 50; ++i)
+          if (*arg_black_kings_mask & BITULL(i)) PRINTF(" %d", i);
+        PRINTF("\n");
+    */
 
-    while(TRUE)
+    while (TRUE)
     {
       int icolour = return_my_random(arg_random) % 2;
 
-      if (icolour == 0) 
+      if (icolour == 0)
       {
-        if ((nwhite_kings >= arg_nwhite_kings) or 
+        if ((nwhite_kings >= arg_nwhite_kings) or
             ((empty & ~(*arg_white_kings_mask)) == 0))
         {
           icolour = 1;
-  
-          if ((nblack_kings >= arg_nblack_kings) or 
-              ((empty & ~(*arg_black_kings_mask)) == 0)) break;
+
+          if ((nblack_kings >= arg_nblack_kings) or
+              ((empty & ~(*arg_black_kings_mask)) == 0))
+            break;
         }
       }
       else
       {
-        if ((nblack_kings >= arg_nblack_kings) or 
+        if ((nblack_kings >= arg_nblack_kings) or
             ((empty & ~(*arg_black_kings_mask)) == 0))
         {
           icolour = 0;
-  
-          if ((nwhite_kings >= arg_nwhite_kings) or 
-              ((empty & ~(*arg_white_kings_mask)) == 0)) break;
+
+          if ((nwhite_kings >= arg_nwhite_kings) or
+              ((empty & ~(*arg_white_kings_mask)) == 0))
+            break;
         }
       }
-    
-      //at least one empty square is available
+
+      // at least one empty square is available
 
       if (icolour == 0)
       {
-        int isquare = return_random_set_bit(arg_random,
-                                            empty & ~(*arg_white_kings_mask));
+        int isquare =
+            return_random_set_bit(arg_random, empty & ~(*arg_white_kings_mask));
 
         HARDBUG(arg_s[isquare] != *nn)
 
@@ -962,14 +1019,14 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
 
         ++nwhite_kings;
 
-/*
-        PRINTF("added white king at %d\n", isquare);
-*/
+        /*
+                PRINTF("added white king at %d\n", isquare);
+        */
       }
       else
       {
-        int isquare = return_random_set_bit(arg_random,
-                                            empty & ~(*arg_black_kings_mask));
+        int isquare =
+            return_random_set_bit(arg_random, empty & ~(*arg_black_kings_mask));
 
         HARDBUG(arg_s[isquare] != *nn)
 
@@ -985,28 +1042,30 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
 
         ++nblack_kings;
 
-/*
-        PRINTF("added black king at %d\n", isquare);
-*/
+        /*
+                PRINTF("added black king at %d\n", isquare);
+        */
       }
 
       if ((nwhite_kings >= arg_nwhite_kings) and
-          (nblack_kings >= arg_nblack_kings)) break;
-  
-      if (empty == 0) break;
+          (nblack_kings >= arg_nblack_kings))
+        break;
+
+      if (empty == 0)
+        break;
     }
 
-/*
-    PRINTF("after while\n");
-    string2board(&(arg_with->S_board), arg_s);
-    print_board(&(arg_with->S_board));
-*/
+    /*
+        PRINTF("after while\n");
+        string2board(&(arg_with->S_board), arg_s);
+        print_board(&(arg_with->S_board));
+    */
 
     if (nsquares == 0)
     {
       PRINTF("add_kings_random rejected no more squares ntry=%d\n", ntry);
 
-      return(result);
+      return (result);
     }
 
     HARDBUG((nwhite_kings + nblack_kings) != nsquares)
@@ -1028,12 +1087,17 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
         int root_score = return_material_score(&(arg_with->S_board));
 
         reset_my_timer(&(arg_with->S_timer));
-    
+
         int best_pv;
-    
-        *arg_best_score = mcts_search(arg_with, root_score, 0, MCTS_PLY_MAX, 
-                                      &moves_list, &best_pv, FALSE);
-    
+
+        *arg_best_score = mcts_search(arg_with,
+                                      root_score,
+                                      0,
+                                      MCTS_PLY_MAX,
+                                      &moves_list,
+                                      &best_pv,
+                                      FALSE);
+
         if (abs(root_score - *arg_best_score) <= (SCORE_MAN / 4))
         {
           result = TRUE;
@@ -1044,7 +1108,9 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
           {
             PRINTF("add_kings_random rejected"
                    " ntry=%d root_score=%d *arg_best_score=%d\n",
-                   ntry, root_score, *arg_best_score);
+                   ntry,
+                   root_score,
+                   *arg_best_score);
           }
         }
       }
@@ -1054,11 +1120,13 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
       if (ntry <= 10)
       {
         PRINTF("add_kings_random rejected ntry=%d ncaptx=%d nmoves=%d\n",
-               ntry, moves_list.ML_ncaptx, moves_list.ML_nmoves);
+               ntry,
+               moves_list.ML_ncaptx,
+               moves_list.ML_nmoves);
       }
     }
 
-    //mark squares and restore
+    // mark squares and restore
 
     for (int isquare = 0; isquare < nsquares; isquare++)
     {
@@ -1091,11 +1159,13 @@ local int add_kings_random(int arg_nwhite_kings, int arg_nblack_kings,
     }
   }
 
-  return(result);
+  return (result);
 }
 
-local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
-  int arg_nkings_max, double arg_time_limit)
+local void gen_random(char *arg_fen_name,
+                      i64_t arg_npositions_max,
+                      int arg_nkings_max,
+                      double arg_time_limit)
 {
   my_random_t temp_random;
 
@@ -1135,9 +1205,9 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
   if (my_mpi_globals.MMG_nslaves > 0)
   {
     npositions = arg_npositions_max / my_mpi_globals.MMG_nslaves;
-   
-    if (npositions * my_mpi_globals.MMG_nslaves < 
-        arg_npositions_max) ++npositions;
+
+    if (npositions * my_mpi_globals.MMG_nslaves < arg_npositions_max)
+      ++npositions;
   }
 
   HARDBUG(npositions < 1)
@@ -1149,60 +1219,92 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
 
   bucket_t bucket_root_score;
 
-  construct_bucket(&bucket_root_score, "bucket_root_score",
-                   SCORE_MAN, SCORE_LOST, SCORE_WON, BUCKET_LINEAR);
+  construct_bucket(&bucket_root_score,
+                   "bucket_root_score",
+                   SCORE_MAN,
+                   SCORE_LOST,
+                   SCORE_WON,
+                   BUCKET_LINEAR);
 
   bucket_t bucket_npieces;
 
-  construct_bucket(&bucket_npieces, "bucket_npieces",
-                   1, 0, 2 * NPIECES_MAX, BUCKET_LINEAR);
+  construct_bucket(&bucket_npieces,
+                   "bucket_npieces",
+                   1,
+                   0,
+                   2 * NPIECES_MAX,
+                   BUCKET_LINEAR);
 
   bucket_t bucket_ndelta;
 
-  construct_bucket(&bucket_ndelta, "bucket_ndelta",
-                   1, -NMAN_MIN, NMAN_MIN, BUCKET_LINEAR);
+  construct_bucket(&bucket_ndelta,
+                   "bucket_ndelta",
+                   1,
+                   -NMAN_MIN,
+                   NMAN_MIN,
+                   BUCKET_LINEAR);
 
   bucket_t bucket_nwhite_man;
 
-  construct_bucket(&bucket_nwhite_man, "bucket_nwhite_man",
-                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+  construct_bucket(&bucket_nwhite_man,
+                   "bucket_nwhite_man",
+                   1,
+                   0,
+                   NPIECES_MAX,
+                   BUCKET_LINEAR);
 
   bucket_t bucket_nblack_man;
 
-  construct_bucket(&bucket_nblack_man, "bucket_nblack_man",
-                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+  construct_bucket(&bucket_nblack_man,
+                   "bucket_nblack_man",
+                   1,
+                   0,
+                   NPIECES_MAX,
+                   BUCKET_LINEAR);
 
   bucket_t bucket_nwhite_kings;
 
-  construct_bucket(&bucket_nwhite_kings, "bucket_nwhite_kings",
-                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+  construct_bucket(&bucket_nwhite_kings,
+                   "bucket_nwhite_kings",
+                   1,
+                   0,
+                   NPIECES_MAX,
+                   BUCKET_LINEAR);
 
   bucket_t bucket_nblack_kings;
 
-  construct_bucket(&bucket_nblack_kings, "bucket_nblack_kings",
-                   1, 0, NPIECES_MAX, BUCKET_LINEAR);
+  construct_bucket(&bucket_nblack_kings,
+                   "bucket_nblack_kings",
+                   1,
+                   0,
+                   NPIECES_MAX,
+                   BUCKET_LINEAR);
 
   bucket_t bucket_nkings;
 
-  construct_bucket(&bucket_nkings, "bucket_nkings",
-                   1, 0, 2 * NPIECES_MAX, BUCKET_LINEAR);
+  construct_bucket(&bucket_nkings,
+                   "bucket_nkings",
+                   1,
+                   0,
+                   2 * NPIECES_MAX,
+                   BUCKET_LINEAR);
 
-  while(iposition < npositions)
+  while (iposition < npositions)
   {
-    double probability = return_my_random(&temp_random) / (double) ULL_MAX;
+    double probability = return_my_random(&temp_random) / (double)ULL_MAX;
 
     int npieces = INVALID;
     int nwhite = INVALID;
     int nblack = INVALID;
     int nwhite_man = INVALID;
-    int nwhite_kings = INVALID; 
+    int nwhite_kings = INVALID;
     int nblack_man = INVALID;
     int nblack_kings = INVALID;
 
-    while(TRUE)
+    while (TRUE)
     {
       nwhite_man = return_my_random(&temp_random) %
-                   (20 - arg_nkings_max - NMAN_MIN + 1) +
+                       (20 - arg_nkings_max - NMAN_MIN + 1) +
                    NMAN_MIN;
 
       nblack_man = nwhite_man;
@@ -1212,14 +1314,16 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
       double cumulative_probability = PROBABILITY_EQUAL;
 
       double delta_probability = (1.0 - PROBABILITY_EQUAL) / NMAN_MIN;
-      
+
       while (TRUE)
       {
-        if (probability < cumulative_probability) break;
-      
+        if (probability < cumulative_probability)
+          break;
+
         ++ndelta;
-      
-        if (ndelta >= NMAN_MIN) break;
+
+        if (ndelta >= NMAN_MIN)
+          break;
 
         cumulative_probability += delta_probability;
       }
@@ -1238,43 +1342,48 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
 
       if (arg_nkings_max > 0)
       {
-        while(TRUE)
+        while (TRUE)
         {
-          probability = return_my_random(&temp_random) / (double) ULL_MAX;
+          probability = return_my_random(&temp_random) / (double)ULL_MAX;
 
           cumulative_probability = 1.0 - probability_one_king(nwhite_man);
-    
+
           delta_probability = (1.0 - cumulative_probability) / arg_nkings_max;
-          
+
           while (TRUE)
           {
-            if (probability < cumulative_probability) break;
-          
+            if (probability < cumulative_probability)
+              break;
+
             ++nwhite_kings;
-          
-            if (nwhite_kings >= arg_nkings_max) break;
-    
+
+            if (nwhite_kings >= arg_nkings_max)
+              break;
+
             cumulative_probability += delta_probability;
           }
 
-          probability = return_my_random(&temp_random) / (double) ULL_MAX;
-  
+          probability = return_my_random(&temp_random) / (double)ULL_MAX;
+
           cumulative_probability = 1.0 - probability_one_king(nblack_man);
-      
+
           delta_probability = (1.0 - cumulative_probability) / arg_nkings_max;
-            
+
           while (TRUE)
           {
-            if (probability < cumulative_probability) break;
-            
+            if (probability < cumulative_probability)
+              break;
+
             ++nblack_kings;
-        
-            if (nblack_kings >= arg_nkings_max) break;
-  
+
+            if (nblack_kings >= arg_nkings_max)
+              break;
+
             cumulative_probability += delta_probability;
           }
 
-          if ((nwhite_kings + nblack_kings) > 0) break;
+          if ((nwhite_kings + nblack_kings) > 0)
+            break;
         }
       }
 
@@ -1283,7 +1392,8 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
 
       npieces = nwhite + nblack;
 
-      if (npieces >= NPIECES_MIN) break;
+      if (npieces >= NPIECES_MIN)
+        break;
     }
 
     HARDBUG(npieces == INVALID)
@@ -1294,14 +1404,18 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
     HARDBUG(nblack_man == INVALID)
     HARDBUG(nblack_kings == INVALID)
 
-    PRINTF("trying iposition=%lld" 
+    PRINTF("trying iposition=%lld"
            " npieces=%d nwhite=%d nblack=%d"
            " nwhite_man=%d nblack_man=%d"
            " nwhite_kings=%d nblack_kings=%d\n",
            iposition,
-           npieces, nwhite, nblack,
-           nwhite_man, nblack_man,
-           nwhite_kings, nblack_kings);
+           npieces,
+           nwhite,
+           nblack,
+           nwhite_man,
+           nblack_man,
+           nwhite_kings,
+           nblack_kings);
 
     double shape = weibull_shape(npieces);
     double scale = weibull_scale(npieces);
@@ -1314,20 +1428,32 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
       s[0] = 'w';
     else
       s[0] = 'b';
-  
+
     int best_score = SCORE_PLUS_INFINITY;
 
     int result = INVALID;
 
     if ((nwhite_kings == 0) and (nblack_kings == 0))
     {
-      result = add_man_random(nwhite_man, nblack_man, shape, scale,
-                              &temp_random, with, s, &best_score);
+      result = add_man_random(nwhite_man,
+                              nblack_man,
+                              shape,
+                              scale,
+                              &temp_random,
+                              with,
+                              s,
+                              &best_score);
     }
     else
     {
-      result = add_man_random(nwhite_man, nblack_man, shape, scale,
-                              &temp_random, with, s, NULL);
+      result = add_man_random(nwhite_man,
+                              nblack_man,
+                              shape,
+                              scale,
+                              &temp_random,
+                              with,
+                              s,
+                              NULL);
     }
 
     if (!result)
@@ -1342,14 +1468,18 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
 
     int nsame = 0;
 
-    while(TRUE)
+    while (TRUE)
     {
       if ((nwhite_kings > 0) or (nblack_kings > 0))
       {
-        if (!add_kings_random(nwhite_kings, nblack_kings,
-                              &temp_random, with,
-                              &white_kings_mask, &black_kings_mask,
-                              s, &best_score))
+        if (!add_kings_random(nwhite_kings,
+                              nblack_kings,
+                              &temp_random,
+                              with,
+                              &white_kings_mask,
+                              &black_kings_mask,
+                              s,
+                              &best_score))
         {
           PRINTF("add_kings_random failed nsame=%d\n", nsame);
 
@@ -1367,65 +1497,71 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
       int root_score = return_material_score(&(with->S_board));
 
       print_board(&(with->S_board));
-    
+
       PRINTF("accepted iposition=%lld nsame=%d"
              " npieces=%d nwhite=%d nblack=%d"
              " nwhite_man=%d nblack_man=%d"
              " nwhite_kings=%d nblack_kings=%d"
              " root_score=%d best_score=%d\n",
-             iposition, nsame, 
-             npieces, nwhite, nblack,
+             iposition,
+             nsame,
+             npieces,
+             nwhite,
+             nblack,
              BIT_COUNT(with->S_board.B_white_man_bb),
              BIT_COUNT(with->S_board.B_black_man_bb),
              BIT_COUNT(with->S_board.B_white_king_bb),
              BIT_COUNT(with->S_board.B_black_king_bb),
-             root_score, best_score);
-    
+             root_score,
+             best_score);
+
       update_bucket(&bucket_root_score, root_score);
-  
+
       update_bucket(&bucket_npieces, npieces);
-    
+
       update_bucket(&bucket_ndelta, nwhite_man - nblack_man);
 
       update_bucket(&bucket_nwhite_man,
-        BIT_COUNT(with->S_board.B_white_man_bb));
-  
+                    BIT_COUNT(with->S_board.B_white_man_bb));
+
       update_bucket(&bucket_nblack_man,
-        BIT_COUNT(with->S_board.B_black_man_bb));
-    
+                    BIT_COUNT(with->S_board.B_black_man_bb));
+
       update_bucket(&bucket_nwhite_kings,
-        BIT_COUNT(with->S_board.B_white_king_bb));
-    
+                    BIT_COUNT(with->S_board.B_white_king_bb));
+
       update_bucket(&bucket_nblack_kings,
-        BIT_COUNT(with->S_board.B_black_king_bb));
-    
+                    BIT_COUNT(with->S_board.B_black_king_bb));
+
       update_bucket(&bucket_nkings,
-        BIT_COUNT(with->S_board.B_white_king_bb) + 
-        BIT_COUNT(with->S_board.B_black_king_bb));
-    
+                    BIT_COUNT(with->S_board.B_white_king_bb) +
+                        BIT_COUNT(with->S_board.B_black_king_bb));
+
       BSTRING(bfen)
-    
+
       board2fen(&(with->S_board), bfen, FALSE);
-      
+
       append_fbuffer_fmt(&ffen, "%s {0.000000}\n", bdata(bfen));
-  
+
       BDESTROY(bfen)
-    
+
       ++iposition;
-      
+
       if ((iposition - iposition_prev) > 100)
       {
         iposition_prev = iposition;
-    
+
         PRINTF("iposition=%lld time=%.2f (%.2f positions/second)\n",
-          iposition, return_my_timer(&timer, FALSE),
-          iposition / return_my_timer(&timer, FALSE));
+               iposition,
+               return_my_timer(&timer, FALSE),
+               iposition / return_my_timer(&timer, FALSE));
       }
 
-      if ((nwhite_kings == 0) and (nblack_kings == 0)) break;
+      if ((nwhite_kings == 0) and (nblack_kings == 0))
+        break;
 
-    }//while(TRUE)
-  }//while(iposition < npositions
+    } // while(TRUE)
+  }   // while(iposition < npositions
 
   flush_fbuffer(&ffen, 0);
 
@@ -1438,37 +1574,35 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
   printf_bucket(&bucket_nblack_kings);
   printf_bucket(&bucket_nkings);
 
-  my_mpi_barrier_v3("after gen", my_mpi_globals.MMG_comm_slaves,
-                    SEMKEY_GEN_RANDOM_BARRIER, TRUE);
+  my_mpi_barrier_v3("after gen",
+                    my_mpi_globals.MMG_comm_slaves,
+                    my_mpi_globals.MMG_semkey_gen_random_barrier,
+                    TRUE);
 
-  my_mpi_allreduce(MPI_IN_PLACE, &iposition, 1, MPI_LONG_LONG_INT,
-    MPI_SUM, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &iposition,
+                   1,
+                   MPI_LONG_LONG_INT,
+                   MPI_SUM,
+                   my_mpi_globals.MMG_comm_slaves);
 
   PRINTF("iposition=%lld\n", iposition);
 
-  my_mpi_bucket_aggregate(&bucket_root_score,
-    my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_root_score, my_mpi_globals.MMG_comm_slaves);
 
-  my_mpi_bucket_aggregate(&bucket_npieces,
-    my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_npieces, my_mpi_globals.MMG_comm_slaves);
 
-  my_mpi_bucket_aggregate(&bucket_ndelta,
-    my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_ndelta, my_mpi_globals.MMG_comm_slaves);
 
-  my_mpi_bucket_aggregate(&bucket_nwhite_man,
-    my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nwhite_man, my_mpi_globals.MMG_comm_slaves);
 
-  my_mpi_bucket_aggregate(&bucket_nblack_man,
-    my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nblack_man, my_mpi_globals.MMG_comm_slaves);
 
-  my_mpi_bucket_aggregate(&bucket_nwhite_kings,
-    my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nwhite_kings, my_mpi_globals.MMG_comm_slaves);
 
-  my_mpi_bucket_aggregate(&bucket_nblack_kings,
-    my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nblack_kings, my_mpi_globals.MMG_comm_slaves);
 
-  my_mpi_bucket_aggregate(&bucket_nkings,
-    my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nkings, my_mpi_globals.MMG_comm_slaves);
 
   printf_bucket(&bucket_root_score);
 
@@ -1491,14 +1625,11 @@ local void gen_random(char *arg_fen_name, i64_t arg_npositions_max,
 
 local void test_cJSON(void)
 {
-  const unsigned int resolution_numbers[3][2] =
-  {
-    {1280, 720},
-    {1920, 1080},
-    {3840, 2160}
-  };
+  const unsigned int resolution_numbers[3][2] = {{1280, 720},
+                                                 {1920, 1080},
+                                                 {3840, 2160}};
 
-  cJSON *monitor = cJSON_CreateObject(); 
+  cJSON *monitor = cJSON_CreateObject();
 
   HARDBUG(monitor == NULL)
 
@@ -1514,14 +1645,16 @@ local void test_cJSON(void)
        ++index)
   {
     cJSON *resolution = cJSON_CreateObject();
-  
+
     HARDBUG(resolution == NULL)
 
-    HARDBUG(cJSON_AddNumberToObject(resolution, "width",
-                                resolution_numbers[index][0]) == NULL)
+    HARDBUG(cJSON_AddNumberToObject(resolution,
+                                    "width",
+                                    resolution_numbers[index][0]) == NULL)
 
-    HARDBUG(cJSON_AddNumberToObject(resolution, "height",
-                                resolution_numbers[index][1]) == NULL)
+    HARDBUG(cJSON_AddNumberToObject(resolution,
+                                    "height",
+                                    resolution_numbers[index][1]) == NULL)
 
     cJSON_AddItemToArray(resolutions, resolution);
   }
@@ -1543,7 +1676,7 @@ local void load_gwd_json(void)
 {
   file2cjson(GWD_JSON, &gwd_json);
 
-  //set defaults
+  // set defaults
 
   strcpy(options.hub_version, "NULL");
 
@@ -1565,7 +1698,7 @@ local void load_gwd_json(void)
   options.time_control_sigma = 20;
   options.time_control_method = 0;
 
-  //TO DO this should be moved out of options_t
+  // TO DO this should be moved out of options_t
 
   options.time_ntrouble = 0;
 
@@ -1662,17 +1795,17 @@ local void load_gwd_json(void)
 local void parse_parameters(void)
 {
   cJSON *parameters = cJSON_GetObjectItem(gwd_json, CJSON_PARAMETERS_ID);
- 
+
   HARDBUG(!cJSON_IsArray(parameters))
 
-  //loop over parameters
+  // loop over parameters
 
   cJSON *parameter;
 
   cJSON_ArrayForEach(parameter, parameters)
   {
     //{"name": "time_limit", "type": "int", "value": 30, "ui": "false"},
- 
+
     cJSON *cjson_name = cJSON_GetObjectItem(parameter, "name");
 
     char *parameter_name = cJSON_GetStringValue(cjson_name);
@@ -1680,7 +1813,7 @@ local void parse_parameters(void)
     HARDBUG(parameter_name == NULL)
 
     cJSON *cjson_type = cJSON_GetObjectItem(parameter, "type");
-    
+
     char *parameter_type = cJSON_GetStringValue(cjson_type);
 
     HARDBUG(parameter_type == NULL)
@@ -1692,51 +1825,52 @@ local void parse_parameters(void)
       HARDBUG(!cJSON_IsNumber(cjson_value))
 
       int ivalue = round(cJSON_GetNumberValue(cjson_value));
- 
-      if (compat_strcasecmp(parameter_name, "verbose") == 0)  
+
+      if (compat_strcasecmp(parameter_name, "verbose") == 0)
         options.verbose = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "network_evaluation_min") == 0)  
+      else if (compat_strcasecmp(parameter_name, "network_evaluation_min") == 0)
         options.network_evaluation_min = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "network_evaluation_max") == 0)  
+      else if (compat_strcasecmp(parameter_name, "network_evaluation_max") == 0)
         options.network_evaluation_max = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "network_evaluation_time") == 0)  
+      else if (compat_strcasecmp(parameter_name, "network_evaluation_time") ==
+               0)
         options.network_evaluation_time = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "time_control_ntrouble") == 0)  
+      else if (compat_strcasecmp(parameter_name, "time_control_ntrouble") == 0)
         options.time_control_ntrouble = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "time_control_mean") == 0)  
+      else if (compat_strcasecmp(parameter_name, "time_control_mean") == 0)
         options.time_control_mean = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "time_control_sigma") == 0)  
+      else if (compat_strcasecmp(parameter_name, "time_control_sigma") == 0)
         options.time_control_sigma = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "time_control_method") == 0)  
+      else if (compat_strcasecmp(parameter_name, "time_control_method") == 0)
         options.time_control_method = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "wall_time_threshold") == 0)  
+      else if (compat_strcasecmp(parameter_name, "wall_time_threshold") == 0)
         options.wall_time_threshold = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "depth_limit") == 0)  
+      else if (compat_strcasecmp(parameter_name, "depth_limit") == 0)
         options.depth_limit = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "book_randomness") == 0)  
+      else if (compat_strcasecmp(parameter_name, "book_randomness") == 0)
         options.book_randomness = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "book_position_frequency") == 0)  
+      else if (compat_strcasecmp(parameter_name, "book_position_frequency") ==
+               0)
         options.book_position_frequency = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "book_move_frequency") == 0)  
+      else if (compat_strcasecmp(parameter_name, "book_move_frequency") == 0)
         options.book_move_frequency = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "book_evaluation_time") == 0)  
+      else if (compat_strcasecmp(parameter_name, "book_evaluation_time") == 0)
         options.book_evaluation_time = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "egtb_level") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_level") == 0)
       {
         if (ivalue < NENDGAME_MAX)
         {
@@ -1744,9 +1878,9 @@ local void parse_parameters(void)
 
           if (cJSON_IsBool(cjson_cli))
           {
-             HARDBUG(!cJSON_IsTrue(cjson_cli))
-  
-             options.egtb_level = ivalue;
+            HARDBUG(!cJSON_IsTrue(cjson_cli))
+
+            options.egtb_level = ivalue;
           }
           else
           {
@@ -1756,115 +1890,110 @@ local void parse_parameters(void)
       }
 
       else if (compat_strcasecmp(parameter_name,
-                                 "quiescence_evaluation_policy") == 0)  
+                                 "quiescence_evaluation_policy") == 0)
         options.quiescence_evaluation_policy = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "quiescence_combination_length") == 0)  
+                                 "quiescence_combination_length") == 0)
         options.quiescence_combination_length = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "quiescence_extension_search_window") == 0)  
+                                 "quiescence_extension_search_window") == 0)
         options.quiescence_extension_search_window = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "quiescence_capture_extensions") == 0)  
+                                 "quiescence_capture_extensions") == 0)
         options.quiescence_capture_extensions = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "pv_combination_length") == 0)  
+      else if (compat_strcasecmp(parameter_name, "pv_combination_length") == 0)
         options.pv_combination_length = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "pv_extension_search_window") == 0)  
+                                 "pv_extension_search_window") == 0)
         options.pv_extension_search_window = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "aspiration_window") == 0)  
+      else if (compat_strcasecmp(parameter_name, "aspiration_window") == 0)
         options.aspiration_window = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "best_score_margin") == 0)  
+      else if (compat_strcasecmp(parameter_name, "best_score_margin") == 0)
         options.best_score_margin = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_depth_root") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_depth_root") == 0)
         options.reduction_depth_root = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_depth_leaf") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_depth_leaf") == 0)
         options.reduction_depth_leaf = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_moves_min") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_moves_min") == 0)
         options.reduction_moves_min = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_full_min") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_full_min") == 0)
         options.reduction_full_min = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "reduction_combination_length") == 0)  
+                                 "reduction_combination_length") == 0)
         options.reduction_combination_length = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_strength") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_strength") == 0)
         options.reduction_strength = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "reduction_probes") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_probes") == 0)
         options.reduction_probes = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "reduction_probe_window") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_probe_window") == 0)
         options.reduction_probe_window = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "reduction_research_margin") == 0)  
+      else if (compat_strcasecmp(parameter_name, "reduction_research_margin") ==
+               0)
         options.reduction_research_margin = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "alpha_beta_cache_size") == 0)  
+      else if (compat_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)
         options.alpha_beta_cache_size = ivalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "alpha_beta_cache_depth_margin") == 0)  
+                                 "alpha_beta_cache_depth_margin") == 0)
         options.alpha_beta_cache_depth_margin = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "pv_cache_fraction") == 0)  
+      else if (compat_strcasecmp(parameter_name, "pv_cache_fraction") == 0)
         options.pv_cache_fraction = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "score_cache_size") == 0)  
+      else if (compat_strcasecmp(parameter_name, "score_cache_size") == 0)
         options.score_cache_size = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "nthreads_alpha_beta") == 0)  
+      else if (compat_strcasecmp(parameter_name, "nthreads_alpha_beta") == 0)
         options.nthreads_alpha_beta = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "lazy_smp_policy") == 0)  
+      else if (compat_strcasecmp(parameter_name, "lazy_smp_policy") == 0)
         options.lazy_smp_policy = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "egtb_entry_cache_size") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_entry_cache_size") == 0)
         options.egtb_entry_cache_size = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "dxp_port") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_port") == 0)
         options.dxp_port = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "dxp_game_time") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_game_time") == 0)
         options.dxp_game_time = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "dxp_game_moves") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_game_moves") == 0)
         options.dxp_game_moves = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "dxp_games") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_games") == 0)
         options.dxp_games = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "dxp_annotate_level") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_annotate_level") == 0)
         options.dxp_annotate_level = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "hub_server_game_time") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_server_game_time") == 0)
         options.hub_server_game_time = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "hub_server_game_moves") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_server_game_moves") == 0)
         options.hub_server_game_moves = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "hub_server_games") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_server_games") == 0)
         options.hub_server_games = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "hub_annotate_level") == 0)  
+      else if (compat_strcasecmp(parameter_name, "hub_annotate_level") == 0)
         options.hub_annotate_level = ivalue;
 
       else
@@ -1877,13 +2006,14 @@ local void parse_parameters(void)
       HARDBUG(!cJSON_IsNumber(cjson_value))
 
       double dvalue = cJSON_GetNumberValue(cjson_value);
- 
-      if (compat_strcasecmp(parameter_name, "time_limit") == 0)  
+
+      if (compat_strcasecmp(parameter_name, "time_limit") == 0)
         options.time_limit = dvalue;
 
       else
         PRINTF("ignoring double parameter %s with value %.2f\n",
-          parameter_name, dvalue);
+               parameter_name,
+               dvalue);
     }
     else if (compat_strcasecmp(parameter_type, "string") == 0)
     {
@@ -1895,53 +2025,53 @@ local void parse_parameters(void)
 
       HARDBUG(svalue == NULL)
 
-      if (compat_strcasecmp(parameter_name, "hub_version") == 0)  
+      if (compat_strcasecmp(parameter_name, "hub_version") == 0)
         strncpy(options.hub_version, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "overrides") == 0)  
+      else if (compat_strcasecmp(parameter_name, "overrides") == 0)
         strncpy(options.overrides, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "networks") == 0)  
+      else if (compat_strcasecmp(parameter_name, "networks") == 0)
         strncpy(options.networks, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "network_name") == 0)  
+      else if (compat_strcasecmp(parameter_name, "network_name") == 0)
         strncpy(options.network_name, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "book_name") == 0)  
+      else if (compat_strcasecmp(parameter_name, "book_name") == 0)
         strncpy(options.book_name, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "egtb_dir") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_dir") == 0)
         strncpy(options.egtb_dir, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "egtb_dir_wdl") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_dir_wdl") == 0)
         strncpy(options.egtb_dir_wdl, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "egtb_ram") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_ram") == 0)
         strncpy(options.egtb_ram, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "egtb_ram_wdl") == 0)  
+      else if (compat_strcasecmp(parameter_name, "egtb_ram_wdl") == 0)
         strncpy(options.egtb_ram_wdl, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "dxp_server_ip") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_server_ip") == 0)
         strncpy(options.dxp_server_ip, svalue, MY_LINE_MAX);
-      
-      else if (compat_strcasecmp(parameter_name, "dxp_ballot") == 0)  
+
+      else if (compat_strcasecmp(parameter_name, "dxp_ballot") == 0)
         strncpy(options.dxp_ballot, svalue, MY_LINE_MAX);
-      
-      else if (compat_strcasecmp(parameter_name, "dxp_tag") == 0)  
+
+      else if (compat_strcasecmp(parameter_name, "dxp_tag") == 0)
         strncpy(options.dxp_tag, svalue, MY_LINE_MAX);
-      
-      else if (compat_strcasecmp(parameter_name, "hub_server_ballot") == 0)  
+
+      else if (compat_strcasecmp(parameter_name, "hub_server_ballot") == 0)
         strncpy(options.hub_server_ballot, svalue, MY_LINE_MAX);
-      
-      else if (compat_strcasecmp(parameter_name, "hub_server_client") == 0)  
+
+      else if (compat_strcasecmp(parameter_name, "hub_server_client") == 0)
         strncpy(options.hub_server_client, svalue, MY_LINE_MAX);
-      
+
       else
         PRINTF("ignoring string parameter %s\n", parameter_name);
     }
     else if (compat_strcasecmp(parameter_type, "bool") == 0)
-    { 
+    {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
       HARDBUG(!cJSON_IsBool(cjson_value))
@@ -1950,44 +2080,43 @@ local void parse_parameters(void)
       if (cJSON_IsTrue(cjson_value))
         bvalue = 1;
 
-      if (compat_strcasecmp(parameter_name, "use_book") == 0)  
+      if (compat_strcasecmp(parameter_name, "use_book") == 0)
         options.use_book = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "book_minimax") == 0)  
+      else if (compat_strcasecmp(parameter_name, "book_minimax") == 0)
         options.book_minimax = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "ponder") == 0)  
+      else if (compat_strcasecmp(parameter_name, "ponder") == 0)
         options.ponder = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "material_only") == 0)  
+      else if (compat_strcasecmp(parameter_name, "material_only") == 0)
         options.material_only = bvalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "captures_are_transparent") == 0)  
+      else if (compat_strcasecmp(parameter_name, "captures_are_transparent") ==
+               0)
         options.captures_are_transparent = bvalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "returned_depth_includes_captures") == 0)  
+                                 "returned_depth_includes_captures") == 0)
         options.returned_depth_includes_captures = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "use_reductions") == 0)  
+      else if (compat_strcasecmp(parameter_name, "use_reductions") == 0)
         options.use_reductions = bvalue;
 
       else if (compat_strcasecmp(parameter_name,
-                                 "use_single_reply_extensions") == 0)  
+                                 "use_single_reply_extensions") == 0)
         options.use_single_reply_extensions = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "sync_clock") == 0)  
+      else if (compat_strcasecmp(parameter_name, "sync_clock") == 0)
         options.sync_clock = bvalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "pv2cache") == 0)  
+      else if (compat_strcasecmp(parameter_name, "pv2cache") == 0)
         options.pv2cache = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "dxp_initiator") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_initiator") == 0)
         options.dxp_initiator = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "dxp_strict_gameend") == 0)  
+      else if (compat_strcasecmp(parameter_name, "dxp_strict_gameend") == 0)
         options.dxp_strict_gameend = bvalue;
 
       else
@@ -2010,37 +2139,38 @@ local void load_overrides(void)
   cJSON *overrides = cJSON_GetObjectItem(overrides_json, options.overrides);
 
   HARDBUG(!cJSON_IsArray(overrides))
-  
+
   cJSON *override;
 
   cJSON_ArrayForEach(override, overrides)
   {
     cJSON *cjson_name = cJSON_GetObjectItem(override, "name");
- 
+
     char *override_name = cJSON_GetStringValue(cjson_name);
 
     HARDBUG(override_name == NULL)
-    
+
     cJSON *parameters = cJSON_GetObjectItem(gwd_json, CJSON_PARAMETERS_ID);
- 
+
     HARDBUG(!cJSON_IsArray(parameters))
 
-    //loop over parameters
-  
+    // loop over parameters
+
     cJSON *parameter;
-  
+
     int nfound = 0;
 
     cJSON_ArrayForEach(parameter, parameters)
     {
       cjson_name = cJSON_GetObjectItem(parameter, "name");
-  
+
       char *parameter_name = cJSON_GetStringValue(cjson_name);
 
       HARDBUG(parameter_name == NULL)
 
-      if (compat_strcasecmp(parameter_name, override_name) != 0) continue;
-  
+      if (compat_strcasecmp(parameter_name, override_name) != 0)
+        continue;
+
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "cli");
 
       if (cJSON_IsTrue(cjson_value))
@@ -2051,21 +2181,21 @@ local void load_overrides(void)
       }
 
       cJSON *cjson_type = cJSON_GetObjectItem(parameter, "type");
-    
+
       char *parameter_type = cJSON_GetStringValue(cjson_type);
-      
+
       HARDBUG(parameter_type == NULL)
-  
+
       if (compat_strcasecmp(parameter_type, "int") == 0)
       {
         cjson_value = cJSON_GetObjectItem(override, "value");
-  
+
         HARDBUG(!cJSON_IsNumber(cjson_value))
-  
+
         int ivalue = round(cJSON_GetNumberValue(cjson_value));
 
         cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
         HARDBUG(!cJSON_IsNumber(cjson_value))
 
         cJSON_SetNumberValue(cjson_value, ivalue);
@@ -2075,13 +2205,13 @@ local void load_overrides(void)
       else if (compat_strcasecmp(parameter_type, "double") == 0)
       {
         cjson_value = cJSON_GetObjectItem(override, "value");
-  
+
         HARDBUG(!cJSON_IsNumber(cjson_value))
-  
+
         double dvalue = cJSON_GetNumberValue(cjson_value);
 
         cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
         HARDBUG(!cJSON_IsNumber(cjson_value))
 
         cJSON_SetNumberValue(cjson_value, dvalue);
@@ -2091,13 +2221,13 @@ local void load_overrides(void)
       else if (compat_strcasecmp(parameter_type, "string") == 0)
       {
         cjson_value = cJSON_GetObjectItem(override, "value");
-  
+
         char *svalue = cJSON_GetStringValue(cjson_value);
-  
+
         HARDBUG(svalue == NULL)
-  
+
         cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
         HARDBUG(!cJSON_IsString(cjson_value))
 
         cJSON_SetValuestring(cjson_value, svalue);
@@ -2107,9 +2237,9 @@ local void load_overrides(void)
       else if (compat_strcasecmp(parameter_type, "bool") == 0)
       {
         cjson_value = cJSON_GetObjectItem(override, "value");
-  
+
         HARDBUG(!cJSON_IsBool(cjson_value))
-  
+
         int bvalue;
 
         if (cJSON_IsFalse(cjson_value))
@@ -2118,7 +2248,7 @@ local void load_overrides(void)
           bvalue = 1;
 
         cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
         HARDBUG(!cJSON_IsBool(cjson_value))
 
         cJSON_SetBoolValue(cjson_value, bvalue);
@@ -2134,20 +2264,19 @@ local void load_overrides(void)
       exit(EXIT_FAILURE);
     }
   }
- 
-  //check CJSON_CSV_ID
 
-  cJSON *cjson_csv =
-    cJSON_GetObjectItem(overrides_json, CJSON_CSV_ID);
+  // check CJSON_CSV_ID
+
+  cJSON *cjson_csv = cJSON_GetObjectItem(overrides_json, CJSON_CSV_ID);
 
   HARDBUG(cjson_csv == NULL)
 
   cJSON *cjson_path = cJSON_GetObjectItem(cjson_csv, CJSON_CSV_PATH_ID);
- 
+
   HARDBUG(!cJSON_IsString(cjson_path))
 
   char *path = cJSON_GetStringValue(cjson_path);
-  
+
   HARDBUG(path == NULL)
 
   cJSON *columns = cJSON_GetObjectItem(cjson_csv, CJSON_CSV_COLUMNS_ID);
@@ -2159,33 +2288,34 @@ local void load_overrides(void)
   cJSON_ArrayForEach(column, columns)
   {
     cJSON *cjson_name = cJSON_GetObjectItem(column, "name");
- 
+
     HARDBUG(!cJSON_IsString(cjson_name))
 
     char *column_name = cJSON_GetStringValue(cjson_name);
- 
+
     HARDBUG(column_name == NULL)
 
     cJSON *parameters = cJSON_GetObjectItem(gwd_json, CJSON_PARAMETERS_ID);
- 
+
     HARDBUG(!cJSON_IsArray(parameters))
 
-    //loop over parameters
-  
+    // loop over parameters
+
     cJSON *parameter;
-  
+
     int nfound = 0;
 
     cJSON_ArrayForEach(parameter, parameters)
     {
       cjson_name = cJSON_GetObjectItem(parameter, "name");
-  
+
       char *parameter_name = cJSON_GetStringValue(cjson_name);
 
       HARDBUG(parameter_name == NULL)
 
-      if (compat_strcasecmp(parameter_name, column_name) != 0) continue;
-  
+      if (compat_strcasecmp(parameter_name, column_name) != 0)
+        continue;
+
       nfound++;
     }
     if (nfound != 1)
@@ -2198,24 +2328,23 @@ local void load_overrides(void)
 
 void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 {
-  cJSON *cjson_csv =
-    cJSON_GetObjectItem(overrides_json, CJSON_CSV_ID);
+  cJSON *cjson_csv = cJSON_GetObjectItem(overrides_json, CJSON_CSV_ID);
 
   HARDBUG(cjson_csv == NULL)
 
   cJSON *cjson_path = cJSON_GetObjectItem(cjson_csv, CJSON_CSV_PATH_ID);
- 
+
   HARDBUG(!cJSON_IsString(cjson_path))
 
   char *path = cJSON_GetStringValue(cjson_path);
-  
+
   HARDBUG(path == NULL)
 
   cJSON *columns = cJSON_GetObjectItem(cjson_csv, CJSON_CSV_COLUMNS_ID);
 
   HARDBUG(!cJSON_IsArray(columns))
 
-  //header
+  // header
 
   char header[MY_LINE_MAX];
 
@@ -2226,9 +2355,9 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
   cJSON_ArrayForEach(column, columns)
   {
     cJSON *cjson_name = cJSON_GetObjectItem(column, "name");
-  
+
     HARDBUG(!cJSON_IsString(cjson_name))
- 
+
     strcat(header, ",");
     strcat(header, cJSON_GetStringValue(cjson_name));
   }
@@ -2250,8 +2379,8 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
   }
   else
   {
-    //check if header has changed
-  
+    // check if header has changed
+
     HARDBUG((fcsv = fopen(path, "r")) == NULL)
 
     char line[MY_LINE_MAX];
@@ -2272,8 +2401,7 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 
       time_t t = time(NULL);
 
-      HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S",
-                       localtime(&t)) == 0)
+      HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t)) == 0)
 
       char newpath[MY_LINE_MAX];
 
@@ -2295,53 +2423,53 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 
   time_t t = time(NULL);
 
-  HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S",
-                   localtime(&t)) == 0)
+  HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t)) == 0)
 
   HARDBUG(fprintf(fcsv, "\"%s\",\"%s\"", REVISION, stamp) < 0)
 
   cJSON_ArrayForEach(column, columns)
   {
     cJSON *cjson_name = cJSON_GetObjectItem(column, "name");
- 
+
     HARDBUG(!cJSON_IsString(cjson_name))
 
     char *column_name = cJSON_GetStringValue(cjson_name);
- 
+
     HARDBUG(column_name == NULL)
 
     cJSON *parameters = cJSON_GetObjectItem(gwd_json, CJSON_PARAMETERS_ID);
- 
+
     HARDBUG(!cJSON_IsArray(parameters))
 
-    //loop over parameters
-  
+    // loop over parameters
+
     cJSON *parameter;
-  
+
     int nfound = 0;
 
     cJSON_ArrayForEach(parameter, parameters)
     {
       cjson_name = cJSON_GetObjectItem(parameter, "name");
-  
+
       char *parameter_name = cJSON_GetStringValue(cjson_name);
 
       HARDBUG(parameter_name == NULL)
 
-      if (compat_strcasecmp(parameter_name, column_name) != 0) continue;
-  
+      if (compat_strcasecmp(parameter_name, column_name) != 0)
+        continue;
+
       cJSON *cjson_type = cJSON_GetObjectItem(parameter, "type");
-    
+
       char *parameter_type = cJSON_GetStringValue(cjson_type);
-      
+
       HARDBUG(parameter_type == NULL)
-  
+
       if (compat_strcasecmp(parameter_type, "int") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
         HARDBUG(!cJSON_IsNumber(cjson_value))
-  
+
         int ivalue = round(cJSON_GetNumberValue(cjson_value));
 
         HARDBUG(fprintf(fcsv, ",%d", ivalue) < 0)
@@ -2351,9 +2479,9 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
       else if (compat_strcasecmp(parameter_type, "double") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
         HARDBUG(!cJSON_IsNumber(cjson_value))
-  
+
         double dvalue = cJSON_GetNumberValue(cjson_value);
 
         HARDBUG(fprintf(fcsv, ",%.2f", dvalue) < 0)
@@ -2363,11 +2491,11 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
       else if (compat_strcasecmp(parameter_type, "string") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
         char *svalue = cJSON_GetStringValue(cjson_value);
-  
+
         HARDBUG(svalue == NULL)
-  
+
         if (strcmp(parameter_name, "network_name") == 0)
           HARDBUG(fprintf(fcsv, ",\"%s\"", options.network_name) < 0)
         else
@@ -2378,9 +2506,9 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
       else if (compat_strcasecmp(parameter_type, "bool") == 0)
       {
         cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
         HARDBUG(!cJSON_IsBool(cjson_value))
-  
+
         int bvalue;
 
         if (cJSON_IsFalse(cjson_value))
@@ -2406,8 +2534,8 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
   FCLOSE(fcsv)
 }
 
-#define PRINTF_CFG_B(I) PRINTF("options." #I "=%s\n",\
-  options.I ? "true" : "false");
+#define PRINTF_CFG_B(I) \
+  PRINTF("options." #I "=%s\n", options.I ? "true" : "false");
 #define PRINTF_CFG_I(I) PRINTF("options." #I "=%d\n", options.I);
 #define PRINTF_CFG_D(D) PRINTF("options." #D "=%.2f\n", options.D);
 #define PRINTF_CFG_I64(I64) PRINTF("options." #I64 "=%lld\n", options.I64);
@@ -2452,7 +2580,7 @@ int main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
-  //special argument
+  // special argument
 
   if ((argc > 1) and (compat_strcasecmp(argv[1], "--revision") == 0))
   {
@@ -2468,34 +2596,35 @@ int main(int argc, char **argv)
 
   if (compat_strcasecmp(options.hub_version, "NULL") == 0)
   {
-    PRINTF("required parameter hub_version not found in gwd.json!\n"); 
+    PRINTF("required parameter hub_version not found in gwd.json!\n");
     exit(EXIT_FAILURE);
   }
   if (compat_strcasecmp(options.overrides, "NULL") == 0)
   {
-    PRINTF("required parameter overrides not found in gwd.json!\n"); 
+    PRINTF("required parameter overrides not found in gwd.json!\n");
     exit(EXIT_FAILURE);
   }
 
   options.mode = INVALID;
 
-  //parse command line arguments 
+  // parse command line arguments
 
   int iarg = 1;
 
   int narg = 1;
 
-  while(argv[narg] != NULL) ++narg;
+  while (argv[narg] != NULL)
+    ++narg;
 
   HARDBUG(narg != argc)
-  
+
   while (argv[iarg] != NULL)
-  {  
+  {
     cJSON *parameters = cJSON_GetObjectItem(gwd_json, CJSON_PARAMETERS_ID);
- 
+
     HARDBUG(!cJSON_IsArray(parameters))
 
-    //loop over parameters
+    // loop over parameters
 
     cJSON *parameter;
 
@@ -2505,11 +2634,12 @@ int main(int argc, char **argv)
     {
       //{"name": "time_limit", "type": "int", "value": 30, "ui": "false"},
       // "args": ["--depth_limit", "-d"]}
- 
+
       cJSON *cjson_args = cJSON_GetObjectItem(parameter, "args");
 
-      if (cjson_args == NULL) continue;
-  
+      if (cjson_args == NULL)
+        continue;
+
       HARDBUG(!cJSON_IsArray(cjson_args))
 
       cJSON *cjson_type = cJSON_GetObjectItem(parameter, "type");
@@ -2523,25 +2653,26 @@ int main(int argc, char **argv)
       cJSON_ArrayForEach(cjson_arg, cjson_args)
       {
         char *arg = cJSON_GetStringValue(cjson_arg);
-  
+
         HARDBUG(arg == NULL)
 
         if (compat_strcasecmp(parameter_type, "int") == 0)
         {
           char format[MY_LINE_MAX];
-  
+
           sprintf(format, "%s=%%d", arg);
-  
+
           int ivalue;
-  
-          if (my_sscanf(argv[iarg], format, &ivalue) != 1) continue;
-  
+
+          if (my_sscanf(argv[iarg], format, &ivalue) != 1)
+            continue;
+
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
           HARDBUG(!cJSON_IsNumber(cjson_value))
-  
+
           cJSON_SetNumberValue(cjson_value, ivalue);
-  
+
           cJSON_AddBoolToObject(parameter, "cli", TRUE);
 
           nfound++;
@@ -2549,19 +2680,20 @@ int main(int argc, char **argv)
         else if (compat_strcasecmp(parameter_type, "double") == 0)
         {
           char format[MY_LINE_MAX];
-  
+
           sprintf(format, "%s=%%lf", arg);
-  
+
           double dvalue;
-  
-          if (my_sscanf(argv[iarg], format, &dvalue) != 1) continue;
-  
+
+          if (my_sscanf(argv[iarg], format, &dvalue) != 1)
+            continue;
+
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
           HARDBUG(!cJSON_IsNumber(cjson_value))
-  
+
           cJSON_SetNumberValue(cjson_value, dvalue);
-  
+
           cJSON_AddBoolToObject(parameter, "cli", TRUE);
 
           nfound++;
@@ -2569,37 +2701,39 @@ int main(int argc, char **argv)
         else if (compat_strcasecmp(parameter_type, "string") == 0)
         {
           char format[MY_LINE_MAX];
-  
+
           sprintf(format, "%s=%%s", arg);
-  
+
           char svalue[MY_LINE_MAX];
-  
-          if (my_sscanf(argv[iarg], format, svalue) != 1) continue;
-  
+
+          if (my_sscanf(argv[iarg], format, svalue) != 1)
+            continue;
+
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
           HARDBUG(!cJSON_IsString(cjson_value))
-  
+
           cJSON_SetValuestring(cjson_value, svalue);
 
           cJSON_AddBoolToObject(parameter, "cli", TRUE);
-  
+
           nfound++;
         }
         else if (compat_strcasecmp(parameter_type, "bool") == 0)
         {
           char format[MY_LINE_MAX];
-  
+
           sprintf(format, "%s=%%s", arg);
-  
+
           char svalue[MY_LINE_MAX];
-  
-          if (my_sscanf(argv[iarg], format, svalue) != 1) continue;
-  
+
+          if (my_sscanf(argv[iarg], format, svalue) != 1)
+            continue;
+
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
-  
+
           HARDBUG(!cJSON_IsBool(cjson_value))
-  
+
           if ((compat_strcasecmp(svalue, "false") == 0) or
               (compat_strcasecmp(svalue, "off") == 0) or
               (compat_strcasecmp(svalue, "0") == 0))
@@ -2614,33 +2748,34 @@ int main(int argc, char **argv)
       }
     }
     HARDBUG(nfound > 1)
-    if (nfound == 0) break;
+    if (nfound == 0)
+      break;
 
     iarg++;
   }
 
-  //we have to parse the parameters again
-  //because overrides could have been set from the cli
+  // we have to parse the parameters again
+  // because overrides could have been set from the cli
 
   parse_parameters();
 
   load_overrides();
 
-  //we have to parse the parameters again
-  //because these could have been overridden
+  // we have to parse the parameters again
+  // because these could have been overridden
 
   parse_parameters();
 
-  //query physical memory before MPI processes are started
+  // query physical memory before MPI processes are started
 
   int physical_memory = return_physical_memory();
   int physical_cpus = return_physical_cpus();
 
-  //MPI
+  // MPI
 
   my_mpi_init(&narg, &argv, physical_memory);
 
-  //now that we have the MPI context we can initialize 
+  // now that we have the MPI context we can initialize
 
   init_my_printf();
 
@@ -2655,21 +2790,21 @@ int main(int argc, char **argv)
   if ((iarg == narg) or (compat_strcasecmp(argv[iarg], "hub") == 0))
   {
     options.hub = TRUE;
-   
+
     init_hub();
 
     parse_parameters();
   }
 
-  //modify options
+  // modify options
 
   options.nthreads = options.nthreads_alpha_beta;
 
   PRINTF("Version is %s\n", REVISION);
 
-  PRINTF("sizeof(int)=%lld\n", (i64_t) sizeof(int));
-  PRINTF("sizeof(long)=%lld\n", (i64_t) sizeof(long));
-  PRINTF("sizeof(long long)=%lld\n", (i64_t) sizeof(long long));
+  PRINTF("sizeof(int)=%lld\n", (i64_t)sizeof(int));
+  PRINTF("sizeof(long)=%lld\n", (i64_t)sizeof(long));
+  PRINTF("sizeof(long long)=%lld\n", (i64_t)sizeof(long long));
 
   PRINTF("physical_memory=%d MBYTE\n", physical_memory);
 
@@ -2805,15 +2940,17 @@ int main(int argc, char **argv)
 
   PRINTF("my_mpi_globals.MMG_nslaves=%d"
          " my_mpi_globals.MMG_id_slave=%d\n",
-    my_mpi_globals.MMG_nslaves, my_mpi_globals.MMG_id_slave);
+         my_mpi_globals.MMG_nslaves,
+         my_mpi_globals.MMG_id_slave);
 
   PRINTF("my_mpi_globals.MMG_nglobal=%d"
          " my_mpi_globals.MMG_id_global=%d\n",
-    my_mpi_globals.MMG_nglobal, my_mpi_globals.MMG_id_global);
+         my_mpi_globals.MMG_nglobal,
+         my_mpi_globals.MMG_id_global);
 
   if (((my_mpi_globals.MMG_nslaves > 0) and
-       (my_mpi_globals.MMG_id_slave == INVALID))
-      or RUNNING_ON_VALGRIND)
+       (my_mpi_globals.MMG_id_slave == INVALID)) or
+      RUNNING_ON_VALGRIND)
   {
     options.alpha_beta_cache_size = 128;
 
@@ -2822,12 +2959,10 @@ int main(int argc, char **argv)
     PRINTF("WARNING: CACHE AND PRELOAD EGTB HAVE BEEN ADJUSTED!\n");
   }
 
-  //hardware checks
-  
-  int memory =
-    options.alpha_beta_cache_size + 
-    options.score_cache_size + 
-    options.egtb_entry_cache_size * options.nthreads;
+  // hardware checks
+
+  int memory = options.alpha_beta_cache_size + options.score_cache_size +
+               options.egtb_entry_cache_size * options.nthreads;
 
   PRINTF("memory=%d MBYTE\n", memory);
 
@@ -2835,7 +2970,7 @@ int main(int argc, char **argv)
 
   HARDBUG(options.nthreads_alpha_beta > physical_cpus)
 
-  //parameter checks
+  // parameter checks
 
   HARDBUG(options.quiescence_evaluation_policy < 0)
   HARDBUG(options.quiescence_combination_length < 0)
@@ -2862,88 +2997,90 @@ int main(int argc, char **argv)
   HARDBUG(options.reduction_research_margin < 0)
 
   INIT_PROFILE
-  
-  //BEGIN_BLOCK("main-init")
 
-    if (my_mpi_globals.MMG_nglobal > 0) test_my_mpi();
+  // BEGIN_BLOCK("main-init")
 
-    construct_my_random(&main_random, 0);
+  if (my_mpi_globals.MMG_nglobal > 0)
+    test_my_mpi();
 
-    init_utils(); 
+  construct_my_random(&main_random, 0);
 
-    //test_my_timers();
-    //FATAL("test_my_timers", 1)
+  init_utils();
 
-    construct_queue(&main_queue, "main_queue", STDOUT);
+  // test_my_timers();
+  // FATAL("test_my_timers", 1)
 
-    init_book();
+  construct_queue(&main_queue, "main_queue", STDOUT);
 
-    init_boards();
+  init_book();
 
-    init_endgame();
+  init_boards();
 
-    init_mcts();
+  init_endgame();
 
-    init_networks();
+  init_mcts();
 
-    init_score();
+  init_networks();
 
-    init_search();
+  init_score();
 
-check_my_malloc();
-  //END_BLOCK
+  init_search();
 
-  //BEGIN_BLOCK("main-tests")
+  check_my_malloc();
+  // END_BLOCK
 
-    //tests
+  // BEGIN_BLOCK("main-tests")
 
-    //test_my_printf();
+  // tests
 
-    test_my_cjson();
+  // test_my_printf();
 
-    test_buckets();
+  test_my_cjson();
 
-    test_my_random();
-    //FATAL("test_my_random", EXIT_FAILURE)
+  test_buckets();
 
-    test_cJSON();
+  test_my_random();
+  // FATAL("test_my_random", EXIT_FAILURE)
 
-    test_my_object_class();
+  test_cJSON();
 
-    if (options.use_book) open_book();
-    //FATAL("test_book", EXIT_FAILURE)
+  test_my_object_class();
 
-    test_utils();
+  if (options.use_book)
+    open_book();
+  // FATAL("test_book", EXIT_FAILURE)
 
-    //test_my_timers();
+  test_utils();
 
-    test_records();
+  // test_my_timers();
 
-    test_caches();
+  test_records();
 
-    //test_fbuffer();
+  test_caches();
 
-    //test_dbase();
-    //FATAL("test_dbase", EXIT_FAILURE)
+  // test_fbuffer();
 
-    //test_network();
+  // test_dbase();
+  // FATAL("test_dbase", EXIT_FAILURE)
 
-    //test_nmsimplex();
+  // test_network();
 
-    //test_queues();
-    //FATAL("test_queues", 1)
+  // test_nmsimplex();
 
-    test_states();
+  // test_queues();
+  // FATAL("test_queues", 1)
 
-    test_stats();
-    //FATAL("test_stats", EXIT_FAILURE)
+  test_states();
 
-    //test_threads();
+  test_stats();
+  // FATAL("test_stats", EXIT_FAILURE)
 
-    //test_compress();
-    //FATAL("test_compress", EXIT_FAILURE)
+  // test_threads();
 
-  //END_BLOCK
+  // test_compress();
+  // FATAL("test_compress", EXIT_FAILURE)
+
+  // END_BLOCK
 
   if (options.hub)
   {
@@ -2957,15 +3094,17 @@ check_my_malloc();
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
         enqueue(return_thread_queue(threads + ithread),
-          MESSAGE_EXIT_THREAD, "main/hub");
+                MESSAGE_EXIT_THREAD,
+                "main/hub");
     }
 
     enqueue(return_thread_queue(thread_alpha_beta_master),
-      MESSAGE_EXIT_THREAD, "main/hub");
+            MESSAGE_EXIT_THREAD,
+            "main/hub");
 
     PRINTF("before join\n");
     join_threads();
-  
+
     goto label_hub;
   }
 
@@ -2973,17 +3112,17 @@ check_my_malloc();
 
   BEGIN_BLOCK("main-thread")
 
-  //main loop
+  // main loop
 
   if (compat_strcasecmp(argv[iarg], "solve_problems") == 0)
-  { 
+  {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
     solve_problems(argv[iarg]);
   }
   else if (compat_strcasecmp(argv[iarg], "solve_problems_mcts") == 0)
-  { 
+  {
     iarg++;
 
     HARDBUG(argv[iarg] == NULL)
@@ -2992,21 +3131,21 @@ check_my_malloc();
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     int nshoot_outs;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &nshoot_outs) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     int mcts_depth;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     double mcts_time_limit;
 
     HARDBUG(my_sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
@@ -3021,22 +3160,24 @@ check_my_malloc();
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
-  
+
     start_threads();
 
     HARDBUG(thread_alpha_beta_master == NULL)
-  
+
     solve_problems_multi_threaded(argv[iarg]);
-  
+
     if (options.nthreads > 1)
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
         enqueue(return_thread_queue(threads + ithread),
-          MESSAGE_EXIT_THREAD, "main/solve");  
+                MESSAGE_EXIT_THREAD,
+                "main/solve");
     }
 
     enqueue(return_thread_queue(thread_alpha_beta_master),
-      MESSAGE_EXIT_THREAD, "main/solve");
+            MESSAGE_EXIT_THREAD,
+            "main/solve");
 
     join_threads();
   }
@@ -3047,8 +3188,8 @@ check_my_malloc();
     HARDBUG(memory_slaves >= (physical_memory / 2))
 
     int nthreads_slaves =
-      options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-  
+        options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+
     if (options.ponder)
       HARDBUG(nthreads_slaves > (physical_cpus / 2))
     else
@@ -3058,26 +3199,26 @@ check_my_malloc();
         (my_mpi_globals.MMG_id_slave != INVALID))
     {
       cJSON *hub_server_client =
-        cJSON_GetObjectItem(overrides_json, options.hub_server_client);
+          cJSON_GetObjectItem(overrides_json, options.hub_server_client);
 
       HARDBUG(hub_server_client == NULL)
 
       cJSON *cjson_dir =
-        cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_DIR);
+          cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_DIR);
 
       char *dir = cJSON_GetStringValue(cjson_dir);
 
       HARDBUG(dir == NULL)
 
       cJSON *cjson_exe =
-        cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_EXE);
+          cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_EXE);
 
       char *exe = cJSON_GetStringValue(cjson_exe);
 
       HARDBUG(exe == NULL)
 
       cJSON *cjson_arg =
-        cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_ARG);
+          cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_ARG);
 
       char *arg = cJSON_GetStringValue(cjson_arg);
 
@@ -3092,25 +3233,24 @@ check_my_malloc();
       pipe_t child2parent[2];
 
       HARDBUG(compat_pipe(parent2child) == -1)
-  
+
       HARDBUG(compat_pipe(child2parent) == -1)
-  
+
       pid_t pid;
-  
+
       HARDBUG((pid = compat_fork()) == -1)
-    
+
       if (pid == 0)
       {
         HARDBUG(compat_pipe_close(parent2child[1]) == -1)
-    
-        HARDBUG(compat_pipe_close(child2parent[0]) == -1)
-    
-        HARDBUG(compat_dup2(parent2child[0], 0) == -1)
-  
-        HARDBUG(compat_dup2(child2parent[1], 1) == -1)
-  
-        HARDBUG(compat_chdir(dir) == -1)
 
+        HARDBUG(compat_pipe_close(child2parent[0]) == -1)
+
+        HARDBUG(compat_dup2(parent2child[0], 0) == -1)
+
+        HARDBUG(compat_dup2(child2parent[1], 1) == -1)
+
+        HARDBUG(compat_chdir(dir) == -1)
 
         if (compat_strcasecmp(arg, "NULL") == 0)
         {
@@ -3120,12 +3260,12 @@ check_my_malloc();
         {
           HARDBUG(execlp(exe, exe, arg, NULL) == -1)
         }
-  
+
         FATAL("should not get here!", EXIT_FAILURE)
       }
 
       HARDBUG(compat_pipe_close(parent2child[0]) == -1)
-  
+
       HARDBUG(compat_pipe_close(child2parent[1]) == -1)
 
       start_threads();
@@ -3134,13 +3274,13 @@ check_my_malloc();
 #else
       pipe_t parent2child[2];
 
-      //pipe for stdin
+      // pipe for stdin
 
       HARDBUG(compat_pipe(parent2child) == -1)
 
       HARDBUG(!SetHandleInformation(parent2child[1], HANDLE_FLAG_INHERIT, 0))
 
-      //pipe for stdout
+      // pipe for stdout
 
       pipe_t child2parent[2];
 
@@ -3150,7 +3290,7 @@ check_my_malloc();
 
       PROCESS_INFORMATION piProcInfo;
       STARTUPINFO siStartInfo;
-  
+
       ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
       ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
       siStartInfo.cb = sizeof(STARTUPINFO);
@@ -3158,34 +3298,37 @@ check_my_malloc();
       siStartInfo.hStdInput = parent2child[0];
       siStartInfo.hStdOutput = child2parent[1];
       siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
-  
-      BOOL bSuccess = CreateProcess(NULL, // No module name (use command line)
-                       (LPSTR) exe,       // Command line
-                       NULL,              // Process handle not inheritable
-                       NULL,              // Thread handle not inheritable
-                       TRUE,              // Set handle inheritance to TRUE
-                       0,                 // No creation flags
-                       NULL,              // Use parent's environment block
-                       (LPSTR) dir,       // Set working directory
-                       &siStartInfo,      // Pointer to STARTUPINFO structure
-                       &piProcInfo);      // Pointer to PROCESS_INFORMATION 
+
+      BOOL bSuccess =
+          CreateProcess(NULL,         // No module name (use command line)
+                        (LPSTR)exe,   // Command line
+                        NULL,         // Process handle not inheritable
+                        NULL,         // Thread handle not inheritable
+                        TRUE,         // Set handle inheritance to TRUE
+                        0,            // No creation flags
+                        NULL,         // Use parent's environment block
+                        (LPSTR)dir,   // Set working directory
+                        &siStartInfo, // Pointer to STARTUPINFO structure
+                        &piProcInfo); // Pointer to PROCESS_INFORMATION
 
       HARDBUG(!bSuccess)
-      
+
       start_threads();
 
       hub_server(parent2child[1], child2parent[0]);
 #endif
-  
+
       if (options.nthreads > 1)
       {
         for (int ithread = 1; ithread < options.nthreads; ithread++)
           enqueue(return_thread_queue(threads + ithread),
-            MESSAGE_EXIT_THREAD, "main/hub_server");
+                  MESSAGE_EXIT_THREAD,
+                  "main/hub_server");
       }
-  
+
       enqueue(return_thread_queue(thread_alpha_beta_master),
-        MESSAGE_EXIT_THREAD, "main/hub_server");
+              MESSAGE_EXIT_THREAD,
+              "main/hub_server");
 
       PRINTF("before join\n");
       join_threads();
@@ -3195,7 +3338,7 @@ check_my_malloc();
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     char *fen_name;
 
     fen_name = argv[iarg];
@@ -3204,7 +3347,7 @@ check_my_malloc();
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     i64_t npositions_max;
 
     HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions_max) != 1)
@@ -3217,12 +3360,12 @@ check_my_malloc();
     int nkings_max;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &nkings_max) != 1)
- 
+
     //
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     double mcts_time_limit;
 
     HARDBUG(my_sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
@@ -3233,15 +3376,16 @@ check_my_malloc();
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves =
-    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-    //HARDBUG(nthreads_slaves > physical_cpus)
+    // int nthreads_slaves =
+    //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+    // HARDBUG(nthreads_slaves > physical_cpus)
 
     test_weibull();
 
     for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
       PRINTF("npieces=%d probability_one_king=%.6f\n",
-             npieces, probability_one_king(npieces));
+             npieces,
+             probability_one_king(npieces));
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -3251,16 +3395,18 @@ check_my_malloc();
   {
     iarg++;
 
-    if (argv[iarg] == NULL) FATAL("db_name missing!", EXIT_FAILURE)
+    if (argv[iarg] == NULL)
+      FATAL("db_name missing!", EXIT_FAILURE)
 
     char *db_name = argv[iarg];
-  
+
     iarg++;
 
-    if (argv[iarg] == NULL) FATAL("pdn_name missing!", EXIT_FAILURE)
+    if (argv[iarg] == NULL)
+      FATAL("pdn_name missing!", EXIT_FAILURE)
 
     char *pdn_name = argv[iarg];
-  
+
     my_sqlite3_t db;
 
     construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
@@ -3275,8 +3421,9 @@ check_my_malloc();
   {
     iarg++;
 
-    if (argv[iarg] == NULL) FATAL("db_name missing!", EXIT_FAILURE)
- 
+    if (argv[iarg] == NULL)
+      FATAL("db_name missing!", EXIT_FAILURE)
+
     char *db_name = argv[iarg];
 
     iarg++;
@@ -3309,7 +3456,7 @@ check_my_malloc();
     iarg++;
 
     HARDBUG(argv[iarg] == NULL)
- 
+
     char *db_name = argv[iarg];
 
     iarg++;
@@ -3323,7 +3470,7 @@ check_my_malloc();
     HARDBUG(argv[iarg] == NULL)
 
     int depth;
-   
+
     HARDBUG(my_sscanf(argv[iarg], "%d", &depth) != 1)
 
     HARDBUG(depth < 0)
@@ -3346,7 +3493,7 @@ check_my_malloc();
       construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
 
       expand_book(&db, fen, depth, centi_seconds);
-  
+
       close_my_sqlite3(&db);
     }
   }
@@ -3355,7 +3502,7 @@ check_my_malloc();
     iarg++;
 
     HARDBUG(argv[iarg] == NULL)
- 
+
     char *db_name = argv[iarg];
 
     iarg++;
@@ -3368,21 +3515,21 @@ check_my_malloc();
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     char *db_name;
 
     db_name = argv[iarg];
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     i64_t npositions;
 
     HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     int mcts_depth;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
@@ -3391,9 +3538,9 @@ check_my_malloc();
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves =
-    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-    //HARDBUG(nthreads_slaves > physical_cpus)
+    // int nthreads_slaves =
+    //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+    // HARDBUG(nthreads_slaves > physical_cpus)
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -3411,14 +3558,14 @@ check_my_malloc();
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     char *db_name;
 
     db_name = argv[iarg];
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     int mcts_depth;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
@@ -3427,9 +3574,9 @@ check_my_malloc();
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves =
-    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-    //HARDBUG(nthreads_slaves > physical_cpus)
+    // int nthreads_slaves =
+    //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+    // HARDBUG(nthreads_slaves > physical_cpus)
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -3447,21 +3594,21 @@ check_my_malloc();
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     char *db_name;
 
     db_name = argv[iarg];
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     int mcts_depth;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
- 
+
     int frequency;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &frequency) != 1)
@@ -3470,9 +3617,9 @@ check_my_malloc();
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves =
-    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-    //HARDBUG(nthreads_slaves > physical_cpus)
+    // int nthreads_slaves =
+    //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+    // HARDBUG(nthreads_slaves > physical_cpus)
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -3488,15 +3635,15 @@ check_my_malloc();
   }
   else if (compat_strcasecmp(argv[iarg], "play_game") == 0)
   {
-    //name
+    // name
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
-   
+
     char name[MY_LINE_MAX];
     HARDBUG(my_sscanf(argv[iarg], "%s", name) != 1)
 
-    //colour
+    // colour
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -3504,7 +3651,7 @@ check_my_malloc();
     char colour[MY_LINE_MAX];
     HARDBUG(my_sscanf(argv[iarg], "%s", colour) != 1)
 
-    //game_minutes
+    // game_minutes
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -3512,7 +3659,7 @@ check_my_malloc();
     int game_minutes;
     HARDBUG(my_sscanf(argv[iarg], "%d", &game_minutes) != 1)
 
-    //used_minutes
+    // used_minutes
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -3524,19 +3671,21 @@ check_my_malloc();
 
     start_threads();
 
-    while(TRUE)
-    { 
+    while (TRUE)
+    {
       char line[MY_LINE_MAX];
 
       if (fexists(name))
       {
         PRINTF("\nDo you want to resume the game from %s (y/n)?\n", name);
 
-        if (fgets(line, MY_LINE_MAX, stdin) == NULL) break;
+        if (fgets(line, MY_LINE_MAX, stdin) == NULL)
+          break;
 
         CSTRING(canswer, strlen(line))
 
-        if (my_sscanf(line, "%s", canswer) != 1) strcpy(canswer, "y");
+        if (my_sscanf(line, "%s", canswer) != 1)
+          strcpy(canswer, "y");
 
         if (*canswer == 'y')
         {
@@ -3556,7 +3705,8 @@ check_my_malloc();
 
       PRINTF("\nDo you want to play another game (y/n)?\n");
 
-      if (fgets(line, MY_LINE_MAX, stdin) == NULL) break;
+      if (fgets(line, MY_LINE_MAX, stdin) == NULL)
+        break;
 
       CSTRING(canswer, strlen(line))
 
@@ -3571,8 +3721,9 @@ check_my_malloc();
 
       CDESTROY(canswer)
 
-      if (*answer == 'n') break;
-      
+      if (*answer == 'n')
+        break;
+
       for (int ihistory = 10; ihistory > 1; --ihistory)
       {
         char oldpath[MY_LINE_MAX];
@@ -3585,9 +3736,9 @@ check_my_malloc();
 
         rename(oldpath, newpath);
       }
-      
+
       char newpath[MY_LINE_MAX];
-  
+
       snprintf(newpath, MY_LINE_MAX, "%s-1", name);
 
       remove(newpath);
@@ -3599,17 +3750,19 @@ check_my_malloc();
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
         enqueue(return_thread_queue(threads + ithread),
-          MESSAGE_EXIT_THREAD, "main/play_game");
+                MESSAGE_EXIT_THREAD,
+                "main/play_game");
     }
 
     enqueue(return_thread_queue(thread_alpha_beta_master),
-      MESSAGE_EXIT_THREAD, "main/play_game");
+            MESSAGE_EXIT_THREAD,
+            "main/play_game");
 
     PRINTF("before join\n");
     join_threads();
   }
   else if (compat_strcasecmp(argv[iarg], "fen2network") == 0)
-  { 
+  {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
@@ -3627,9 +3780,9 @@ check_my_malloc();
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves =
-    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-    //HARDBUG(nthreads_slaves > physical_cpus)
+    // int nthreads_slaves =
+    //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+    // HARDBUG(nthreads_slaves > physical_cpus)
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -3638,30 +3791,34 @@ check_my_malloc();
     }
   }
   else if (compat_strcasecmp(argv[iarg], "fen2csv") == 0)
-  { 
+  {
     iarg++;
-    if (argv[iarg] == NULL) FATAL("nman_min argument missing", EXIT_FAILURE)
+    if (argv[iarg] == NULL)
+      FATAL("nman_min argument missing", EXIT_FAILURE)
 
     int nman_min;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &nman_min) != 1)
 
     iarg++;
-    if (argv[iarg] == NULL) FATAL("nman_max argument missing", EXIT_FAILURE)
+    if (argv[iarg] == NULL)
+      FATAL("nman_max argument missing", EXIT_FAILURE)
 
     int nman_max;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &nman_max) != 1)
 
     iarg++;
-    if (argv[iarg] == NULL) FATAL("nkings_min argument missing", EXIT_FAILURE)
+    if (argv[iarg] == NULL)
+      FATAL("nkings_min argument missing", EXIT_FAILURE)
 
     int nkings_min;
 
     HARDBUG(my_sscanf(argv[iarg], "%d", &nkings_min) != 1)
 
     iarg++;
-    if (argv[iarg] == NULL) FATAL("nkings_max argument missing", EXIT_FAILURE)
+    if (argv[iarg] == NULL)
+      FATAL("nkings_max argument missing", EXIT_FAILURE)
 
     int nkings_max;
 
@@ -3670,15 +3827,16 @@ check_my_malloc();
     //
 
     iarg++;
-    if (argv[iarg] == NULL) FATAL("file argument missing", EXIT_FAILURE)
+    if (argv[iarg] == NULL)
+      FATAL("file argument missing", EXIT_FAILURE)
 
     int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
     HARDBUG(memory_slaves >= physical_memory)
 
-    //int nthreads_slaves =
-    //  options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-    //HARDBUG(nthreads_slaves > physical_cpus)
+    // int nthreads_slaves =
+    //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+    // HARDBUG(nthreads_slaves > physical_cpus)
 
     if ((my_mpi_globals.MMG_nslaves == 0) or
         (my_mpi_globals.MMG_id_slave != INVALID))
@@ -3689,7 +3847,7 @@ check_my_malloc();
   else if (compat_strcasecmp(argv[iarg], "dxp_server") == 0)
   {
     HARDBUG(memory >= (physical_memory / 2))
-    
+
     if (options.ponder)
       HARDBUG(options.nthreads_alpha_beta > (physical_cpus / 2))
     else
@@ -3703,11 +3861,13 @@ check_my_malloc();
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
         enqueue(return_thread_queue(threads + ithread),
-          MESSAGE_EXIT_THREAD, "main/dxp_server");
+                MESSAGE_EXIT_THREAD,
+                "main/dxp_server");
     }
 
     enqueue(return_thread_queue(thread_alpha_beta_master),
-      MESSAGE_EXIT_THREAD, "main/dxp_server");
+            MESSAGE_EXIT_THREAD,
+            "main/dxp_server");
 
     PRINTF("before join\n");
     join_threads();
@@ -3715,7 +3875,7 @@ check_my_malloc();
   else if (compat_strcasecmp(argv[iarg], "dxp_client") == 0)
   {
     HARDBUG(memory >= (physical_memory / 2))
-    
+
     if (options.ponder)
     {
       if (options.nthreads_alpha_beta > (physical_cpus / 2))
@@ -3735,17 +3895,19 @@ check_my_malloc();
     {
       for (int ithread = 1; ithread < options.nthreads; ithread++)
         enqueue(return_thread_queue(threads + ithread),
-          MESSAGE_EXIT_THREAD, "main/dxp_client");
+                MESSAGE_EXIT_THREAD,
+                "main/dxp_client");
     }
 
     enqueue(return_thread_queue(thread_alpha_beta_master),
-      MESSAGE_EXIT_THREAD, "main/dxp_client");
+            MESSAGE_EXIT_THREAD,
+            "main/dxp_client");
 
     PRINTF("before join\n");
     join_threads();
   }
   else if (compat_strcasecmp(argv[iarg], "recompress_endgame") == 0)
-  { 
+  {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
@@ -3776,31 +3938,33 @@ check_my_malloc();
     FATAL("unknown command", EXIT_FAILURE)
   }
 
-  label_hub:
+label_hub:
 
   if (my_mpi_globals.MMG_nglobal > 0)
-    my_mpi_barrier_v3("main", my_mpi_globals.MMG_comm_global,
-                      SEMKEY_MAIN_BARRIER, TRUE);
+    my_mpi_barrier_v3("main",
+                      my_mpi_globals.MMG_comm_global,
+                      my_mpi_globals.MMG_semkey_main_barrier,
+                      TRUE);
 
   END_BLOCK
 
-  //BEGIN_BLOCK("main-final")
+  // BEGIN_BLOCK("main-final")
 
-  //finalization
+  // finalization
 
   fin_endgame();
- 
+
   fin_search();
 
   fin_my_malloc(FALSE);
-  
+
   PRINTF("$");
-  
-  //END_BLOCK
+
+  // END_BLOCK
 
   DUMP_PROFILE(1)
 
   FATAL("OK", EXIT_SUCCESS)
 
-  return(EXIT_SUCCESS);
+  return (EXIT_SUCCESS);
 }

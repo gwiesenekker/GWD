@@ -1,27 +1,32 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "profile.h"
 
 #ifdef PROFILE
 
-#define PROFILE_BUG(X) if (X)\
-  {fprintf(stderr, "%s::%ld:%s\n", __FILE__, (long) __LINE__, #X); exit(EXIT_FAILURE);}
+#define PROFILE_BUG(X)                                             \
+  if (X)                                                           \
+  {                                                                \
+    fprintf(stderr, "%s::%ld:%s\n", __FILE__, (long)__LINE__, #X); \
+    exit(EXIT_FAILURE);                                            \
+  }
 
 #define local static
 #define FALSE 0
-#define TRUE  1
-#define or    ||
+#define TRUE 1
+#define or ||
 
-#define NAME_MAX  32
+#define NAME_MAX 32
 #define BLOCK_MAX 100
 #define STACK_MAX 100
 
 #define TICKS(TV) (TV)
-#define SECS(X)   ((double) (X) / (double) frequency)
-#define PERC(X)   ((X) / time_self_total * 100)
+#define SECS(X) ((double)(X) / (double)frequency)
+#define PERC(X) ((X) / time_self_total * 100)
 
 #define PL profile_local[pid]
 
-//call stack
+// call stack
 typedef struct
 {
   int stack_id;
@@ -51,7 +56,7 @@ typedef struct
   char block_name[NAME_MAX];
   int block_invocation;
 
-  //needed for end_block
+  // needed for end_block
   int *block_invocation_pointer;
 
   long long block_calls;
@@ -86,8 +91,8 @@ profile_global_t profile_global[THREAD_MAX];
 
 local profile_mutex_t profile_mutex;
 
-//tid = thread id
-//pid = logical thread id
+// tid = thread id
+// pid = logical thread id
 
 local int tids[THREAD_MAX];
 local profile_local_t profile_local[THREAD_MAX];
@@ -109,12 +114,14 @@ int return_pid(int tid)
   PROFILE_MUTEX_LOCK(profile_mutex)
 
   for (result = 0; result < THREAD_MAX; result++)
-    if (tids[result] == tid) break;
+    if (tids[result] == tid)
+      break;
 
   if (result >= THREAD_MAX)
   {
     for (result = 0; result < THREAD_MAX; result++)
-      if (tids[result] == PROFILE_INVALID) break;
+      if (tids[result] == PROFILE_INVALID)
+        break;
 
     PROFILE_BUG(result >= THREAD_MAX)
 
@@ -123,7 +130,7 @@ int return_pid(int tid)
 
   PROFILE_MUTEX_UNLOCK(profile_mutex)
 
-  return(result);
+  return (result);
 }
 
 void init_block(int block_id[RECURSE_MAX])
@@ -167,33 +174,36 @@ local void mangle(char *dest, const char *source)
     PROFILE_BUG(strlen(source) >= MANGLE_MAX)
 
     strncpy(m, source, MANGLE_MAX);
-    
-    //remove vowels from the right
+
+    // remove vowels from the right
 
     int n = strlen(m);
 
-    while(n >= NAME_MAX)
+    while (n >= NAME_MAX)
     {
-      //search for a vowel or underscore from the right
+      // search for a vowel or underscore from the right
 
-      while(n >= 0)
+      while (n >= 0)
       {
-        //first vowels
+        // first vowels
 
-        if ((m[n] == 'a') || (m[n] == 'o') or (m[n] == 'u') or
-            (m[n] == 'i') or (m[n] == 'e')) break;
-        
-        //then underscores
+        if ((m[n] == 'a') || (m[n] == 'o') or (m[n] == 'u') or (m[n] == 'i') or
+            (m[n] == 'e'))
+          break;
 
-        if (m[n] == '_') break;
+        // then underscores
+
+        if (m[n] == '_')
+          break;
 
         n--;
       }
       PROFILE_BUG(n < 0)
-      
-      //remove vowel
 
-      while((m[n] = m[n + 1]) != '\0') n++;
+      // remove vowel
+
+      while ((m[n] = m[n + 1]) != '\0')
+        n++;
     }
     PROFILE_BUG(strlen(m) >= NAME_MAX)
 
@@ -221,17 +231,16 @@ int new_block(int pid, const char *name, int *invocation_pointer)
 
   PL.nblock++;
 
-  return(block_id);
+  return (block_id);
 }
 
-local void update_mean_sigma(long long n, long long x,
-  double *mn, double *sn)
+local void update_mean_sigma(long long n, long long x, double *mn, double *sn)
 {
   double mnm1 = *mn;
   double snm1 = *sn;
 
   *mn = mnm1 + (x - mnm1) / n;
-  
+
   *sn = snm1 + (x - mnm1) * (x - *mn);
 }
 
@@ -247,10 +256,10 @@ local long long counter_correction(int pid, long long counter_delta)
   for (long long n = 1; n <= NCALIBRATION; ++n)
   {
     counter_t counter_stamp;
-  
+
     GET_COUNTER_BEGIN(&counter_stamp)
     GET_COUNTER_END(PG.counter_pointer)
-  
+
     update_mean_sigma(n, TICKS(counter_dummy) - TICKS(counter_stamp), &mn, &sn);
   }
 
@@ -258,9 +267,10 @@ local long long counter_correction(int pid, long long counter_delta)
 
   result = counter_delta - result;
 
-  if (result < 0) result = 0;
+  if (result < 0)
+    result = 0;
 
-  return(result);
+  return (result);
 }
 
 void begin_block(int pid, int block_id)
@@ -275,7 +285,7 @@ void begin_block(int pid, int block_id)
                               TICKS(with_previous->stack_counter_begin);
 
     with_previous->stack_time_self +=
-      SECS(counter_correction(pid, counter_delta));
+        SECS(counter_correction(pid, counter_delta));
   }
   else
   {
@@ -309,8 +319,7 @@ void end_block(int pid)
   long long counter_delta = TICKS(with_current->stack_counter_end) -
                             TICKS(with_current->stack_counter_begin);
 
-  with_current->stack_time_self +=
-    SECS(counter_correction(pid, counter_delta));
+  with_current->stack_time_self += SECS(counter_correction(pid, counter_delta));
 
   with_current->stack_time_total += with_current->stack_time_self;
 
@@ -336,19 +345,19 @@ void end_block(int pid)
 
     PG.counter_pointer = &(with_previous->stack_counter_begin);
 
-    //update parent in child
+    // update parent in child
 
-    parent_t *with_parent = PL.block[with_current->stack_id].block_parent +
-                            with_previous->stack_id;
+    parent_t *with_parent =
+        PL.block[with_current->stack_id].block_parent + with_previous->stack_id;
 
     with_parent->parent_active = TRUE;
 
     with_parent->parent_calls++;
 
-    //update child in parent
+    // update child in parent
 
-    child_t *with_child = PL.block[with_previous->stack_id].block_child +
-                          with_current->stack_id;
+    child_t *with_child =
+        PL.block[with_previous->stack_id].block_child + with_current->stack_id;
 
     with_child->child_active = TRUE;
 
@@ -359,9 +368,9 @@ void end_block(int pid)
   else
   {
     GET_COUNTER_END(&(PL.counter_overhead_end))
- 
-    counter_delta = TICKS(PL.counter_overhead_end) -
-                    TICKS(PL.counter_overhead_begin);
+
+    counter_delta =
+        TICKS(PL.counter_overhead_end) - TICKS(PL.counter_overhead_begin);
 
     PL.time_total += SECS(counter_delta);
   }
@@ -377,28 +386,28 @@ local void validate_counter_correction(void)
   {
     BEGIN_BLOCK("profile-0-0")
     END_BLOCK
-  
+
     BEGIN_BLOCK("profile-1-1")
-      BEGIN_BLOCK("profile-1-1-0")
-      END_BLOCK
+    BEGIN_BLOCK("profile-1-1-0")
     END_BLOCK
-  
+    END_BLOCK
+
     BEGIN_BLOCK("profile-2-2")
-      BEGIN_BLOCK("profile-2-2-1-0")
-      END_BLOCK
-      BEGIN_BLOCK("profile-2-2-2-0")
-      END_BLOCK
+    BEGIN_BLOCK("profile-2-2-1-0")
     END_BLOCK
-  
+    BEGIN_BLOCK("profile-2-2-2-0")
+    END_BLOCK
+    END_BLOCK
+
     BEGIN_BLOCK("profile-3-1")
-      BEGIN_BLOCK("profile-3-3-1-3")
-        BEGIN_BLOCK("profile-3-3-1-3-1-0")
-        END_BLOCK
-        BEGIN_BLOCK("profile-3-3-1-3-2-0")
-        END_BLOCK
-        BEGIN_BLOCK("profile-3-3-1-3-3-0")
-        END_BLOCK
-      END_BLOCK
+    BEGIN_BLOCK("profile-3-3-1-3")
+    BEGIN_BLOCK("profile-3-3-1-3-1-0")
+    END_BLOCK
+    BEGIN_BLOCK("profile-3-3-1-3-2-0")
+    END_BLOCK
+    BEGIN_BLOCK("profile-3-3-1-3-3-0")
+    END_BLOCK
+    END_BLOCK
     END_BLOCK
   }
   END_BLOCK
@@ -425,16 +434,16 @@ void init_profile(void)
     with->time_total = 0.0;
   }
 
-  (void) remove("profile.txt");
+  (void)remove("profile.txt");
   for (int ithread = 0; ithread < THREAD_MAX; ithread++)
   {
     char name[NAME_MAX];
 
     snprintf(name, NAME_MAX, "profile-%d.txt", ithread);
-    (void) remove(name);
+    (void)remove(name);
   }
 
-  //dynamically determine frequency
+  // dynamically determine frequency
 
   counter_t counter_begin;
   counter_t counter_end;
@@ -447,17 +456,17 @@ void init_profile(void)
 
   int pid = PID;
   PG.counter_pointer = &counter_dummy;
-  
+
   double mn = 0.0;
   double sn = 0.0;
 
   for (long long n = 1; n <= NCALL; ++n)
   {
     counter_t counter_stamp;
-  
+
     GET_COUNTER_BEGIN(&counter_stamp)
     GET_COUNTER_END(PG.counter_pointer)
-  
+
     update_mean_sigma(n, TICKS(counter_dummy) - TICKS(counter_stamp), &mn, &sn);
   }
   counter_mean = round(mn);
@@ -469,7 +478,7 @@ void init_profile(void)
   for (long long n = 1; n <= NCALL; ++n)
   {
     counter_t counter_stamp;
-  
+
     GET_COUNTER_BEGIN(&counter_stamp)
     GET_COUNTER_END(PG.counter_pointer)
 
@@ -481,7 +490,7 @@ void init_profile(void)
       counter_largest = delta;
     }
   }
-  //validate_counter_correction();
+  // validate_counter_correction();
 }
 
 void dump_profile(int pid, int verbose)
@@ -500,36 +509,46 @@ void dump_profile(int pid, int verbose)
     char stamp[NAME_MAX];
     time_t t = time(NULL);
 
-    (void) strftime(stamp, NAME_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t));
+    (void)strftime(stamp, NAME_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t));
 
     fprintf(f, "# Profile dumped at %s\n", stamp);
   }
 
-  fprintf(f, "# The frequency is %lld ticks, or %.10f secs/tick.\n",
-    frequency, 1.0/frequency);
-  fprintf(f, "# The intrinsic profile overhead is %lld ticks on average.\n",
-    counter_mean);
-  fprintf(f, "# %lld out of %lld samples of the intrinsic profile overhead\n"
-             "# ..are larger than twice the mean, the largest value is %lld.\n",
-             ncounter_largest, NCALL, counter_largest);
+  fprintf(f,
+          "# The frequency is %lld ticks, or %.10f secs/tick.\n",
+          frequency,
+          1.0 / frequency);
+  fprintf(f,
+          "# The intrinsic profile overhead is %lld ticks on average.\n",
+          counter_mean);
+  fprintf(f,
+          "# %lld out of %lld samples of the intrinsic profile overhead\n"
+          "# ..are larger than twice the mean, the largest value is %lld.\n",
+          ncounter_largest,
+          NCALL,
+          counter_largest);
 
   fprintf(f, "# The total number of blocks is %d.\n", PL.nblock);
 
   if (PL.nstack > 0)
   {
-    fprintf(f, "# The following blocks are not properly terminated by an END_BLOCK!\n");
+    fprintf(f,
+            "# The following blocks are not properly terminated by an "
+            "END_BLOCK!\n");
 
     for (int istack = 0; istack < PL.nstack; istack++)
     {
       block_t *with_block = PL.block + PL.stack[istack].stack_id;
 
-      fprintf(f, "%s (invocation %d)\n",
-        with_block->block_name,with_block->block_invocation);
+      fprintf(f,
+              "%s (invocation %d)\n",
+              with_block->block_name,
+              with_block->block_invocation);
     }
     fprintf(f, "\n");
   }
 
-  //total time
+  // total time
 
   double time_self_total = 0.0;
 
@@ -553,7 +572,8 @@ void dump_profile(int pid, int verbose)
     {
       child_t *with_child = with_block->block_child + jblock;
 
-      if (!with_child->child_active) continue;
+      if (!with_child->child_active)
+        continue;
 
       with_block->block_child_calls += with_child->child_calls;
 
@@ -563,9 +583,10 @@ void dump_profile(int pid, int verbose)
     time_self_total += with_block->block_time_self_total;
   }
 
-  //main-thread takes precedence
+  // main-thread takes precedence
 
-  if (with_main_thread != NULL) with_main = with_main_thread;
+  if (with_main_thread != NULL)
+    with_main = with_main_thread;
 
   if (with_main == NULL)
   {
@@ -577,12 +598,13 @@ void dump_profile(int pid, int verbose)
 
   fprintf(f, "# The total self time was %.10f secs.\n", time_self_total);
 
-  fprintf(f, "# The total profile overhead was %.10f secs.\n",
-    PL.time_total - time_self_total);
+  fprintf(f,
+          "# The total profile overhead was %.10f secs.\n",
+          PL.time_total - time_self_total);
 
   fprintf(f, "\n");
 
-  //sort by straight insertion
+  // sort by straight insertion
 
   int sort[BLOCK_MAX];
 
@@ -596,7 +618,8 @@ void dump_profile(int pid, int verbose)
     for (int jblock = iblock + 1; jblock < PL.nblock; jblock++)
     {
       if (PL.block[sort[jblock]].block_time_total >
-          PL.block[sort[kblock]].block_time_total) kblock = jblock;
+          PL.block[sort[kblock]].block_time_total)
+        kblock = jblock;
     }
 
     int t = sort[iblock];
@@ -608,24 +631,33 @@ void dump_profile(int pid, int verbose)
 
   fprintf(f, "# The sum of total times (or the sum of the percentages)\n");
 
-  fprintf(f, "# does not have any meaning, since children will be double counted.\n");
+  fprintf(
+      f,
+      "# does not have any meaning, since children will be double counted.\n");
 
-  fprintf(f, "%-32s %-10s %6s %16s %10s\n", 
-    "name", "invocation", "perc", "total time", "calls");
+  fprintf(f,
+          "%-32s %-10s %6s %16s %10s\n",
+          "name",
+          "invocation",
+          "perc",
+          "total time",
+          "calls");
 
   for (int iblock = 0; iblock < PL.nblock; iblock++)
   {
     block_t *with_block = PL.block + sort[iblock];
 
-    fprintf(f, "%-32s %-10d %6.2f %16.10f %10lld\n",
-      with_block->block_name, with_block->block_invocation,
-      PERC(with_block->block_time_total),
-      with_block->block_time_total,
-      with_block->block_calls);
+    fprintf(f,
+            "%-32s %-10d %6.2f %16.10f %10lld\n",
+            with_block->block_name,
+            with_block->block_invocation,
+            PERC(with_block->block_time_total),
+            with_block->block_time_total,
+            with_block->block_calls);
   }
   fprintf(f, "\n");
 
-  //sort by straight insertion
+  // sort by straight insertion
 
   for (int iblock = 0; iblock < PL.nblock; iblock++)
     sort[iblock] = iblock;
@@ -637,7 +669,8 @@ void dump_profile(int pid, int verbose)
     for (int jblock = iblock + 1; jblock < PL.nblock; jblock++)
     {
       if (PL.block[sort[jblock]].block_time_self_total >
-          PL.block[sort[kblock]].block_time_self_total) kblock = jblock;
+          PL.block[sort[kblock]].block_time_self_total)
+        kblock = jblock;
     }
 
     int t = sort[iblock];
@@ -649,18 +682,25 @@ void dump_profile(int pid, int verbose)
 
   fprintf(f, "# The sum of the self times is equal to the total self time.\n");
 
-  fprintf(f, "%-32s %-10s %6s %16s %10s\n", 
-    "name", "invocation", "perc", "self time", "calls");
+  fprintf(f,
+          "%-32s %-10s %6s %16s %10s\n",
+          "name",
+          "invocation",
+          "perc",
+          "self time",
+          "calls");
 
   for (int iblock = 0; iblock < PL.nblock; iblock++)
   {
     block_t *with_block = PL.block + sort[iblock];
 
-    fprintf(f, "%-32s %-10d %6.2f %16.10f %10lld\n",
-      with_block->block_name, with_block->block_invocation,
-      PERC(with_block->block_time_self_total),
-      with_block->block_time_self_total,
-      with_block->block_calls);
+    fprintf(f,
+            "%-32s %-10d %6.2f %16.10f %10lld\n",
+            with_block->block_name,
+            with_block->block_invocation,
+            PERC(with_block->block_time_self_total),
+            with_block->block_time_self_total,
+            with_block->block_calls);
   }
   fprintf(f, "\n");
 
@@ -673,29 +713,30 @@ void dump_profile(int pid, int verbose)
     if (PL.block[iblock].block_invocation == 1)
     {
       PL.block[iblock].block_time_recursive_total =
-        PL.block[iblock].block_time_self_total;
+          PL.block[iblock].block_time_self_total;
 
       PL.block[iblock].block_calls_recursive_total =
-        PL.block[iblock].block_calls;
+          PL.block[iblock].block_calls;
 
       for (int jblock = 0; jblock < PL.nblock; jblock++)
       {
-        if (PL.block[jblock].block_invocation == 1) continue;
+        if (PL.block[jblock].block_invocation == 1)
+          continue;
 
-        if (strcmp(PL.block[iblock].block_name,
-                   PL.block[jblock].block_name) == 0)
+        if (strcmp(PL.block[iblock].block_name, PL.block[jblock].block_name) ==
+            0)
         {
           PL.block[iblock].block_time_recursive_total +=
-            PL.block[jblock].block_time_self_total;
+              PL.block[jblock].block_time_self_total;
 
           PL.block[iblock].block_calls_recursive_total +=
-            PL.block[jblock].block_calls;
+              PL.block[jblock].block_calls;
         }
       }
     }
   }
 
-  //sort by straight insertion
+  // sort by straight insertion
 
   for (int iblock = 0; iblock < PL.nblock; iblock++)
     sort[iblock] = iblock;
@@ -707,7 +748,8 @@ void dump_profile(int pid, int verbose)
     for (int jblock = iblock + 1; jblock < PL.nblock; jblock++)
     {
       if (PL.block[sort[jblock]].block_time_recursive_total >
-          PL.block[sort[kblock]].block_time_recursive_total) kblock = jblock;
+          PL.block[sort[kblock]].block_time_recursive_total)
+        kblock = jblock;
     }
 
     int t = sort[iblock];
@@ -715,10 +757,18 @@ void dump_profile(int pid, int verbose)
     sort[kblock] = t;
   }
 
-  fprintf(f, "# Blocks sorted by self times summed over recursive invocations.\n");
+  fprintf(f,
+          "# Blocks sorted by self times summed over recursive invocations.\n");
 
-  fprintf(f, "%-32s %6s %6s %16s %10s %16s %10s\n",
-    "name", "perc", "%main", "self time", "calls", "self time/call", "ticks/call");
+  fprintf(f,
+          "%-32s %6s %6s %16s %10s %16s %10s\n",
+          "name",
+          "perc",
+          "%main",
+          "self time",
+          "calls",
+          "self time/call",
+          "ticks/call");
 
   for (int iblock = 0; iblock < PL.nblock; iblock++)
   {
@@ -726,42 +776,52 @@ void dump_profile(int pid, int verbose)
 
     if (PL.block[jblock].block_invocation == 1)
     {
-      double self_time_per_call = 
-        PL.block[jblock].block_time_recursive_total / 
-        PL.block[jblock].block_calls_recursive_total;
+      double self_time_per_call = PL.block[jblock].block_time_recursive_total /
+                                  PL.block[jblock].block_calls_recursive_total;
       long long ticks_per_call = -1;
       if (self_time_per_call < 1.0)
         ticks_per_call = round(self_time_per_call * frequency);
 
-      fprintf(f, "%-32s %6.2f %6.2f %16.10f %10lld %16.10f %10lld\n",
-        PL.block[jblock].block_name,
-        PERC(PL.block[jblock].block_time_recursive_total),
-        PL.block[jblock].block_time_recursive_total / with_main->block_time_total * 100,
-        PL.block[jblock].block_time_recursive_total,
-        PL.block[jblock].block_calls_recursive_total,
-        self_time_per_call,
-        ticks_per_call);
+      fprintf(f,
+              "%-32s %6.2f %6.2f %16.10f %10lld %16.10f %10lld\n",
+              PL.block[jblock].block_name,
+              PERC(PL.block[jblock].block_time_recursive_total),
+              PL.block[jblock].block_time_recursive_total /
+                  with_main->block_time_total * 100,
+              PL.block[jblock].block_time_recursive_total,
+              PL.block[jblock].block_calls_recursive_total,
+              self_time_per_call,
+              ticks_per_call);
     }
   }
   fprintf(f, "\n");
 
-  if (verbose == 0) goto label_return;
+  if (verbose == 0)
+    goto label_return;
 
   for (int iblock = 0; iblock < PL.nblock; iblock++)
   {
     block_t *with_block = PL.block + sort[iblock];
 
-    fprintf(f, "# Summary for block %s, invocation %d.\n",
-      with_block->block_name, with_block->block_invocation);
+    fprintf(f,
+            "# Summary for block %s, invocation %d.\n",
+            with_block->block_name,
+            with_block->block_invocation);
 
-    fprintf(f, "Spends %.10f secs in %lld call(s), or %.2f%% of total execution time.\n",
-      with_block->block_time_total,
-      with_block->block_calls,
-      PERC(with_block->block_time_total));
+    fprintf(f,
+            "Spends %.10f secs in %lld call(s), or %.2f%% of total execution "
+            "time.\n",
+            with_block->block_time_total,
+            with_block->block_calls,
+            PERC(with_block->block_time_total));
 
-    fprintf(f, "Spends %.10f secs (%.2f%%) in own code, %.10f secs (%.2f%%) in children.\n",
-      with_block->block_time_self_total, PERC(with_block->block_time_self_total),
-      with_block->block_child_time_total, PERC(with_block->block_child_time_total));
+    fprintf(f,
+            "Spends %.10f secs (%.2f%%) in own code, %.10f secs (%.2f%%) in "
+            "children.\n",
+            with_block->block_time_self_total,
+            PERC(with_block->block_time_self_total),
+            with_block->block_child_time_total,
+            PERC(with_block->block_child_time_total));
     fprintf(f, "\n");
 
     int found = FALSE;
@@ -770,18 +830,21 @@ void dump_profile(int pid, int verbose)
     {
       child_t *with_child = with_block->block_child + jblock;
 
-      if (!with_child->child_active) continue;
+      if (!with_child->child_active)
+        continue;
 
       found = TRUE;
 
-      fprintf(f, "Spends %.10f secs in %lld call(s) to %s, invocation %d.\n",
-        with_child->child_time_total,
-        with_child->child_calls,
-        PL.block[jblock].block_name,
-        PL.block[jblock].block_invocation);
+      fprintf(f,
+              "Spends %.10f secs in %lld call(s) to %s, invocation %d.\n",
+              with_child->child_time_total,
+              with_child->child_calls,
+              PL.block[jblock].block_name,
+              PL.block[jblock].block_invocation);
     }
 
-    if (!found) fprintf(f, "No children were found.\n");
+    if (!found)
+      fprintf(f, "No children were found.\n");
 
     found = FALSE;
 
@@ -789,21 +852,25 @@ void dump_profile(int pid, int verbose)
     {
       parent_t *with_parent = with_block->block_parent + jblock;
 
-      if (!with_parent->parent_active) continue;
+      if (!with_parent->parent_active)
+        continue;
 
       found = TRUE;
 
-      fprintf(f, "Is called %lld time(s) from %s, invocation %d.\n",
-        with_parent->parent_calls,
-        PL.block[jblock].block_name, PL.block[jblock].block_invocation);
+      fprintf(f,
+              "Is called %lld time(s) from %s, invocation %d.\n",
+              with_parent->parent_calls,
+              PL.block[jblock].block_name,
+              PL.block[jblock].block_invocation);
     }
 
-    if (!found) fprintf(f, "No parents were found\n");
+    if (!found)
+      fprintf(f, "No parents were found\n");
 
     fprintf(f, "\n");
   }
 
-  label_return:
+label_return:
 
   fprintf(f, "# End of profile.\n");
 
@@ -811,5 +878,3 @@ void dump_profile(int pid, int verbose)
 }
 
 #endif
-
-

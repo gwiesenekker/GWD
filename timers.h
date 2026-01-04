@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef TimersH
 #define TimersH
 
@@ -56,4 +57,3 @@ void set_time_limit(int, time_control_t *);
 void test_my_timers(void);
 
 #endif
-

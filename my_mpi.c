@@ -1,39 +1,51 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 enum
 {
-  SEM_MUTEX      = 0,
-  SEM_COUNT      = 1,
+  SEM_MUTEX = 0,
+  SEM_COUNT = 1,
   SEM_ENTRY_GATE = 2,
-  SEM_EXIT_GATE  = 3,
+  SEM_EXIT_GATE = 3,
   NSEMS
 };
 
 #define TAG_REQUEST_LOCK 1
 #define TAG_LOCK_GRANTED 2
 #define TAG_RELEASE_LOCK 3
-#define TAG_FLUSH_LOCK   4
+#define TAG_FLUSH_LOCK 4
 
-const char *tag2string[] =
-{
-  "TAG_INVALID",
-  "TAG_REQUEST_LOCK",
-  "TAG_LOCK_GRANTED",
-  "TAG_RELEASE_LOCK",
-  "TAG_FLUSH_LOCK"
-};
+const char *tag2string[] = {"TAG_INVALID",
+                            "TAG_REQUEST_LOCK",
+                            "TAG_LOCK_GRANTED",
+                            "TAG_RELEASE_LOCK",
+                            "TAG_FLUSH_LOCK"};
 
-my_mpi_globals_t my_mpi_globals =
-{
-  .MMG_init = FALSE,
-  .MMG_nglobal = 0,
-  .MMG_id_global = INVALID,
-  .MMG_nslaves = 0,
-  .MMG_id_slave = INVALID,
-  .MMG_comm_global = MPI_COMM_NULL,
-  .MMG_comm_slaves = MPI_COMM_NULL
-};
+my_mpi_globals_t my_mpi_globals = {.MMG_init = FALSE,
+                                   .MMG_nglobal = 0,
+                                   .MMG_id_global = INVALID,
+                                   .MMG_nslaves = 0,
+                                   .MMG_id_slave = INVALID,
+                                   .MMG_comm_global = MPI_COMM_NULL,
+                                   .MMG_comm_slaves = MPI_COMM_NULL,
+
+                                   .MMG_semkey_offset = 0,
+
+                                   .MMG_semkey_gen_book_barrier = 1,
+                                   .MMG_semkey_init_endgame_barrier = 2,
+                                   .MMG_semkey_gen_random_barrier = 3,
+                                   .MMG_semkey_main_barrier = 4,
+                                   .MMG_semkey_test_my_mpi = 5,
+                                   .MMG_semkey_test_my_mpi_barrier = 6,
+                                   .MMG_semkey_flush_sql_buffer = 7,
+                                   .MMG_semkey_construct_my_sqlite3_barrier = 8,
+                                   .MMG_semkey_close_my_sqlite3 = 9,
+                                   .MMG_semkey_close_my_sqlite3_barrier = 10,
+                                   .MMG_semkey_gen_db_barrier = 11,
+                                   .MMG_semkey_update_db_barrier = 12,
+                                   .MMG_semkey_add_positions_barrier = 13,
+                                   .MMG_semkey_query_positions_barrier = 14};
 
 local void my_sem_setval(int arg_semid, int arg_sem_num, int arg_value)
 {
@@ -60,7 +72,9 @@ local int my_sem_getval(int arg_semid, int arg_sem_num)
 
   HARDBUG((value = semctl(arg_semid, arg_sem_num, GETVAL)) == -1)
 
-  return(value);
+  return (value);
+#else
+  return(-1);
 #endif
 }
 
@@ -79,19 +93,18 @@ local void my_create_semaphore(int arg_semkey)
 
       FATAL("semget", EXIT_FAILURE)
     }
-  
+
     if (semctl(semid, 0, IPC_RMID) == -1)
-    { 
+    {
       perror("semctl failed");
-  
+
       FATAL("semctl", EXIT_FAILURE)
     }
-  
-    if ((semid = semget(arg_semkey, NSEMS,
-                        IPC_CREAT | IPC_EXCL | 0600)) == -1)
+
+    if ((semid = semget(arg_semkey, NSEMS, IPC_CREAT | IPC_EXCL | 0600)) == -1)
     {
       perror("semget failed");
- 
+
       FATAL("semget", EXIT_FAILURE)
     }
   }
@@ -105,235 +118,334 @@ local void my_create_semaphore(int arg_semkey)
 
 void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
 {
+  my_mpi_globals_t *with = &my_mpi_globals;
+
 #ifdef USE_OPENMPI
 
   MPI_Init(narg, argv);
 
-  my_mpi_globals.MMG_init = TRUE;
+  with->MMG_init = TRUE;
 
   int mpi_nworld;
-  
+
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_nworld);
-  
+
   HARDBUG(mpi_nworld < 1)
 
-  if (mpi_nworld > 1) MPI_Barrier(MPI_COMM_WORLD);
+  if (mpi_nworld > 1)
+    MPI_Barrier(MPI_COMM_WORLD);
 
   int mpi_id_world;
 
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_id_world);
 
+  if (getenv("MMG_semkey_offset") != NULL)
+  {
+    HARDBUG(my_sscanf(getenv("MMG_semkey_offset"),
+                      "%d",
+                      &(with->MMG_semkey_offset)) != 1)
+  }
+
+  with->MMG_semkey_gen_book_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_init_endgame_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_gen_random_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_main_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_test_my_mpi += with->MMG_semkey_offset;
+  with->MMG_semkey_test_my_mpi_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_flush_sql_buffer += with->MMG_semkey_offset;
+  with->MMG_semkey_construct_my_sqlite3_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_close_my_sqlite3 += with->MMG_semkey_offset;
+  with->MMG_semkey_close_my_sqlite3_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_gen_db_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_update_db_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_add_positions_barrier += with->MMG_semkey_offset;
+  with->MMG_semkey_query_positions_barrier += with->MMG_semkey_offset;
+
   if (mpi_id_world == 0)
   {
-    my_create_semaphore(SEMKEY_GEN_BOOK_BARRIER);
-    my_create_semaphore(SEMKEY_INIT_ENDGAME_BARRIER);
-    my_create_semaphore(SEMKEY_GEN_RANDOM_BARRIER);
-    my_create_semaphore(SEMKEY_MAIN_BARRIER);
-    my_create_semaphore(SEMKEY_TEST_MY_MPI);
-    my_create_semaphore(SEMKEY_TEST_MY_MPI_BARRIER);
-    my_create_semaphore(SEMKEY_FLUSH_SQL_BUFFER);
-    my_create_semaphore(SEMKEY_CONSTRUCT_MY_SQLITE3_BARRIER);
-    my_create_semaphore(SEMKEY_CLOSE_MY_SQLITE3);
-    my_create_semaphore(SEMKEY_CLOSE_MY_SQLITE3_BARRIER);
-    my_create_semaphore(SEMKEY_GEN_DB_BARRIER);
-    my_create_semaphore(SEMKEY_UPDATE_DB_BARRIER);
-    my_create_semaphore(SEMKEY_ADD_POSITIONS_BARRIER);
-    my_create_semaphore(SEMKEY_QUERY_POSITIONS_BARRIER);
+    my_create_semaphore(with->MMG_semkey_gen_book_barrier);
+    my_create_semaphore(with->MMG_semkey_init_endgame_barrier);
+    my_create_semaphore(with->MMG_semkey_gen_random_barrier);
+    my_create_semaphore(with->MMG_semkey_main_barrier);
+    my_create_semaphore(with->MMG_semkey_test_my_mpi);
+    my_create_semaphore(with->MMG_semkey_test_my_mpi_barrier);
+    my_create_semaphore(with->MMG_semkey_flush_sql_buffer);
+    my_create_semaphore(with->MMG_semkey_construct_my_sqlite3_barrier);
+    my_create_semaphore(with->MMG_semkey_close_my_sqlite3);
+    my_create_semaphore(with->MMG_semkey_close_my_sqlite3_barrier);
+    my_create_semaphore(with->MMG_semkey_gen_db_barrier);
+    my_create_semaphore(with->MMG_semkey_update_db_barrier);
+    my_create_semaphore(with->MMG_semkey_add_positions_barrier);
+    my_create_semaphore(with->MMG_semkey_query_positions_barrier);
   }
 
-  if (mpi_nworld > 1) MPI_Barrier(MPI_COMM_WORLD);
+  if (mpi_nworld > 1)
+    MPI_Barrier(MPI_COMM_WORLD);
 
-  my_mpi_globals.MMG_comm_global = MPI_COMM_WORLD;
-  my_mpi_globals.MMG_comm_slaves = MPI_COMM_NULL;
-  
+  with->MMG_comm_global = MPI_COMM_WORLD;
+  with->MMG_comm_slaves = MPI_COMM_NULL;
+
   int slave = (mpi_id_world == 0) ? 0 : 1;
-  
-  MPI_Comm_split(MPI_COMM_WORLD, slave, mpi_id_world,
-                 &my_mpi_globals.MMG_comm_slaves);
-  
+
+  MPI_Comm_split(MPI_COMM_WORLD, slave, mpi_id_world, &(with->MMG_comm_slaves));
+
   if (!slave)
   {
-    my_mpi_globals.MMG_comm_slaves = MPI_COMM_NULL;
-  
-    my_mpi_globals.MMG_id_slave = INVALID;
+    with->MMG_comm_slaves = MPI_COMM_NULL;
+
+    with->MMG_id_slave = INVALID;
   }
   else
   {
-    MPI_Comm_rank(my_mpi_globals.MMG_comm_slaves,
-                  &my_mpi_globals.MMG_id_slave);
+    MPI_Comm_rank(with->MMG_comm_slaves, &(with->MMG_id_slave));
   }
 
-  MPI_Allreduce(&slave, &my_mpi_globals.MMG_nslaves, 1, MPI_INT, MPI_SUM,
+  MPI_Allreduce(&slave,
+                &(with->MMG_nslaves),
+                1,
+                MPI_INT,
+                MPI_SUM,
                 MPI_COMM_WORLD);
-  
-  HARDBUG(my_mpi_globals.MMG_nslaves != (mpi_nworld - 1))
 
-  MPI_Comm_size(my_mpi_globals.MMG_comm_global,
-                &my_mpi_globals.MMG_nglobal);
+  HARDBUG(with->MMG_nslaves != (mpi_nworld - 1))
 
-  HARDBUG(my_mpi_globals.MMG_nglobal > MY_MPI_NGLOBAL_MAX)
-  
-  HARDBUG(my_mpi_globals.MMG_nglobal !=
-          (my_mpi_globals.MMG_nslaves + 1))
-  
-  MPI_Comm_rank(my_mpi_globals.MMG_comm_global,
-                &my_mpi_globals.MMG_id_global);
-  
-  if (my_mpi_globals.MMG_id_global == 0)
+  MPI_Comm_size(with->MMG_comm_global, &(with->MMG_nglobal));
+
+  HARDBUG(with->MMG_nglobal > MY_MPI_NGLOBAL_MAX)
+
+  HARDBUG(with->MMG_nglobal != (with->MMG_nslaves + 1))
+
+  MPI_Comm_rank(with->MMG_comm_global, &(with->MMG_id_global));
+
+  if (with->MMG_id_global == 0)
   {
-    HARDBUG(my_mpi_globals.MMG_id_slave != INVALID)
+    HARDBUG(with->MMG_id_slave != INVALID)
   }
   else
   {
-    HARDBUG(my_mpi_globals.MMG_id_slave == INVALID)
+    HARDBUG(with->MMG_id_slave == INVALID)
   }
 
-  MPI_Bcast(&arg_physical_memory, 1, MPI_INT, 0,
-            my_mpi_globals.MMG_comm_global);
+  MPI_Bcast(&arg_physical_memory, 1, MPI_INT, 0, with->MMG_comm_global);
 #else
-  my_mpi_globals.MMG_init = FALSE;
+  with->MMG_init = FALSE;
 
-  my_mpi_globals.MMG_nglobal = 0;
-  my_mpi_globals.MMG_id_global = INVALID;
+  with->MMG_nglobal = 0;
+  with->MMG_id_global = INVALID;
 
-  my_mpi_globals.MMG_nslaves = 0;
-  my_mpi_globals.MMG_id_slave = INVALID;
+  with->MMG_nslaves = 0;
+  with->MMG_id_slave = INVALID;
 #endif
 }
 
 int my_mpi_comm_size(MPI_Comm comm, int *size)
 {
 #ifdef USE_OPENMPI
-  return(MPI_Comm_size(comm, size));
+  return (MPI_Comm_size(comm, size));
 #else
-  return(MPI_SUCCESS);
+  return (MPI_SUCCESS);
 #endif
 }
 
 int my_mpi_comm_rank(MPI_Comm comm, int *rank)
 {
 #ifdef USE_OPENMPI
-  return(MPI_Comm_rank(comm, rank));
+  return (MPI_Comm_rank(comm, rank));
 #else
-  return(MPI_SUCCESS);
+  return (MPI_SUCCESS);
 #endif
 }
 
-int my_mpi_allreduce(const void *arg_sendbuf, void *arg_recvbuf, int arg_count,
-  MPI_Datatype arg_datatype, MPI_Op arg_op, MPI_Comm arg_comm)
+int my_mpi_allreduce(const void *arg_sendbuf,
+                     void *arg_recvbuf,
+                     int arg_count,
+                     MPI_Datatype arg_datatype,
+                     MPI_Op arg_op,
+                     MPI_Comm arg_comm)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return(MPI_SUCCESS);
+  if (arg_comm == MPI_COMM_NULL)
+    return (MPI_SUCCESS);
 
-  return(MPI_Allreduce(arg_sendbuf, arg_recvbuf, arg_count, arg_datatype,
-                       arg_op, arg_comm));
+  return (MPI_Allreduce(arg_sendbuf,
+                        arg_recvbuf,
+                        arg_count,
+                        arg_datatype,
+                        arg_op,
+                        arg_comm));
 #else
-  return(MPI_SUCCESS);
+  return (MPI_SUCCESS);
 #endif
 }
 
-int my_mpi_bcast(void *buffer, int count, MPI_Datatype datatype, int root,
-  MPI_Comm comm)
+int my_mpi_win_allocate_shared(MPI_Aint size,
+                               int disp_unit,
+                               MPI_Info info,
+                               MPI_Comm comm,
+                               void *baseptr,
+                               MPI_Win *win)
 {
 #ifdef USE_OPENMPI
-  return(MPI_Bcast(buffer, count, datatype, root, comm));
+  return (MPI_Win_allocate_shared(size, disp_unit, info, comm, baseptr, win));
 #else
-  return(MPI_SUCCESS);
+  return (MPI_SUCCESS);
 #endif
 }
 
-int my_mpi_win_allocate_shared(MPI_Aint size, int disp_unit, MPI_Info info,
-  MPI_Comm comm, void *baseptr, MPI_Win *win)
+int my_mpi_win_shared_query(MPI_Win win,
+                            int rank,
+                            MPI_Aint *size,
+                            int *disp_unit,
+                            void *baseptr)
 {
 #ifdef USE_OPENMPI
-  return(MPI_Win_allocate_shared(size, disp_unit, info, comm, baseptr, win));
+  return (MPI_Win_shared_query(win, rank, size, disp_unit, baseptr));
 #else
-  return(MPI_SUCCESS);
-#endif
-}
-
-int my_mpi_win_shared_query(MPI_Win win, int rank, MPI_Aint *size,
-  int *disp_unit, void *baseptr)
-{
-#ifdef USE_OPENMPI
-  return(MPI_Win_shared_query(win, rank, size, disp_unit, baseptr));
-#else
-  return(MPI_SUCCESS);
-#endif
-}
-
-void my_mpi_win_allocate(MPI_Aint arg_size, int arg_disp_unit,
-  MPI_Info arg_info, MPI_Comm arg_comm, void *arg_baseptr, MPI_Win *arg_win)
-{
-#ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
-
-  MPI_Win_allocate(arg_size, arg_disp_unit, arg_info, arg_comm, arg_baseptr,
-                   arg_win);
-
-  int rank;
-
-  my_mpi_comm_rank(arg_comm, &rank);
-
-  if (rank == 0)
-  {
-    MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, *arg_win);
-
-    int zero = 0;
-
-    MPI_Put(&zero, 1, MPI_INT, 0, 0, 1, MPI_INT, *arg_win);
-
-    MPI_Win_flush(0, *arg_win);
-
-    MPI_Win_unlock(0, *arg_win);
-  }
-
-  my_mpi_win_fence(arg_comm, 0, *arg_win);
+  return (MPI_SUCCESS);
 #endif
 }
 
 int my_mpi_win_fence(MPI_Comm arg_comm, int arg_assert, MPI_Win arg_win)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return(MPI_SUCCESS);
+  if (arg_comm == MPI_COMM_NULL)
+    return (MPI_SUCCESS);
 
-  return(MPI_Win_fence(arg_assert, arg_win));
+  return (MPI_Win_fence(arg_assert, arg_win));
 #else
-  return(MPI_SUCCESS);
+  return (MPI_SUCCESS);
+#endif
+}
+
+void my_mpi_allocate_shared(MPI_Comm arg_comm,
+                            size_t arg_element_size,
+                            size_t arg_nelements,
+                            void **arg_shared,
+                            MPI_Win *arg_win)
+{
+  size_t size = arg_element_size * arg_nelements;
+
+  if (arg_comm == MPI_COMM_NULL)
+  {
+    MY_MALLOC_VOID(*arg_shared, size)
+
+    *arg_win = MPI_WIN_NULL;
+  }
+#ifdef USE_OPENMPI
+  else
+  {
+    int iproc;
+
+    MPI_Comm_rank(arg_comm, &iproc);
+
+    MPI_Info info;
+    MPI_Info_create(&info);
+    MPI_Info_set(info, "mpi_minimum_memory_alignment", "64");
+
+    my_mpi_win_allocate_shared(iproc == 0 ? size : 0,
+                               arg_element_size,
+                               info,
+                               arg_comm,
+                               arg_shared,
+                               arg_win);
+
+    MPI_Info_free(&info);
+
+    my_mpi_win_fence(arg_comm, 0, *arg_win);
+
+    MPI_Aint ssize;
+    int disp_unit;
+
+    my_mpi_win_shared_query(*arg_win, 0, &ssize, &disp_unit, arg_shared);
+
+    HARDBUG(disp_unit != arg_element_size)
+
+    HARDBUG(ssize < size)
+
+    // HARDBUG(((uintptr_t)(*arg_shared) & 63u) != 0)
+
+    PRINTF("ssize=%lld disp_unit=%d\n", (long long)ssize, disp_unit);
+
+    my_mpi_win_fence(arg_comm, 0, *arg_win);
+  }
+#endif
+}
+
+void my_mpi_sync_shared(MPI_Comm arg_comm, MPI_Win arg_win, char *arg_info)
+{
+#ifdef USE_OPENMPI
+  if (arg_comm != MPI_COMM_NULL)
+  {
+    MPI_Barrier(arg_comm);
+
+    my_mpi_win_fence(arg_comm, 0, arg_win);
+
+    MPI_Aint ssize = 0;
+    int disp_unit = 0;
+    void *baseptr = NULL;
+
+    my_mpi_win_shared_query(arg_win, 0, &ssize, &disp_unit, &baseptr);
+
+    HARDBUG(ssize < 1)
+    HARDBUG(disp_unit < 1)
+    HARDBUG(baseptr == NULL)
+
+    int iproc;
+
+    MPI_Comm_rank(arg_comm, &iproc);
+
+    ui64_t xxh3_64 = 0;
+
+    if (iproc == 0)
+      xxh3_64 = return_XXH3_64(baseptr, ssize);
+
+    MPI_Bcast(&xxh3_64, 1, MPI_UINT64_T, 0, arg_comm);
+
+    uint64_t my_xxh3_64 = return_XXH3_64(baseptr, ssize);
+
+    HARDBUG(my_xxh3_64 != xxh3_64)
+
+    PRINTF("shared %s ssize=%lld disp_unit=%d xxh3_64=%llX\n",
+           arg_info,
+           (long long)ssize,
+           disp_unit,
+           xxh3_64);
+  }
 #endif
 }
 
 int my_mpi_win_free(MPI_Win *win)
 {
 #ifdef USE_OPENMPI
-  return(MPI_Win_free(win));
+  return (MPI_Win_free(win));
 #else
-  return(MPI_SUCCESS);
+  return (MPI_SUCCESS);
 #endif
 }
 
 int my_mpi_finalize(void)
 {
 #ifdef USE_OPENMPI
-  return(MPI_Finalize());
+  return (MPI_Finalize());
 #else
-  return(MPI_SUCCESS);
+  return (MPI_SUCCESS);
 #endif
 }
 
 int my_mpi_abort(MPI_Comm comm, int errorcode)
 {
 #ifdef USE_OPENMPI
-  return(MPI_Abort(comm, errorcode));
+  return (MPI_Abort(comm, errorcode));
 #else
-  return(MPI_SUCCESS);
+  return (MPI_SUCCESS);
 #endif
 }
 
 void my_mpi_barrier(char *arg_info, MPI_Comm arg_comm, int arg_verbose)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int ncomm;
 
@@ -341,14 +453,18 @@ void my_mpi_barrier(char *arg_info, MPI_Comm arg_comm, int arg_verbose)
 
   HARDBUG(ncomm < 1)
 
-  if (ncomm == 1) return;
+  if (ncomm == 1)
+    return;
 
   int comm_id;
 
   MPI_Comm_rank(arg_comm, &comm_id);
 
-  if (arg_verbose) PRINTF("entering my_mpi_barrier %s ncomm=%d comm_id=%d\n$",
-    arg_info, ncomm, comm_id);
+  if (arg_verbose)
+    PRINTF("entering my_mpi_barrier %s ncomm=%d comm_id=%d\n$",
+           arg_info,
+           ncomm,
+           comm_id);
 
   double t0 = compat_time();
 
@@ -379,7 +495,8 @@ void my_mpi_acquire_semaphore(MPI_Comm arg_comm, MPI_Win arg_win)
 #ifdef USE_OPENMPI
   static int ntries_max = 0;
 
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int zero = 0;
 
@@ -391,66 +508,66 @@ void my_mpi_acquire_semaphore(MPI_Comm arg_comm, MPI_Win arg_win)
 
   int ntries = 0;
 
-  while(TRUE)
+  while (TRUE)
   {
     HARDBUG(ntries > NTRIES_LIMIT)
 
-    if (ntries >= NTRIES_LIMIT) 
+    if (ntries >= NTRIES_LIMIT)
       PRINTF("%s::MPI_Win_lock..\n$", __FUNC__);
 
     MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, arg_win);
 
-    if (ntries >= NTRIES_LIMIT) 
+    if (ntries >= NTRIES_LIMIT)
       PRINTF("%s::MPI_Fetch_and_op..\n$", __FUNC__);
 
     MPI_Fetch_and_op(&zero, &lock_acquired, MPI_INT, 0, 0, MPI_SUM, arg_win);
 
-    if (ntries >= NTRIES_LIMIT) 
+    if (ntries >= NTRIES_LIMIT)
       PRINTF("%s::lock_acquired=%d\n$", __FUNC__, lock_acquired);
 
-    if (ntries >= NTRIES_LIMIT) 
+    if (ntries >= NTRIES_LIMIT)
       PRINTF("%s::MPI_Win_flush..\n$", __FUNC__);
 
     MPI_Win_flush(0, arg_win);
 
     if (lock_acquired == 0)
     {
-      if (ntries >= NTRIES_LIMIT) 
+      if (ntries >= NTRIES_LIMIT)
         PRINTF("%s::MPI_Accumulate..\n$", __FUNC__);
 
       MPI_Accumulate(&one, 1, MPI_INT, 0, 0, 1, MPI_INT, MPI_REPLACE, arg_win);
 
-      if (ntries >= NTRIES_LIMIT) 
+      if (ntries >= NTRIES_LIMIT)
         PRINTF("%s::MPI_Win_flush..\n$", __FUNC__);
 
       MPI_Win_flush(0, arg_win);
-  
-      if (ntries >= NTRIES_LIMIT) 
+
+      if (ntries >= NTRIES_LIMIT)
         PRINTF("%s::MPI_Get..\n$", __FUNC__);
 
       MPI_Get(&value, 1, MPI_INT, 0, 0, 1, MPI_INT, arg_win);
 
-      if (ntries >= NTRIES_LIMIT) 
+      if (ntries >= NTRIES_LIMIT)
         PRINTF("%s::MPI_Win_flush..\n$", __FUNC__);
 
       MPI_Win_flush(0, arg_win);
 
       HARDBUG(value != 1)
 
-      if (ntries >= NTRIES_LIMIT) 
+      if (ntries >= NTRIES_LIMIT)
         PRINTF("%s::MPI_Win_unlock..\n$", __FUNC__);
 
       MPI_Win_unlock(0, arg_win);
 
-      if (ntries > ntries_max) ntries_max = ntries;
+      if (ntries > ntries_max)
+        ntries_max = ntries;
 
-      PRINTF("lock acquired ntries=%d ntries_max=%d\n",
-             ntries, ntries_max);
+      PRINTF("lock acquired ntries=%d ntries_max=%d\n", ntries, ntries_max);
 
       break;
     }
 
-    if (ntries >= NTRIES_LIMIT) 
+    if (ntries >= NTRIES_LIMIT)
       PRINTF("%s::MPI_Win_unlock..\n$", __FUNC__);
 
     MPI_Win_unlock(0, arg_win);
@@ -465,7 +582,8 @@ void my_mpi_acquire_semaphore(MPI_Comm arg_comm, MPI_Win arg_win)
 void my_mpi_release_semaphore(MPI_Comm arg_comm, MPI_Win arg_win)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int zero = 0;
 
@@ -482,7 +600,7 @@ void my_mpi_release_semaphore(MPI_Comm arg_comm, MPI_Win arg_win)
   MPI_Accumulate(&zero, 1, MPI_INT, 0, 0, 1, MPI_INT, MPI_REPLACE, arg_win);
 
   MPI_Win_flush(0, arg_win);
-  
+
   MPI_Get(&value, 1, MPI_INT, 0, 0, 1, MPI_INT, arg_win);
 
   MPI_Win_flush(0, arg_win);
@@ -496,13 +614,15 @@ void my_mpi_release_semaphore(MPI_Comm arg_comm, MPI_Win arg_win)
 void my_mpi_acquire_semaphore_v2(MPI_Comm arg_comm)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int nprocs;
 
   MPI_Comm_size(arg_comm, &nprocs);
 
-  if (nprocs <= 1) return;
+  if (nprocs <= 1)
+    return;
 
   int iproc;
 
@@ -530,15 +650,17 @@ void my_mpi_acquire_semaphore_v2(MPI_Comm arg_comm)
   {
     int flag = 0;
     MPI_Status status;
-   
+
     MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, arg_comm, &flag, &status);
-  
+
     update_progress(&progress);
 
     if (flag)
     {
-      PRINTF("%s::PROBED source=%d tag=%d\n$", __FUNC__,
-            status.MPI_TAG, status.MPI_SOURCE);
+      PRINTF("%s::PROBED source=%d tag=%d\n$",
+             __FUNC__,
+             status.MPI_TAG,
+             status.MPI_SOURCE);
 
       break;
     }
@@ -557,13 +679,15 @@ void my_mpi_acquire_semaphore_v2(MPI_Comm arg_comm)
 void my_mpi_release_semaphore_v2(MPI_Comm arg_comm)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int nprocs;
 
   MPI_Comm_size(arg_comm, &nprocs);
 
-  if (nprocs <= 1) return;
+  if (nprocs <= 1)
+    return;
 
   int iproc;
 
@@ -584,13 +708,15 @@ void my_mpi_release_semaphore_v2(MPI_Comm arg_comm)
 void my_mpi_flush_semaphore_v2(MPI_Comm arg_comm)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int nprocs;
 
   MPI_Comm_size(arg_comm, &nprocs);
 
-  if (nprocs <= 1) return;
+  if (nprocs <= 1)
+    return;
 
   int iproc;
 
@@ -607,14 +733,16 @@ void my_mpi_flush_semaphore_v2(MPI_Comm arg_comm)
 void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int nprocs;
 
   MPI_Comm_size(arg_comm, &nprocs);
 
-  if (nprocs <= 1) return;
- 
+  if (nprocs <= 1)
+    return;
+
   HARDBUG(nprocs > LENGTH_MAX)
 
   PRINTF("%s::nprocs=%d\n$", __FUNC__, nprocs);
@@ -626,13 +754,13 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
   HARDBUG(iproc != 0)
 
   int ndone = 0;
-   
+
   int queue[LENGTH_MAX];
- 
+
   double wall[MY_MPI_NGLOBAL_MAX];
 
   for (iproc = 0; iproc < nprocs; iproc++)
-   wall[iproc] = compat_time();
+    wall[iproc] = compat_time();
 
   i64_t nread = 0;
   i64_t nwrite = -1;
@@ -643,7 +771,7 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
 
   int locked = FALSE;
 
-  while(TRUE)
+  while (TRUE)
   {
     MPI_Status status;
 
@@ -653,7 +781,8 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
 
     ++nprobes;
 
-    if ((nprobes % 1000) == 0) PRINTF("%s::nprobes=%lld\n$", __FUNC__, nprobes);
+    if ((nprobes % 1000) == 0)
+      PRINTF("%s::nprobes=%lld\n$", __FUNC__, nprobes);
 
     if (!flag)
     {
@@ -668,13 +797,24 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
     int tag = status.MPI_TAG;
 
     PRINTF("%s::nmessages=%lld RECEIVING FROM source=%d tag=%s\n$",
-           __FUNC__, nmessages, source, tag2string[tag]);
+           __FUNC__,
+           nmessages,
+           source,
+           tag2string[tag]);
 
-    MPI_Recv(NULL, 0, MPI_INT, status.MPI_SOURCE, status.MPI_TAG, arg_comm,
+    MPI_Recv(NULL,
+             0,
+             MPI_INT,
+             status.MPI_SOURCE,
+             status.MPI_TAG,
+             arg_comm,
              MPI_STATUS_IGNORE);
 
     PRINTF("%s::nmessages=%lld RECEIVED tag=%s FROM source=%d\n$",
-           __FUNC__, nmessages, tag2string[tag], source);
+           __FUNC__,
+           nmessages,
+           tag2string[tag],
+           source);
 
     double now = compat_time();
 
@@ -687,21 +827,28 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
       HARDBUG(length >= LENGTH_MAX)
 
       nwrite++;
-      
+
       queue[nwrite % LENGTH_MAX] = source;
 
       length++;
 
-      if (length > length_max) length_max = length;
+      if (length > length_max)
+        length_max = length;
 
       PRINTF("%s::nmessages=%lld enqueue source=%d"
              " nread=%lld nwrite=%lld length=%d length_max=%d\n$",
-             __FUNC__, nmessages, source, nread, nwrite, length, length_max);
+             __FUNC__,
+             nmessages,
+             source,
+             nread,
+             nwrite,
+             length,
+             length_max);
     }
     else if (tag == TAG_RELEASE_LOCK)
     {
       HARDBUG(!locked)
-   
+
       locked = FALSE;
 
       PRINTF("%s::RELEASED LOCK\n$", __FUNC__);
@@ -715,17 +862,21 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
       if (ndone == (nprocs - 1))
       {
         PRINTF("%s::nmessages=%lld nread=%lld nwrite=%lld length_max=%d\n$",
-               __FUNC__, nmessages, nread, nwrite, length_max);
+               __FUNC__,
+               nmessages,
+               nread,
+               nwrite,
+               length_max);
 
         HARDBUG(nread <= nwrite)
-   
+
         break;
       }
     }
     else
     {
-      PRINTF("tag=%d\n$", tag);   
- 
+      PRINTF("tag=%d\n$", tag);
+
       FATAL("unknown tag", EXIT_FAILURE)
     }
 
@@ -736,12 +887,18 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
       tag = TAG_LOCK_GRANTED;
 
       PRINTF("%s::nmessages=%lld SENDING tag=%s TO source=%d\n$",
-             __FUNC__, nmessages, tag2string[tag], source);
+             __FUNC__,
+             nmessages,
+             tag2string[tag],
+             source);
 
       MPI_Send(NULL, 0, MPI_INT, source, tag, arg_comm);
 
       PRINTF("%s::nmessages=%lld SENT tag=%s TO source=%d\n$",
-             __FUNC__, nmessages, tag2string[tag], source);
+             __FUNC__,
+             nmessages,
+             tag2string[tag],
+             source);
 
       locked = TRUE;
 
@@ -753,7 +910,11 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
 
       PRINTF("%s::nmessages=%lld dequeue"
              " nread=%lld nwrite=%lld length=%d\n$",
-             __FUNC__, nmessages, nread, nwrite, length);
+             __FUNC__,
+             nmessages,
+             nread,
+             nwrite,
+             length);
     }
 
     int ilatency_max = INVALID;
@@ -763,7 +924,8 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
     for (iproc = 0; iproc < nprocs; iproc++)
     {
       double latency = now - wall[iproc];
-      if (latency > latency_max) ilatency_max = iproc;
+      if (latency > latency_max)
+        ilatency_max = iproc;
     }
 
     if (ilatency_max != INVALID)
@@ -772,8 +934,7 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
 #endif
 }
 
-local int my_semop(int arg_semid, int arg_sem_num, short arg_op,
-  short arg_flg)
+local int my_semop(int arg_semid, int arg_sem_num, short arg_op, short arg_flg)
 {
 #ifdef USE_OPENMPI
   struct sembuf sops;
@@ -782,9 +943,9 @@ local int my_semop(int arg_semid, int arg_sem_num, short arg_op,
   sops.sem_op = arg_op;
   sops.sem_flg = arg_flg;
 
-  return(semop(arg_semid, &sops, 1));
+  return (semop(arg_semid, &sops, 1));
 #else
-  return(0);
+  return (0);
 #endif
 }
 
@@ -792,13 +953,15 @@ void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
 {
 #ifdef USE_OPENMPI
 
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int nprocs;
 
   MPI_Comm_size(arg_comm, &nprocs);
 
-  if (nprocs <= 1) return;
+  if (nprocs <= 1)
+    return;
 
   int iproc;
 
@@ -813,12 +976,16 @@ void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
   HARDBUG((semid = semget(arg_semkey, NSEMS, 0600)) == -1);
 
   PRINTF("%s::acquiring lock iproc=%d arg_semkey=%d semid=%d\n$",
-         __FUNC__, iproc, arg_semkey, semid);
+         __FUNC__,
+         iproc,
+         arg_semkey,
+         semid);
 
   while (TRUE)
   {
-    if (my_semop(semid, 0, -1, IPC_NOWAIT) == 0) break;
- 
+    if (my_semop(semid, 0, -1, IPC_NOWAIT) == 0)
+      break;
+
     update_progress(&progress);
 
     compat_sleep(MILLI_SECOND);
@@ -833,13 +1000,15 @@ void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
 void my_mpi_release_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int nprocs;
 
   MPI_Comm_size(arg_comm, &nprocs);
 
-  if (nprocs <= 1) return;
+  if (nprocs <= 1)
+    return;
 
   int iproc;
 
@@ -852,15 +1021,21 @@ void my_mpi_release_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
   HARDBUG(my_semop(semid, 0, 1, 0) != 0)
 
   PRINTF("%s::released lock iproc=%d arg_semkey=%d semid=%d\n$",
-         __FUNC__, iproc, arg_semkey, semid);
+         __FUNC__,
+         iproc,
+         arg_semkey,
+         semid);
 #endif
 }
 
-void my_mpi_barrier_v3(char *arg_info, MPI_Comm arg_comm, 
-  int arg_semkey, int arg_verbose)
+void my_mpi_barrier_v3(char *arg_info,
+                       MPI_Comm arg_comm,
+                       int arg_semkey,
+                       int arg_verbose)
 {
 #ifdef USE_OPENMPI
-  if (arg_comm == MPI_COMM_NULL) return;
+  if (arg_comm == MPI_COMM_NULL)
+    return;
 
   int nprocs;
 
@@ -868,7 +1043,8 @@ void my_mpi_barrier_v3(char *arg_info, MPI_Comm arg_comm,
 
   HARDBUG(nprocs < 1)
 
-  if (nprocs == 1) return;
+  if (nprocs == 1)
+    return;
 
   int iproc;
 
@@ -881,11 +1057,16 @@ void my_mpi_barrier_v3(char *arg_info, MPI_Comm arg_comm,
   if (arg_verbose)
     PRINTF("%s::entering barrier %s nprocs=%d iproc=%d"
            " arg_semkey=%d semid=%d..\n$",
-           __FUNC__, arg_info, nprocs, iproc, arg_semkey, semid);
+           __FUNC__,
+           arg_info,
+           nprocs,
+           iproc,
+           arg_semkey,
+           semid);
 
   double t0 = compat_time();
 
-  //arrival
+  // arrival
 
   HARDBUG(my_semop(semid, SEM_MUTEX, -1, 0) != 0)
 
@@ -897,24 +1078,24 @@ void my_mpi_barrier_v3(char *arg_info, MPI_Comm arg_comm,
 
   if (count == nprocs)
   {
-    //close second gate
+    // close second gate
 
     HARDBUG(my_semop(semid, SEM_EXIT_GATE, -1, 0) != 0)
 
-    //open first gate
+    // open first gate
 
     HARDBUG(my_semop(semid, SEM_ENTRY_GATE, +1, 0) != 0)
   }
 
   HARDBUG(my_semop(semid, SEM_MUTEX, +1, 0) != 0)
 
-  //pass the baton
+  // pass the baton
 
   HARDBUG(my_semop(semid, SEM_ENTRY_GATE, -1, 0) != 0)
 
   HARDBUG(my_semop(semid, SEM_ENTRY_GATE, +1, 0) != 0)
 
-  //departure
+  // departure
 
   HARDBUG(my_semop(semid, SEM_MUTEX, -1, 0) != 0)
 
@@ -926,18 +1107,18 @@ void my_mpi_barrier_v3(char *arg_info, MPI_Comm arg_comm,
 
   if (count == 0)
   {
-    //close the first gate
+    // close the first gate
 
     HARDBUG(my_semop(semid, SEM_ENTRY_GATE, -1, 0) != 0)
 
-    //open the second gate
+    // open the second gate
 
     HARDBUG(my_semop(semid, SEM_EXIT_GATE, +1, 0) != 0)
   }
 
   HARDBUG(my_semop(semid, SEM_MUTEX, +1, 0) != 0)
 
-  //pass the baton
+  // pass the baton
 
   HARDBUG(my_semop(semid, SEM_EXIT_GATE, -1, 0) != 0)
 
@@ -949,7 +1130,9 @@ void my_mpi_barrier_v3(char *arg_info, MPI_Comm arg_comm,
 
   if (arg_verbose)
     PRINTF("%s::..leaving barrier %s wall=%.0f seconds\n$",
-           __FUNC__, arg_info, wall);
+           __FUNC__,
+           arg_info,
+           wall);
 
 #endif
 }
@@ -971,9 +1154,13 @@ void test_my_mpi(void)
   MPI_Win win;
   int *shared_data;
 
-  my_mpi_win_allocate_shared(my_mpi_globals.MMG_id_global == 0 ?
-    SIZE * sizeof(int) : 0, sizeof(int), MPI_INFO_NULL,
-    my_mpi_globals.MMG_comm_global, &shared_data, &win);
+  my_mpi_win_allocate_shared(
+      my_mpi_globals.MMG_id_global == 0 ? SIZE * sizeof(int) : 0,
+      sizeof(int),
+      MPI_INFO_NULL,
+      my_mpi_globals.MMG_comm_global,
+      &shared_data,
+      &win);
 
   my_mpi_win_fence(my_mpi_globals.MMG_comm_global, 0, win);
 
@@ -991,41 +1178,42 @@ void test_my_mpi(void)
 
   if (my_mpi_globals.MMG_id_global == 0)
   {
-    for (int i = 0; i < SIZE; i++) shared_data[i] = i;
+    for (int i = 0; i < SIZE; i++)
+      shared_data[i] = i;
   }
 
   my_mpi_win_fence(my_mpi_globals.MMG_comm_global, 0, win);
 
-  for (int i = 0; i < SIZE; i++) HARDBUG(shared_data[i] != i)
+  for (int i = 0; i < SIZE; i++)
+    HARDBUG(shared_data[i] != i)
 
   my_mpi_win_free(&win);
 
-  my_mpi_barrier("after sharded query", my_mpi_globals.MMG_comm_global,
-                 TRUE);
+  my_mpi_barrier("after sharded query", my_mpi_globals.MMG_comm_global, TRUE);
 
-  PRINTF("Process %d is testing semaphores..\n$",
-         my_mpi_globals.MMG_id_global);
+  PRINTF("Process %d is testing semaphores..\n$", my_mpi_globals.MMG_id_global);
 
   for (i64_t imessage = 1; imessage <= NMESSAGES; ++imessage)
   {
     compat_sleep(MILLI_SECOND);
-    
+
     my_mpi_acquire_semaphore_v3(my_mpi_globals.MMG_comm_global,
-                                SEMKEY_TEST_MY_MPI);
-    
+                                my_mpi_globals.MMG_semkey_test_my_mpi);
+
     PRINTF("Process %d acquired semaphore\n$", my_mpi_globals.MMG_id_global);
-  
+
     compat_sleep(MILLI_SECOND);
-    
+
     my_mpi_release_semaphore_v3(my_mpi_globals.MMG_comm_global,
-                                SEMKEY_TEST_MY_MPI);
- 
+                                my_mpi_globals.MMG_semkey_test_my_mpi);
+
     PRINTF("Process %d released semaphore\n$", my_mpi_globals.MMG_id_global);
   }
 
-  //compat_sleep(my_mpi_globals.MMG_id_global + MILLI_SECOND);
+  // compat_sleep(my_mpi_globals.MMG_id_global + MILLI_SECOND);
 
-  my_mpi_barrier_v3("after semaphores", my_mpi_globals.MMG_comm_global,
-                    SEMKEY_TEST_MY_MPI_BARRIER, TRUE);
+  my_mpi_barrier_v3("after semaphores",
+                    my_mpi_globals.MMG_comm_global,
+                    my_mpi_globals.MMG_semkey_test_my_mpi_barrier,
+                    TRUE);
 }
-

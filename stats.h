@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef StatsH
 #define StatsH
 
@@ -34,25 +35,27 @@ inline local void update_stats(void *self, double x)
   object->S_n++;
 
   if (object->S_n == 1)
-  { 
+  {
     object->S_min = x;
     object->S_max = x;
   }
   else
   {
-    if (x > object->S_max) object->S_max = x;
-    if (x < object->S_min) object->S_min = x;
+    if (x > object->S_max)
+      object->S_max = x;
+    if (x < object->S_min)
+      object->S_min = x;
   }
-  
+
   double mnm1 = object->S_mean_welford;
   double snm1 = object->S_sigma_welford;
 
   object->S_mean_welford = mnm1 + (x - mnm1) / object->S_n;
-   
+
   object->S_sigma_welford = snm1 + (x - mnm1) * (x - object->S_mean_welford);
 
   object->S_sum += x;
-  object->S_sum2 += x * x ;
+  object->S_sum2 += x * x;
 }
 
 void construct_stats(void *, char *);

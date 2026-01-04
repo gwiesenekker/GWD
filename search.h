@@ -1,20 +1,21 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef SearchH
 #define SearchH
 
 #define DEPTH_MAX 127
 
 #define MINIMAL_WINDOW_BIT BIT(0)
-#define PV_BIT             BIT(1)
-#define GE_BETA_BIT        BIT(2)
-#define LE_ALPHA_BIT       BIT(3)
-#define TRUE_SCORE_BIT     BIT(4)
+#define PV_BIT BIT(1)
+#define GE_BETA_BIT BIT(2)
+#define LE_ALPHA_BIT BIT(3)
+#define TRUE_SCORE_BIT BIT(4)
 
 #define IS_MINIMAL_WINDOW(X) ((X) & MINIMAL_WINDOW_BIT)
-#define IS_PV(X)             ((X) & PV_BIT)
+#define IS_PV(X) ((X) & PV_BIT)
 
 #define SEARCH_BEST_SCORE_EGTB 0
-#define SEARCH_BEST_SCORE_AB   1
+#define SEARCH_BEST_SCORE_AB 1
 
 typedef struct
 {
@@ -107,4 +108,3 @@ void init_search(void);
 void fin_search(void);
 
 #endif
-

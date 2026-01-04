@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 #define NRETRIES 1000000
@@ -13,120 +14,124 @@
 const char *my_sqlite3_errmsg(sqlite3 *arg_db)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_errmsg(arg_db));
+  return (sqlite3_errmsg(arg_db));
 #else
-  return(NULL);
+  return (NULL);
 #endif
 }
 
 int my_sqlite3_open(const char *arg_db_name, sqlite3 **arg_db)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_open(arg_db_name, arg_db));
+  return (sqlite3_open(arg_db_name, arg_db));
 #else
-  return(SQLITE_OK);
+  return (SQLITE_OK);
 #endif
 }
 
-int my_sqlite3_open_v2(const char *arg_db_name, sqlite3 **arg_db, int flags,
-  const char *arg_zvfs)
+int my_sqlite3_open_v2(const char *arg_db_name,
+                       sqlite3 **arg_db,
+                       int flags,
+                       const char *arg_zvfs)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_open_v2(arg_db_name, arg_db, flags, arg_zvfs));
+  return (sqlite3_open_v2(arg_db_name, arg_db, flags, arg_zvfs));
 #else
-  return(SQLITE_OK);
+  return (SQLITE_OK);
 #endif
 }
 
-int my_sqlite3_bind_int(sqlite3_stmt *arg_stmt, int arg_index, 
-  int arg_value)
+int my_sqlite3_bind_int(sqlite3_stmt *arg_stmt, int arg_index, int arg_value)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_bind_int(arg_stmt, arg_index, arg_value));
+  return (sqlite3_bind_int(arg_stmt, arg_index, arg_value));
 #else
-  return(SQLITE_OK);
+  return (SQLITE_OK);
 #endif
 }
 
-int my_sqlite3_bind_int64(sqlite3_stmt *arg_stmt, int arg_index,
-  i64_t arg_value)
+int my_sqlite3_bind_int64(sqlite3_stmt *arg_stmt,
+                          int arg_index,
+                          i64_t arg_value)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_bind_int64(arg_stmt, arg_index, arg_value));
+  return (sqlite3_bind_int64(arg_stmt, arg_index, arg_value));
 #else
-  return(SQLITE_OK);
+  return (SQLITE_OK);
 #endif
 }
 
 int my_sqlite3_step(sqlite3_stmt *arg_stmt)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_step(arg_stmt));
+  return (sqlite3_step(arg_stmt));
 #else
-  return(SQLITE_OK);
+  return (SQLITE_OK);
 #endif
 }
 
-int my_sqlite3_exec(sqlite3 *arg_db, const char *arg_sql,
-  int (*arg_callback)(void*,int,char**,char**), void *arg_void,
-  char **arg_errmsg)
+int my_sqlite3_exec(sqlite3 *arg_db,
+                    const char *arg_sql,
+                    int (*arg_callback)(void *, int, char **, char **),
+                    void *arg_void,
+                    char **arg_errmsg)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_exec(arg_db, arg_sql, arg_callback, arg_void,
-         arg_errmsg));
+  return (sqlite3_exec(arg_db, arg_sql, arg_callback, arg_void, arg_errmsg));
 #else
-  return(SQLITE_OK);
+  return (SQLITE_OK);
 #endif
 }
 
 int my_sqlite3_column_int(sqlite3_stmt *arg_stmt, int arg_icol)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_column_int(arg_stmt, arg_icol));
+  return (sqlite3_column_int(arg_stmt, arg_icol));
 #else
-  return(INVALID);
+  return (INVALID);
 #endif
 }
 
 i64_t my_sqlite3_column_int64(sqlite3_stmt *arg_stmt, int arg_icol)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_column_int64(arg_stmt, arg_icol));
+  return (sqlite3_column_int64(arg_stmt, arg_icol));
 #else
-  return(INVALID);
+  return (INVALID);
 #endif
 }
 
 const unsigned char *my_sqlite3_column_text(sqlite3_stmt *arg_stmt,
-  int arg_icol)
+                                            int arg_icol)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_column_text(arg_stmt, arg_icol));
+  return (sqlite3_column_text(arg_stmt, arg_icol));
 #else
-  return(NULL);
+  return (NULL);
 #endif
 }
 
 int my_sqlite3_finalize(sqlite3_stmt *arg_stmt)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_finalize(arg_stmt));
+  return (sqlite3_finalize(arg_stmt));
 #else
-  return(SQLITE_OK);
+  return (SQLITE_OK);
 #endif
 }
 
 int my_sqlite3_close(sqlite3 *arg_db)
 {
 #ifdef USE_SQLITE3
-  return(sqlite3_close(arg_db));
+  return (sqlite3_close(arg_db));
 #else
-  return(SQLITE_OK);
+  return (SQLITE_OK);
 #endif
 }
 
-void my_sqlite3_prepare_v2(sqlite3 *arg_db, const char *arg_sql,
-  sqlite3_stmt **arg_stmt)
+void my_sqlite3_prepare_v2(sqlite3 *arg_db,
+                           const char *arg_sql,
+                           sqlite3_stmt **arg_stmt)
 {
 #ifdef USE_SQLITE3
   int rc = sqlite3_prepare_v2(arg_db, arg_sql, -1, arg_stmt, NULL);
@@ -134,7 +139,9 @@ void my_sqlite3_prepare_v2(sqlite3 *arg_db, const char *arg_sql,
   if (rc != SQLITE_OK)
   {
     PRINTF("Failed to prepare statement sql=%s rc=%d err_msg=%s\n",
-           arg_sql, rc, sqlite3_errmsg(arg_db));
+           arg_sql,
+           rc,
+           sqlite3_errmsg(arg_db));
 
     FATAL("sqlite3", EXIT_FAILURE)
   }
@@ -155,10 +162,11 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
     HARDBUG(bassigncstr(bsql, sqlite3_sql((sqlite3_stmt *)arg_sql)) == BSTR_ERR)
   else
   {
-    HARDBUG(bassigncstr(bsql, (char *) arg_sql) == BSTR_ERR)
-    
+    HARDBUG(bassigncstr(bsql, (char *)arg_sql) == BSTR_ERR)
+
     for (int ichar = 0; ichar < blength(bsql); ichar++)
-      if (bchar(bsql, ichar) == ';') nsemicolons++;
+      if (bchar(bsql, ichar) == ';')
+        nsemicolons++;
   }
 
   if (!retry_random_init)
@@ -176,21 +184,24 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
 
   int iretry = 0;
 
-  while(iretry <= NRETRIES)
+  while (iretry <= NRETRIES)
   {
     if (arg_step)
-      rc = sqlite3_step((sqlite3_stmt *) arg_sql);
+      rc = sqlite3_step((sqlite3_stmt *)arg_sql);
     else
-      rc = sqlite3_exec(arg_db, (const char *) arg_sql, 0, 0, &err_msg);
+      rc = sqlite3_exec(arg_db, (const char *)arg_sql, 0, 0, &err_msg);
 
-    if ((rc != SQLITE_BUSY) and (rc != SQLITE_LOCKED)) break;
+    if ((rc != SQLITE_BUSY) and (rc != SQLITE_LOCKED))
+      break;
 
     if (arg_step)
     {
       if ((iretry % 1000) == 0)
       {
-        PRINTF("busy or locked step=%s iretry=%d delay=%.6f\n", 
-               bdata(bsql), iretry, delay);
+        PRINTF("busy or locked step=%s iretry=%d delay=%.6f\n",
+               bdata(bsql),
+               iretry,
+               delay);
       }
     }
     else
@@ -203,17 +214,20 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
       {
         if (blength(bsql) <= (2 * SQL_PRINTF_WIDTH))
         {
-          PRINTF("busy or locked sql=%s iretry=%d delay=%.6f\n", 
-                 bdata(bsql), iretry, delay);
+          PRINTF("busy or locked sql=%s iretry=%d delay=%.6f\n",
+                 bdata(bsql),
+                 iretry,
+                 delay);
         }
         else
         {
-          PRINTF("busy or locked sql=%.*s...%.*s iretry=%d delay=%.6f\n", 
+          PRINTF("busy or locked sql=%.*s...%.*s iretry=%d delay=%.6f\n",
                  SQL_PRINTF_WIDTH,
                  bdata(bsql),
                  SQL_PRINTF_WIDTH,
                  bdata(bsql) + blength(bsql) - SQL_PRINTF_WIDTH,
-                 iretry, delay);
+                 iretry,
+                 delay);
         }
       }
     }
@@ -223,7 +237,8 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
     else
       delay = (1.0 + return_my_random(&retry_random) % 1000) * MICRO_SECOND;
 
-    if ((iretry % 1000) == 0) PRINTF("delay=%.6f\n", delay);
+    if ((iretry % 1000) == 0)
+      PRINTF("delay=%.6f\n", delay);
 
     compat_sleep(delay);
 
@@ -236,19 +251,23 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
     {
       if (arg_step)
       {
-        PRINTF("OK or DONE or ROW step=%s iretry=%d delay=%.6f\n", 
-               bdata(bsql), iretry, delay);
+        PRINTF("OK or DONE or ROW step=%s iretry=%d delay=%.6f\n",
+               bdata(bsql),
+               iretry,
+               delay);
       }
       else
       {
-        PRINTF("OK or DONE or ROW sql=%s iretry=%d delay=%.2f\n", 
-               bdata(bsql), iretry, delay);
+        PRINTF("OK or DONE or ROW sql=%s iretry=%d delay=%.2f\n",
+               bdata(bsql),
+               iretry,
+               delay);
       }
     }
 
     BDESTROY(bsql);
 
-    return(rc);
+    return (rc);
   }
 
   if (arg_step)
@@ -259,25 +278,32 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
   {
     if (blength(bsql) <= (2 * SQL_PRINTF_WIDTH))
     {
-      PRINTF("FAILED sql=%s rc=%d err_msg=%s iretry=%d delay=%.6f\n", 
-             bdata(bsql), rc, sqlite3_errmsg(arg_db), iretry, delay);
+      PRINTF("FAILED sql=%s rc=%d err_msg=%s iretry=%d delay=%.6f\n",
+             bdata(bsql),
+             rc,
+             sqlite3_errmsg(arg_db),
+             iretry,
+             delay);
     }
     else
     {
-      PRINTF("FAILED sql=%.*s...%.*s rc=%d err_msg=%s iretry=%d delay=%.6f\n", 
+      PRINTF("FAILED sql=%.*s...%.*s rc=%d err_msg=%s iretry=%d delay=%.6f\n",
              SQL_PRINTF_WIDTH,
              bdata(bsql),
              SQL_PRINTF_WIDTH,
              bdata(bsql) + blength(bsql) - SQL_PRINTF_WIDTH,
-             rc, sqlite3_errmsg(arg_db), iretry, delay);
+             rc,
+             sqlite3_errmsg(arg_db),
+             iretry,
+             delay);
     }
   }
 
   FATAL("sqlite3", EXIT_FAILURE)
 
-  return(INVALID);
+  return (INVALID);
 #else
-  return(INVALID);
+  return (INVALID);
 #endif
 }
 
@@ -285,51 +311,48 @@ void create_tables(sqlite3 *arg_db)
 {
 #ifdef USE_SQLITE3
   const char *create_positions_table_sql =
-    "CREATE TABLE IF NOT EXISTS positions "
-    "(id INTEGER PRIMARY KEY AUTOINCREMENT,"
-    "fen TEXT UNIQUE,"
-    "depth INTEGER DEFAULT 0,"
-    "frequency INTEGER DEFAULT 0,"
-    "nwon INTEGER DEFAULT 0,"
-    "ndraw INTEGER DEFAULT 0,"
-    "nlost INTEGER DEFAULT 0);";
+      "CREATE TABLE IF NOT EXISTS positions "
+      "(id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "fen TEXT UNIQUE,"
+      "depth INTEGER DEFAULT 0,"
+      "frequency INTEGER DEFAULT 0,"
+      "nwon INTEGER DEFAULT 0,"
+      "ndraw INTEGER DEFAULT 0,"
+      "nlost INTEGER DEFAULT 0);";
 
   const char *create_moves_table_sql =
-    "CREATE TABLE IF NOT EXISTS moves (id INTEGER PRIMARY KEY AUTOINCREMENT,"
-    "position_id INTEGER NOT NULL,"
-    "move TEXT,"
-    "frequency INTEGER DEFAULT 0,"
-    "nwon INTEGER DEFAULT 0,"
-    "ndraw INTEGER DEFAULT 0,"
-    "nlost INTEGER DEFAULT 0,"
-    "FOREIGN KEY (position_id) REFERENCES positions (id) ON DELETE CASCADE,"
-    "UNIQUE (position_id, move));";
+      "CREATE TABLE IF NOT EXISTS moves (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "position_id INTEGER NOT NULL,"
+      "move TEXT,"
+      "frequency INTEGER DEFAULT 0,"
+      "nwon INTEGER DEFAULT 0,"
+      "ndraw INTEGER DEFAULT 0,"
+      "nlost INTEGER DEFAULT 0,"
+      "FOREIGN KEY (position_id) REFERENCES positions (id) ON DELETE CASCADE,"
+      "UNIQUE (position_id, move));";
 
   const char *create_evaluations_table_sql =
-    "CREATE TABLE IF NOT EXISTS evaluations ("
-    "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-    "move_id INTEGER NOT NULL,"
-    "evaluation INTEGER,"
-    "lcb REAL,"
-    "ucb REAL,"
-    "FOREIGN KEY (move_id) REFERENCES moves (id) ON DELETE CASCADE,"
-    "UNIQUE (move_id));";
+      "CREATE TABLE IF NOT EXISTS evaluations ("
+      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+      "move_id INTEGER NOT NULL,"
+      "evaluation INTEGER,"
+      "lcb REAL,"
+      "ucb REAL,"
+      "FOREIGN KEY (move_id) REFERENCES moves (id) ON DELETE CASCADE,"
+      "UNIQUE (move_id));";
 
   HARDBUG(execute_sql(arg_db, create_positions_table_sql, FALSE) != SQLITE_OK)
 
   HARDBUG(execute_sql(arg_db, create_moves_table_sql, FALSE) != SQLITE_OK)
 
-  HARDBUG(execute_sql(arg_db, create_evaluations_table_sql, FALSE) !=
-          SQLITE_OK)
+  HARDBUG(execute_sql(arg_db, create_evaluations_table_sql, FALSE) != SQLITE_OK)
 #endif
 }
 
-int query_position_fen(sqlite3 *arg_db, i64_t arg_position_id,
-  bstring arg_bfen)
+int query_position_fen(sqlite3 *arg_db, i64_t arg_position_id, bstring arg_bfen)
 {
 #ifdef USE_SQLITE3
-  const char *sql =
-    "SELECT fen FROM positions WHERE id = ?;";
+  const char *sql = "SELECT fen FROM positions WHERE id = ?;";
 
   sqlite3_stmt *stmt;
 
@@ -341,28 +364,26 @@ int query_position_fen(sqlite3 *arg_db, i64_t arg_position_id,
   {
     HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-    return(INVALID);
+    return (INVALID);
   }
 
   const unsigned char *fen = my_sqlite3_column_text(stmt, 0);
 
-  HARDBUG(bassigncstr(arg_bfen, (char *) fen) == BSTR_ERR)
+  HARDBUG(bassigncstr(arg_bfen, (char *)fen) == BSTR_ERR)
 
   HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-  return(0);
+  return (0);
 #else
-  return(INVALID);
+  return (INVALID);
 #endif
 }
 
-i64_t query_position_id(sqlite3 *arg_db, const char *arg_fen,
-                        int arg_frequency)
+i64_t query_position_id(sqlite3 *arg_db, const char *arg_fen, int arg_frequency)
 {
 #ifdef USE_SQLITE3
-  const char *sql =
-    "SELECT id FROM positions WHERE fen = ? AND "
-    "frequency >= ?;";
+  const char *sql = "SELECT id FROM positions WHERE fen = ? AND "
+                    "frequency >= ?;";
 
   sqlite3_stmt *stmt;
 
@@ -376,26 +397,28 @@ i64_t query_position_id(sqlite3 *arg_db, const char *arg_fen,
   {
     HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-    return(INVALID);
+    return (INVALID);
   }
 
   i64_t id = sqlite3_column_int64(stmt, 0);
 
   HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-  return(id);
+  return (id);
 #else
-  return(INVALID);
+  return (INVALID);
 #endif
 }
 
-i64_t query_move(sqlite3 *arg_db, i64_t arg_position_id, const char *arg_move,
-  int arg_frequency)
+i64_t query_move(sqlite3 *arg_db,
+                 i64_t arg_position_id,
+                 const char *arg_move,
+                 int arg_frequency)
 {
 #ifdef USE_SQLITE3
   const char *sql =
-    "SELECT id FROM moves WHERE position_id = ? AND move = ? AND "
-    "frequency >= ?;";
+      "SELECT id FROM moves WHERE position_id = ? AND move = ? AND "
+      "frequency >= ?;";
 
   sqlite3_stmt *stmt;
 
@@ -411,24 +434,23 @@ i64_t query_move(sqlite3 *arg_db, i64_t arg_position_id, const char *arg_move,
   {
     HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-    return(INVALID);
+    return (INVALID);
   }
 
   i64_t id = sqlite3_column_int64(stmt, 0);
 
   HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-  return(id);
+  return (id);
 #else
-  return(INVALID);
+  return (INVALID);
 #endif
 }
 
 int query_evaluation(sqlite3 *arg_db, i64_t arg_move_id)
 {
 #ifdef USE_SQLITE3
-  const char *sql =
-    "SELECT evaluation FROM evaluations WHERE move_id = ?;";
+  const char *sql = "SELECT evaluation FROM evaluations WHERE move_id = ?;";
 
   sqlite3_stmt *stmt;
 
@@ -440,16 +462,16 @@ int query_evaluation(sqlite3 *arg_db, i64_t arg_move_id)
   {
     HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-    return(SCORE_PLUS_INFINITY);
+    return (SCORE_PLUS_INFINITY);
   }
 
   int evaluation = sqlite3_column_int(stmt, 0);
 
   HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-  return(evaluation);
+  return (evaluation);
 #else
-  return(INVALID);
+  return (INVALID);
 #endif
 }
 
@@ -465,7 +487,8 @@ void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name)
   if (rc != SQLITE_OK)
   {
     PRINTF("Cannot open disk database: %s err_mes=%s\n",
-           arg_file_name, sqlite3_errmsg(disk_db));
+           arg_file_name,
+           sqlite3_errmsg(disk_db));
 
     FATAL("sqlite3", EXIT_FAILURE)
   }
@@ -474,8 +497,9 @@ void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name)
 
   if (!backup)
   {
-    PRINTF("Failed to initialize backup: %s err_msg=%s\n", 
-           arg_file_name, sqlite3_errmsg(disk_db));
+    PRINTF("Failed to initialize backup: %s err_msg=%s\n",
+           arg_file_name,
+           sqlite3_errmsg(disk_db));
 
     FATAL("sqlite3", EXIT_FAILURE)
   }
@@ -485,7 +509,8 @@ void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name)
   if ((rc != SQLITE_DONE) and (rc != SQLITE_OK))
   {
     PRINTF("Backup step failed: %s err_msg=%s\n",
-           arg_file_name, sqlite3_errmsg(disk_db));
+           arg_file_name,
+           sqlite3_errmsg(disk_db));
 
     FATAL("sqlite3", EXIT_FAILURE)
   }
@@ -495,7 +520,8 @@ void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name)
   if (rc != SQLITE_OK)
   {
     PRINTF("Backup finish failed: %s err_msg=%s\n",
-           arg_file_name, sqlite3_errmsg(disk_db));
+           arg_file_name,
+           sqlite3_errmsg(disk_db));
 
     FATAL("sqlite3", EXIT_FAILURE)
   }
@@ -505,7 +531,8 @@ void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name)
   if (rc != SQLITE_OK)
   {
     PRINTF("Backup failed: %s err_msg=%s\n",
-           arg_file_name, sqlite3_errmsg(disk_db));
+           arg_file_name,
+           sqlite3_errmsg(disk_db));
 
     FATAL("sqlite3", EXIT_FAILURE)
   }
@@ -527,7 +554,8 @@ void flush_sql_buffer(my_sqlite3_t *self, int nsql_buffer)
     {
       PRINTF("acquiring semaphore..\n$");
 
-      my_mpi_acquire_semaphore_v3(object->MS_comm, SEMKEY_FLUSH_SQL_BUFFER);
+      my_mpi_acquire_semaphore_v3(object->MS_comm,
+                                  my_mpi_globals.MMG_semkey_flush_sql_buffer);
     }
 
     if (object->MS_verbose > 0)
@@ -540,15 +568,15 @@ void flush_sql_buffer(my_sqlite3_t *self, int nsql_buffer)
     BSTRING(b)
 
     bassigncstr(b, ";");
-  
+
     struct bstrList *bsql;
-    
+
     HARDBUG((bsql = bsplits(object->MS_bbuffer, b)) == NULL)
 
     for (int isql = 0; isql < bsql->qty; isql++)
     {
-      HARDBUG(execute_sql(object->MS_db, bdata(bsql->entry[isql]),
-                          FALSE) != SQLITE_OK)
+      HARDBUG(execute_sql(object->MS_db, bdata(bsql->entry[isql]), FALSE) !=
+              SQLITE_OK)
     }
 
     HARDBUG(bstrListDestroy(bsql) == BSTR_ERR)
@@ -570,7 +598,8 @@ void flush_sql_buffer(my_sqlite3_t *self, int nsql_buffer)
     {
       PRINTF("releasing semaphore..\n$");
 
-      my_mpi_release_semaphore_v3(object->MS_comm, SEMKEY_FLUSH_SQL_BUFFER);
+      my_mpi_release_semaphore_v3(object->MS_comm,
+                                  my_mpi_globals.MMG_semkey_flush_sql_buffer);
     }
 
     if (object->MS_verbose > 0)
@@ -593,8 +622,9 @@ void append_sql_buffer(my_sqlite3_t *self, const char *arg_fmt, ...)
   flush_sql_buffer(object, NSQL_BUFFER);
 }
 
-void construct_my_sqlite3(my_sqlite3_t *self, char *arg_db_name,
-  MPI_Comm arg_comm)
+void construct_my_sqlite3(my_sqlite3_t *self,
+                          char *arg_db_name,
+                          MPI_Comm arg_comm)
 {
   my_sqlite3_t *object = self;
 
@@ -608,7 +638,7 @@ void construct_my_sqlite3(my_sqlite3_t *self, char *arg_db_name,
   if (iproc <= 0)
   {
     int rc = my_sqlite3_open(arg_db_name, &(object->MS_db));
-  
+
     if (rc != SQLITE_OK)
     {
       if (object->MS_db == NULL)
@@ -618,9 +648,10 @@ void construct_my_sqlite3(my_sqlite3_t *self, char *arg_db_name,
       else
       {
         PRINTF("Cannot open database: %s err_msg=%s\n",
-               arg_db_name, my_sqlite3_errmsg(object->MS_db));
+               arg_db_name,
+               my_sqlite3_errmsg(object->MS_db));
       }
-  
+
       FATAL("sqlite3", EXIT_FAILURE)
     }
 
@@ -636,23 +667,26 @@ void construct_my_sqlite3(my_sqlite3_t *self, char *arg_db_name,
             SQLITE_OK)
   }
 
-  my_mpi_barrier_v3("after open database", arg_comm,
-                    SEMKEY_CONSTRUCT_MY_SQLITE3_BARRIER, TRUE);
+  my_mpi_barrier_v3("after open database",
+                    arg_comm,
+                    my_mpi_globals.MMG_semkey_construct_my_sqlite3_barrier,
+                    TRUE);
 
   if (iproc > 0)
   {
     int rc = my_sqlite3_open(arg_db_name, &(object->MS_db));
-  
+
     if (rc != SQLITE_OK)
     {
-      if (object->MS_db == NULL)   
+      if (object->MS_db == NULL)
       {
         PRINTF("Cannot open database: %s err_msg=NULL\n", arg_db_name);
       }
       else
       {
         PRINTF("Cannot open database: %s err_msg=%s\n",
-                arg_db_name, my_sqlite3_errmsg(object->MS_db));
+               arg_db_name,
+               my_sqlite3_errmsg(object->MS_db));
       }
       FATAL("sqlite3", EXIT_FAILURE)
     }
@@ -660,7 +694,7 @@ void construct_my_sqlite3(my_sqlite3_t *self, char *arg_db_name,
     HARDBUG(execute_sql(object->MS_db, "PRAGMA cache_size=-131072;", FALSE) !=
             SQLITE_OK)
   }
-  
+
   HARDBUG((object->MS_bbuffer = bfromcstr("")) == NULL)
 
   object->MS_verbose = 1;
@@ -680,27 +714,31 @@ void close_my_sqlite3(my_sqlite3_t *self)
   {
     PRINTF("%s::closing db iproc=%d\n$", __FUNC__, iproc);
 
-    my_mpi_acquire_semaphore_v3(object->MS_comm, SEMKEY_CLOSE_MY_SQLITE3);
+    my_mpi_acquire_semaphore_v3(object->MS_comm,
+                                my_mpi_globals.MMG_semkey_close_my_sqlite3);
 
     HARDBUG(my_sqlite3_close(object->MS_db) != SQLITE_OK)
 
-    my_mpi_release_semaphore_v3(object->MS_comm, SEMKEY_CLOSE_MY_SQLITE3);
+    my_mpi_release_semaphore_v3(object->MS_comm,
+                                my_mpi_globals.MMG_semkey_close_my_sqlite3);
 
     PRINTF("%s::closed db iproc=%d\n$", __FUNC__, iproc);
   }
 
-  my_mpi_barrier_v3("after my_sqlite3_close", object->MS_comm,
-                    SEMKEY_CLOSE_MY_SQLITE3_BARRIER, TRUE);
+  my_mpi_barrier_v3("after my_sqlite3_close",
+                    object->MS_comm,
+                    my_mpi_globals.MMG_semkey_close_my_sqlite3_barrier,
+                    TRUE);
 
   if (iproc <= 0)
   {
     int ntries = 0;
 
-    while(TRUE)
+    while (TRUE)
     {
       int frames_in_wal;
       int frames_checkpointed;
-  
+
       int rc = sqlite3_wal_checkpoint_v2(object->MS_db,
                                          NULL,
                                          SQLITE_CHECKPOINT_TRUNCATE,
@@ -709,21 +747,25 @@ void close_my_sqlite3(my_sqlite3_t *self)
       if (rc != SQLITE_OK)
       {
         PRINTF("Failed wal_checkpoint_v2: %s\n", sqlite3_errmsg(object->MS_db));
-    
+
         FATAL("sqlite3", EXIT_FAILURE);
       }
-    
+
       PRINTF("ntries=%d frames_in_wal=%d frames_checkpointed=%d\n$",
-             ntries, frames_in_wal, frames_checkpointed);
-  
-      if (frames_in_wal <= 0) break;
-  
+             ntries,
+             frames_in_wal,
+             frames_checkpointed);
+
+      if (frames_in_wal <= 0)
+        break;
+
       ++ntries;
 
       HARDBUG(ntries > NTRIES_MAX)
     }
 
-    if (ntries > 0) PRINTF("needed %d tries to flush wal\n$", ntries);
+    if (ntries > 0)
+      PRINTF("needed %d tries to flush wal\n$", ntries);
 
     HARDBUG(sqlite3_close(object->MS_db) != SQLITE_OK)
   }
@@ -733,7 +775,7 @@ void close_my_sqlite3(my_sqlite3_t *self)
 #define TEST_DB "test.db"
 
 #define NTEST_POSITIONS 1000
-#define NTEST_MOVES     100
+#define NTEST_MOVES 100
 
 void test_dbase(void)
 {
@@ -755,10 +797,11 @@ void test_dbase(void)
     ++position_id;
 
     append_sql_buffer(&db,
-                     "INSERT INTO positions (id, fen) "
-                     "VALUES (%d, 'position%d');",
-                     position_id, position_id);
-   
+                      "INSERT INTO positions (id, fen) "
+                      "VALUES (%d, 'position%d');",
+                      position_id,
+                      position_id);
+
     for (i64_t imove = 0; imove < NTEST_MOVES; imove++)
     {
       ++move_id;
@@ -766,14 +809,15 @@ void test_dbase(void)
       append_sql_buffer(&db,
                         "INSERT INTO moves (position_id, id, move) "
                         "VALUES (%d, %d, 'move%d');",
-                        position_id, move_id, move_id);
+                        position_id,
+                        move_id,
+                        move_id);
     }
   }
 
   flush_sql_buffer(&db, 0);
-  
+
   HARDBUG(my_sqlite3_close(db.MS_db) != SQLITE_OK)
 
   PRINTF("test_dbase OK\n");
 }
-

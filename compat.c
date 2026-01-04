@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 #undef read
@@ -15,30 +16,30 @@
 #undef mkdir
 #undef clock
 
-i64_t compat_read(int fd, void* buffer, i64_t nbuffer)
+i64_t compat_read(int fd, void *buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(read(fd, buffer, nbuffer));
+  return (read(fd, buffer, nbuffer));
 #else
-  return(_read(fd, buffer, nbuffer));
+  return (_read(fd, buffer, nbuffer));
 #endif
 }
 
-i64_t compat_write(int fd, void* buffer, i64_t nbuffer)
+i64_t compat_write(int fd, void *buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(write(fd, buffer, nbuffer));
+  return (write(fd, buffer, nbuffer));
 #else
-  return(_write(fd, buffer, nbuffer));
+  return (_write(fd, buffer, nbuffer));
 #endif
 }
 
 int compat_close(int fd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(close(fd));
+  return (close(fd));
 #else
-  return(_close(fd));
+  return (_close(fd));
 #endif
 }
 
@@ -47,7 +48,8 @@ int compat_lock_file(char *fname)
 #if COMPAT_OS == COMPAT_OS_LINUX
   int fd = open(fname, O_WRONLY | O_CREAT | O_APPEND, 0644);
 
-  if (fd == -1) return(-1);
+  if (fd == -1)
+    return (-1);
 
   struct flock fl;
 
@@ -56,23 +58,28 @@ int compat_lock_file(char *fname)
   fl.l_start = 0;
   fl.l_len = 0;
 
-  if (fcntl(fd, F_SETLKW, &fl) == -1) return(-1);
+  if (fcntl(fd, F_SETLKW, &fl) == -1)
+    return (-1);
 #else
-  int fd = _open(fname,
-                 _O_WRONLY | _O_CREAT | _O_APPEND, _S_IREAD | _S_IWRITE);
+  int fd = _open(fname, _O_WRONLY | _O_CREAT | _O_APPEND, _S_IREAD | _S_IWRITE);
 
-  if (fd == -1) return(-1);
+  if (fd == -1)
+    return (-1);
 
   OVERLAPPED ol = {0};
 
   if (!LockFileEx((HANDLE)_get_osfhandle(fd),
-                  LOCKFILE_EXCLUSIVE_LOCK, 0, MAXDWORD, MAXDWORD, &ol))
+                  LOCKFILE_EXCLUSIVE_LOCK,
+                  0,
+                  MAXDWORD,
+                  MAXDWORD,
+                  &ol))
   {
-    return(-1);
+    return (-1);
   }
 #endif
 
-  return(fd);
+  return (fd);
 }
 
 void compat_unlock_file(int fd)
@@ -91,8 +98,7 @@ void compat_unlock_file(int fd)
 #else
   OVERLAPPED ol = {0};
 
-  HARDBUG(!UnlockFileEx((HANDLE)_get_osfhandle(fd),
-                        0, MAXDWORD, MAXDWORD, &ol))
+  HARDBUG(!UnlockFileEx((HANDLE)_get_osfhandle(fd), 0, MAXDWORD, MAXDWORD, &ol))
 #endif
 }
 
@@ -116,65 +122,65 @@ void compat_fdprintf(int fd, char *format, ...)
 int compat_socket_startup(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(0);
+  return (0);
 #else
   WORD wVersionRequested = MAKEWORD(2, 2);
 
   WSADATA wsaData;
 
-  return(WSAStartup(wVersionRequested, &wsaData));
+  return (WSAStartup(wVersionRequested, &wsaData));
 #endif
 }
 
 int compat_socket_cleanup(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(0);
+  return (0);
 #else
-  return(WSACleanup());
+  return (WSACleanup());
 #endif
 }
 
-i64_t compat_socket_read(int fd, void* buffer, i64_t nbuffer)
+i64_t compat_socket_read(int fd, void *buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(read(fd, buffer, nbuffer));
+  return (read(fd, buffer, nbuffer));
 #else
-  return(recv(fd, buffer, (int)nbuffer, 0));
+  return (recv(fd, buffer, (int)nbuffer, 0));
 #endif
 }
 
-i64_t compat_socket_write(int fd, void* buffer, i64_t nbuffer)
+i64_t compat_socket_write(int fd, void *buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(write(fd, buffer, nbuffer));
+  return (write(fd, buffer, nbuffer));
 #else
-  return(send(fd, buffer, (int)nbuffer, 0));
+  return (send(fd, buffer, (int)nbuffer, 0));
 #endif
 }
 
 int compat_socket_close(int fd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(close(fd));
+  return (close(fd));
 #else
-  return(closesocket(fd));
+  return (closesocket(fd));
 #endif
 }
 
 int compat_fork(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(fork());
+  return (fork());
 #else
-  return(INVALID);
+  return (INVALID);
 #endif
 }
 
 int compat_pipe(pipe_t pfd[2])
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(pipe(pfd));
+  return (pipe(pfd));
 #else
   SECURITY_ATTRIBUTES saAttr;
 
@@ -184,77 +190,80 @@ int compat_pipe(pipe_t pfd[2])
 
   HANDLE readPipe, writePipe;
 
-  if (!CreatePipe(&readPipe, &writePipe, &saAttr, 0)) return(-1);
+  if (!CreatePipe(&readPipe, &writePipe, &saAttr, 0))
+    return (-1);
 
   pfd[0] = readPipe;
   pfd[1] = writePipe;
 
-  return(0);
+  return (0);
 #endif
 }
 
-i64_t compat_pipe_read(pipe_t fd, void* buffer, i64_t nbuffer)
+i64_t compat_pipe_read(pipe_t fd, void *buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(read(fd, buffer, nbuffer));
+  return (read(fd, buffer, nbuffer));
 #else
   DWORD nread;
 
-  if (!ReadFile(fd, buffer, nbuffer, &nread, NULL)) return(-1);
+  if (!ReadFile(fd, buffer, nbuffer, &nread, NULL))
+    return (-1);
 
-  return(nread);
+  return (nread);
 #endif
 }
 
-i64_t compat_pipe_write(pipe_t fd, void* buffer, i64_t nbuffer)
+i64_t compat_pipe_write(pipe_t fd, void *buffer, i64_t nbuffer)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(write(fd, buffer, nbuffer));
+  return (write(fd, buffer, nbuffer));
 #else
   DWORD nwritten;
 
-  if (!WriteFile(fd, buffer, nbuffer, &nwritten, NULL)) return(-1);
+  if (!WriteFile(fd, buffer, nbuffer, &nwritten, NULL))
+    return (-1);
 
-  return(nwritten);
+  return (nwritten);
 #endif
 }
 
 int compat_pipe_close(pipe_t fd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(close(fd));
+  return (close(fd));
 #else
-  return(CloseHandle(fd) ? 0 : -1);
+  return (CloseHandle(fd) ? 0 : -1);
 #endif
 }
 
-int compat_fseeko(FILE* stream, i64_t offset, int whence)
+int compat_fseeko(FILE *stream, i64_t offset, int whence)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(fseeko(stream, offset, whence));
+  return (fseeko(stream, offset, whence));
 #else
-  return(_fseeki64(stream, offset, whence));
+  return (_fseeki64(stream, offset, whence));
 #endif
 }
 
-int compat_strcasecmp(char* s1, char* s2)
+int compat_strcasecmp(char *s1, char *s2)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(strcasecmp(s1, s2));
+  return (strcasecmp(s1, s2));
 #else
-  return(_stricmp(s1, s2));
+  return (_stricmp(s1, s2));
 #endif
 }
 
 int compat_poll(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  struct pollfd mypoll = { STDIN_FILENO, POLLIN };
+  struct pollfd mypoll = {STDIN_FILENO, POLLIN};
 
   if (poll(&mypoll, 1, 10) > 0)
-    return(TRUE);
+    return (TRUE);
   else
-    return(FALSE);
+    return (FALSE);
 #else
   HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
   DWORD dwAvail = 0;
@@ -262,67 +271,69 @@ int compat_poll(void)
   if (GetFileType(hStdin) == FILE_TYPE_PIPE)
   {
     if (PeekNamedPipe(hStdin, NULL, 0, NULL, &dwAvail, NULL) && dwAvail > 0)
-      return(TRUE);
+      return (TRUE);
   }
   else if (_kbhit()) // console
   {
-    return(TRUE);
+    return (TRUE);
   }
 
-  return(FALSE);
+  return (FALSE);
 #endif
 }
 
-int compat_access(char* pathname, int mode)
+int compat_access(char *pathname, int mode)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(access(pathname, mode));
+  return (access(pathname, mode));
 #else
-  return(_access(pathname, mode));
+  return (_access(pathname, mode));
 #endif
 }
 
-i64_t compat_size(char* pathname)
+i64_t compat_size(char *pathname)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
   struct stat st;
-  
-  if (stat(pathname, &st) != 0) return(-1);
 
-  return(st.st_size);
+  if (stat(pathname, &st) != 0)
+    return (-1);
+
+  return (st.st_size);
 #else
   struct __stat64 st;
 
-  if (_stat64(pathname, &st) != 0) return -1;
+  if (_stat64(pathname, &st) != 0)
+    return -1;
 
-  return(st.st_size);
+  return (st.st_size);
 #endif
 }
 
 int compat_dup2(int oldfd, int newfd)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(dup2(oldfd, newfd));
+  return (dup2(oldfd, newfd));
 #else
-  return(_dup2(oldfd, newfd));
+  return (_dup2(oldfd, newfd));
 #endif
 }
 
-int compat_chdir(char* path)
+int compat_chdir(char *path)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(chdir(path));
+  return (chdir(path));
 #else
-  return(_chdir(path));
+  return (_chdir(path));
 #endif
 }
 
-int compat_mkdir(char* path)
+int compat_mkdir(char *path)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(mkdir(path, 0750));
+  return (mkdir(path, 0750));
 #else
-  return(_mkdir(path));
+  return (_mkdir(path));
 #endif
 }
 
@@ -337,27 +348,27 @@ double return_my_clock(void)
     HARDBUG(clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tv) != 0)
   }
 
-  return((double)tv.tv_sec + (double)tv.tv_nsec / NANO_SECONDS);
+  return ((double)tv.tv_sec + (double)tv.tv_nsec / NANO_SECONDS);
 #else
   LARGE_INTEGER frequency, ticks;
 
   QueryPerformanceFrequency(&frequency);
   QueryPerformanceCounter(&ticks);
 
-  return((double)ticks.QuadPart / frequency.QuadPart);
+  return ((double)ticks.QuadPart / frequency.QuadPart);
 #endif
 }
 
-//returns physical memory in MB
+// returns physical memory in MB
 
 int return_physical_memory(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  FILE* fproc;
+  FILE *fproc;
 
   HARDBUG((fproc = fopen("/proc/meminfo", "r")) == NULL)
 
-    char line[MY_LINE_MAX];
+  char line[MY_LINE_MAX];
 
   i64_t result = 0;
 
@@ -373,9 +384,9 @@ int return_physical_memory(void)
 
   FCLOSE(fproc)
 
-    HARDBUG(result == INVALID)
+  HARDBUG(result == INVALID)
 
-    return(result / MBYTE);
+  return (result / MBYTE);
 #else
   MEMORYSTATUSEX statex;
 
@@ -383,14 +394,14 @@ int return_physical_memory(void)
 
   GlobalMemoryStatusEx(&statex);
 
-  return((int)(statex.ullAvailPhys / MBYTE));
+  return ((int)(statex.ullAvailPhys / MBYTE));
 #endif
 }
 
 int return_physical_cpus(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  FILE* fproc;
+  FILE *fproc;
 
   HARDBUG((fproc = fopen("/proc/cpuinfo", "r")) == NULL)
 
@@ -402,12 +413,13 @@ int return_physical_cpus(void)
   {
     int dummy;
 
-    if (my_sscanf(line, "processor%*[^0-9]%d", &dummy) == 1) ++result;
+    if (my_sscanf(line, "processor%*[^0-9]%d", &dummy) == 1)
+      ++result;
   }
 
   FCLOSE(fproc)
 
-  return(result);
+  return (result);
 #else
   PSYSTEM_LOGICAL_PROCESSOR_INFORMATION plpi = NULL;
   DWORD returnLength = 0;
@@ -424,8 +436,8 @@ int return_physical_cpus(void)
         if (GetLogicalProcessorInformation(plpi, &returnLength))
         {
           PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = plpi;
-          DWORD numSlots = returnLength /
-                           sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+          DWORD numSlots =
+              returnLength / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
 
           while (ptr < plpi + numSlots)
           {
@@ -443,7 +455,7 @@ int return_physical_cpus(void)
 
   HARDBUG(physicalCores == 0); // detection failed
 
-  return(physicalCores);
+  return (physicalCores);
 #endif
 }
 
@@ -452,11 +464,11 @@ void return_cpu_flags(char flags[MY_LINE_MAX])
   strncpy(flags, "NULL", MY_LINE_MAX);
 
 #if COMPAT_OS == COMPAT_OS_LINUX
-  FILE* fproc;
+  FILE *fproc;
 
   HARDBUG((fproc = fopen("/proc/cpuinfo", "r")) == NULL)
 
-    char line[MY_LINE_MAX];
+  char line[MY_LINE_MAX];
 
   while (fgets(line, MY_LINE_MAX, fproc) != NULL)
   {
@@ -466,7 +478,7 @@ void return_cpu_flags(char flags[MY_LINE_MAX])
 
   FCLOSE(fproc)
 #else
-  //no need to port as flags are informational only
+  // no need to port as flags are informational only
 #endif
 }
 
@@ -475,13 +487,13 @@ void compat_sleep(double seconds)
   HARDBUG(seconds <= 0.0)
 
 #if COMPAT_OS == COMPAT_OS_LINUX
-    struct timespec req, rem;
+  struct timespec req, rem;
 
   req.tv_sec = floor(seconds);
   req.tv_nsec = round((seconds - floor(seconds)) * NANO_SECONDS);
   HARDBUG(req.tv_nsec < 0)
-    HARDBUG(req.tv_nsec >= NANO_SECONDS)
-    nanosleep(&req, &rem);
+  HARDBUG(req.tv_nsec >= NANO_SECONDS)
+  nanosleep(&req, &rem);
 #else
   Sleep((DWORD)(1000.0 * seconds));
 #endif
@@ -494,95 +506,96 @@ double compat_time(void)
 
   clock_gettime(CLOCK_REALTIME, &tv);
 
-  return((double) tv.tv_sec + (double) tv.tv_nsec / NANO_SECONDS);
+  return ((double)tv.tv_sec + (double)tv.tv_nsec / NANO_SECONDS);
 #else
-   FILETIME ft;
+  FILETIME ft;
 
-   GetSystemTimePreciseAsFileTime(&ft);
+  GetSystemTimePreciseAsFileTime(&ft);
 
-   ULARGE_INTEGER uli;
+  ULARGE_INTEGER uli;
 
-   uli.LowPart = ft.dwLowDateTime;
-   uli.HighPart = ft.dwHighDateTime;
+  uli.LowPart = ft.dwLowDateTime;
+  uli.HighPart = ft.dwHighDateTime;
 
-   return((double) uli.QuadPart / (NANO_SECONDS / 100));
+  return ((double)uli.QuadPart / (NANO_SECONDS / 100));
 #endif
 }
 
-//threads
+// threads
 
 unsigned long compat_pthread_self(void)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
-  return((unsigned long) thrd_current());
+  return ((unsigned long)thrd_current());
 #elif COMPAT_CSTD == COMPAT_CSTD_WIN
   DWORD dword = GetCurrentThreadId();
-  return((unsigned long) dword);
+  return ((unsigned long)dword);
 #else
-  return((unsigned long) pthread_self());
+  return ((unsigned long)pthread_self());
 #endif
 }
 
-int compat_mutex_init(my_mutex_t* mutex)
+int compat_mutex_init(my_mutex_t *mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
-  return(mtx_init(mutex, mtx_plain));
+  return (mtx_init(mutex, mtx_plain));
 #elif COMPAT_CSTD == COMPAT_CSTD_WIN
   InitializeSRWLock(mutex);
-  return(0);
+  return (0);
 #else
-  return(pthread_mutex_init(mutex, NULL));
+  return (pthread_mutex_init(mutex, NULL));
 #endif
 }
 
-int compat_mutex_lock(my_mutex_t* mutex)
+int compat_mutex_lock(my_mutex_t *mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
-  return(mtx_lock(mutex));
+  return (mtx_lock(mutex));
 #elif COMPAT_CSTD == COMPAT_CSTD_WIN
   AcquireSRWLockExclusive(mutex);
-  return(0);
+  return (0);
 #else
-  return(pthread_mutex_lock(mutex));
+  return (pthread_mutex_lock(mutex));
 #endif
 }
 
-int compat_mutex_trylock(my_mutex_t* mutex)
+int compat_mutex_trylock(my_mutex_t *mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
-  return(mtx_trylock(mutex));
+  return (mtx_trylock(mutex));
 #elif COMPAT_CSTD == COMPAT_CSTD_WIN
   TryAcquireSRWLockExclusive(mutex);
-  return(0);
+  return (0);
 #else
-  return(pthread_mutex_trylock(mutex));
+  return (pthread_mutex_trylock(mutex));
 #endif
 }
 
-int compat_mutex_unlock(my_mutex_t* mutex)
+int compat_mutex_unlock(my_mutex_t *mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
-  return(mtx_unlock(mutex));
+  return (mtx_unlock(mutex));
 #elif COMPAT_CSTD == COMPAT_CSTD_WIN
   ReleaseSRWLockExclusive(mutex);
-  return(0);
+  return (0);
 #else
-  return(pthread_mutex_unlock(mutex));
+  return (pthread_mutex_unlock(mutex));
 #endif
 }
 
-int compat_mutex_destroy(my_mutex_t* mutex)
+int compat_mutex_destroy(my_mutex_t *mutex)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_C11
   mtx_destroy(mutex);
 #elif COMPAT_CSTD == COMPAT_CSTD_WIN
 #else
 #endif
-  return(0);
+  return (0);
 }
 
-void compat_thread_create(my_thread_t* thread, my_thread_func_t thread_func,
-                      void* arg)
+void compat_thread_create(my_thread_t *thread,
+                          my_thread_func_t thread_func,
+                          void *arg)
 {
   int ierr;
 
@@ -595,8 +608,12 @@ void compat_thread_create(my_thread_t* thread, my_thread_func_t thread_func,
     exit(EXIT_FAILURE);
   }
 #elif COMPAT_CSTD == COMPAT_CSTD_WIN
-  HANDLE hThread = CreateThread(NULL, 0, (unsigned long (*)(void*))thread_func,
-                                arg, 0, NULL);
+  HANDLE hThread = CreateThread(NULL,
+                                0,
+                                (unsigned long (*)(void *))thread_func,
+                                arg,
+                                0,
+                                NULL);
 
   if (hThread == NULL)
   {
@@ -651,7 +668,9 @@ void compat_thread_join(my_thread_t thread)
 void compat_getrandom_u64(ui64_t *r)
 {
 #if COMPAT_CSTD == COMPAT_CSTD_WIN
-  HARDBUG(BCryptGenRandom(NULL, (PUCHAR) r, (ULONG) sizeof(ui64_t),
+  HARDBUG(BCryptGenRandom(NULL,
+                          (PUCHAR)r,
+                          (ULONG)sizeof(ui64_t),
                           BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0)
 
 #else
@@ -662,9 +681,8 @@ void compat_getrandom_u64(ui64_t *r)
 i64_t compat_getpid(void)
 {
 #if COMPAT_OS == COMPAT_OS_LINUX
-  return(getpid());
+  return (getpid());
 #else
-  return(GetCurrentProcessId());
+  return (GetCurrentProcessId());
 #endif
 }
-

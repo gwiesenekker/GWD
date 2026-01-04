@@ -1,11 +1,12 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 #undef ALIGN8
 
-#define CACHE_ENTRY_SIZE(P)\
-  (P->C_entry_key_size + P->C_entry_key_nalign +\
-   P->C_entry_value_size + P->C_entry_value_nalign)
+#define CACHE_ENTRY_SIZE(P)                                              \
+  (P->C_entry_key_size + P->C_entry_key_nalign + P->C_entry_value_size + \
+   P->C_entry_value_nalign)
 
 local void printf_cache(void *self)
 {
@@ -13,56 +14,58 @@ local void printf_cache(void *self)
 
   PRINTF("C_name=%s\n", bdata(object->C_name));
 
-  PRINTF("%s_entry_key_type=%d\n", bdata(object->C_name),
-    object->C_entry_key_type);
+  PRINTF("%s_entry_key_type=%d\n",
+         bdata(object->C_name),
+         object->C_entry_key_type);
 
-  PRINTF("%s_entry_key_size=%d\n", bdata(object->C_name),
-    (int) object->C_entry_key_size);
+  PRINTF("%s_entry_key_size=%d\n",
+         bdata(object->C_name),
+         (int)object->C_entry_key_size);
 
-  PRINTF("%s_entry_key_nalign=%d\n", bdata(object->C_name),
-    object->C_entry_key_nalign);
+  PRINTF("%s_entry_key_nalign=%d\n",
+         bdata(object->C_name),
+         object->C_entry_key_nalign);
 
-  PRINTF("%s_entry_value_size=%d\n", bdata(object->C_name),
-    (int) object->C_entry_value_size);
+  PRINTF("%s_entry_value_size=%d\n",
+         bdata(object->C_name),
+         (int)object->C_entry_value_size);
 
-  PRINTF("%s_entry_value_nalign=%d\n", bdata(object->C_name),
-    object->C_entry_value_nalign);
+  PRINTF("%s_entry_value_nalign=%d\n",
+         bdata(object->C_name),
+         object->C_entry_value_nalign);
 
-  PRINTF("%s_nentries=%lld\n", bdata(object->C_name),
-    object->C_nentries);
+  PRINTF("%s_nentries=%lld\n", bdata(object->C_name), object->C_nentries);
 
-  PRINTF("%s_nhits=%lld\n", bdata(object->C_name),
-    object->C_nhits);
+  PRINTF("%s_nhits=%lld\n", bdata(object->C_name), object->C_nhits);
 
-  PRINTF("%s_nstored=%lld\n", bdata(object->C_name),
-    object->C_nstored);
+  PRINTF("%s_nstored=%lld\n", bdata(object->C_name), object->C_nstored);
 
-  PRINTF("%s_nupdates=%lld\n", bdata(object->C_name),
-    object->C_nupdates);
+  PRINTF("%s_nupdates=%lld\n", bdata(object->C_name), object->C_nupdates);
 
-  PRINTF("%s_noverwrites=%lld\n", bdata(object->C_name),
-    object->C_noverwrites);
+  PRINTF("%s_noverwrites=%lld\n", bdata(object->C_name), object->C_noverwrites);
 
   i64_t nunused = 0;
 
   for (i64_t icache_entry = 0; icache_entry < object->C_nentries;
        icache_entry++)
   {
-    void *cache_entry = (i8_t *) object->C_entry_values + 
+    void *cache_entry = (i8_t *)object->C_entry_values +
                         CACHE_ENTRY_SIZE(object) * icache_entry;
 
-    if (memcmp(cache_entry, object->C_entry_key_default,
+    if (memcmp(cache_entry,
+               object->C_entry_key_default,
                object->C_entry_key_size) == 0)
 
       nunused++;
   }
 
-  PRINTF("%s_nunused=%lld or %.2f percent\n", bdata(object->C_name),
-    nunused, nunused * 100.0 / object->C_nentries);
+  PRINTF("%s_nunused=%lld or %.2f percent\n",
+         bdata(object->C_name),
+         nunused,
+         nunused * 100.0 / object->C_nentries);
 }
 
-int check_entry_in_cache(void *self,
-  void *arg_entry_key, void *arg_entry_value)
+int check_entry_in_cache(void *self, void *arg_entry_key, void *arg_entry_value)
 {
   cache_t *object = self;
 
@@ -78,7 +81,7 @@ int check_entry_in_cache(void *self,
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *) object->C_entry_values +
+    cache_entry = (i8_t *)object->C_entry_values +
                   CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else if (object->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
@@ -89,7 +92,7 @@ int check_entry_in_cache(void *self,
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *) object->C_entry_values +
+    cache_entry = (i8_t *)object->C_entry_values +
                   CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else if (object->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
@@ -100,9 +103,9 @@ int check_entry_in_cache(void *self,
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *) object->C_entry_values +
+    cache_entry = (i8_t *)object->C_entry_values +
                   CACHE_ENTRY_SIZE(object) * icache_entry;
-  } 
+  }
   else
     FATAL("unknown C_entry_key_type", EXIT_FAILURE)
 
@@ -113,18 +116,17 @@ int check_entry_in_cache(void *self,
     if (arg_entry_value != NULL)
     {
       memcpy(arg_entry_value,
-             (i8_t *) cache_entry + object->C_entry_key_size,
+             (i8_t *)cache_entry + object->C_entry_key_size,
              object->C_entry_value_size);
     }
 
     result = TRUE;
   }
 
-  return(result);
+  return (result);
 }
 
-int store_entry_in_cache(void *self,
-  void *arg_entry_key, void *arg_entry_value)
+int store_entry_in_cache(void *self, void *arg_entry_key, void *arg_entry_value)
 {
   cache_t *object = self;
 
@@ -140,7 +142,7 @@ int store_entry_in_cache(void *self,
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *) object->C_entry_values +
+    cache_entry = (i8_t *)object->C_entry_values +
                   CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else if (object->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
@@ -151,7 +153,7 @@ int store_entry_in_cache(void *self,
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *) object->C_entry_values + 
+    cache_entry = (i8_t *)object->C_entry_values +
                   CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else if (object->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
@@ -162,9 +164,9 @@ int store_entry_in_cache(void *self,
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *) object->C_entry_values + 
+    cache_entry = (i8_t *)object->C_entry_values +
                   CACHE_ENTRY_SIZE(object) * icache_entry;
-  } 
+  }
   else
     FATAL("unknown C_entry_key_type", EXIT_FAILURE)
 
@@ -174,7 +176,8 @@ int store_entry_in_cache(void *self,
   {
     object->C_nupdates++;
   }
-  else if (memcmp(cache_entry, object->C_entry_key_default,
+  else if (memcmp(cache_entry,
+                  object->C_entry_key_default,
                   object->C_entry_key_size) != 0)
   {
     object->C_noverwrites++;
@@ -183,29 +186,32 @@ int store_entry_in_cache(void *self,
 
   memcpy(cache_entry, arg_entry_key, object->C_entry_key_size);
 
-  memcpy((i8_t *) cache_entry + object->C_entry_key_size,
-         arg_entry_value, object->C_entry_value_size);
+  memcpy((i8_t *)cache_entry + object->C_entry_key_size,
+         arg_entry_value,
+         object->C_entry_value_size);
 
-  return(result);
+  return (result);
 }
 
 void clear_cache(void *self)
 {
   cache_t *object = self;
 
-  memcpy(object->C_entry_values, object->C_entry_key_default,
+  memcpy(object->C_entry_values,
+         object->C_entry_key_default,
          object->C_entry_key_size);
 
   void *source = object->C_entry_values;
   i64_t itarget = 1;
   i64_t nsource = 1;
 
-  while(itarget < object->C_nentries)
+  while (itarget < object->C_nentries)
   {
-    void *target = (i8_t *) object->C_entry_values + 
-                   CACHE_ENTRY_SIZE(object) * itarget;
+    void *target =
+        (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * itarget;
 
-    while((itarget + nsource) > object->C_nentries) nsource--;
+    while ((itarget + nsource) > object->C_nentries)
+      nsource--;
 
     memcpy(target, source, object->C_entry_key_size * nsource);
 
@@ -215,12 +221,16 @@ void clear_cache(void *self)
   }
 }
 
-void construct_cache(void *self, char *arg_cache_name, i64_t arg_cache_size,
-  int arg_entry_key_type, void *arg_entry_key_default,
-  size_t arg_entry_value_size, void *arg_entry_value_default)
+void construct_cache(void *self,
+                     char *arg_cache_name,
+                     i64_t arg_cache_size,
+                     int arg_entry_key_type,
+                     void *arg_entry_key_default,
+                     size_t arg_entry_value_size,
+                     void *arg_entry_value_default)
 {
   cache_t *object = self;
-  
+
   object->C_name = bfromcstr(arg_cache_name);
 
   object->C_entry_key_type = arg_entry_key_type;
@@ -236,18 +246,17 @@ void construct_cache(void *self, char *arg_cache_name, i64_t arg_cache_size,
 
   object->C_entry_key_nalign = 0;
 #ifdef ALIGN8
-  while(((object->C_entry_key_size +
-          object->C_entry_key_nalign) % 8) != 0)
+  while (((object->C_entry_key_size + object->C_entry_key_nalign) % 8) != 0)
     object->C_entry_key_nalign++;
 #endif
 
-  //copy the default key value
+  // copy the default key value
 
-  MY_MALLOC_BY_TYPE(object->C_entry_key_default, i8_t,
-    object->C_entry_key_size)
+  MY_MALLOC_BY_TYPE(object->C_entry_key_default, i8_t, object->C_entry_key_size)
 
-  memcpy(object->C_entry_key_default, arg_entry_key_default,
-    object->C_entry_key_size);
+  memcpy(object->C_entry_key_default,
+         arg_entry_key_default,
+         object->C_entry_key_size);
 
   HARDBUG(arg_entry_value_size < 1)
 
@@ -255,35 +264,38 @@ void construct_cache(void *self, char *arg_cache_name, i64_t arg_cache_size,
 
   object->C_entry_value_nalign = 0;
 #ifdef ALIGN8
-  while(((object->C_entry_value_size +
-          object->C_entry_value_nalign) % 8) != 0)
+  while (((object->C_entry_value_size + object->C_entry_value_nalign) % 8) != 0)
     object->C_entry_value_nalign++;
 #endif
 
-  object->C_nentries = first_prime_below(arg_cache_size /
-                                           CACHE_ENTRY_SIZE(object));
+  object->C_nentries =
+      first_prime_below(arg_cache_size / CACHE_ENTRY_SIZE(object));
 
   HARDBUG(object->C_nentries < 3)
 
-  MY_MALLOC_BY_TYPE(object->C_entry_values, i8_t,
-    CACHE_ENTRY_SIZE(object) * object->C_nentries)
+  MY_MALLOC_BY_TYPE(object->C_entry_values,
+                    i8_t,
+                    CACHE_ENTRY_SIZE(object) * object->C_nentries)
 
-  memcpy(object->C_entry_values, object->C_entry_key_default,
+  memcpy(object->C_entry_values,
+         object->C_entry_key_default,
          object->C_entry_key_size);
 
-  memcpy((i8_t *) object->C_entry_values + object->C_entry_key_size,
-         arg_entry_value_default, object->C_entry_value_size);
+  memcpy((i8_t *)object->C_entry_values + object->C_entry_key_size,
+         arg_entry_value_default,
+         object->C_entry_value_size);
 
   void *source = object->C_entry_values;
   i64_t itarget = 1;
   i64_t nsource = 1;
 
-  while(itarget < object->C_nentries)
+  while (itarget < object->C_nentries)
   {
-    void *target = (i8_t *) object->C_entry_values + 
-                   CACHE_ENTRY_SIZE(object) * itarget;
+    void *target =
+        (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * itarget;
 
-    while((itarget + nsource) > object->C_nentries) nsource--;
+    while ((itarget + nsource) > object->C_nentries)
+      nsource--;
 
     memcpy(target, source, CACHE_ENTRY_SIZE(object) * nsource);
 
@@ -308,8 +320,13 @@ void test_caches(void)
 
   cache_t a;
 
-  construct_cache(&a, "a", MBYTE, CACHE_ENTRY_KEY_TYPE_I64_T,
-    &d, sizeof(i64_t), &d);
+  construct_cache(&a,
+                  "a",
+                  MBYTE,
+                  CACHE_ENTRY_KEY_TYPE_I64_T,
+                  &d,
+                  sizeof(i64_t),
+                  &d);
 
   for (i64_t i = 0; i < 100000; i++)
   {
@@ -356,10 +373,15 @@ void test_caches(void)
 
   cache_t b;
 
-  construct_cache(&b, "b", MBYTE, CACHE_ENTRY_KEY_TYPE_UI64_T,
-    &e, sizeof(ui64_t), &e);
+  construct_cache(&b,
+                  "b",
+                  MBYTE,
+                  CACHE_ENTRY_KEY_TYPE_UI64_T,
+                  &e,
+                  sizeof(ui64_t),
+                  &e);
 
-  //for ui64_t the key 0 is not allowed
+  // for ui64_t the key 0 is not allowed
 
   for (ui64_t i = 1; i < 100000; i++)
   {

@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef RandomH
 #define RandomH
 
@@ -14,4 +15,3 @@ ui64_t return_my_random(my_random_t *);
 void test_my_random(void);
 
 #endif
-

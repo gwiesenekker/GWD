@@ -1,11 +1,12 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 void construct_my_bstream(my_bstream_t *object, char *arg_name)
 {
   HARDBUG((object->BS_file = fopen(arg_name, "r")) == NULL)
 
-  HARDBUG((object->BS_bfile = bsopen((bNread) fread, object->BS_file)) == NULL)
+  HARDBUG((object->BS_bfile = bsopen((bNread)fread, object->BS_file)) == NULL)
 
   HARDBUG((object->BS_bline = bfromcstr("")) == NULL)
 
@@ -16,14 +17,15 @@ void construct_my_bstream(my_bstream_t *object, char *arg_name)
 
 int my_bstream_readln(my_bstream_t *object, int remove_newline)
 {
-  int result = bsreadln(object->BS_bline, object->BS_bfile, (char) '\n');
+  int result = bsreadln(object->BS_bline, object->BS_bfile, (char)'\n');
 
-  if (result != BSTR_OK) return(result);
+  if (result != BSTR_OK)
+    return (result);
 
-  if (remove_newline) bfindreplace(object->BS_bline,
-                                   object->BS_newline, object->BS_empty, 0);
+  if (remove_newline)
+    bfindreplace(object->BS_bline, object->BS_newline, object->BS_empty, 0);
 
-  return(result);
+  return (result);
 }
 
 void destroy_my_bstream(my_bstream_t *object)

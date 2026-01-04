@@ -1,10 +1,11 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef RecordsH
 #define RecordsH
 
-#define FIELD_TYPE_INT    0
+#define FIELD_TYPE_INT 0
 #define FIELD_TYPE_STRING 1
-#define FIELD_TYPE_ARRAY  2
+#define FIELD_TYPE_ARRAY 2
 
 typedef struct record
 {
@@ -23,4 +24,3 @@ bstring get_record(void *);
 void test_records(void);
 
 #endif
-

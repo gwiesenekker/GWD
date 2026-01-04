@@ -1,5 +1,8 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
+
+// clang-format off
 
 int square2field[1 + 50] =
 {
@@ -80,6 +83,8 @@ int black_row[BOARD_MAX] =
     -1, -1, -1, -1, -1
 };
 
+// clang-format on
+
 my_random_t boards_random;
 
 hash_key_t hash_keys[NCOLOUR_ENUM][NPIECE_ENUM][BOARD_MAX];
@@ -100,19 +105,18 @@ void push_board_state(void *self)
   board_t *object = self;
 
   HARDBUG(object->B_nstate >= NODE_MAX)
-  
+
   board_state_t *state = object->B_states + object->B_nstate;
 
   state->BS_key = object->B_key;
 
-  memcpy(state->BS_bit_boards, object->B_bit_boards,
+  memcpy(state->BS_bit_boards,
+         object->B_bit_boards,
          sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
-  state->BS_npieces = 
-    BIT_COUNT(object->B_white_man_bb) +
-    BIT_COUNT(object->B_white_king_bb) +
-    BIT_COUNT(object->B_black_man_bb) +
-    BIT_COUNT(object->B_black_king_bb);
+  state->BS_npieces =
+      BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
+      BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb);
 
   object->B_nstate++;
 }
@@ -124,19 +128,19 @@ void pop_board_state(void *self)
   object->B_nstate--;
 
   HARDBUG(object->B_nstate < 0)
-  
+
   board_state_t *state = object->B_states + object->B_nstate;
 
   object->B_key = state->BS_key;
 
-  memcpy(object->B_bit_boards, state->BS_bit_boards,
+  memcpy(object->B_bit_boards,
+         state->BS_bit_boards,
          sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
-  SOFTBUG(state->BS_npieces !=
-          (BIT_COUNT(object->B_white_man_bb) +
-           BIT_COUNT(object->B_white_king_bb) +
-           BIT_COUNT(object->B_black_man_bb) +
-           BIT_COUNT(object->B_black_king_bb)))
+  SOFTBUG(
+      state->BS_npieces !=
+      (BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
+       BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb)))
 }
 
 hash_key_t return_key_from_bb(void *self)
@@ -149,7 +153,7 @@ hash_key_t return_key_from_bb(void *self)
 
   ui64_t bb = object->B_white_man_bb;
 
-  while(bb != 0)
+  while (bb != 0)
   {
     int ifield = BIT_CTZ(bb);
 
@@ -160,7 +164,7 @@ hash_key_t return_key_from_bb(void *self)
 
   bb = object->B_white_king_bb;
 
-  while(bb != 0)
+  while (bb != 0)
   {
     int ifield = BIT_CTZ(bb);
 
@@ -171,7 +175,7 @@ hash_key_t return_key_from_bb(void *self)
 
   bb = object->B_black_man_bb;
 
-  while(bb != 0)
+  while (bb != 0)
   {
     int ifield = BIT_CTZ(bb);
 
@@ -182,7 +186,7 @@ hash_key_t return_key_from_bb(void *self)
 
   bb = object->B_black_king_bb;
 
-  while(bb != 0)
+  while (bb != 0)
   {
     int ifield = BIT_CTZ(bb);
 
@@ -191,7 +195,7 @@ hash_key_t return_key_from_bb(void *self)
     bb &= ~BITULL(ifield);
   }
 
-  return(result);
+  return (result);
 }
 
 void string2board(board_t *self, char *arg_s)
@@ -219,7 +223,7 @@ void string2board(board_t *self, char *arg_s)
   char nn_local = *nn;
 
   for (int i = 1; i <= 50; ++i)
-  { 
+  {
     if ((arg_s[i] == *wO_hub) or (arg_s[i] == *wX_hub))
     {
       wO_local = *wO_hub;
@@ -229,7 +233,7 @@ void string2board(board_t *self, char *arg_s)
       nn_local = *nn_hub;
 
       break;
-    } 
+    }
   }
 
   for (int i = 1; i <= 50; ++i)
@@ -260,7 +264,7 @@ void string2board(board_t *self, char *arg_s)
     }
     else if (arg_s[i] == nn_local)
     {
-      //do nothing
+      // do nothing
     }
     else
       FATAL("arg_s[i] error", EXIT_FAILURE)
@@ -290,11 +294,12 @@ void string2board(board_t *self, char *arg_s)
 void fen2board(board_t *self, char *arg_fen)
 {
   char s[51];
-  for (int i = 1; i <= 50; ++i) s[i] = *nn;
+  for (int i = 1; i <= 50; ++i)
+    s[i] = *nn;
 
   char *f = arg_fen;
 
-  //W or B
+  // W or B
 
   if (*f == 'W')
     s[0] = 'w';
@@ -311,7 +316,7 @@ void fen2board(board_t *self, char *arg_fen)
 
   f++;
 
-  //W or B
+  // W or B
 
   HARDBUG((*f != 'W') and (*f != 'B'))
 
@@ -319,11 +324,13 @@ void fen2board(board_t *self, char *arg_fen)
 
   char k = 'M';
 
-  while(TRUE)
+  while (TRUE)
   {
-    if ((*f == '.') or (*f == '\0')) break;
+    if ((*f == '.') or (*f == '\0'))
+      break;
 
-    if (*f == '"') break;
+    if (*f == '"')
+      break;
 
     if ((*f == 'W') or (*f == 'B'))
     {
@@ -340,14 +347,14 @@ void fen2board(board_t *self, char *arg_fen)
     if (isdigit(*f))
     {
       int i = 0;
-      while(isdigit(*f))
+      while (isdigit(*f))
       {
         i = i * 10 + (*f - '0');
         f++;
       }
       HARDBUG(i < 1)
       HARDBUG(i > 50)
-      
+
       int j = i;
 
       if (*f == '-')
@@ -358,7 +365,7 @@ void fen2board(board_t *self, char *arg_fen)
 
         j = 0;
 
-        while(isdigit(*f))
+        while (isdigit(*f))
         {
           j = j * 10 + (*f - '0');
           f++;
@@ -368,7 +375,7 @@ void fen2board(board_t *self, char *arg_fen)
         HARDBUG(j > 50)
       }
 
-      while(i <= j)
+      while (i <= j)
       {
         if (k == 'M')
         {
@@ -398,7 +405,7 @@ void fen2board(board_t *self, char *arg_fen)
 
       continue;
     }
-  
+
     HARDBUG((*f != ',') and (*f != ':'))
 
     f++;
@@ -424,7 +431,8 @@ void board2fen(board_t *self, bstring arg_bfen, int arg_brackets)
   int wcomma = FALSE;
   int bcomma = FALSE;
 
-  if (arg_brackets) bcatcstr(arg_bfen, "[FEN \"");
+  if (arg_brackets)
+    bcatcstr(arg_bfen, "[FEN \"");
 
   if (IS_WHITE(object->B_colour2move))
     bcatcstr(arg_bfen, "W");
@@ -440,7 +448,8 @@ void board2fen(board_t *self, bstring arg_bfen, int arg_brackets)
 
     if (white_bb & BITULL(ifield))
     {
-      if (wcomma) bcatcstr(bwfen, ",");
+      if (wcomma)
+        bcatcstr(bwfen, ",");
 
       if (object->B_white_king_bb & BITULL(ifield))
         bcatcstr(bwfen, "K");
@@ -451,7 +460,8 @@ void board2fen(board_t *self, bstring arg_bfen, int arg_brackets)
     }
     else if (black_bb & BITULL(ifield))
     {
-      if (bcomma) bcatcstr(bbfen, ",");
+      if (bcomma)
+        bcatcstr(bbfen, ",");
 
       if (object->B_black_king_bb & BITULL(ifield))
         bcatcstr(bbfen, "K");
@@ -465,7 +475,8 @@ void board2fen(board_t *self, bstring arg_bfen, int arg_brackets)
   bconcat(arg_bfen, bwfen);
   bconcat(arg_bfen, bbfen);
 
-  if (arg_brackets) bcatcstr(arg_bfen, ".\"]");
+  if (arg_brackets)
+    bcatcstr(arg_bfen, ".\"]");
 
   BDESTROY(bbfen)
   BDESTROY(bwfen)
@@ -478,7 +489,8 @@ void print_board(board_t *self)
   int i = 0;
   for (int irow = 10; irow >= 1; --irow)
   {
-    if ((irow & 1) == 0) my_printf(object->B_my_printf, "  ");
+    if ((irow & 1) == 0)
+      my_printf(object->B_my_printf, "  ");
     for (int icol = 1; icol <= 5; ++icol)
     {
       ++i;
@@ -498,14 +510,14 @@ void print_board(board_t *self)
     }
     my_printf(object->B_my_printf, "\n");
   }
-  my_printf(object->B_my_printf, 
-    "(%d) (%dx%d) (%dx%d)",
-    BIT_COUNT(object->B_white_man_bb | object->B_white_king_bb | 
-              object->B_black_man_bb | object->B_black_king_bb),
-    BIT_COUNT(object->B_white_man_bb),
-    BIT_COUNT(object->B_black_man_bb),
-    BIT_COUNT(object->B_white_king_bb),
-    BIT_COUNT(object->B_black_king_bb));
+  my_printf(object->B_my_printf,
+            "(%d) (%dx%d) (%dx%d)",
+            BIT_COUNT(object->B_white_man_bb | object->B_white_king_bb |
+                      object->B_black_man_bb | object->B_black_king_bb),
+            BIT_COUNT(object->B_white_man_bb),
+            BIT_COUNT(object->B_black_man_bb),
+            BIT_COUNT(object->B_white_king_bb),
+            BIT_COUNT(object->B_black_king_bb));
 
   if (IS_WHITE(object->B_colour2move))
     my_printf(object->B_my_printf, " WHITE to move\n");
@@ -527,14 +539,15 @@ char *board2string(board_t *self, int arg_hub)
 {
   board_t *object = self;
 
-  for (int i = 0; i <= 50; ++i) object->B_string[i] = '?';
+  for (int i = 0; i <= 50; ++i)
+    object->B_string[i] = '?';
 
   if (IS_WHITE(object->B_colour2move))
   {
     if (!arg_hub)
-      object->B_string[0] = 'w'; 
+      object->B_string[0] = 'w';
     else
-      object->B_string[0] = 'W'; 
+      object->B_string[0] = 'W';
   }
   else
   {
@@ -586,7 +599,7 @@ char *board2string(board_t *self, int arg_hub)
   }
   object->B_string[51] = '\0';
 
-  return(object->B_string);
+  return (object->B_string);
 }
 
 void init_boards(void)
@@ -601,20 +614,20 @@ void init_boards(void)
 
   MARK_ARRAY_READ_ONLY(black_row, sizeof(field2square))
 
-  for (int i = 0; i < BOARD_MAX; i++) 
+  for (int i = 0; i < BOARD_MAX; i++)
     hash_keys[WHITE_ENUM][MAN_ENUM][i] = return_my_random(&boards_random);
 
-  for (int i = 0; i < BOARD_MAX; i++) 
+  for (int i = 0; i < BOARD_MAX; i++)
     hash_keys[WHITE_ENUM][KING_ENUM][i] = return_my_random(&boards_random);
 
-  for (int i = 0; i < BOARD_MAX; i++) 
+  for (int i = 0; i < BOARD_MAX; i++)
     hash_keys[BLACK_ENUM][MAN_ENUM][i] = return_my_random(&boards_random);
 
-  for (int i = 0; i < BOARD_MAX; i++) 
+  for (int i = 0; i < BOARD_MAX; i++)
     hash_keys[BLACK_ENUM][KING_ENUM][i] = return_my_random(&boards_random);
 
   MARK_ARRAY_READ_ONLY(hash_keys, sizeof(hash_keys))
-} 
+}
 
 void state2board(board_t *self, game_state_t *arg_game)
 {
@@ -622,7 +635,7 @@ void state2board(board_t *self, game_state_t *arg_game)
 
   fen2board(object, arg_game->get_starting_position(arg_game));
 
-  //read game moves
+  // read game moves
 
   moves_list_t moves_list;
   construct_moves_list(&moves_list);
@@ -630,7 +643,7 @@ void state2board(board_t *self, game_state_t *arg_game)
   cJSON *game_move;
 
   BSTRING(bmove)
-  
+
   cJSON_ArrayForEach(game_move, arg_game->get_moves(arg_game))
   {
     cJSON *move_string = cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
@@ -656,4 +669,3 @@ void state2board(board_t *self, game_state_t *arg_game)
   }
   BDESTROY(bmove)
 }
-

@@ -1,32 +1,34 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 
 #include "globals.h"
 
 patterns_shared_t patterns_shared;
 
-local int map_row_col[10][10] = {
-  { -1,  1, -1,  2, -1,  3, -1,  4, -1,  5 },
-  {  6, -1,  7, -1,  8, -1,  9, -1, 10, -1 },
-  { -1, 11, -1, 12, -1, 13, -1, 14, -1, 15 },
-  { 16, -1, 17, -1, 18, -1, 19, -1, 20, -1 },
-  { -1, 21, -1, 22, -1, 23, -1, 24, -1, 25 },
-  { 26, -1, 27, -1, 28, -1, 29, -1, 30, -1 },
-  { -1, 31, -1, 32, -1, 33, -1, 34, -1, 35 },
-  { 36, -1, 37, -1, 38, -1, 39, -1, 40, -1 },
-  { -1, 41, -1, 42, -1, 43, -1, 44, -1, 45 },
-  { 46, -1, 47, -1, 48, -1, 49, -1, 50, -1 }
-};
+local int map_row_col[10][10] = {{-1, 1, -1, 2, -1, 3, -1, 4, -1, 5},
+                                 {6, -1, 7, -1, 8, -1, 9, -1, 10, -1},
+                                 {-1, 11, -1, 12, -1, 13, -1, 14, -1, 15},
+                                 {16, -1, 17, -1, 18, -1, 19, -1, 20, -1},
+                                 {-1, 21, -1, 22, -1, 23, -1, 24, -1, 25},
+                                 {26, -1, 27, -1, 28, -1, 29, -1, 30, -1},
+                                 {-1, 31, -1, 32, -1, 33, -1, 34, -1, 35},
+                                 {36, -1, 37, -1, 38, -1, 39, -1, 40, -1},
+                                 {-1, 41, -1, 42, -1, 43, -1, 44, -1, 45},
+                                 {46, -1, 47, -1, 48, -1, 49, -1, 50, -1}};
 
 local int map_row_col2field(int irow, int icol)
 {
-  if ((irow < 0) or (irow > 9)) return(INVALID);
-  if ((icol < 0) or (icol > 9)) return(INVALID);
-  
+  if ((irow < 0) or (irow > 9))
+    return (INVALID);
+  if ((icol < 0) or (icol > 9))
+    return (INVALID);
+
   int isquare = map_row_col[irow][icol];
 
-  if (isquare == INVALID) return(INVALID);
+  if (isquare == INVALID)
+    return (INVALID);
 
-  return(square2field[isquare]);
+  return (square2field[isquare]);
 }
 
 local void sort_int(int n, int *a)
@@ -36,7 +38,8 @@ local void sort_int(int n, int *a)
     int k = i;
 
     for (int j = i + 1; j < n; j++)
-     if (a[j] < a[k]) k = j;
+      if (a[j] < a[k])
+        k = j;
 
     int t = a[i];
     a[i] = a[k];
@@ -46,7 +49,8 @@ local void sort_int(int n, int *a)
     HARDBUG(a[i] > a[i + 1])
 }
 
-local void add_pattern(patterns_shared_t *self, int arg_nlinear, int *arg_fields)
+local void
+add_pattern(patterns_shared_t *self, int arg_nlinear, int *arg_fields)
 {
   patterns_shared_t *object = self;
 
@@ -59,12 +63,14 @@ local void add_pattern(patterns_shared_t *self, int arg_nlinear, int *arg_fields
 
   HARDBUG(object->PS_npatterns >= NPATTERNS_MAX)
 
-  pattern_shared_t *with_pattern_shared = object->PS_patterns + object->PS_npatterns;
+  pattern_shared_t *with_pattern_shared =
+      object->PS_patterns + object->PS_npatterns;
 
   with_pattern_shared->PS_nlinear = arg_nlinear;
 
   PRINTF("object->PS_npatterns=%d with_pattern_shared->PS_nlinear=%d\n",
-    object->PS_npatterns, with_pattern_shared->PS_nlinear);
+         object->PS_npatterns,
+         with_pattern_shared->PS_nlinear);
 
   for (int ifield = 0; ifield < BOARD_MAX; ifield++)
     with_pattern_shared->PS_field2linear[ifield] = INVALID;
@@ -76,15 +82,16 @@ local void add_pattern(patterns_shared_t *self, int arg_nlinear, int *arg_fields
     int ipattern;
 
     for (ipattern = 0; ipattern < NPATTERNS_MAX; ipattern++)
-      if (object->PS_patterns_map[ifield][ipattern] == INVALID) break;
-  
+      if (object->PS_patterns_map[ifield][ipattern] == INVALID)
+        break;
+
     HARDBUG(ipattern >= NPATTERNS_MAX)
-  
+
     object->PS_patterns_map[ifield][ipattern] = object->PS_npatterns;
 
     with_pattern_shared->PS_field2linear[ifield] = ilinear;
   }
-  
+
   int nstates = 1;
 
   for (int ilinear = 0; ilinear < with_pattern_shared->PS_nlinear; ilinear++)
@@ -107,24 +114,25 @@ local void add_quincunx(patterns_shared_t *self, int arg_irow, int arg_icol)
 
   int ifield;
 
-  if ((ifield = map_row_col2field(arg_irow, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + 1)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + 1)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
 
-  if (nlinear == 0) return;
+  if (nlinear == 0)
+    return;
 
   add_pattern(object, nlinear, fields);
 }
 
-local void add_zigzag(patterns_shared_t *self, int arg_irow, int arg_icol,
-  int arg_delta)
+local void
+add_zigzag(patterns_shared_t *self, int arg_irow, int arg_icol, int arg_delta)
 {
   patterns_shared_t *object = self;
 
@@ -134,30 +142,35 @@ local void add_zigzag(patterns_shared_t *self, int arg_irow, int arg_icol,
 
   int ifield;
 
-  if ((ifield = map_row_col2field(arg_irow, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
 
-  if (nlinear == 0) return;
+  if (nlinear == 0)
+    return;
 
   add_pattern(object, nlinear, fields);
 }
 
-local void add_zigzag3(patterns_shared_t *self, int arg_irow, int arg_icol,
-  int arg_delta)
+local void
+add_zigzag3(patterns_shared_t *self, int arg_irow, int arg_icol, int arg_delta)
 {
   patterns_shared_t *object = self;
 
@@ -167,38 +180,45 @@ local void add_zigzag3(patterns_shared_t *self, int arg_irow, int arg_icol,
 
   int ifield;
 
-  if ((ifield = map_row_col2field(arg_irow, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow, arg_icol + 4)) !=
-      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 4)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta + 4)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 4)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 4)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta + 4)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
 
-  if (nlinear == 0) return;
+  if (nlinear == 0)
+    return;
 
   add_pattern(object, nlinear, fields);
 }
 
-local void add_kingsrow(patterns_shared_t *self, int arg_irow, int arg_icol,
-  int arg_delta)
+local void
+add_kingsrow(patterns_shared_t *self, int arg_irow, int arg_icol, int arg_delta)
 {
   patterns_shared_t *object = self;
 
@@ -208,38 +228,47 @@ local void add_kingsrow(patterns_shared_t *self, int arg_irow, int arg_icol,
 
   int ifield;
 
-  if ((ifield = map_row_col2field(arg_irow, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 4, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 4, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 4, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 4, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 5, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 5, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
 
-  if (nlinear == 0) return;
+  if (nlinear == 0)
+    return;
 
   add_pattern(object, nlinear, fields);
 }
 
-local void add_kingsrow2(patterns_shared_t *self, int arg_irow, int arg_icol,
-  int arg_delta)
+local void add_kingsrow2(patterns_shared_t *self,
+                         int arg_irow,
+                         int arg_icol,
+                         int arg_delta)
 {
   patterns_shared_t *object = self;
 
@@ -249,38 +278,47 @@ local void add_kingsrow2(patterns_shared_t *self, int arg_irow, int arg_icol,
 
   int ifield;
 
-  if ((ifield = map_row_col2field(arg_irow, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow, arg_icol + 4)) !=
-      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 4)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta + 4)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 4)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 4)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta + 4)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
 
-  if (nlinear == 0) return;
+  if (nlinear == 0)
+    return;
 
   add_pattern(object, nlinear, fields);
 }
 
-local void add_kingsrow4(patterns_shared_t *self, int arg_irow, int arg_icol,
-  int arg_delta)
+local void add_kingsrow4(patterns_shared_t *self,
+                         int arg_irow,
+                         int arg_icol,
+                         int arg_delta)
 {
   patterns_shared_t *object = self;
 
@@ -290,36 +328,43 @@ local void add_kingsrow4(patterns_shared_t *self, int arg_irow, int arg_icol,
 
   int ifield;
 
-  if ((ifield = map_row_col2field(arg_irow, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 1, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 2, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 3, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 4, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 4, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 4, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 4, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 5, arg_icol + arg_delta)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
   if ((ifield = map_row_col2field(arg_irow + 5, arg_icol + arg_delta + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 6, arg_icol)) !=
-      INVALID) fields[nlinear++] = ifield;
-  if ((ifield = map_row_col2field(arg_irow + 6, arg_icol + 2)) !=
-      INVALID) fields[nlinear++] = ifield;
+      INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 6, arg_icol)) != INVALID)
+    fields[nlinear++] = ifield;
+  if ((ifield = map_row_col2field(arg_irow + 6, arg_icol + 2)) != INVALID)
+    fields[nlinear++] = ifield;
 
-  if (nlinear == 0) return;
+  if (nlinear == 0)
+    return;
 
   add_pattern(object, nlinear, fields);
 }
@@ -352,7 +397,7 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
   bassigncstr(b, ",:;");
 
   struct bstrList *btokens;
-  
+
   HARDBUG((btokens = bsplits(barg_shape, b)) == NULL)
 
   BSTRING(string)
@@ -451,8 +496,7 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
             add_kingsrow(object, irow, icol, -1);
           }
 
-          if ((irow == 3) and
-              ((icol == 0) or (icol == 2) or (icol == 4)))
+          if ((irow == 3) and ((icol == 0) or (icol == 2) or (icol == 4)))
           {
             add_kingsrow2(object, irow, icol, 1);
           }
@@ -470,8 +514,7 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
             add_kingsrow(object, irow, icol, -1);
           }
 
-          if ((irow == 3) and
-              ((icol == 0) or (icol == 4)))
+          if ((irow == 3) and ((icol == 0) or (icol == 4)))
           {
             add_kingsrow2(object, irow, icol, 1);
           }
@@ -497,7 +540,6 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
 
           ++nshapes;
         }
-
       }
     }
   }
@@ -523,7 +565,8 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
     {
       int ilinear = with->PS_field2linear[ifield];
 
-      if (ilinear != INVALID) PRINTF(" %s", nota[ifield]);
+      if (ilinear != INVALID)
+        PRINTF(" %s", nota[ifield]);
     }
     PRINTF("\n");
   }
@@ -538,7 +581,8 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
 
     for (int ipattern = 0; ipattern < object->PS_npatterns; ipattern++)
     {
-      if (object->PS_patterns_map[ifield][ipattern] == INVALID) break;
+      if (object->PS_patterns_map[ifield][ipattern] == INVALID)
+        break;
 
       PRINTF(" %d", object->PS_patterns_map[ifield][ipattern]);
     }
@@ -553,16 +597,16 @@ void board2patterns_thread(board_t *self)
   patterns_shared_t *with_patterns_shared = &patterns_shared;
 
   patterns_thread_t *with_patterns_thread =
-    &(object->B_network_thread.NT_patterns);
+      &(object->B_network_thread.NT_patterns);
 
   for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
        ipattern++)
   {
     pattern_shared_t *with_pattern_shared =
-      with_patterns_shared->PS_patterns + ipattern;
+        with_patterns_shared->PS_patterns + ipattern;
 
     pattern_thread_t *with_pattern_thread =
-      with_patterns_thread->PT_patterns + ipattern;
+        with_patterns_thread->PT_patterns + ipattern;
 
     for (int ilinear = 0; ilinear < with_pattern_shared->PS_nlinear; ilinear++)
       with_pattern_thread->PT_embed[ilinear] = 0;
@@ -577,16 +621,17 @@ void board2patterns_thread(board_t *self)
     {
       int jpattern = with_patterns_shared->PS_patterns_map[ifield][ipattern];
 
-      if (jpattern == INVALID) break;
+      if (jpattern == INVALID)
+        break;
 
       pattern_shared_t *with_pattern_shared =
-        with_patterns_shared->PS_patterns + jpattern;
+          with_patterns_shared->PS_patterns + jpattern;
 
       pattern_thread_t *with_pattern_thread =
-        with_patterns_thread->PT_patterns + jpattern;
+          with_patterns_thread->PT_patterns + jpattern;
 
       int ilinear = with_pattern_shared->PS_field2linear[ifield];
-   
+
       HARDBUG(ilinear == INVALID)
       HARDBUG(ilinear >= with_pattern_shared->PS_nlinear)
 
@@ -599,7 +644,7 @@ void board2patterns_thread(board_t *self)
     }
   }
 
-  check_board_patterns_thread(object, (char *) __FUNC__, FALSE);
+  check_board_patterns_thread(object, (char *)__FUNC__, FALSE);
 }
 
 void check_board_patterns_thread(board_t *self, char *arg_where, int input_set)
@@ -608,16 +653,16 @@ void check_board_patterns_thread(board_t *self, char *arg_where, int input_set)
 
   patterns_shared_t *with_patterns_shared = &patterns_shared;
   patterns_thread_t *with_patterns_thread =
-    &(object->B_network_thread.NT_patterns);
+      &(object->B_network_thread.NT_patterns);
 
   for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
        ipattern++)
   {
     pattern_shared_t *with_pattern_shared =
-      with_patterns_shared->PS_patterns + ipattern;
+        with_patterns_shared->PS_patterns + ipattern;
 
     pattern_thread_t *with_pattern_thread =
-      with_patterns_thread->PT_patterns + ipattern;
+        with_patterns_thread->PT_patterns + ipattern;
 
     for (int isquare = 1; isquare <= 50; ++isquare)
     {

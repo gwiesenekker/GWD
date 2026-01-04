@@ -1,10 +1,11 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef ProfileH
 #define ProfileH
 
 #ifdef PROFILE
 
-#define PROFILE_LINUX   0
+#define PROFILE_LINUX 0
 #define PROFILE_WINDOWS 1
 
 #define PROFILE_PLATFORM PROFILE_LINUX
@@ -48,13 +49,13 @@ typedef SRWLOCK profile_mutex_t;
 #endif
 
 #define PROFILE_INVALID (-1)
-#define THREAD_MAX      64
-#define RECURSE_MAX     100
+#define THREAD_MAX 64
+#define RECURSE_MAX 100
 
 #define PG profile_global[pid]
 #define PS profile_static[pid]
 
-//typedef struct timespec counter_t;
+// typedef struct timespec counter_t;
 typedef long long counter_t;
 
 typedef struct
@@ -73,7 +74,7 @@ typedef struct
 extern profile_global_t profile_global[THREAD_MAX];
 
 int return_pid(int);
-void init_block(int [RECURSE_MAX]);
+void init_block(int[RECURSE_MAX]);
 int new_block(int, const char *, int *);
 void begin_block(int, int);
 void end_block(int);
@@ -81,40 +82,45 @@ void init_profile(void);
 void clear_profile(void);
 void dump_profile(int, int);
 
-#define GET_COUNTER_BEGIN(P)\
-{\
-  unsigned int dummy;\
-  *P = __rdtscp(&dummy);\
-}
-
-#define GET_COUNTER_END(P)\
-{\
-  unsigned int dummy;\
-  *P = __rdtscp(&dummy);\
-}
-
-#define BEGIN_BLOCK(X) \
-  {\
-    static profile_static_t profile_static[THREAD_MAX];\
-    counter_t counter_stamp;\
-    GET_COUNTER_END(&counter_stamp);\
-    int pid = PID;\
-    PG.counter_stamp = counter_stamp;\
-    if (PS.block_init == 0) {init_block(PS.block_id); PS.block_init = 1;}\
-    PS.block_invocation++;\
-    if (PS.block_id[PS.block_invocation] == PROFILE_INVALID)\
-      PS.block_id[PS.block_invocation] = new_block(pid, X, &(PS.block_invocation));\
-    begin_block(pid, PS.block_id[PS.block_invocation]);\
-    GET_COUNTER_BEGIN(PG.counter_pointer);\
+#define GET_COUNTER_BEGIN(P) \
+  {                          \
+    unsigned int dummy;      \
+    *P = __rdtscp(&dummy);   \
   }
-#define END_BLOCK \
-  {\
-    counter_t counter_stamp;\
-    GET_COUNTER_END(&counter_stamp);\
-    int pid = PID;\
-    PG.counter_stamp = counter_stamp;\
-    end_block(pid);\
-    GET_COUNTER_BEGIN(PG.counter_pointer);\
+
+#define GET_COUNTER_END(P) \
+  {                        \
+    unsigned int dummy;    \
+    *P = __rdtscp(&dummy); \
+  }
+
+#define BEGIN_BLOCK(X)                                       \
+  {                                                          \
+    static profile_static_t profile_static[THREAD_MAX];      \
+    counter_t counter_stamp;                                 \
+    GET_COUNTER_END(&counter_stamp);                         \
+    int pid = PID;                                           \
+    PG.counter_stamp = counter_stamp;                        \
+    if (PS.block_init == 0)                                  \
+    {                                                        \
+      init_block(PS.block_id);                               \
+      PS.block_init = 1;                                     \
+    }                                                        \
+    PS.block_invocation++;                                   \
+    if (PS.block_id[PS.block_invocation] == PROFILE_INVALID) \
+      PS.block_id[PS.block_invocation] =                     \
+          new_block(pid, X, &(PS.block_invocation));         \
+    begin_block(pid, PS.block_id[PS.block_invocation]);      \
+    GET_COUNTER_BEGIN(PG.counter_pointer);                   \
+  }
+#define END_BLOCK                          \
+  {                                        \
+    counter_t counter_stamp;               \
+    GET_COUNTER_END(&counter_stamp);       \
+    int pid = PID;                         \
+    PG.counter_stamp = counter_stamp;      \
+    end_block(pid);                        \
+    GET_COUNTER_BEGIN(PG.counter_pointer); \
   }
 
 #define INIT_PROFILE init_profile();
@@ -128,4 +134,3 @@ void dump_profile(int, int);
 #endif
 
 #endif
-

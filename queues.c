@@ -1,8 +1,10 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 void construct_queue(void *self,
-  char *arg_queue_name, my_printf_t *arg_queue_my_printf)
+                     char *arg_queue_name,
+                     my_printf_t *arg_queue_my_printf)
 {
   queue_t *object = self;
 
@@ -11,8 +13,7 @@ void construct_queue(void *self,
   object->Q_my_printf = arg_queue_my_printf;
 
   for (int imessage = 0; imessage < NMESSAGES_MAX; imessage++)
-    HARDBUG((object->Q_messages[imessage].message_text = bfromcstr("")) ==
-            NULL)
+    HARDBUG((object->Q_messages[imessage].message_text = bfromcstr("")) == NULL)
 
   object->Q_nread = 0;
   object->Q_nwrite = -1;
@@ -24,14 +25,14 @@ void construct_queue(void *self,
 void enqueue(void *self, int arg_message_id, char *arg_message_text)
 {
   queue_t *object = self;
-  
+
   HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
 
-  //nread, nwrite
-  //0      -1     : 0 messages in queue
-  //0      0      : 1 message in queue
-  //0      1      : 2 messages in queue
-  //number of messages = (nwrite - nread + 1)
+  // nread, nwrite
+  // 0      -1     : 0 messages in queue
+  // 0      0      : 1 message in queue
+  // 0      1      : 2 messages in queue
+  // number of messages = (nwrite - nread + 1)
 
   if ((object->Q_nwrite - object->Q_nread + 1) >= NMESSAGES_MAX)
   {
@@ -42,8 +43,7 @@ void enqueue(void *self, int arg_message_id, char *arg_message_text)
 
   object->Q_nwrite++;
 
-  message_t *message =
-    &(object->Q_messages[object->Q_nwrite % NMESSAGES_MAX]);
+  message_t *message = &(object->Q_messages[object->Q_nwrite % NMESSAGES_MAX]);
 
   message->message_id = arg_message_id;
 
@@ -57,8 +57,11 @@ void enqueue(void *self, int arg_message_id, char *arg_message_text)
   {
 #ifdef DEBUG
     my_printf(object->Q_my_printf,
-      "length queue %s after enqueue is %d message_id=%d message=%s\n",
-      bdata(object->Q_name), length, arg_message_id, arg_message_text);
+              "length queue %s after enqueue is %d message_id=%d message=%s\n",
+              bdata(object->Q_name),
+              length,
+              arg_message_id,
+              arg_message_text);
 #endif
     object->Q_length_max = length;
   }
@@ -72,7 +75,8 @@ int poll_queue(void *self)
 
   int result = INVALID;
 
-  if (object == NULL) return(result);
+  if (object == NULL)
+    return (result);
 
   HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
 
@@ -81,7 +85,7 @@ int poll_queue(void *self)
 
   HARDBUG(compat_mutex_unlock(&(object->Q_mutex)) != 0)
 
-  return(result);
+  return (result);
 }
 
 int dequeue(void *self, message_t *arg_message)
@@ -89,13 +93,12 @@ int dequeue(void *self, message_t *arg_message)
   queue_t *object = self;
 
   int result = INVALID;
-  
+
   HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
 
   if (object->Q_nread <= object->Q_nwrite)
   {
-    message_t *message = 
-      &(object->Q_messages[object->Q_nread % NMESSAGES_MAX]);
+    message_t *message = &(object->Q_messages[object->Q_nread % NMESSAGES_MAX]);
 
     message->message_read = TRUE;
 
@@ -103,12 +106,13 @@ int dequeue(void *self, message_t *arg_message)
 
     result = message->message_id;
 
-    if (arg_message != NULL) *arg_message = *message;
+    if (arg_message != NULL)
+      *arg_message = *message;
   }
 
   HARDBUG(compat_mutex_unlock(&(object->Q_mutex)) != 0)
 
-  return(result);
+  return (result);
 }
 
 #define NTEST 4
@@ -125,7 +129,7 @@ void test_queues(void)
 
     construct_queue(test + itest, name, STDOUT);
   }
-  
+
   for (int itest = 0; itest < NTEST; itest++)
   {
     for (int jtest = 0; jtest < NTEST; jtest++)
@@ -134,8 +138,7 @@ void test_queues(void)
       {
         char text[MY_LINE_MAX];
 
-        snprintf(text, MY_LINE_MAX, "message %d from %d",
-          imessage, itest);
+        snprintf(text, MY_LINE_MAX, "message %d from %d", imessage, itest);
 
         enqueue(test + jtest, itest, text);
       }
@@ -146,13 +149,15 @@ void test_queues(void)
   {
     message_t message;
 
-    while(dequeue(test + itest, &message) != INVALID)
+    while (dequeue(test + itest, &message) != INVALID)
     {
       PRINTF("%d received %d '%s'\n",
-        itest, message.message_id, bdata(message.message_text));
+             itest,
+             message.message_id,
+             bdata(message.message_text));
     }
 
-    //test WARNING
+    // test WARNING
 
     char text[MY_LINE_MAX];
 

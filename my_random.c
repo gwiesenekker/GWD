@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
 /*
@@ -21,8 +22,8 @@ local ui64_t splitmix64(ui64_t *arg_seed)
   result = (result ^ (result >> 27)) * 0x94d049bb133111ebULL;
 
   result ^= result >> 31;
-  
-  return(result);
+
+  return (result);
 }
 
 /*
@@ -40,10 +41,11 @@ local ui64_t rotl(ui64_t x, int k)
 
 void shuffle(int *s, int n, my_random_t *r)
 {
-  for (int i = 0; i < n; i++) s[i] = i;
+  for (int i = 0; i < n; i++)
+    s[i] = i;
 
   if (r != NULL)
-  { 
+  {
     for (int i = n - 1; i >= 1; --i)
     {
       int j = return_my_random(r) % (i + 1);
@@ -63,7 +65,9 @@ void shuffle(int *s, int n, my_random_t *r)
   {
     int m = 0;
 
-    for (int j = 0; j < n; j++) if (s[j] == i) ++m;
+    for (int j = 0; j < n; j++)
+      if (s[j] == i)
+        ++m;
 
     HARDBUG(m != 1)
   }
@@ -109,8 +113,8 @@ ui64_t return_my_random(my_random_t *self)
 {
   my_random_t *object = self;
 
-  ui64_t result = rotl(object->MR_state[0] + object->MR_state[3], 23) +
-                  object->MR_state[0];
+  ui64_t result =
+      rotl(object->MR_state[0] + object->MR_state[3], 23) + object->MR_state[0];
 
   ui64_t t = object->MR_state[1] << 17;
 
@@ -125,15 +129,15 @@ ui64_t return_my_random(my_random_t *self)
   return result;
 }
 
-#define TEST_NBITS    16
-#define TEST_MASK     (~(~0ULL << TEST_NBITS))
+#define TEST_NBITS 16
+#define TEST_MASK (~(~0ULL << TEST_NBITS))
 #define TEST_NBUCKETS (TEST_MASK + 1)
-#define TEST_NFILL    100
+#define TEST_NFILL 100
 
 local i64_t buckets[TEST_NBUCKETS];
 
 void test_my_random(void)
-{ 
+{
   double mean_min, mean_max;
   double sigma_min, sigma_max;
 
@@ -141,41 +145,44 @@ void test_my_random(void)
   {
     for (i64_t ibucket = 0; ibucket < TEST_NBUCKETS; ibucket++)
       buckets[ibucket] = 0;
-  
+
     my_random_t test_random;
-  
+
     construct_my_random(&test_random, 0);
-  
+
     stats_t stats;
     construct_stats(&stats, "test_random");
-  
+
     int nsamples = TEST_NBUCKETS * TEST_NFILL;
 
-    if (RUNNING_ON_VALGRIND) nsamples = TEST_NBUCKETS;
+    if (RUNNING_ON_VALGRIND)
+      nsamples = TEST_NBUCKETS;
 
     for (i64_t isample = 0; isample < nsamples; isample++)
     {
       int r = (return_my_random(&test_random) >> ishift) & TEST_MASK;
-  
+
       buckets[r]++;
-  
+
       update_stats(&stats, r);
     }
-  
+
     i64_t min = buckets[0];
     i64_t max = buckets[0];
-  
+
     for (i64_t ibucket = 1; ibucket < TEST_NBUCKETS; ibucket++)
     {
-      if (buckets[ibucket] < min) min = buckets[ibucket];
-      if (buckets[ibucket] > max) max = buckets[ibucket];
+      if (buckets[ibucket] < min)
+        min = buckets[ibucket];
+      if (buckets[ibucket] > max)
+        max = buckets[ibucket];
     }
     mean_sigma(&stats);
-  
-    //PRINTF("ishift=%d\n", ishift);
-    //PRINTF("min=%lld max=%lld\n", min, max);
-    //PRINTF("mean=%.6f(%.6f)\n", stats.S_mean, stats.S_mean_sum);
-    //PRINTF("sigma=%.6f(%.6f)\n", stats.S_sigma, stats.S_sigma_sum2);
+
+    // PRINTF("ishift=%d\n", ishift);
+    // PRINTF("min=%lld max=%lld\n", min, max);
+    // PRINTF("mean=%.6f(%.6f)\n", stats.S_mean, stats.S_mean_sum);
+    // PRINTF("sigma=%.6f(%.6f)\n", stats.S_sigma, stats.S_sigma_sum2);
 
     if (ishift == 0)
     {
@@ -184,25 +191,32 @@ void test_my_random(void)
     }
     else
     {
-       if (stats.S_mean < mean_min) mean_min = stats.S_mean;
-       if (stats.S_mean > mean_max) mean_max = stats.S_mean;
-       if (stats.S_sigma < sigma_min) sigma_min = stats.S_sigma;
-       if (stats.S_sigma > sigma_max) sigma_max = stats.S_sigma;
+      if (stats.S_mean < mean_min)
+        mean_min = stats.S_mean;
+      if (stats.S_mean > mean_max)
+        mean_max = stats.S_mean;
+      if (stats.S_sigma < sigma_min)
+        sigma_min = stats.S_sigma;
+      if (stats.S_sigma > sigma_max)
+        sigma_max = stats.S_sigma;
     }
   }
 
   PRINTF("exact mean=%.6f mean_min=%.6f mean_max=%0.6f\n",
-         TEST_MASK / 2.0, mean_min, mean_max);
+         TEST_MASK / 2.0,
+         mean_min,
+         mean_max);
   PRINTF("exact sigma=%.6f sigma_min=%.6f sigma_max=%0.6f\n",
-         TEST_MASK / sqrt(12.0), sigma_min, sigma_max);
+         TEST_MASK / sqrt(12.0),
+         sigma_min,
+         sigma_max);
 
   int s[TEST_NBUCKETS];
 
   my_random_t test_random;
-  
+
   construct_my_random(&test_random, 0);
 
   shuffle(s, TEST_NBUCKETS, NULL);
   shuffle(s, TEST_NBUCKETS, &test_random);
 }
-

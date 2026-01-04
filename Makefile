@@ -1,3 +1,5 @@
+.PHONY: cppcheck clang-tidy clang-format clean
+
 OBJS=main.o\
   bstrlib.o\
   cJSON.o\
@@ -207,7 +209,13 @@ cppcheck:
 	--suppress=constParameterCallback \
 	--check-level=exhaustive \
 	--inconclusive \
-	--force -D__cppcheck__ -i bstrlib.c -i cJSON.c -i xxhash.c .
+	--force -D__cppcheck__ -i bstrlib.c -i cJSON.c -i xxhash.c *.c
+
+clang-tidy:
+	clang-tidy *.c -- -I./include
+
+clang-format:
+	clang-format -i *.c *.h
 
 clean:
 	rm *.o logs/*

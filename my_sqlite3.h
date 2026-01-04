@@ -1,4 +1,5 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #ifndef DbaseH
 #define DbaseH
 
@@ -14,9 +15,9 @@
 
 #define SQLITE_OPEN_READONLY 1
 
-#define SQLITE_OK            2
-#define SQLITE_ROW           3
-#define SQLITE_DONE          4
+#define SQLITE_OK 2
+#define SQLITE_ROW 3
+#define SQLITE_DONE 4
 
 typedef struct sqlite3_ sqlite3;
 typedef struct sqlite3_stmt_ sqlite3_stmt;
@@ -42,8 +43,11 @@ int my_sqlite3_bind_int64(sqlite3_stmt *, int, i64_t);
 
 int my_sqlite3_step(sqlite3_stmt *);
 
-int my_sqlite3_exec(sqlite3 *, const char *,
-  int (*)(void *, int, char**, char**), void *, char **);
+int my_sqlite3_exec(sqlite3 *,
+                    const char *,
+                    int (*)(void *, int, char **, char **),
+                    void *,
+                    char **);
 
 int my_sqlite3_column_int(sqlite3_stmt *, int);
 
@@ -70,7 +74,7 @@ i64_t query_move(sqlite3 *, i64_t, const char *, int);
 int query_evaluation(sqlite3 *, i64_t);
 
 void backup_db(sqlite3 *, const char *);
- 
+
 void append_sql_buffer(my_sqlite3_t *, const char *, ...);
 
 void flush_sql_buffer(my_sqlite3_t *, int);

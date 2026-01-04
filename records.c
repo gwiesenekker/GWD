@@ -1,9 +1,10 @@
-//SCU REVISION 8.0098 vr  2 jan 2026 13:41:25 CET
+//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
+// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
 #include "globals.h"
 
-#define CJSON_FIELDS_ID      "fields"
-#define CJSON_FIELD_NAME_ID  "field_name"
-#define CJSON_FIELD_TYPE_ID  "field_type"
+#define CJSON_FIELDS_ID "fields"
+#define CJSON_FIELD_NAME_ID "field_name"
+#define CJSON_FIELD_TYPE_ID "field_type"
 #define CJSON_FIELD_VALUE_ID "field_value"
 
 local cJSON *find_field(cJSON *fields, char *arg_field_name)
@@ -16,12 +17,12 @@ local cJSON *find_field(cJSON *fields, char *arg_field_name)
 
   cJSON_ArrayForEach(field, fields)
   {
-    cJSON *field_name =
-      cJSON_GetObjectItem(field, CJSON_FIELD_NAME_ID);
+    cJSON *field_name = cJSON_GetObjectItem(field, CJSON_FIELD_NAME_ID);
 
     HARDBUG(!cJSON_IsString(field_name))
 
-    if (compat_strcasecmp(cJSON_GetStringValue(field_name),  arg_field_name) == 0)
+    if (compat_strcasecmp(cJSON_GetStringValue(field_name), arg_field_name) ==
+        0)
     {
       result = field;
 
@@ -29,13 +30,13 @@ local cJSON *find_field(cJSON *fields, char *arg_field_name)
     }
   }
 
-  return(result);
+  return (result);
 }
 
 void construct_record(void *self)
 {
   record_t *object = self;
-  
+
   object->R_cjson = cJSON_CreateObject();
 
   HARDBUG(cJSON_AddArrayToObject(object->R_cjson, CJSON_FIELDS_ID) == NULL)
@@ -43,8 +44,10 @@ void construct_record(void *self)
   HARDBUG((object->R_string = bfromcstr("")) == NULL)
 }
 
-void add_field(void *self, char *arg_field_name,
-  int arg_field_type, void *arg_field_value)
+void add_field(void *self,
+               char *arg_field_name,
+               int arg_field_type,
+               void *arg_field_value)
 {
   record_t *object = self;
 
@@ -60,41 +63,44 @@ void add_field(void *self, char *arg_field_name,
 
   cJSON_AddItemToArray(fields, field);
 
-  HARDBUG(cJSON_AddStringToObject(field, CJSON_FIELD_NAME_ID,
-                              arg_field_name) == NULL)
+  HARDBUG(cJSON_AddStringToObject(field, CJSON_FIELD_NAME_ID, arg_field_name) ==
+          NULL)
 
-  if (arg_field_type == FIELD_TYPE_INT)   
+  if (arg_field_type == FIELD_TYPE_INT)
   {
     int value = 0;
 
-    if (arg_field_value != NULL) value = *((int *) arg_field_value);
+    if (arg_field_value != NULL)
+      value = *((int *)arg_field_value);
 
-    HARDBUG(cJSON_AddNumberToObject(field, CJSON_FIELD_TYPE_ID,
-                                FIELD_TYPE_INT) == NULL)
+    HARDBUG(cJSON_AddNumberToObject(field,
+                                    CJSON_FIELD_TYPE_ID,
+                                    FIELD_TYPE_INT) == NULL)
 
-    HARDBUG(cJSON_AddNumberToObject(field, CJSON_FIELD_VALUE_ID, 
-                                value) == NULL)
-  } 
+    HARDBUG(cJSON_AddNumberToObject(field, CJSON_FIELD_VALUE_ID, value) == NULL)
+  }
   else if (arg_field_type == FIELD_TYPE_STRING)
   {
     char value[MY_LINE_MAX];
 
     strcpy(value, "");
 
-    if (arg_field_value != NULL) strncpy(value, arg_field_value, MY_LINE_MAX);
+    if (arg_field_value != NULL)
+      strncpy(value, arg_field_value, MY_LINE_MAX);
 
-    HARDBUG(cJSON_AddNumberToObject(field, CJSON_FIELD_TYPE_ID,
-                                FIELD_TYPE_STRING) == NULL)
+    HARDBUG(cJSON_AddNumberToObject(field,
+                                    CJSON_FIELD_TYPE_ID,
+                                    FIELD_TYPE_STRING) == NULL)
 
-    HARDBUG(cJSON_AddStringToObject(field, CJSON_FIELD_VALUE_ID,
-                                value) == NULL)
+    HARDBUG(cJSON_AddStringToObject(field, CJSON_FIELD_VALUE_ID, value) == NULL)
   }
   else if (arg_field_type == FIELD_TYPE_ARRAY)
   {
     HARDBUG(arg_field_value != NULL)
- 
-    HARDBUG(cJSON_AddNumberToObject(field, CJSON_FIELD_TYPE_ID,
-                                FIELD_TYPE_ARRAY) == NULL)
+
+    HARDBUG(cJSON_AddNumberToObject(field,
+                                    CJSON_FIELD_TYPE_ID,
+                                    FIELD_TYPE_ARRAY) == NULL)
 
     HARDBUG(cJSON_AddArrayToObject(field, arg_field_name) == NULL)
   }
@@ -123,16 +129,16 @@ void set_field(void *self, char *arg_field_name, void *arg_value)
     cJSON *field_value = cJSON_GetObjectItem(field, CJSON_FIELD_VALUE_ID);
 
     HARDBUG(!cJSON_IsNumber(field_value))
-  
-    cJSON_SetNumberValue(field_value, *(int *) arg_value);
-  } 
+
+    cJSON_SetNumberValue(field_value, *(int *)arg_value);
+  }
   else if (round(cJSON_GetNumberValue(field_type)) == FIELD_TYPE_STRING)
   {
     cJSON *field_value = cJSON_GetObjectItem(field, CJSON_FIELD_VALUE_ID);
 
     HARDBUG(!cJSON_IsString(field_value))
 
-    cJSON_SetValuestring(field_value, (char *) arg_value);
+    cJSON_SetValuestring(field_value, (char *)arg_value);
   }
 }
 
@@ -157,16 +163,16 @@ void get_field(void *self, char *arg_field_name, void *arg_value)
     cJSON *field_value = cJSON_GetObjectItem(field, CJSON_FIELD_VALUE_ID);
 
     HARDBUG(!cJSON_IsNumber(field_value))
-  
-    *((int *) arg_value) = round(cJSON_GetNumberValue(field_value));
-  } 
+
+    *((int *)arg_value) = round(cJSON_GetNumberValue(field_value));
+  }
   else if (round(cJSON_GetNumberValue(field_type)) == FIELD_TYPE_STRING)
   {
     cJSON *field_value = cJSON_GetObjectItem(field, CJSON_FIELD_VALUE_ID);
 
     HARDBUG(!cJSON_IsString(field_value))
 
-    HARDBUG(bassigncstr((bstring) arg_value,
+    HARDBUG(bassigncstr((bstring)arg_value,
                         cJSON_GetStringValue(field_value)) == BSTR_ERR)
   }
 }
@@ -178,7 +184,7 @@ void set_record(void *self, bstring arg_bstring)
   object->R_cjson = cJSON_Parse(bdata(arg_bstring));
 
   if (object->R_cjson == NULL)
-  { 
+  {
     const char *error = cJSON_GetErrorPtr();
 
     if (error != NULL)
@@ -193,14 +199,14 @@ bstring get_record(void *self)
   record_t *object = self;
 
   char *cstring;
-  
+
   HARDBUG((cstring = cJSON_Print(object->R_cjson)) == NULL)
 
   HARDBUG(bassigncstr(object->R_string, cstring) == BSTR_ERR)
 
   free(cstring);
 
-  return(object->R_string);
+  return (object->R_string);
 }
 
 void test_records(void)
@@ -252,4 +258,3 @@ void test_records(void)
 
   BDESTROY(string)
 }
-
