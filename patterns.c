@@ -1,4 +1,4 @@
-// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
+// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
 
 #include "globals.h"
 
@@ -16,6 +16,12 @@ local int map_row_col[10][10] = {{-1, 1, -1, 2, -1, 3, -1, 4, -1, 5},
                                  {36, -1, 37, -1, 38, -1, 39, -1, 40, -1},
                                  {-1, 41, -1, 42, -1, 43, -1, 44, -1, 45},
                                  {46, -1, 47, -1, 48, -1, 49, -1, 50, -1}};
+
+local int attackers24[12] = {3, 4, 5, 9, 10, 13, 14, 15, 19, 20, 24, 25};
+local int defenders24[12] = {48, 49, 50, 43, 44, 45, 39, 40, 34, 35, 30, 25};
+
+local int attackers27[12] = {46, 47, 48, 41, 42, 36, 37, 38, 31, 32, 26, 27};
+local int defenders27[12] = {1, 2, 3, 6, 7, 8, 11, 12, 16, 17, 21, 26};
 
 local int map_row_col2field(int irow, int icol)
 {
@@ -165,6 +171,32 @@ local void add_zigzag(patterns_shared_t *self,
   add_pattern(object, nlinear, fields);
 }
 
+local void add_squares(patterns_shared_t *self,
+                      int arg_nsquares,
+                      int *arg_squares)
+{
+  patterns_shared_t *object = self;
+
+  int fields[NLINEAR_MAX];
+
+  int nlinear = 0;
+
+  for (int isquare = 0; isquare < arg_nsquares; isquare++)
+  {
+    int ifield = square2field[arg_squares[isquare]];
+
+    HARDBUG(ifield == INVALID)
+    HARDBUG(nlinear >= NLINEAR_MAX)
+
+    fields[nlinear++] = ifield;
+  }
+
+  if (nlinear == 0)
+    return;
+
+  add_pattern(object, nlinear, fields);
+}
+
 void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
 {
   patterns_shared_t *object = self;
@@ -256,6 +288,33 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
           ++nshapes;
         }
 
+        HARDBUG(bassigncstr(string, "zigzag6x2-2427") == BSTR_ERR)
+
+        if (bstrcmp(string, btokens->entry[itoken]) == 0)
+        {
+          if (((irow == 0) or (irow == 4)) and
+              ((icol == 1) or (icol == 3) or (icol == 5) or (icol == 7)))
+          {
+            add_zigzag(object, 6, 2, irow, icol, -1);
+          }
+
+          ++nshapes;
+        }
+
+
+        HARDBUG(bassigncstr(string, "center6x2-2427") == BSTR_ERR)
+
+        if (bstrcmp(string, btokens->entry[itoken]) == 0)
+        {
+          if (((irow == 0) or (irow == 4)) and
+              (icol == 3))
+          {
+            add_zigzag(object, 6, 2, irow, icol, 1);
+          }
+
+          ++nshapes;
+        }
+
         HARDBUG(bassigncstr(string, "zigzag4x2") == BSTR_ERR)
 
         if (bstrcmp(string, btokens->entry[itoken]) == 0)
@@ -307,6 +366,26 @@ void construct_patterns_shared(patterns_shared_t *self, char *arg_shape)
           ++nshapes;
         }
       }
+    }
+
+    HARDBUG(bassigncstr(string, "zigzag6x2-2427") == BSTR_ERR)
+
+    if (bstrcmp(string, btokens->entry[itoken]) == 0)
+    {
+      add_squares(object, 12, attackers24);
+      add_squares(object, 12, defenders24);
+      add_squares(object, 12, attackers27);
+      add_squares(object, 12, defenders27);
+    }
+
+    HARDBUG(bassigncstr(string, "center6x2-2427") == BSTR_ERR)
+
+    if (bstrcmp(string, btokens->entry[itoken]) == 0)
+    {
+      add_squares(object, 12, attackers24);
+      add_squares(object, 12, defenders24);
+      add_squares(object, 12, attackers27);
+      add_squares(object, 12, defenders27);
     }
   }
   HARDBUG(nshapes == 0)

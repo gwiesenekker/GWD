@@ -1,4 +1,4 @@
-// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
+// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
 #ifndef BookH
 #define BookH
 

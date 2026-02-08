@@ -1,4 +1,4 @@
-// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
+// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
 #ifndef SearchH
 #define SearchH
 
@@ -36,7 +36,9 @@
 #define IS_SR_WON(X) ((X) & SR_WON_BIT)
 #define IS_SR_LOST(X) ((X) & SR_LOST_BIT)
 
-#define PV_SLOT_IMOVE_MASK 0xFFULL
+#define PV_SLOT_WHITE_MOVE_MASK 0xFFULL
+#define PV_SLOT_BLACK_MOVE_MASK 0xFF00ULL
+#define PV_SLOT_MOVES_MASK (PV_SLOT_WHITE_MOVE_MASK | PV_SLOT_BLACK_MOVE_MASK)
 
 typedef enum
 {

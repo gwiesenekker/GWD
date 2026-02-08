@@ -1,4 +1,4 @@
-// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
+// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
 #include "globals.h"
 
 #define FAST_MODULO64(H, N) ((ui64_t)(((__uint128_t)(H) * (N)) >> 64));
@@ -656,11 +656,13 @@ local inline ui64_t return_fmix64(ui64_t arg_key)
   return (arg_key);
 }
 
-local int probe_pv(pv_entries_t *arg_pv, ui64_t arg_key)
+local int probe_pv(pv_entries_t *arg_pv, search_t *object)
 {
   int result = INVALID;
 
-  ui32_t fmix32 = (ui32_t)return_fmix64(arg_key);
+  ui64_t key = object->S_board.B_key;
+
+  ui32_t fmix32 = (ui32_t)return_fmix64(key);
 
   int ientry = fmix32 & (NPV_ENTRIES - 1);
 
@@ -668,18 +670,27 @@ local int probe_pv(pv_entries_t *arg_pv, ui64_t arg_key)
 
   for (int islot = 0; islot < NPV_SLOTS; islot++)
   {
-    if ((pve_slots[islot] >> 8) == (arg_key >> 8))
+    if ((pve_slots[islot] & ~PV_SLOT_MOVES_MASK) ==
+        (key & ~PV_SLOT_MOVES_MASK))
     {
-      result = pve_slots[islot] & PV_SLOT_IMOVE_MASK;
+      if (IS_WHITE(object->S_board.B_colour2move))
+        result = pve_slots[islot] & PV_SLOT_WHITE_MOVE_MASK;
+      else
+        result = (pve_slots[islot] & PV_SLOT_BLACK_MOVE_MASK) >> 8;
+
+      if (result == PV_SLOT_WHITE_MOVE_MASK) result = INVALID;
+
       break;
     }
   }
   return (result);
 }
 
-local void update_pv(pv_entries_t *arg_pv, ui64_t arg_key, int arg_imove)
+local void update_pv(pv_entries_t *arg_pv, search_t *object, int arg_imove)
 {
-  ui32_t fmix32 = (ui32_t)return_fmix64(arg_key);
+  ui64_t key = object->S_board.B_key;
+
+  ui32_t fmix32 = (ui32_t)return_fmix64(key);
 
   int ientry = fmix32 & (NPV_ENTRIES - 1);
 
@@ -688,20 +699,30 @@ local void update_pv(pv_entries_t *arg_pv, ui64_t arg_key, int arg_imove)
   int islot;
 
   for (islot = 0; islot < NPV_SLOTS; islot++)
-    if ((pve_slots[islot] >> 8) == (arg_key >> 8))
+    if ((pve_slots[islot] & ~PV_SLOT_MOVES_MASK) ==
+        (key & ~PV_SLOT_MOVES_MASK))
       break;
 
   if (islot == NPV_SLOTS)
   {
     for (islot = 0; islot < NPV_SLOTS; islot++)
-      if (pve_slots[islot] == PV_SLOT_IMOVE_MASK)
+      if (pve_slots[islot] == PV_SLOT_MOVES_MASK)
         break;
   }
 
   if (islot == NPV_SLOTS)
+  {
     islot = (fmix32 >> 30) & (NPV_SLOTS - 1);
 
-  pve_slots[islot] = (arg_key & ~PV_SLOT_IMOVE_MASK) | (ui64_t) arg_imove;
+    pve_slots[islot] = key | PV_SLOT_MOVES_MASK;
+  }
+
+  if (IS_WHITE(object->S_board.B_colour2move))
+    pve_slots[islot] = (pve_slots[islot] & ~PV_SLOT_WHITE_MOVE_MASK) |
+                       (ui64_t) arg_imove;
+  else
+    pve_slots[islot] = (pve_slots[islot] & ~PV_SLOT_BLACK_MOVE_MASK) |
+                       ((ui64_t) arg_imove) << 8;
 }
 
 local void endgame_pv(search_t *object, int arg_mate, bstring arg_bpv_string)
@@ -1333,7 +1354,7 @@ local void quiescence(search_t *object,
     {
       *arg_best_score = temp_score;
 
-      update_pv(&temp_pv, object->S_board.B_key, jmove);
+      update_pv(&temp_pv, object, jmove);
 
       *arg_best_pv = temp_pv;
     }
@@ -1675,7 +1696,7 @@ local void trace_ab_exit(search_t *object,
 
   BSTRING(bmove_string)
 
-  int best_move = probe_pv(&(arg_best_result->SR_pv), object->S_board.B_key);
+  int best_move = probe_pv(&(arg_best_result->SR_pv), object);
 
   if (best_move == INVALID)
     HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
@@ -2007,7 +2028,7 @@ local void alpha_beta_captures(search_t *object,
     {
       assign_search_result_b2a(arg_search_result, &temp_result);
 
-      update_pv(&(temp_result.SR_pv), object->S_board.B_key, jmove);
+      update_pv(&(temp_result.SR_pv), object, jmove);
 
       arg_search_result->SR_pv = temp_result.SR_pv;
 
@@ -2361,7 +2382,7 @@ local void alpha_beta_minimal(search_t *object,
 
       assign_search_result_b2a(arg_search_result, &temp_result);
 
-      update_pv(&(temp_result.SR_pv), object->S_board.B_key, jmove);
+      update_pv(&(temp_result.SR_pv), object, jmove);
 
       arg_search_result->SR_pv = temp_result.SR_pv;
 
@@ -2704,7 +2725,7 @@ local void alpha_beta_pv(search_t *object,
       {
         assign_search_result_b2a(arg_search_result, &temp_result);
 
-        update_pv(&(temp_result.SR_pv), object->S_board.B_key, jmove);
+        update_pv(&(temp_result.SR_pv), object, jmove);
 
         arg_search_result->SR_pv = temp_result.SR_pv;
 
@@ -3051,7 +3072,7 @@ local void alpha_beta(search_t *object,
                                     SR_NULL);
 
             update_pv(&(arg_search_result->SR_pv),
-                      object->S_board.B_key,
+                      object,
                       alpha_beta_cache_slot.ABCS_moves[0]);
 
             arg_search_result->SR_depth = alpha_beta_cache_slot.ABCS_depth;
@@ -3074,7 +3095,7 @@ local void alpha_beta(search_t *object,
                                     SR_NULL);
 
             update_pv(&(arg_search_result->SR_pv),
-                      object->S_board.B_key,
+                      object,
                       alpha_beta_cache_slot.ABCS_moves[0]);
 
             arg_search_result->SR_depth = alpha_beta_cache_slot.ABCS_depth;
@@ -3093,7 +3114,7 @@ local void alpha_beta(search_t *object,
                                   SR_NULL);
 
           update_pv(&(arg_search_result->SR_pv),
-                    object->S_board.B_key,
+                    object,
                     alpha_beta_cache_slot.ABCS_moves[0]);
 
           arg_search_result->SR_depth = alpha_beta_cache_slot.ABCS_depth;
@@ -3452,7 +3473,7 @@ void do_pv(search_t *object,
     return;
   }
 
-  int jmove = probe_pv(arg_best_pv, object->S_board.B_key);
+  int jmove = probe_pv(arg_best_pv, object);
 
   if (jmove == INVALID)
   {
@@ -4529,7 +4550,7 @@ void init_search(void)
   }
 
   for (int islot = 0; islot < NPV_SLOTS; islot++)
-    pv_entry_default.PVE_slots[islot] = PV_SLOT_IMOVE_MASK;
+    pv_entry_default.PVE_slots[islot] = PV_SLOT_MOVES_MASK;
 
   for (int ientry = 0; ientry < NPV_ENTRIES; ientry++)
     pv_entries_default.PVE_entries[ientry] = pv_entry_default;
