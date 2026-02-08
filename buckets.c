@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #undef WEIBULL
@@ -25,7 +24,7 @@ void update_bucket(void *self, double arg_value)
     if (object->bucket_scale == BUCKET_LINEAR)
     {
       i64_t ibucket =
-          floor((arg_value - object->bucket_min) / object->bucket_size);
+        floor((arg_value - object->bucket_min) / object->bucket_size);
 
       if (ibucket >= object->nbuckets)
         ibucket = object->nbuckets - 1;
@@ -254,7 +253,7 @@ void test_buckets(void)
   for (int i = 0; i < ntest; i++)
   {
     double value =
-        (2.0 * (return_my_random(&test_random) % ntest)) / ntest - 1.0;
+      (2.0 * (return_my_random(&test_random) % ntest)) / ntest - 1.0;
 
     update_bucket(&a, value);
   }

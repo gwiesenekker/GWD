@@ -1,9 +1,9 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef PatternsH
 #define PatternsH
 
-#define NPATTERNS_MAX 256
+#define NPATTERNS_MAX 32
+#define NMATERIAL_MAX 8
 #define NLINEAR_MAX 16
 #define NMASK2INPUTS_MAX (1 << NLINEAR_MAX)
 
@@ -29,19 +29,21 @@ typedef struct
 
 typedef struct
 {
-  int MS_nstates;
-  int MS_nembed;
-  int MS_offset;
-  scaled_double_t **MS_weights_nembedxnstates;
-  scaled_double_t **MS_weights_nstatesxnembed;
-  scaled_double_t **MS_sum;
+  int MG_nstates;
+  int MG_nembed;
+  int MG_offset;
+  scaled_double_t **MG_weights_nembedxnstates;
+  scaled_double_t **MG_weights_nstatesxnembed;
+  scaled_double_t **MG_sum_nstatesxnoutputs;
 } material_shared_t;
+
+// plural
 
 typedef struct
 {
-  int PS_npatterns;
-  int *PS_patterns_map[BOARD_MAX];
-  pattern_shared_t PS_patterns[NPATTERNS_MAX];
+  int PSS_npatterns;
+  int *PSS_patterns_map[BOARD_MAX];
+  pattern_shared_t PSS_patterns[NPATTERNS_MAX];
 } patterns_shared_t;
 
 typedef struct
@@ -50,6 +52,14 @@ typedef struct
 } patterns_thread_t;
 
 extern patterns_shared_t patterns_shared;
+
+typedef struct
+{
+  int MSS_nmaterial;
+  material_shared_t MSS_materials[NMATERIAL_MAX];
+} materials_global_t;
+
+extern materials_global_t materials_global;
 
 void construct_patterns_shared(patterns_shared_t *, char *);
 

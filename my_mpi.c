@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 enum
@@ -74,14 +73,19 @@ local int my_sem_getval(int arg_semid, int arg_sem_num)
 
   return (value);
 #else
-  return(-1);
+  return (-1);
 #endif
 }
 
 local void my_create_semaphore(int arg_semkey)
 {
 #ifdef USE_OPENMPI
+  // removing and recreating sometimes fails?
   int semid = semget(arg_semkey, NSEMS, IPC_CREAT | IPC_EXCL | 0600);
+
+  // int semid = semget(arg_semkey, NSEMS, 0600);
+
+  // HARDBUG(semid == -1)
 
   if (semid == -1)
   {
@@ -943,7 +947,17 @@ local int my_semop(int arg_semid, int arg_sem_num, short arg_op, short arg_flg)
   sops.sem_op = arg_op;
   sops.sem_flg = arg_flg;
 
-  return (semop(arg_semid, &sops, 1));
+  // return (semop(arg_semid, &sops, 1));
+
+  int rc = semop(arg_semid, &sops, 1);
+
+  if (rc == -1)
+  {
+    if ((arg_flg != IPC_NOWAIT) and (errno != EAGAIN))
+      PRINTF("rc=%d errno=%d strerror=%s\n", rc, errno, strerror(errno));
+  }
+
+  return (rc);
 #else
   return (0);
 #endif
@@ -1155,12 +1169,12 @@ void test_my_mpi(void)
   int *shared_data;
 
   my_mpi_win_allocate_shared(
-      my_mpi_globals.MMG_id_global == 0 ? SIZE * sizeof(int) : 0,
-      sizeof(int),
-      MPI_INFO_NULL,
-      my_mpi_globals.MMG_comm_global,
-      &shared_data,
-      &win);
+    my_mpi_globals.MMG_id_global == 0 ? SIZE * sizeof(int) : 0,
+    sizeof(int),
+    MPI_INFO_NULL,
+    my_mpi_globals.MMG_comm_global,
+    &shared_data,
+    &win);
 
   my_mpi_win_fence(my_mpi_globals.MMG_comm_global, 0, win);
 

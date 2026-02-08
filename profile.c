@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "profile.h"
 
 #ifdef PROFILE
@@ -285,7 +284,7 @@ void begin_block(int pid, int block_id)
                               TICKS(with_previous->stack_counter_begin);
 
     with_previous->stack_time_self +=
-        SECS(counter_correction(pid, counter_delta));
+      SECS(counter_correction(pid, counter_delta));
   }
   else
   {
@@ -348,7 +347,7 @@ void end_block(int pid)
     // update parent in child
 
     parent_t *with_parent =
-        PL.block[with_current->stack_id].block_parent + with_previous->stack_id;
+      PL.block[with_current->stack_id].block_parent + with_previous->stack_id;
 
     with_parent->parent_active = TRUE;
 
@@ -357,7 +356,7 @@ void end_block(int pid)
     // update child in parent
 
     child_t *with_child =
-        PL.block[with_previous->stack_id].block_child + with_current->stack_id;
+      PL.block[with_previous->stack_id].block_child + with_current->stack_id;
 
     with_child->child_active = TRUE;
 
@@ -370,7 +369,7 @@ void end_block(int pid)
     GET_COUNTER_END(&(PL.counter_overhead_end))
 
     counter_delta =
-        TICKS(PL.counter_overhead_end) - TICKS(PL.counter_overhead_begin);
+      TICKS(PL.counter_overhead_end) - TICKS(PL.counter_overhead_begin);
 
     PL.time_total += SECS(counter_delta);
   }
@@ -632,8 +631,8 @@ void dump_profile(int pid, int verbose)
   fprintf(f, "# The sum of total times (or the sum of the percentages)\n");
 
   fprintf(
-      f,
-      "# does not have any meaning, since children will be double counted.\n");
+    f,
+    "# does not have any meaning, since children will be double counted.\n");
 
   fprintf(f,
           "%-32s %-10s %6s %16s %10s\n",
@@ -713,10 +712,10 @@ void dump_profile(int pid, int verbose)
     if (PL.block[iblock].block_invocation == 1)
     {
       PL.block[iblock].block_time_recursive_total =
-          PL.block[iblock].block_time_self_total;
+        PL.block[iblock].block_time_self_total;
 
       PL.block[iblock].block_calls_recursive_total =
-          PL.block[iblock].block_calls;
+        PL.block[iblock].block_calls;
 
       for (int jblock = 0; jblock < PL.nblock; jblock++)
       {
@@ -727,10 +726,10 @@ void dump_profile(int pid, int verbose)
             0)
         {
           PL.block[iblock].block_time_recursive_total +=
-              PL.block[jblock].block_time_self_total;
+            PL.block[jblock].block_time_self_total;
 
           PL.block[iblock].block_calls_recursive_total +=
-              PL.block[jblock].block_calls;
+            PL.block[jblock].block_calls;
         }
       }
     }
@@ -787,7 +786,7 @@ void dump_profile(int pid, int verbose)
               PL.block[jblock].block_name,
               PERC(PL.block[jblock].block_time_recursive_total),
               PL.block[jblock].block_time_recursive_total /
-                  with_main->block_time_total * 100,
+                with_main->block_time_total * 100,
               PL.block[jblock].block_time_recursive_total,
               PL.block[jblock].block_calls_recursive_total,
               self_time_per_call,

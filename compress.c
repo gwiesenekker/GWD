@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #include <zstd.h>
@@ -115,13 +114,13 @@ local void save_compressed_file(compressed_file_t *self, bstring bname)
   for (i64_t iblock = 1; iblock < object->CF_nblocks; iblock++)
   {
     object->CF_blocks[iblock].CB_offset =
-        object->CF_blocks[iblock - 1].CB_offset +
-        object->CF_blocks[iblock - 1].CB_ldata_compressed;
+      object->CF_blocks[iblock - 1].CB_offset +
+      object->CF_blocks[iblock - 1].CB_ldata_compressed;
   }
 
   i64_t ldata_compressed =
-      object->CF_blocks[object->CF_nblocks - 1].CB_offset +
-      object->CF_blocks[object->CF_nblocks - 1].CB_ldata_compressed;
+    object->CF_blocks[object->CF_nblocks - 1].CB_offset +
+    object->CF_blocks[object->CF_nblocks - 1].CB_ldata_compressed;
 
   PRINTF("ldata_compressed=%lld\n", ldata_compressed);
 
@@ -201,10 +200,10 @@ local void load_compressed_file(compressed_file_t *self, bstring bname)
     i8_t data_uncompressed[BLOCK_LENGTH];
 
     size_t zstd_size = ZSTD_decompress(
-        data_uncompressed,
-        BLOCK_LENGTH,
-        object->CF_data_compressed + object->CF_blocks[iblock].CB_offset,
-        object->CF_blocks[iblock].CB_ldata_compressed);
+      data_uncompressed,
+      BLOCK_LENGTH,
+      object->CF_data_compressed + object->CF_blocks[iblock].CB_offset,
+      object->CF_blocks[iblock].CB_ldata_compressed);
 
     HARDBUG(ZSTD_isError(zstd_size))
 
@@ -228,10 +227,10 @@ local i8_t read_compressed_file(compressed_file_t *self, i64_t where)
   i8_t data_uncompressed[BLOCK_LENGTH];
 
   size_t zstd_size = ZSTD_decompress(
-      data_uncompressed,
-      BLOCK_LENGTH,
-      object->CF_data_compressed + object->CF_blocks[iblock].CB_offset,
-      object->CF_blocks[iblock].CB_ldata_compressed);
+    data_uncompressed,
+    BLOCK_LENGTH,
+    object->CF_data_compressed + object->CF_blocks[iblock].CB_offset,
+    object->CF_blocks[iblock].CB_ldata_compressed);
 
   HARDBUG(ZSTD_isError(zstd_size))
 

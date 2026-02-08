@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef MyMallocH
 #define MyMallocH
 
@@ -11,11 +10,11 @@
 #define MY_MALLOC_VOID(P, N) \
   HARDBUG(((P) = my_malloc(#P, __FILE__, __FUNC__, __LINE__, N)) == NULL)
 
-#define MY_MALLOC_BY_TYPE(P, T, N)                                          \
-  HARDBUG(                                                                  \
-      ((P) = (T *)                                                          \
-           my_malloc(#P, __FILE__, __FUNC__, __LINE__, sizeof(T) * (N))) == \
-      NULL)
+#define MY_MALLOC_BY_TYPE(P, T, N)                                           \
+  HARDBUG(                                                                   \
+    ((P) =                                                                   \
+       (T *)my_malloc(#P, __FILE__, __FUNC__, __LINE__, sizeof(T) * (N))) == \
+    NULL)
 
 #define MY_FREE_AND_NULL(P) \
   {                         \
@@ -44,7 +43,8 @@
     PUSH_NAME(#B) HARDBUG((B = bfromcstr("")) == NULL) \
   }
 
-#define BDESTROY(B) POP_NAME(#B) HARDBUG(bdestroy(B) == BSTR_ERR)
+#define BDESTROY(B) \
+  HARDBUG((B) == NULL) POP_NAME(#B) HARDBUG(bdestroy(B) == BSTR_ERR)(B) = NULL;
 
 #define CSTRING(C, N)                                  \
   char *C = NULL;                                      \

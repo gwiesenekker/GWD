@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #define FAST_MODULO64(H, N) ((ui64_t)(((__uint128_t)(H) * (N)) >> 64));
@@ -11,9 +10,127 @@
 
 #define STAGE_SEARCH_MOVE_AT_REDUCED_DEPTH BIT(0)
 #define STAGE_SEARCH_MOVE_AT_FULL_DEPTH BIT(1)
-#define STAGE_RESEARCH_MOVE_AT_FULL_DEPTH BIT(2)
-#define STAGE_SEARCHED_MOVE_AT_REDUCED_DEPTH BIT(3)
-#define STAGE_SEARCHED_MOVE_AT_FULL_DEPTH BIT(4)
+#define STAGE_SEARCHED_MOVE_AT_REDUCED_DEPTH BIT(2)
+#define STAGE_SEARCHED_MOVE_AT_FULL_DEPTH BIT(3)
+
+#undef TRACE_AB
+
+#ifdef TRACE_AB
+
+#define TRACE_AB_ENTRY(object,        \
+                       arg_my_alpha,  \
+                       arg_my_beta,   \
+                       arg_node_type, \
+                       arg_my_depth)  \
+  trace_ab_entry(object,              \
+                 __FILE__,            \
+                 __FUNC__,            \
+                 __LINE__,            \
+                 arg_my_alpha,        \
+                 arg_my_beta,         \
+                 arg_node_type,       \
+                 arg_my_depth);
+
+#define TRACE_AB_CACHE(object, arg_info, arg_alpha_beta_cache_slot) \
+  trace_ab_cache(object,                                            \
+                 __FILE__,                                          \
+                 __FUNC__,                                          \
+                 __LINE__,                                          \
+                 arg_info,                                          \
+                 arg_alpha_beta_cache_slot);
+
+#define TRACE_KEY(object) ui64_t trace_key = object->S_board.B_key;
+
+#define TRACE_AB_WINDOW(arg_trace_key,  \
+                        arg_info,       \
+                        arg_alpha,      \
+                        arg_beta,       \
+                        arg_moves_list, \
+                        arg_jmove)      \
+  trace_ab_window(arg_trace_key,        \
+                  __FILE__,             \
+                  __FUNC__,             \
+                  __LINE__,             \
+                  arg_info,             \
+                  arg_alpha,            \
+                  arg_beta,             \
+                  arg_moves_list,       \
+                  arg_jmove);
+
+#define TRACE_INDENT(arg_moves_list, arg_jmove)     \
+  int trace_lpv_string = blength(trace_bpv_string); \
+  trace_indent(arg_moves_list, arg_jmove);
+
+#define TRACE_DEDENT                                              \
+  HARDBUG(btrunc(trace_bpv_string, trace_lpv_string) == BSTR_ERR) \
+  trace_dedent();
+
+#define TRACE_AB_RESULT(arg_trace_key,  \
+                        arg_info,       \
+                        arg_alpha,      \
+                        arg_beta,       \
+                        arg_moves_list, \
+                        arg_jmove,      \
+                        arg_result)     \
+  trace_ab_result(arg_trace_key,        \
+                  __FILE__,             \
+                  __FUNC__,             \
+                  __LINE__,             \
+                  arg_info,             \
+                  arg_alpha,            \
+                  arg_beta,             \
+                  arg_moves_list,       \
+                  arg_jmove,            \
+                  arg_result);
+
+#define TRACE_AB_EXIT(object,          \
+                      arg_my_alpha,    \
+                      arg_my_beta,     \
+                      arg_node_type,   \
+                      arg_my_depth,    \
+                      arg_best_result) \
+  trace_ab_exit(object,                \
+                __FILE__,              \
+                __FUNC__,              \
+                __LINE__,              \
+                arg_my_alpha,          \
+                arg_my_beta,           \
+                arg_node_type,         \
+                arg_my_depth,          \
+                arg_best_result);
+
+#else
+
+#define TRACE_AB_ENTRY(object,        \
+                       arg_my_alpha,  \
+                       arg_my_beta,   \
+                       arg_node_type, \
+                       arg_my_depth)
+#define TRACE_AB_CACHE(object, arg_info, arg_alpha_beta_cache_slot)
+#define TRACE_KEY(object)
+#define TRACE_AB_WINDOW(arg_trace_key,  \
+                        arg_info,       \
+                        arg_alpha,      \
+                        arg_beta,       \
+                        arg_moves_list, \
+                        arg_jmove)
+#define TRACE_INDENT(arg_moves_list, arg_jmove)
+#define TRACE_DEDENT
+#define TRACE_AB_RESULT(arg_trace_key,  \
+                        arg_info,       \
+                        arg_alpha,      \
+                        arg_beta,       \
+                        arg_moves_list, \
+                        arg_jmove,      \
+                        arg_result)
+#define TRACE_AB_EXIT(object,        \
+                      arg_my_alpha,  \
+                      arg_my_beta,   \
+                      arg_node_type, \
+                      arg_my_depth,  \
+                      arg_best_result)
+
+#endif
 
 #undef CHECK_TIME_LIMIT_IN_QUIESCENCE
 
@@ -51,6 +168,9 @@ local alpha_beta_cache_slot_t alpha_beta_cache_slot_default;
 local alpha_beta_cache_entry_t alpha_beta_cache_entry_default;
 local alpha_beta_cache_entry_t *alpha_beta_cache[NCOLOUR_ENUM];
 
+local pv_entry_t pv_entry_default;
+local pv_entries_t pv_entries_default;
+
 local i64_t global_nodes;
 
 local bucket_t bucket_depth;
@@ -59,6 +179,25 @@ local bucket_t bucket_depth;
 #ifdef LAZY_STATS
 local stats_t lazy_stats[2 * NPIECES_MAX + 1][2 * NPIECES_MAX + 1];
 #endif
+
+local int trace_depth = 0;
+local long trace_line = 0;
+
+bstring trace_bpv_string = NULL;
+
+local void binary(bstring arg_bstring, uint64_t arg_uint64, int arg_nbits)
+{
+  HARDBUG((arg_nbits <= 0) or (arg_nbits > 64))
+
+  btrunc(arg_bstring, 0);
+
+  for (int ibit = arg_nbits - 1; ibit >= 0; --ibit)
+  {
+    char cbit = (arg_uint64 & (1ULL << ibit)) ? '1' : '0';
+
+    HARDBUG(bconchar(arg_bstring, cbit) == BSTR_ERR)
+  }
+}
 
 int draw_by_repetition(board_t *object, int arg_strict)
 {
@@ -268,6 +407,7 @@ void clear_totals(search_t *object)
 
   object->S_total_nodes = 0;
   object->S_total_alpha_beta_nodes = 0;
+  object->S_total_capture_nodes = 0;
   object->S_total_minimal_window_nodes = 0;
   object->S_total_pv_nodes = 0;
 
@@ -316,7 +456,7 @@ void clear_totals(search_t *object)
 #define PRINTF_TOTAL(X) my_printf(object->S_my_printf, #X "=%lld\n", object->X);
 
 void print_totals(search_t *object){
-    // clang-format off
+  // clang-format off
 
   PRINTF_TOTAL(S_total_move_repetitions)
 
@@ -328,6 +468,7 @@ void print_totals(search_t *object){
 
   PRINTF_TOTAL(S_total_nodes)
   PRINTF_TOTAL(S_total_alpha_beta_nodes)
+  PRINTF_TOTAL(S_total_capture_nodes)
   PRINTF_TOTAL(S_total_minimal_window_nodes)
   PRINTF_TOTAL(S_total_pv_nodes)
 
@@ -372,15 +513,15 @@ void print_totals(search_t *object){
   PRINTF_TOTAL(S_total_score_cache_hits)
   PRINTF_TOTAL(S_total_score_cache_crc32_errors)
 
-    // clang-format on
+  // clang-format on
 }
 
-local int probe_alpha_beta_cache(
-    search_t *object,
-    int arg_node_type,
-    int arg_pv_only,
-    alpha_beta_cache_entry_t *arg_alpha_beta_cache,
-    alpha_beta_cache_slot_t *arg_alpha_beta_cache_slot)
+local
+  int probe_alpha_beta_cache(search_t *object,
+                             int arg_node_type,
+                             int arg_pv_only,
+                             alpha_beta_cache_entry_t *arg_alpha_beta_cache,
+                             alpha_beta_cache_slot_t *arg_alpha_beta_cache_slot)
 {
   int result = FALSE;
 
@@ -466,53 +607,6 @@ local int probe_alpha_beta_cache(
   return (result);
 }
 
-local void update_alpha_beta_cache_slot_moves(
-    alpha_beta_cache_slot_t *arg_alpha_beta_cache_slot,
-    int arg_jmove)
-{
-  int kmove;
-
-  for (kmove = 0; kmove < NMOVES; kmove++)
-    if (arg_alpha_beta_cache_slot->ABCS_moves[kmove] == arg_jmove)
-      break;
-
-  if (kmove == NMOVES)
-    kmove = NMOVES - 1;
-
-  while (kmove > 0)
-  {
-    arg_alpha_beta_cache_slot->ABCS_moves[kmove] =
-        arg_alpha_beta_cache_slot->ABCS_moves[kmove - 1];
-
-    kmove--;
-  }
-
-  arg_alpha_beta_cache_slot->ABCS_moves[0] = arg_jmove;
-
-#ifdef DEBUG
-  for (int idebug = 0; idebug < NMOVES; idebug++)
-  {
-    if (arg_alpha_beta_cache_slot->ABCS_moves[idebug] == INVALID)
-    {
-      for (int jdebug = idebug + 1; jdebug < NMOVES; jdebug++)
-        HARDBUG(arg_alpha_beta_cache_slot->ABCS_moves[jdebug] != INVALID)
-
-      break;
-    }
-
-    int ndebug = 0;
-
-    for (int jdebug = 0; jdebug < NMOVES; jdebug++)
-    {
-      if (arg_alpha_beta_cache_slot->ABCS_moves[jdebug] ==
-          arg_alpha_beta_cache_slot->ABCS_moves[idebug])
-        ndebug++;
-    }
-    HARDBUG(ndebug != 1)
-  }
-#endif
-}
-
 local void
 update_alpha_beta_cache(search_t *object,
                         int arg_node_type,
@@ -549,6 +643,65 @@ update_alpha_beta_cache(search_t *object,
   }
 
   with->ABCE_slots[0] = *arg_alpha_beta_cache_slot;
+}
+
+local inline ui64_t return_fmix64(ui64_t arg_key)
+{
+  arg_key ^= arg_key >> 33;
+  arg_key *= 0xff51afd7ed558ccdULL;
+  arg_key ^= arg_key >> 33;
+  arg_key *= 0xc4ceb9fe1a85ec53ULL;
+  arg_key ^= arg_key >> 33;
+
+  return (arg_key);
+}
+
+local int probe_pv(pv_entries_t *arg_pv, ui64_t arg_key)
+{
+  int result = INVALID;
+
+  ui32_t fmix32 = (ui32_t)return_fmix64(arg_key);
+
+  int ientry = fmix32 & (NPV_ENTRIES - 1);
+
+  ui64_t *pve_slots = arg_pv->PVE_entries[ientry].PVE_slots;
+
+  for (int islot = 0; islot < NPV_SLOTS; islot++)
+  {
+    if ((pve_slots[islot] >> 8) == (arg_key >> 8))
+    {
+      result = pve_slots[islot] & PV_SLOT_IMOVE_MASK;
+      break;
+    }
+  }
+  return (result);
+}
+
+local void update_pv(pv_entries_t *arg_pv, ui64_t arg_key, int arg_imove)
+{
+  ui32_t fmix32 = (ui32_t)return_fmix64(arg_key);
+
+  int ientry = fmix32 & (NPV_ENTRIES - 1);
+
+  ui64_t *pve_slots = arg_pv->PVE_entries[ientry].PVE_slots;
+
+  int islot;
+
+  for (islot = 0; islot < NPV_SLOTS; islot++)
+    if ((pve_slots[islot] >> 8) == (arg_key >> 8))
+      break;
+
+  if (islot == NPV_SLOTS)
+  {
+    for (islot = 0; islot < NPV_SLOTS; islot++)
+      if (pve_slots[islot] == PV_SLOT_IMOVE_MASK)
+        break;
+  }
+
+  if (islot == NPV_SLOTS)
+    islot = (fmix32 >> 30) & (NPV_SLOTS - 1);
+
+  pve_slots[islot] = (arg_key & ~PV_SLOT_IMOVE_MASK) | (ui64_t) arg_imove;
 }
 
 local void endgame_pv(search_t *object, int arg_mate, bstring arg_bpv_string)
@@ -676,9 +829,9 @@ local void endgame_pv(search_t *object, int arg_mate, bstring arg_bpv_string)
       }
     }
   }
-  SOFTBUG(ibest_move == INVALID)
+  HARDBUG(ibest_move == INVALID)
 
-  SOFTBUG(best_mate == ENDGAME_UNKNOWN)
+  HARDBUG(best_mate == ENDGAME_UNKNOWN)
 
   if (best_mate != arg_mate)
   {
@@ -737,28 +890,34 @@ local void endgame_pv(search_t *object, int arg_mate, bstring arg_bpv_string)
   undo_move(&(object->S_board), ibest_move, &moves_list, FALSE);
 }
 
-local int quiescence(search_t *object,
-                     int arg_my_alpha,
-                     int arg_my_beta,
-                     int arg_node_type,
-                     moves_list_t *arg_moves_list,
-                     int arg_all_moves,
-                     int arg_ncapture_extensions,
-                     ui64_t arg_history,
-                     pv_t *arg_best_pv,
-                     int *arg_best_depth)
+local void inline flip_score(int *arg_score)
+{
+  if (!IS_SCORE_NAN(*arg_score))
+    *arg_score = -*arg_score;
+}
+
+local void quiescence(search_t *object,
+                      int arg_my_alpha,
+                      int arg_my_beta,
+                      int arg_node_type,
+                      moves_list_t *arg_moves_list,
+                      int arg_all_moves,
+                      int arg_ncapture_extensions,
+                      ui64_t arg_history,
+                      int *arg_best_score,
+                      pv_entries_t *arg_best_pv)
 {
   PUSH_NAME(__FUNC__)
 
   BEGIN_BLOCK(__FUNC__)
 
-  SOFTBUG(arg_my_alpha >= arg_my_beta)
+  HARDBUG(arg_my_alpha >= arg_my_beta)
 
-  SOFTBUG(arg_node_type == 0)
+  HARDBUG(arg_node_type == 0)
 
-  SOFTBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
+  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
 
-  SOFTBUG(IS_MINIMAL_WINDOW(arg_node_type) and
+  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
           ((arg_my_beta - arg_my_alpha) != 1))
 
   colour_enum my_colour;
@@ -781,11 +940,7 @@ local int quiescence(search_t *object,
               arg_node_type);
   }
 
-  *arg_best_pv = INVALID;
-
-  *arg_best_depth = INVALID;
-
-  int best_score = SCORE_MINUS_INFINITY;
+  *arg_best_score = SCORE_MINUS_INFINITY;
 
   ++(object->S_total_nodes);
 
@@ -809,9 +964,7 @@ local int quiescence(search_t *object,
       {
         my_printf(object->S_my_printf, "got message\n");
 
-        object->S_interrupt = BOARD_INTERRUPT_MESSAGE;
-
-        best_score = SCORE_PLUS_INFINITY;
+        *arg_best_score = SCORE_NOT_A_NUMBER;
 
         goto label_return;
       }
@@ -842,22 +995,18 @@ local int quiescence(search_t *object,
       // check time_limit again
       if (return_my_timer(&(object->S_timer), FALSE) >= options.time_limit)
       {
-        object->S_interrupt = BOARD_INTERRUPT_TIME;
-
-        best_score = SCORE_PLUS_INFINITY;
+        *arg_best_score = SCORE_NOT_A_NUMBER;
 
         goto label_return;
       }
     }
     else
     {
-      SOFTBUG(options.nthreads <= 1)
+      HARDBUG(options.nthreads <= 1)
 
       if (poll_queue(return_thread_queue(object->S_thread)) != INVALID)
       {
-        object->S_interrupt = BOARD_INTERRUPT_MESSAGE;
-
-        best_score = SCORE_PLUS_INFINITY;
+        *arg_best_score = SCORE_NOT_A_NUMBER;
 
         goto label_return;
       }
@@ -866,9 +1015,7 @@ local int quiescence(search_t *object,
 
   if (draw_by_repetition(&(object->S_board), FALSE))
   {
-    best_score = 0;
-
-    *arg_best_depth = 0;
+    *arg_best_score = 0;
 
     goto label_return;
   }
@@ -881,27 +1028,25 @@ local int quiescence(search_t *object,
 
   if (temp_mate != ENDGAME_UNKNOWN)
   {
-    *arg_best_depth = DEPTH_MAX;
-
     if (temp_mate == INVALID)
     {
-      best_score = 0;
-
-      *arg_best_depth = 0;
+      *arg_best_score = 0;
     }
     else if (temp_mate > 0)
     {
       if (wdl)
-        best_score = SCORE_WON - object->S_board.B_inode - temp_mate;
+        *arg_best_score = SCORE_WON - object->S_board.B_inode - temp_mate;
       else
-        best_score = SCORE_WON_ABSOLUTE - object->S_board.B_inode - temp_mate;
+        *arg_best_score =
+          SCORE_WON_ABSOLUTE - object->S_board.B_inode - temp_mate;
     }
     else
     {
       if (wdl)
-        best_score = SCORE_LOST + object->S_board.B_inode - temp_mate;
+        *arg_best_score = SCORE_LOST + object->S_board.B_inode - temp_mate;
       else
-        best_score = SCORE_LOST_ABSOLUTE + object->S_board.B_inode - temp_mate;
+        *arg_best_score =
+          SCORE_LOST_ABSOLUTE + object->S_board.B_inode - temp_mate;
     }
 
     goto label_return;
@@ -923,9 +1068,7 @@ local int quiescence(search_t *object,
 
   if (arg_moves_list->ML_nmoves == 0)
   {
-    best_score = SCORE_LOST_ABSOLUTE + object->S_board.B_inode;
-
-    *arg_best_depth = DEPTH_MAX;
+    *arg_best_score = SCORE_LOST_ABSOLUTE + object->S_board.B_inode;
 
     goto label_return;
   }
@@ -974,8 +1117,7 @@ local int quiescence(search_t *object,
     }
   }
 
-  if (!arg_all_moves and IS_PV(arg_node_type) and
-      (arg_my_alpha >= (SCORE_LOST + NODE_MAX)))
+  if (!arg_all_moves and IS_PV(arg_node_type) and !IS_SCORE_LOST(arg_my_alpha))
   {
     object->S_total_quiescence_extension_searches++;
 
@@ -992,29 +1134,27 @@ local int quiescence(search_t *object,
     else if (options.quiescence_extension_search_window > 0)
     {
       int reduced_alpha =
-          arg_my_alpha - options.quiescence_extension_search_window;
+        arg_my_alpha - options.quiescence_extension_search_window;
       int reduced_beta = reduced_alpha + 1;
 
       int temp_score;
 
-      pv_t temp_pv[PV_MAX];
+      pv_entries_t temp_pv = *arg_best_pv;
 
-      int temp_depth;
+      quiescence(object,
+                 reduced_alpha,
+                 reduced_beta,
+                 MINIMAL_WINDOW_BIT,
+                 arg_moves_list,
+                 TRUE,
+                 arg_ncapture_extensions,
+                 arg_history,
+                 &temp_score,
+                 &temp_pv);
 
-      temp_score = quiescence(object,
-                              reduced_alpha,
-                              reduced_beta,
-                              MINIMAL_WINDOW_BIT,
-                              arg_moves_list,
-                              TRUE,
-                              arg_ncapture_extensions,
-                              arg_history,
-                              temp_pv,
-                              &temp_depth);
-
-      if (object->S_interrupt != 0)
+      if (IS_SCORE_NAN(temp_score))
       {
-        best_score = SCORE_PLUS_INFINITY;
+        *arg_best_score = SCORE_NOT_A_NUMBER;
 
         goto label_return;
       }
@@ -1053,11 +1193,9 @@ local int quiescence(search_t *object,
   {
     ++(object->S_total_evaluations);
 
-    best_score = return_score(object);
+    *arg_best_score = return_score(object);
 
-    *arg_best_depth = 0;
-
-    if ((nextend == 0) or (best_score >= arg_my_beta))
+    if ((nextend == 0) or (*arg_best_score >= arg_my_beta))
       goto label_return;
   }
 
@@ -1081,7 +1219,7 @@ local int quiescence(search_t *object,
         jmove = kmove;
     }
 
-    SOFTBUG(moves_weight[jmove] == L_MIN)
+    HARDBUG(moves_weight[jmove] == L_MIN)
 
     moves_weight[jmove] = L_MIN;
 
@@ -1093,31 +1231,31 @@ local int quiescence(search_t *object,
 
     int temp_alpha;
 
-    if (best_score < arg_my_alpha)
+    if (*arg_best_score < arg_my_alpha)
       temp_alpha = arg_my_alpha;
     else
-      temp_alpha = best_score;
+      temp_alpha = *arg_best_score;
 
     int temp_score = SCORE_MINUS_INFINITY;
 
-    pv_t temp_pv[PV_MAX];
-
-    int temp_depth;
+    pv_entries_t temp_pv = *arg_best_pv;
 
     if (IS_MINIMAL_WINDOW(arg_node_type))
     {
       do_move(&(object->S_board), jmove, arg_moves_list, FALSE);
 
-      temp_score = -quiescence(object,
-                               -arg_my_beta,
-                               -temp_alpha,
-                               arg_node_type,
-                               NULL,
-                               FALSE,
-                               arg_ncapture_extensions,
-                               arg_history,
-                               temp_pv + 1,
-                               &temp_depth);
+      quiescence(object,
+                 -arg_my_beta,
+                 -temp_alpha,
+                 arg_node_type,
+                 NULL,
+                 FALSE,
+                 arg_ncapture_extensions,
+                 arg_history,
+                 &temp_score,
+                 &temp_pv);
+
+      flip_score(&temp_score);
 
       undo_move(&(object->S_board), jmove, arg_moves_list, FALSE);
     }
@@ -1127,16 +1265,18 @@ local int quiescence(search_t *object,
       {
         do_move(&(object->S_board), jmove, arg_moves_list, FALSE);
 
-        temp_score = -quiescence(object,
-                                 -arg_my_beta,
-                                 -temp_alpha,
-                                 arg_node_type,
-                                 NULL,
-                                 FALSE,
-                                 arg_ncapture_extensions,
-                                 arg_history,
-                                 temp_pv + 1,
-                                 &temp_depth);
+        quiescence(object,
+                   -arg_my_beta,
+                   -temp_alpha,
+                   arg_node_type,
+                   NULL,
+                   FALSE,
+                   arg_ncapture_extensions,
+                   arg_history,
+                   &temp_score,
+                   &temp_pv);
+
+        flip_score(&temp_score);
 
         undo_move(&(object->S_board), jmove, arg_moves_list, FALSE);
       }
@@ -1146,122 +1286,1578 @@ local int quiescence(search_t *object,
 
         do_move(&(object->S_board), jmove, arg_moves_list, FALSE);
 
-        temp_score = -quiescence(object,
-                                 -temp_beta,
-                                 -temp_alpha,
-                                 MINIMAL_WINDOW_BIT,
-                                 NULL,
-                                 FALSE,
-                                 arg_ncapture_extensions,
-                                 arg_history,
-                                 temp_pv + 1,
-                                 &temp_depth);
+        quiescence(object,
+                   -temp_beta,
+                   -temp_alpha,
+                   MINIMAL_WINDOW_BIT,
+                   NULL,
+                   FALSE,
+                   arg_ncapture_extensions,
+                   arg_history,
+                   &temp_score,
+                   &temp_pv);
 
-        if ((object->S_interrupt == 0) and (temp_score >= temp_beta) and
+        flip_score(&temp_score);
+
+        if (!IS_SCORE_NAN(temp_score) and (temp_score >= temp_beta) and
             (temp_score < arg_my_beta))
         {
-          temp_score = -quiescence(object,
-                                   -arg_my_beta,
-                                   -temp_alpha,
-                                   arg_node_type,
-                                   NULL,
-                                   FALSE,
-                                   arg_ncapture_extensions,
-                                   arg_history,
-                                   temp_pv + 1,
-                                   &temp_depth);
+          quiescence(object,
+                     -arg_my_beta,
+                     -temp_alpha,
+                     arg_node_type,
+                     NULL,
+                     FALSE,
+                     arg_ncapture_extensions,
+                     arg_history,
+                     &temp_score,
+                     &temp_pv);
+
+          flip_score(&temp_score);
         }
 
         undo_move(&(object->S_board), jmove, arg_moves_list, FALSE);
       }
     }
 
-    if (object->S_interrupt != 0)
+    if (IS_SCORE_NAN(temp_score))
     {
-      best_score = SCORE_PLUS_INFINITY;
+      *arg_best_score = SCORE_NOT_A_NUMBER;
 
       goto label_return;
     }
 
-    SOFTBUG(temp_score == SCORE_MINUS_INFINITY)
+    HARDBUG(temp_score == SCORE_MINUS_INFINITY)
 
-    if (temp_score > best_score)
+    if (temp_score > *arg_best_score)
     {
-      best_score = temp_score;
+      *arg_best_score = temp_score;
 
-      *arg_best_pv = jmove;
+      update_pv(&temp_pv, object->S_board.B_key, jmove);
 
-      for (int ipv = 1; (arg_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++)
-        ;
-
-      *arg_best_depth = temp_depth;
+      *arg_best_pv = temp_pv;
     }
 
-    if (best_score >= arg_my_beta)
+    if (*arg_best_score >= arg_my_beta)
       break;
   } // imove
 
-  SOFTBUG(best_score == SCORE_MINUS_INFINITY)
+  HARDBUG(*arg_best_score == SCORE_MINUS_INFINITY)
 
-  SOFTBUG(*arg_best_depth == INVALID)
-
-  if ((options.quiescence_evaluation_policy > 0) and (best_score < arg_my_beta))
+  if ((options.quiescence_evaluation_policy > 0) and
+      (*arg_best_score < arg_my_beta))
   {
     ++(object->S_total_evaluations);
 
     int temp_score = return_score(object);
 
-    if (temp_score > best_score)
-    {
-      best_score = temp_score;
-
-      *arg_best_depth = 0;
-    }
+    if (temp_score > *arg_best_score)
+      *arg_best_score = temp_score;
   }
 
 label_return:
 
-  if (FALSE and (*arg_best_depth == DEPTH_MAX))
-  {
-    HARDBUG((best_score < (SCORE_WON - NODE_MAX)) and
-            (best_score > (SCORE_LOST + NODE_MAX)) and (best_score != 0))
-  }
-
-  if (best_score >= arg_my_beta)
-  {
-    best_score = arg_my_beta;
-    *arg_best_depth = 0;
-  }
+  if (!IS_SCORE_NAN(*arg_best_score) and (*arg_best_score >= arg_my_beta))
+    *arg_best_score = arg_my_beta;
 
   END_BLOCK
 
   POP_NAME(__FUNC__)
-
-  return (best_score);
 }
 
-local int alpha_beta(search_t *object,
-                     int arg_my_alpha,
-                     int arg_my_beta,
-                     int arg_my_depth,
-                     int arg_node_type,
-                     int arg_reduction_depth_root,
-                     int arg_my_tweaks,
-                     ui64_t arg_history,
-                     pv_t *arg_best_pv,
-                     int *arg_best_depth)
+local void
+construct_search_result(search_result_t *self, int arg_score, int arg_flags)
+{
+  search_result_t *object = self;
+
+  object->SR_score = arg_score;
+  object->SR_flags = arg_flags;
+  object->SR_depth = INVALID;
+}
+
+local void flip_search_result(search_result_t *arg_search_result)
+{
+  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+  {
+    arg_search_result->SR_score = -arg_search_result->SR_score;
+
+    if (IS_SR_GE_BETA(arg_search_result->SR_flags))
+    {
+      arg_search_result->SR_flags &= ~SR_GE_BETA_BIT;
+      arg_search_result->SR_flags |= SR_LE_ALPHA_BIT;
+    }
+    else if (IS_SR_LE_ALPHA(arg_search_result->SR_flags))
+    {
+      arg_search_result->SR_flags &= ~SR_LE_ALPHA_BIT;
+      arg_search_result->SR_flags |= SR_GE_BETA_BIT;
+    }
+    else
+    {
+      HARDBUG(!IS_SR_TRUE_SCORE(arg_search_result->SR_flags))
+    }
+
+    if (IS_SR_WON(arg_search_result->SR_flags))
+    {
+      arg_search_result->SR_flags &= ~SR_WON_BIT;
+      arg_search_result->SR_flags |= SR_LOST_BIT;
+    }
+    else if (IS_SR_LOST(arg_search_result->SR_flags))
+    {
+      arg_search_result->SR_flags &= ~SR_LOST_BIT;
+      arg_search_result->SR_flags |= SR_WON_BIT;
+    }
+  }
+}
+
+local int compare_search_results(search_result_t *a,
+                                 search_result_operator_enum op,
+                                 search_result_t *b)
+{
+  int result = INVALID;
+
+  if (op == SR_OPERATOR_LT)
+    result = a->SR_score < b->SR_score;
+  else if (op == SR_OPERATOR_LE)
+    result = a->SR_score <= b->SR_score;
+  else if (op == SR_OPERATOR_EQ)
+    result = a->SR_score == b->SR_score;
+  else if (op == SR_OPERATOR_GE)
+    result = a->SR_score >= b->SR_score;
+  else if (op == SR_OPERATOR_GT)
+    result = a->SR_score > b->SR_score;
+  else
+    FATAL("unknown op", EXIT_FAILURE)
+
+  return (result);
+}
+
+local void assign_search_result_b2a(search_result_t *a, search_result_t *b)
+{
+  a->SR_score = b->SR_score;
+  a->SR_flags = b->SR_flags;
+
+  // HARDBUG((a->SR_score != 0) and IS_SR_DRAW_BY_REP(a->SR_flags))
+}
+
+local void trace_ab_entry(search_t *object,
+                          char *file,
+                          const char *func,
+                          int line,
+                          int arg_my_alpha,
+                          int arg_my_beta,
+                          int arg_node_type,
+                          int arg_my_depth)
+{
+  for (int idepth = 0; idepth < trace_depth; idepth++)
+    PRINTF(".");
+
+  char *colour2move;
+
+  if (IS_WHITE(object->S_board.B_colour2move))
+    colour2move = "WTM";
+  else
+    colour2move = "BTM";
+
+  PRINTF("(%ld,%s %s)ab_entry:::%s::%s:%d"
+         " key=%llx arg_my_alpha=%d arg_my_beta=%d"
+         " arg_node_type=%d arg_my_depth=%d\n",
+         ++trace_line,
+         bdata(trace_bpv_string),
+         colour2move,
+         file,
+         func,
+         line,
+         object->S_board.B_key,
+         arg_my_alpha,
+         arg_my_beta,
+         arg_node_type,
+         arg_my_depth);
+}
+
+local void trace_ab_cache(search_t *object,
+                          char *file,
+                          const char *func,
+                          int line,
+                          char *arg_info,
+                          alpha_beta_cache_slot_t *arg_cache_slot)
+{
+  for (int idepth = 0; idepth < trace_depth; idepth++)
+    PRINTF(".");
+
+  moves_list_t moves_list;
+
+  gen_moves(&(object->S_board), &moves_list);
+
+  BSTRING(bmove_string)
+
+  int ABCS_score = arg_cache_slot->ABCS_score;
+  int ABCS_depth = arg_cache_slot->ABCS_depth;
+  int ABCS_flags = arg_cache_slot->ABCS_flags;
+  int ABCS_move = arg_cache_slot->ABCS_moves[0];
+
+  if (ABCS_move == INVALID)
+    HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
+  else
+  {
+    HARDBUG(ABCS_move >= moves_list.ML_nmoves)
+
+    move2bstring(&moves_list, ABCS_move, bmove_string);
+  }
+
+  BSTRING(bABCS_flags)
+
+  binary(bABCS_flags, ABCS_flags, 8);
+
+  PRINTF("(%ld,%s)ab_cache:::%s::%s:%d"
+         " key=%llx arg_info=%s"
+         " ABCS_score=%d ABCS_depth=%d ABCS_flags=%s ABCS_move=%s\n",
+         ++trace_line,
+         bdata(trace_bpv_string),
+         file,
+         func,
+         line,
+         object->S_board.B_key,
+         arg_info,
+         ABCS_score,
+         ABCS_depth,
+         bdata(bABCS_flags),
+         bdata(bmove_string));
+
+  BDESTROY(bABCS_flags)
+
+  BDESTROY(bmove_string)
+}
+
+local void trace_ab_window(ui64_t arg_trace_key,
+                           char *file,
+                           const char *func,
+                           int line,
+                           char *arg_info,
+                           int arg_alpha,
+                           int arg_beta,
+                           moves_list_t *arg_moves_list,
+                           int arg_jmove)
+{
+  for (int idepth = 0; idepth < trace_depth; idepth++)
+    PRINTF(".");
+
+  BSTRING(bmove_string)
+
+  if (arg_jmove == INVALID)
+    bassigncstr(bmove_string, "NULL");
+  else
+  {
+    HARDBUG(arg_jmove >= arg_moves_list->ML_nmoves)
+
+    move2bstring(arg_moves_list, arg_jmove, bmove_string);
+  }
+
+  PRINTF("(%ld,%s)ab_window:::%s::%s:%d"
+         " arg_trace_key=%llx arg_info=%s arg_alpha=%d arg_beta=%d"
+         " arg_jmove=%s\n",
+         ++trace_line,
+         bdata(trace_bpv_string),
+         file,
+         func,
+         line,
+         arg_trace_key,
+         arg_info,
+         arg_alpha,
+         arg_beta,
+         bdata(bmove_string));
+
+  BDESTROY(bmove_string)
+}
+
+local void trace_indent(moves_list_t *arg_moves_list, int arg_jmove)
+{
+  if (trace_bpv_string == NULL)
+  {
+    HARDBUG((trace_bpv_string = bfromcstr("")) == NULL)
+  }
+
+  BSTRING(bmove_string)
+
+  HARDBUG(arg_jmove == INVALID)
+  HARDBUG(arg_jmove >= arg_moves_list->ML_nmoves)
+
+  move2bstring(arg_moves_list, arg_jmove, bmove_string);
+
+  bformata(trace_bpv_string, " %s", bdata(bmove_string));
+
+  BDESTROY(bmove_string)
+
+  ++trace_depth;
+}
+
+local void trace_dedent(void)
+{
+  --trace_depth;
+
+  HARDBUG(trace_depth < 0)
+}
+
+local void trace_ab_result(ui64_t arg_trace_key,
+                           char *file,
+                           const char *func,
+                           int line,
+                           char *arg_info,
+                           int arg_alpha,
+                           int arg_beta,
+                           moves_list_t *arg_moves_list,
+                           int arg_jmove,
+                           search_result_t *arg_result)
+{
+  for (int idepth = 0; idepth < trace_depth; idepth++)
+    PRINTF(".");
+
+  BSTRING(bmove_string)
+
+  if (arg_jmove == INVALID)
+    bassigncstr(bmove_string, "NULL");
+  else
+  {
+    HARDBUG(arg_jmove >= arg_moves_list->ML_nmoves)
+
+    move2bstring(arg_moves_list, arg_jmove, bmove_string);
+  }
+
+  BSTRING(bSR_flags)
+
+  binary(bSR_flags, arg_result->SR_flags, 8);
+
+  PRINTF("(%ld,%s)ab_window:::%s::%s:%d"
+         " arg_trace_key=%llx arg_info=%s arg_alpha=%d arg_beta=%d"
+         " arg_jmove=%s arg_result->SR_score=%d arg_result->SR_flags=%s"
+         " arg_result->SR_depth=%d\n",
+         ++trace_line,
+         bdata(trace_bpv_string),
+         file,
+         func,
+         line,
+         arg_trace_key,
+         arg_info,
+         arg_alpha,
+         arg_beta,
+         bdata(bmove_string),
+         arg_result->SR_score,
+         bdata(bSR_flags),
+         arg_result->SR_depth);
+
+  BDESTROY(bSR_flags)
+
+  BDESTROY(bmove_string)
+}
+
+local void trace_ab_exit(search_t *object,
+                         char *file,
+                         const char *func,
+                         int line,
+                         int arg_my_alpha,
+                         int arg_my_beta,
+                         int arg_node_type,
+                         int arg_my_depth,
+                         search_result_t *arg_best_result)
+{
+  for (int idepth = 0; idepth < trace_depth; idepth++)
+    PRINTF(".");
+
+  char *colour2move;
+
+  if (IS_WHITE(object->S_board.B_colour2move))
+    colour2move = "WTM";
+  else
+    colour2move = "BTM";
+
+  moves_list_t moves_list;
+
+  gen_moves(&(object->S_board), &moves_list);
+
+  BSTRING(bmove_string)
+
+  int best_move = probe_pv(&(arg_best_result->SR_pv), object->S_board.B_key);
+
+  if (best_move == INVALID)
+    HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
+  else
+  {
+    HARDBUG(best_move >= moves_list.ML_nmoves)
+
+    move2bstring(&moves_list, best_move, bmove_string);
+  }
+
+  BSTRING(bSR_flags)
+
+  binary(bSR_flags, arg_best_result->SR_flags, 8);
+
+  PRINTF("(%ld,%s %s %s)ab_exit:::%s::%s:%d"
+         " key=%llx arg_my_alpha=%d arg_my_beta=%d "
+         " arg_node_type=%d arg_my_depth=%d"
+         " arg_best_result->SR_score=%d arg_best_result->SR_flags=%s"
+         " arg_best_result->SR_pv[0]=%s arg_best_result->SR_depth=%d\n",
+         ++trace_line,
+         bdata(trace_bpv_string),
+         colour2move,
+         bdata(bmove_string),
+         file,
+         func,
+         line,
+         object->S_board.B_key,
+         arg_my_alpha,
+         arg_my_beta,
+         arg_node_type,
+         arg_my_depth,
+         arg_best_result->SR_score,
+         bdata(bSR_flags),
+         bdata(bmove_string),
+         arg_best_result->SR_depth);
+
+  BDESTROY(bSR_flags)
+
+  BDESTROY(bmove_string)
+}
+
+local void inline fail_hard(int arg_my_alpha,
+                            int arg_my_beta,
+                            search_result_t *arg_search_result)
+{
+  if (IS_SCORE_NAN(arg_search_result->SR_score))
+    return;
+
+  if (arg_search_result->SR_score >= arg_my_beta)
+  {
+    arg_search_result->SR_score = arg_my_beta;
+
+    arg_search_result->SR_flags |= SR_GE_BETA_BIT;
+  }
+  else if (arg_search_result->SR_score <= arg_my_alpha)
+  {
+    arg_search_result->SR_flags |= SR_LE_ALPHA_BIT;
+  }
+  else
+  {
+    arg_search_result->SR_flags |= SR_TRUE_SCORE_BIT;
+  }
+}
+
+local void inline check_search_result(int arg_my_alpha,
+                                      int arg_my_beta,
+                                      search_result_t *arg_search_result)
+{
+  int ok = TRUE;
+
+  if (IS_SR_GE_BETA(arg_search_result->SR_flags) and
+      (arg_search_result->SR_score < arg_my_beta))
+    ok = FALSE;
+
+  if (IS_SR_LE_ALPHA(arg_search_result->SR_flags) and
+      (arg_search_result->SR_score > arg_my_alpha))
+    ok = FALSE;
+
+  if (IS_SR_TRUE_SCORE(arg_search_result->SR_flags) and
+      ((arg_search_result->SR_score <= arg_my_alpha) or
+       (arg_search_result->SR_score >= arg_my_beta)))
+    ok = FALSE;
+
+  if (!ok)
+  {
+    BSTRING(bSR_flags)
+
+    binary(bSR_flags, arg_search_result->SR_flags, 8);
+
+    PRINTF("arg_my_alpha=%d"
+           " arg_my_beta=%d"
+           " arg_search_result->SR_score=%d"
+           " arg_search_result->SR_flags=%s\n",
+           arg_my_alpha,
+           arg_my_beta,
+           arg_search_result->SR_score,
+           bdata(bSR_flags));
+
+    FATAL("eh?", EXIT_FAILURE)
+  }
+}
+
+local void
+alpha_beta(search_t *, int, int, int, int, int, int, ui64_t, search_result_t *);
+
+local void alpha_beta_captures(search_t *object,
+                               int arg_my_alpha,
+                               int arg_my_beta,
+                               int arg_my_depth,
+                               int arg_node_type,
+                               int arg_reduction_depth_root,
+                               int arg_my_tweaks,
+                               moves_list_t *arg_moves_list,
+                               int arg_sort[NMOVES_MAX],
+                               ui64_t arg_history,
+                               search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
 
   BEGIN_BLOCK(__FUNC__)
 
-  SOFTBUG(arg_my_alpha >= arg_my_beta)
+  TRACE_AB_ENTRY(object, arg_my_alpha, arg_my_beta, arg_node_type, arg_my_depth)
 
-  SOFTBUG(arg_my_depth < 0)
+  HARDBUG(arg_my_alpha >= arg_my_beta)
 
-  SOFTBUG(arg_node_type == 0)
+  HARDBUG(arg_my_depth < 0)
 
-  SOFTBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
+  HARDBUG(arg_node_type == 0)
+
+  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
+
+  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
+          ((arg_my_beta - arg_my_alpha) != 1))
+
+  HARDBUG(arg_history == 0)
+
+  ++(object->S_total_nodes);
+
+  ++(object->S_total_capture_nodes);
+
+  HARDBUG(arg_moves_list->ML_nmoves == 0)
+
+  construct_search_result(arg_search_result, SCORE_MINUS_INFINITY, SR_NULL);
+
+  int your_tweaks = 0;
+
+  /*
+    if (((moves_list.ML_nmoves <= 3) and !move_repetition(&(object->S_board)))
+    or (options.captures_are_transparent and (moves_list.ML_ncaptx > 0)))
+  */
+
+  int nproven = 0;
+
+  search_result_t temp_result;
+
+  temp_result.SR_pv = arg_search_result->SR_pv;
+
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
+  {
+    int jmove = arg_sort[imove];
+
+    int temp_alpha;
+
+    if (arg_search_result->SR_score < arg_my_alpha)
+      temp_alpha = arg_my_alpha;
+    else
+      temp_alpha = arg_search_result->SR_score;
+
+    construct_search_result(&temp_result, SCORE_MINUS_INFINITY, SR_NULL);
+
+    TRACE_KEY(object)
+
+    do_move(&(object->S_board), jmove, arg_moves_list, FALSE);
+
+    if (IS_MINIMAL_WINDOW(arg_node_type))
+    {
+      TRACE_AB_WINDOW(trace_key,
+                      "minimal window search",
+                      temp_alpha,
+                      arg_my_beta,
+                      arg_moves_list,
+                      jmove)
+
+      TRACE_INDENT(arg_moves_list, jmove)
+
+      alpha_beta(object,
+                 -arg_my_beta,
+                 -temp_alpha,
+                 arg_my_depth,
+                 arg_node_type,
+                 arg_reduction_depth_root,
+                 your_tweaks,
+                 arg_history,
+                 &temp_result);
+
+      TRACE_DEDENT
+
+      flip_search_result(&temp_result);
+
+      TRACE_AB_RESULT(trace_key,
+                      "result minimal window search",
+                      temp_alpha,
+                      arg_my_beta,
+                      arg_moves_list,
+                      jmove,
+                      &temp_result);
+    }
+    else
+    {
+      if (imove == 0)
+      {
+        TRACE_AB_WINDOW(trace_key,
+                        "full window search first move",
+                        temp_alpha,
+                        arg_my_beta,
+                        arg_moves_list,
+                        jmove)
+
+        TRACE_INDENT(arg_moves_list, jmove)
+
+        alpha_beta(object,
+                   -arg_my_beta,
+                   -temp_alpha,
+                   arg_my_depth,
+                   arg_node_type,
+                   arg_reduction_depth_root,
+                   your_tweaks,
+                   arg_history,
+                   &temp_result);
+
+        TRACE_DEDENT
+
+        flip_search_result(&temp_result);
+
+        TRACE_AB_RESULT(trace_key,
+                        "result full window search first move",
+                        temp_alpha,
+                        arg_my_beta,
+                        arg_moves_list,
+                        jmove,
+                        &temp_result);
+      }
+      else
+      {
+        int temp_beta = temp_alpha + 1;
+
+        TRACE_AB_WINDOW(trace_key,
+                        "minimal window search next move",
+                        temp_alpha,
+                        temp_beta,
+                        arg_moves_list,
+                        jmove)
+
+        TRACE_INDENT(arg_moves_list, jmove)
+
+        alpha_beta(object,
+                   -temp_beta,
+                   -temp_alpha,
+                   arg_my_depth,
+                   MINIMAL_WINDOW_BIT,
+                   arg_reduction_depth_root,
+                   your_tweaks,
+                   arg_history,
+                   &temp_result);
+
+        TRACE_DEDENT
+
+        flip_search_result(&temp_result);
+
+        TRACE_AB_RESULT(trace_key,
+                        "result minimal window search next move",
+                        temp_alpha,
+                        temp_beta,
+                        arg_moves_list,
+                        jmove,
+                        &temp_result);
+
+        if (!IS_SCORE_NAN(temp_result.SR_score) and
+            (temp_result.SR_score >= temp_beta) and
+            (temp_result.SR_score < arg_my_beta))
+        {
+          TRACE_AB_WINDOW(trace_key,
+                          "fail high search next move",
+                          temp_alpha,
+                          arg_my_beta,
+                          arg_moves_list,
+                          jmove)
+
+          TRACE_INDENT(arg_moves_list, jmove)
+
+          alpha_beta(object,
+                     -arg_my_beta,
+                     -temp_alpha,
+                     arg_my_depth,
+                     arg_node_type,
+                     arg_reduction_depth_root,
+                     your_tweaks,
+                     arg_history,
+                     &temp_result);
+
+          TRACE_DEDENT
+
+          flip_search_result(&temp_result);
+
+          TRACE_AB_RESULT(trace_key,
+                          "result fail high search next move",
+                          temp_alpha,
+                          arg_my_beta,
+                          arg_moves_list,
+                          jmove,
+                          &temp_result);
+        }
+      }
+    }
+
+    undo_move(&(object->S_board), jmove, arg_moves_list, FALSE);
+
+    if (IS_SCORE_NAN(temp_result.SR_score))
+    {
+      construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
+
+      goto label_return;
+    }
+
+    if (temp_result.SR_depth == DEPTH_MAX)
+      ++nproven;
+
+    if (compare_search_results(&temp_result, SR_OPERATOR_GT, arg_search_result))
+    {
+      assign_search_result_b2a(arg_search_result, &temp_result);
+
+      update_pv(&(temp_result.SR_pv), object->S_board.B_key, jmove);
+
+      arg_search_result->SR_pv = temp_result.SR_pv;
+
+      arg_search_result->SR_depth = temp_result.SR_depth;
+
+      for (int kmove = imove; kmove > 0; kmove--)
+        arg_sort[kmove] = arg_sort[kmove - 1];
+
+      arg_sort[0] = jmove;
+
+      TRACE_AB_RESULT(trace_key,
+                      "result best move",
+                      arg_my_alpha,
+                      arg_my_beta,
+                      arg_moves_list,
+                      jmove,
+                      arg_search_result);
+
+      if (arg_search_result->SR_score >= arg_my_beta)
+        break;
+    }
+  }
+
+  HARDBUG(arg_search_result->SR_depth == INVALID)
+
+  if ((nproven < arg_moves_list->ML_nmoves) and
+      (arg_search_result->SR_depth == DEPTH_MAX) and
+      !IS_SR_LOST(arg_search_result->SR_flags) and
+      !IS_SR_WON(arg_search_result->SR_flags))
+  {
+    // print_board(&(object->S_board));
+    // PRINTF("NOT PROVEN!\n");
+
+    arg_search_result->SR_depth = arg_my_depth;
+  }
+
+label_return:
+
+  if (FALSE and (arg_search_result->SR_depth == DEPTH_MAX))
+  {
+    HARDBUG(!IS_SCORE_WON(arg_search_result->SR_score) and
+            !IS_SCORE_LOST(arg_search_result->SR_score) and
+            (arg_search_result->SR_score != 0))
+  }
+
+  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+  {
+    HARDBUG(arg_search_result->SR_depth < arg_my_depth)
+  }
+
+  fail_hard(arg_my_alpha, arg_my_beta, arg_search_result);
+
+  TRACE_AB_EXIT(object,
+                arg_my_alpha,
+                arg_my_beta,
+                arg_node_type,
+                arg_my_depth,
+                arg_search_result);
+
+  check_search_result(arg_my_alpha, arg_my_beta, arg_search_result);
+
+  END_BLOCK
+
+  POP_NAME(__FUNC__)
+}
+
+local void alpha_beta_minimal(search_t *object,
+                              int arg_my_alpha,
+                              int arg_my_beta,
+                              int arg_my_depth,
+                              int arg_node_type,
+                              int arg_reduction_depth_root,
+                              int arg_my_tweaks,
+                              moves_list_t *arg_moves_list,
+                              int arg_sort[NMOVES_MAX],
+                              ui64_t arg_history,
+                              search_result_t *arg_search_result)
+{
+  PUSH_NAME(__FUNC__)
+
+  BEGIN_BLOCK(__FUNC__)
+
+  TRACE_AB_ENTRY(object, arg_my_alpha, arg_my_beta, arg_node_type, arg_my_depth)
+
+  HARDBUG(arg_my_alpha >= arg_my_beta)
+
+  HARDBUG(arg_my_depth < 1)
+
+  HARDBUG(arg_node_type == 0)
+
+  HARDBUG(!IS_MINIMAL_WINDOW(arg_node_type))
+
+  HARDBUG((arg_my_beta - arg_my_alpha) != 1)
+
+  HARDBUG(arg_moves_list->ML_nmoves == 0)
+
+  HARDBUG(arg_moves_list->ML_ncaptx > 0)
+
+  HARDBUG(arg_history == 0)
+
+  construct_search_result(arg_search_result, SCORE_MINUS_INFINITY, SR_NULL);
+
+  colour_enum my_colour;
+
+  if (IS_WHITE(object->S_board.B_colour2move))
+    my_colour = WHITE_ENUM;
+  else
+    my_colour = BLACK_ENUM;
+
+  ++(object->S_total_nodes);
+
+  ++(object->S_total_minimal_window_nodes);
+
+  int your_depth = arg_my_depth - 1;
+
+  HARDBUG(your_depth < 0)
+
+  int allow_reductions =
+    options.use_reductions and
+    !(arg_my_tweaks & TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT) and
+    !(arg_my_tweaks & TWEAK_PREVIOUS_MOVE_NULL_BIT) and
+    !(arg_my_tweaks & TWEAK_PREVIOUS_MOVE_REDUCED_BIT) and
+    !(arg_my_tweaks & TWEAK_PREVIOUS_MOVE_EXTENDED_BIT) and
+    (arg_moves_list->ML_ncaptx == 0) and
+    (arg_moves_list->ML_nmoves >= options.reduction_moves_min) and
+    (your_depth >= options.reduction_depth_leaf) and
+    (arg_reduction_depth_root == 0) and !IS_SCORE_LOST(arg_my_alpha) and
+    !IS_SCORE_WON(arg_my_beta);
+
+  if (allow_reductions and (options.reduction_combination_length > 0) and
+      (return_combination_length(arg_history) >=
+       options.reduction_combination_length))
+  {
+    object->S_total_reductions_combinations++;
+
+    allow_reductions = FALSE;
+  }
+
+  int your_tweaks = 0;
+
+  int nmoves_searched_at_full_depth = 0;
+
+  int reduced_depth = INVALID;
+
+#define SCALE 1000000000LL
+
+  if (allow_reductions)
+  {
+    i64_t mobility = SCALE;
+
+    int npieces = BIT_COUNT(object->S_board.B_bit_boards[my_colour][MAN_ENUM]);
+
+    if (npieces > 0)
+    {
+      mobility =
+        ((i64_t)arg_moves_list->ML_nmoves * SCALE) / (2LL * (i64_t)npieces);
+
+      if (mobility > SCALE)
+        mobility = SCALE;
+    }
+
+    i64_t reduced_depth_ll =
+      (SCALE - mobility) * ((i64_t)your_depth - 1L) +
+      (mobility * (i64_t)your_depth * (i64_t)options.reduction_percentage) /
+        100LL;
+
+#ifdef DEBUG
+    double dmobility = 1.0;
+
+    if (npieces > 0)
+    {
+      dmobility = (double)arg_moves_list->ML_nmoves / (2.0 * (double)npieces);
+
+      if (dmobility > 1.0)
+        dmobility = 1.0;
+    }
+
+    double dreduced_depth = (1.0 - dmobility) * ((double)your_depth - 1.0) +
+                            dmobility * (double)your_depth *
+                              (double)options.reduction_percentage / 100.0d;
+
+    if (llabs(reduced_depth_ll - llround(dreduced_depth * (double)SCALE)) > 10)
+    {
+      PRINTF("reduced_depth_ll=%lld dreduced_depth=%.9f"
+             " llround(dreduced_depth * (double) SCALE)=%lld\n",
+             reduced_depth_ll,
+             dreduced_depth,
+             llround(dreduced_depth * (double)SCALE));
+
+      FATAL("eh?", EXIT_FAILURE)
+    }
+
+#endif
+
+    reduced_depth = reduced_depth_ll / SCALE;
+
+    if (reduced_depth < 1)
+      reduced_depth = 1;
+  }
+
+  HARDBUG(allow_reductions and (reduced_depth == INVALID))
+
+  int nproven = 0;
+
+  search_result_t temp_result;
+
+  temp_result.SR_pv = arg_search_result->SR_pv;
+
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
+  {
+    int jmove = arg_sort[imove];
+
+    construct_search_result(&temp_result, SCORE_MINUS_INFINITY, SR_NULL);
+
+    TRACE_KEY(object)
+
+    do_move(&(object->S_board), jmove, arg_moves_list, FALSE);
+
+    int stage = STAGE_SEARCH_MOVE_AT_REDUCED_DEPTH;
+
+    if (!allow_reductions or
+        (nmoves_searched_at_full_depth < options.reduction_full_min) or
+        MOVE_DO_NOT_REDUCE(arg_moves_list->ML_move_flags[jmove]))
+    {
+      stage = STAGE_SEARCH_MOVE_AT_FULL_DEPTH;
+    }
+
+    if (stage == STAGE_SEARCH_MOVE_AT_REDUCED_DEPTH)
+    {
+      ++(object->S_total_reductions);
+
+      HARDBUG(reduced_depth == INVALID)
+      HARDBUG(reduced_depth < 1)
+
+      int reduced_alpha = arg_search_result->SR_score;
+
+      int reduced_beta = reduced_alpha + 1;
+
+      TRACE_AB_WINDOW(trace_key,
+                      "reduced depth search",
+                      reduced_alpha,
+                      reduced_beta,
+                      arg_moves_list,
+                      jmove)
+
+      TRACE_INDENT(arg_moves_list, jmove)
+
+      alpha_beta(object,
+                 -reduced_beta,
+                 -reduced_alpha,
+                 reduced_depth,
+                 arg_node_type,
+                 arg_reduction_depth_root,
+                 your_tweaks | TWEAK_PREVIOUS_MOVE_REDUCED_BIT,
+                 arg_history,
+                 &temp_result);
+
+      TRACE_DEDENT
+
+      flip_search_result(&temp_result);
+
+      TRACE_AB_RESULT(trace_key,
+                      "result reduced depth search",
+                      reduced_alpha,
+                      reduced_beta,
+                      arg_moves_list,
+                      jmove,
+                      &temp_result);
+
+      if (IS_SCORE_NAN(temp_result.SR_score))
+      {
+        undo_move(&(object->S_board), jmove, arg_moves_list, FALSE);
+
+        construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
+
+        goto label_return;
+      }
+
+      if (compare_search_results(&temp_result,
+                                 SR_OPERATOR_LE,
+                                 arg_search_result))
+      {
+        ++(object->S_total_reductions_le_alpha);
+
+        stage = STAGE_SEARCHED_MOVE_AT_REDUCED_DEPTH;
+      }
+      else
+      {
+        ++(object->S_total_reductions_ge_beta);
+
+        stage = STAGE_SEARCH_MOVE_AT_FULL_DEPTH;
+      }
+    } // if (stage
+
+    if (stage == STAGE_SEARCH_MOVE_AT_FULL_DEPTH)
+    {
+      TRACE_AB_WINDOW(trace_key,
+                      "full depth search",
+                      arg_my_alpha,
+                      arg_my_beta,
+                      arg_moves_list,
+                      jmove)
+
+      TRACE_INDENT(arg_moves_list, jmove)
+
+      alpha_beta(object,
+                 -arg_my_beta,
+                 -arg_my_alpha,
+                 your_depth,
+                 arg_node_type,
+                 arg_reduction_depth_root,
+                 your_tweaks,
+                 arg_history,
+                 &temp_result);
+
+      TRACE_DEDENT
+
+      flip_search_result(&temp_result);
+
+      TRACE_AB_RESULT(trace_key,
+                      "result full depth search",
+                      arg_my_alpha,
+                      arg_my_beta,
+                      arg_moves_list,
+                      jmove,
+                      &temp_result);
+
+      stage = STAGE_SEARCHED_MOVE_AT_FULL_DEPTH;
+
+      nmoves_searched_at_full_depth++;
+    }
+
+    undo_move(&(object->S_board), jmove, arg_moves_list, FALSE);
+
+    if (IS_SCORE_NAN(temp_result.SR_score))
+    {
+      construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
+
+      goto label_return;
+    }
+
+    HARDBUG(temp_result.SR_score == SCORE_MINUS_INFINITY)
+
+    if ((stage == STAGE_SEARCHED_MOVE_AT_FULL_DEPTH) and
+        (temp_result.SR_depth == DEPTH_MAX))
+      ++nproven;
+
+    if (compare_search_results(&temp_result, SR_OPERATOR_GT, arg_search_result))
+    {
+      HARDBUG(stage != STAGE_SEARCHED_MOVE_AT_FULL_DEPTH)
+
+      assign_search_result_b2a(arg_search_result, &temp_result);
+
+      update_pv(&(temp_result.SR_pv), object->S_board.B_key, jmove);
+
+      arg_search_result->SR_pv = temp_result.SR_pv;
+
+      if (temp_result.SR_depth < (DEPTH_MAX - 1))
+        temp_result.SR_depth++;
+
+      arg_search_result->SR_depth = temp_result.SR_depth;
+
+      for (int kmove = imove; kmove > 0; kmove--)
+        arg_sort[kmove] = arg_sort[kmove - 1];
+
+      arg_sort[0] = jmove;
+
+      TRACE_AB_RESULT(trace_key,
+                      "result best move",
+                      arg_my_alpha,
+                      arg_my_beta,
+                      arg_moves_list,
+                      jmove,
+                      arg_search_result);
+
+      if (arg_search_result->SR_score >= arg_my_beta)
+        goto label_return;
+    }
+  } // for (int imove
+
+  HARDBUG(arg_search_result->SR_depth == INVALID)
+
+  if ((nproven < arg_moves_list->ML_nmoves) and
+      (arg_search_result->SR_depth == DEPTH_MAX) and
+      !IS_SR_LOST(arg_search_result->SR_flags) and
+      !IS_SR_WON(arg_search_result->SR_flags))
+  {
+    // print_board(&(object->S_board));
+    // PRINTF("NOT PROVEN!\n");
+
+    arg_search_result->SR_depth = arg_my_depth;
+  }
+
+  HARDBUG(nmoves_searched_at_full_depth == 0)
+
+label_return:
+
+  if (FALSE and (arg_search_result->SR_depth == DEPTH_MAX))
+  {
+    HARDBUG(!IS_SCORE_WON(arg_search_result->SR_score) and
+            !IS_SCORE_LOST(arg_search_result->SR_score) and
+            (arg_search_result->SR_score != 0))
+  }
+
+  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+    HARDBUG(arg_search_result->SR_depth < arg_my_depth)
+
+  fail_hard(arg_my_alpha, arg_my_beta, arg_search_result);
+
+  TRACE_AB_EXIT(object,
+                arg_my_alpha,
+                arg_my_beta,
+                arg_node_type,
+                arg_my_depth,
+                arg_search_result);
+
+  check_search_result(arg_my_alpha, arg_my_beta, arg_search_result);
+
+  END_BLOCK
+
+  POP_NAME(__FUNC__)
+}
+
+local void alpha_beta_pv(search_t *object,
+                         int arg_my_alpha,
+                         int arg_my_beta,
+                         int arg_my_depth,
+                         int arg_node_type,
+                         int arg_reduction_depth_root,
+                         int arg_my_tweaks,
+                         moves_list_t *arg_moves_list,
+                         int arg_sort[NMOVES_MAX],
+                         ui64_t arg_history,
+                         search_result_t *arg_search_result)
+{
+  PUSH_NAME(__FUNC__)
+
+  BEGIN_BLOCK(__FUNC__)
+
+  TRACE_AB_ENTRY(object, arg_my_alpha, arg_my_beta, arg_node_type, arg_my_depth)
+
+  HARDBUG(arg_my_alpha >= arg_my_beta)
+
+  HARDBUG(arg_my_depth < 1)
+
+  HARDBUG(arg_node_type == 0)
+
+  HARDBUG(!IS_PV(arg_node_type))
+
+  HARDBUG(arg_history == 0)
+
+  ++(object->S_total_nodes);
+
+  ++(object->S_total_pv_nodes);
+
+  construct_search_result(arg_search_result, SCORE_MINUS_INFINITY, SR_NULL);
+
+  int your_tweaks = 0;
+
+  int your_depth = arg_my_depth - 1;
+
+  HARDBUG(your_depth < 0)
+
+  search_result_t temp_result;
+
+  temp_result.SR_pv = arg_search_result->SR_pv;
+
+  if (!(arg_my_tweaks & TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT) and
+      !(arg_my_tweaks & TWEAK_PREVIOUS_MOVE_EXTENDED_BIT) and
+      !IS_SCORE_LOST(arg_my_alpha))
+  {
+    if ((options.pv_combination_length > 0) and
+        (return_combination_length(arg_history) >=
+         options.pv_combination_length))
+    {
+      object->S_total_pv_extension_searches_combination++;
+
+      your_depth++;
+
+      your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
+    }
+    else if (options.pv_extension_search_window > 0)
+    {
+      object->S_total_pv_extension_searches++;
+
+      int reduced_alpha = arg_my_alpha - options.pv_extension_search_window;
+      int reduced_beta = reduced_alpha + 1;
+
+      int reduced_depth = your_depth;
+
+      TRACE_KEY(object)
+
+      TRACE_AB_WINDOW(trace_key,
+                      "extension search",
+                      reduced_alpha,
+                      reduced_beta,
+                      arg_moves_list,
+                      INVALID)
+
+      alpha_beta(object,
+                 reduced_alpha,
+                 reduced_beta,
+                 reduced_depth,
+                 MINIMAL_WINDOW_BIT,
+                 arg_reduction_depth_root,
+                 arg_my_tweaks | TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT,
+                 arg_history,
+                 &temp_result);
+
+      TRACE_AB_RESULT(trace_key,
+                      "result extension search",
+                      reduced_alpha,
+                      reduced_beta,
+                      arg_moves_list,
+                      INVALID,
+                      &temp_result);
+
+      if (IS_SCORE_NAN(temp_result.SR_score))
+      {
+        construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
+
+        goto label_return;
+      }
+
+      if (temp_result.SR_score <= reduced_alpha)
+      {
+        object->S_total_pv_extension_searches_le_alpha++;
+
+        your_depth = your_depth + 1;
+
+        your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
+      }
+      else
+      {
+        object->S_total_pv_extension_searches_ge_beta++;
+      }
+    }
+  }
+
+  int nproven = INVALID;
+
+  for (int ipass = 1; ipass <= 2; ++ipass)
+  {
+    int nsingle_replies = 0;
+
+    nproven = 0;
+
+    for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
+    {
+      int jmove = arg_sort[imove];
+
+      int temp_alpha;
+
+      if (arg_search_result->SR_score < arg_my_alpha)
+        temp_alpha = arg_my_alpha;
+      else
+        temp_alpha = arg_search_result->SR_score;
+
+      construct_search_result(&temp_result, SCORE_MINUS_INFINITY, SR_NULL);
+
+      TRACE_KEY(object)
+
+      do_move(&(object->S_board), jmove, arg_moves_list, FALSE);
+
+      if (imove == 0)
+      {
+        TRACE_AB_WINDOW(trace_key,
+                        "full window search first move",
+                        temp_alpha,
+                        arg_my_beta,
+                        arg_moves_list,
+                        jmove)
+
+        TRACE_INDENT(arg_moves_list, jmove)
+
+        alpha_beta(object,
+                   -arg_my_beta,
+                   -temp_alpha,
+                   your_depth,
+                   arg_node_type,
+                   arg_reduction_depth_root,
+                   your_tweaks,
+                   arg_history,
+                   &temp_result);
+
+        TRACE_DEDENT
+
+        flip_search_result(&temp_result);
+
+        TRACE_AB_RESULT(trace_key,
+                        "result full window search first move",
+                        temp_alpha,
+                        arg_my_beta,
+                        arg_moves_list,
+                        jmove,
+                        &temp_result);
+      }
+      else
+      {
+        int temp_beta = temp_alpha + 1;
+
+        TRACE_AB_WINDOW(trace_key,
+                        "minimal window search next move",
+                        temp_alpha,
+                        temp_beta,
+                        arg_moves_list,
+                        jmove)
+
+        TRACE_INDENT(arg_moves_list, jmove)
+
+        alpha_beta(object,
+                   -temp_beta,
+                   -temp_alpha,
+                   your_depth,
+                   MINIMAL_WINDOW_BIT,
+                   arg_reduction_depth_root,
+                   your_tweaks,
+                   arg_history,
+                   &temp_result);
+
+        TRACE_DEDENT
+
+        flip_search_result(&temp_result);
+
+        TRACE_AB_RESULT(trace_key,
+                        "result minimal window search next move",
+                        temp_alpha,
+                        temp_beta,
+                        arg_moves_list,
+                        jmove,
+                        &temp_result);
+
+        if (!IS_SCORE_NAN(temp_result.SR_score) and
+            (temp_result.SR_score >= temp_beta) and
+            (temp_result.SR_score < arg_my_beta))
+        {
+          TRACE_AB_WINDOW(trace_key,
+                          "fail high search next move",
+                          temp_alpha,
+                          arg_my_beta,
+                          arg_moves_list,
+                          jmove)
+
+          TRACE_INDENT(arg_moves_list, jmove)
+
+          alpha_beta(object,
+                     -arg_my_beta,
+                     -temp_alpha,
+                     your_depth,
+                     arg_node_type,
+                     arg_reduction_depth_root,
+                     your_tweaks,
+                     arg_history,
+                     &temp_result);
+
+          TRACE_DEDENT
+
+          flip_search_result(&temp_result);
+
+          TRACE_AB_RESULT(trace_key,
+                          "result fail high search next move",
+                          temp_alpha,
+                          arg_my_beta,
+                          arg_moves_list,
+                          jmove,
+                          &temp_result);
+        }
+      }
+
+      undo_move(&(object->S_board), jmove, arg_moves_list, FALSE);
+
+      if (IS_SCORE_NAN(temp_result.SR_score))
+      {
+        construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
+
+        goto label_return;
+      }
+
+      HARDBUG(temp_result.SR_score == SCORE_MINUS_INFINITY)
+
+      if (temp_result.SR_score > arg_my_alpha)
+      {
+        HARDBUG(!IS_PV(arg_node_type))
+
+        nsingle_replies++;
+      }
+
+      if (temp_result.SR_depth == DEPTH_MAX)
+        ++nproven;
+
+      if (compare_search_results(&temp_result,
+                                 SR_OPERATOR_GT,
+                                 arg_search_result))
+      {
+        assign_search_result_b2a(arg_search_result, &temp_result);
+
+        update_pv(&(temp_result.SR_pv), object->S_board.B_key, jmove);
+
+        arg_search_result->SR_pv = temp_result.SR_pv;
+
+        if (temp_result.SR_depth < (DEPTH_MAX - 1))
+          temp_result.SR_depth++;
+
+        arg_search_result->SR_depth = temp_result.SR_depth;
+
+        for (int kmove = imove; kmove > 0; kmove--)
+          arg_sort[kmove] = arg_sort[kmove - 1];
+
+        arg_sort[0] = jmove;
+
+        TRACE_AB_RESULT(trace_key,
+                        "result best move",
+                        arg_my_alpha,
+                        arg_my_beta,
+                        arg_moves_list,
+                        jmove,
+                        arg_search_result);
+
+        if (arg_search_result->SR_score >= arg_my_beta)
+          goto label_return;
+      }
+    } // imove
+
+    if ((ipass == 1) and (options.use_single_reply_extensions) and
+        (nsingle_replies == 1))
+    {
+      object->S_total_single_reply_extensions++;
+
+      construct_search_result(arg_search_result, SCORE_MINUS_INFINITY, SR_NULL);
+
+      your_depth = your_depth + 1;
+
+      your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
+
+      continue;
+    }
+
+    break;
+  } // ipass
+
+  HARDBUG(arg_search_result->SR_depth == INVALID)
+
+  if ((nproven < arg_moves_list->ML_nmoves) and
+      (arg_search_result->SR_depth == DEPTH_MAX) and
+      !IS_SR_LOST(arg_search_result->SR_flags) and
+      !IS_SR_WON(arg_search_result->SR_flags))
+  {
+    // print_board(&(object->S_board));
+    // PRINTF("NOT PROVEN!\n");
+
+    arg_search_result->SR_depth = arg_my_depth;
+  }
+
+label_return:
+
+  if (FALSE and (arg_search_result->SR_depth == DEPTH_MAX))
+  {
+    HARDBUG(!IS_SCORE_WON(arg_search_result->SR_score) and
+            !IS_SCORE_LOST(arg_search_result->SR_score) and
+            (arg_search_result->SR_score != 0))
+  }
+
+  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+    HARDBUG(arg_search_result->SR_depth < arg_my_depth)
+
+  fail_hard(arg_my_alpha, arg_my_beta, arg_search_result);
+
+  TRACE_AB_EXIT(object,
+                arg_my_alpha,
+                arg_my_beta,
+                arg_node_type,
+                arg_my_depth,
+                arg_search_result);
+
+  check_search_result(arg_my_alpha, arg_my_beta, arg_search_result);
+
+  END_BLOCK
+
+  POP_NAME(__FUNC__)
+}
+
+local void inline sort_moves_weight(int arg_nmoves,
+                                    int arg_moves_weight[NMOVES_MAX],
+                                    int arg_sort[NMOVES_MAX])
+{
+  for (int imove = 0; imove < arg_nmoves; imove++)
+    arg_sort[imove] = imove;
+
+  for (int imove = 1; imove < arg_nmoves; imove++)
+  {
+    int key = arg_sort[imove];
+
+    int moves_weight = arg_moves_weight[key];
+
+    int jmove = imove - 1;
+
+    while ((jmove >= 0) and arg_moves_weight[arg_sort[jmove]] < moves_weight)
+    {
+      arg_sort[jmove + 1] = arg_sort[jmove];
+
+      --jmove;
+    }
+
+    arg_sort[jmove + 1] = key;
+  }
+
+#ifdef DEBUG
+  int frequency[NMOVES_MAX] = {0};
+
+  for (int imove = 0; imove < arg_nmoves; imove++)
+  {
+    int key = arg_sort[imove];
+
+    HARDBUG((key < 0) or (key >= arg_nmoves))
+
+    frequency[key]++;
+  }
+
+  for (int imove = 0; imove < arg_nmoves; imove++)
+    HARDBUG(frequency[arg_sort[imove]] != 1)
+
+  for (int imove = 1; imove < arg_nmoves; imove++)
+    HARDBUG(arg_moves_weight[arg_sort[imove - 1]] <
+            arg_moves_weight[arg_sort[imove]])
+#endif
+}
+
+local void alpha_beta(search_t *object,
+                      int arg_my_alpha,
+                      int arg_my_beta,
+                      int arg_my_depth,
+                      int arg_node_type,
+                      int arg_reduction_depth_root,
+                      int arg_my_tweaks,
+                      ui64_t arg_history,
+                      search_result_t *arg_search_result)
+{
+  PUSH_NAME(__FUNC__)
+
+  BEGIN_BLOCK(__FUNC__)
+
+  TRACE_AB_ENTRY(object, arg_my_alpha, arg_my_beta, arg_node_type, arg_my_depth)
+
+  HARDBUG(arg_my_alpha >= arg_my_beta)
+
+  HARDBUG(arg_my_depth < 0)
+
+  HARDBUG(arg_node_type == 0)
+
+  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
 
   HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
           ((arg_my_beta - arg_my_alpha) != 1))
@@ -1294,24 +2890,11 @@ local int alpha_beta(search_t *object,
               arg_node_type);
   }
 
-  *arg_best_pv = INVALID;
-
-  *arg_best_depth = INVALID;
-
-  int best_score = SCORE_PLUS_INFINITY;
-
-  int best_move = INVALID;
+  construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
 
   ++(object->S_total_nodes);
 
   ++(object->S_total_alpha_beta_nodes);
-
-  if (IS_MINIMAL_WINDOW(arg_node_type))
-    ++(object->S_total_minimal_window_nodes);
-  else if (IS_PV(arg_node_type))
-    ++(object->S_total_pv_nodes);
-  else
-    FATAL("unknown node_type", EXIT_FAILURE)
 
   if ((object->S_total_alpha_beta_nodes % UPDATE_NODES) == 0)
   {
@@ -1331,9 +2914,7 @@ local int alpha_beta(search_t *object,
       {
         my_printf(object->S_my_printf, "got message\n");
 
-        object->S_interrupt = BOARD_INTERRUPT_MESSAGE;
-
-        best_score = SCORE_PLUS_INFINITY;
+        construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
 
         goto label_return;
       }
@@ -1364,22 +2945,18 @@ local int alpha_beta(search_t *object,
       // check time_limit again
       if (return_my_timer(&(object->S_timer), FALSE) >= options.time_limit)
       {
-        object->S_interrupt = BOARD_INTERRUPT_TIME;
-
-        best_score = SCORE_PLUS_INFINITY;
+        construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
 
         goto label_return;
       }
     }
     else
     {
-      SOFTBUG(options.nthreads <= 1)
+      HARDBUG(options.nthreads <= 1)
 
       if (poll_queue(return_thread_queue(object->S_thread)) != INVALID)
       {
-        object->S_interrupt = BOARD_INTERRUPT_MESSAGE;
-
-        best_score = SCORE_PLUS_INFINITY;
+        construct_search_result(arg_search_result, SCORE_NOT_A_NUMBER, SR_NULL);
 
         goto label_return;
       }
@@ -1388,9 +2965,9 @@ local int alpha_beta(search_t *object,
 
   if (draw_by_repetition(&(object->S_board), FALSE))
   {
-    best_score = 0;
+    construct_search_result(arg_search_result, 0, SR_DRAW_BY_REP_BIT);
 
-    *arg_best_depth = 0;
+    arg_search_result->SR_depth = arg_my_depth;
 
     goto label_return;
   }
@@ -1403,28 +2980,37 @@ local int alpha_beta(search_t *object,
 
   if (temp_mate != ENDGAME_UNKNOWN)
   {
-    *arg_best_depth = DEPTH_MAX;
-
     if (temp_mate == INVALID)
     {
-      best_score = 0;
-
-      *arg_best_depth = 0;
+      construct_search_result(arg_search_result, 0, SR_EGTB_DRAW_BIT);
     }
     else if (temp_mate > 0)
     {
       if (wdl)
-        best_score = SCORE_WON - object->S_board.B_inode - temp_mate;
+        construct_search_result(arg_search_result,
+                                SCORE_WON - object->S_board.B_inode - temp_mate,
+                                SR_WON_BIT);
       else
-        best_score = SCORE_WON_ABSOLUTE - object->S_board.B_inode - temp_mate;
+        construct_search_result(arg_search_result,
+                                SCORE_WON_ABSOLUTE - object->S_board.B_inode -
+                                  temp_mate,
+                                SR_WON_BIT);
     }
     else
     {
       if (wdl)
-        best_score = SCORE_LOST + object->S_board.B_inode - temp_mate;
+        construct_search_result(arg_search_result,
+                                SCORE_LOST + object->S_board.B_inode -
+                                  temp_mate,
+                                SR_NULL);
       else
-        best_score = SCORE_LOST_ABSOLUTE + object->S_board.B_inode - temp_mate;
+        construct_search_result(arg_search_result,
+                                SCORE_LOST_ABSOLUTE + object->S_board.B_inode -
+                                  temp_mate,
+                                SR_NULL);
     }
+
+    arg_search_result->SR_depth = DEPTH_MAX;
 
     goto label_return;
   }
@@ -1456,15 +3042,19 @@ local int alpha_beta(search_t *object,
 
           if (alpha_beta_cache_slot.ABCS_score <= arg_my_alpha)
           {
+            TRACE_AB_CACHE(object, "LE ALPHA HIT", &alpha_beta_cache_slot)
+
             ++(object->S_total_alpha_beta_cache_le_alpha_cutoffs);
 
-            best_score = alpha_beta_cache_slot.ABCS_score;
+            construct_search_result(arg_search_result,
+                                    alpha_beta_cache_slot.ABCS_score,
+                                    SR_NULL);
 
-            arg_best_pv[0] = alpha_beta_cache_slot.ABCS_moves[0];
+            update_pv(&(arg_search_result->SR_pv),
+                      object->S_board.B_key,
+                      alpha_beta_cache_slot.ABCS_moves[0]);
 
-            arg_best_pv[1] = INVALID;
-
-            *arg_best_depth = alpha_beta_cache_slot.ABCS_depth;
+            arg_search_result->SR_depth = alpha_beta_cache_slot.ABCS_depth;
 
             goto label_return;
           }
@@ -1475,30 +3065,38 @@ local int alpha_beta(search_t *object,
 
           if (alpha_beta_cache_slot.ABCS_score >= arg_my_beta)
           {
+            TRACE_AB_CACHE(object, "GE BETA HIT", &alpha_beta_cache_slot)
+
             ++(object->S_total_alpha_beta_cache_ge_beta_cutoffs);
 
-            best_score = alpha_beta_cache_slot.ABCS_score;
+            construct_search_result(arg_search_result,
+                                    alpha_beta_cache_slot.ABCS_score,
+                                    SR_NULL);
 
-            arg_best_pv[0] = alpha_beta_cache_slot.ABCS_moves[0];
+            update_pv(&(arg_search_result->SR_pv),
+                      object->S_board.B_key,
+                      alpha_beta_cache_slot.ABCS_moves[0]);
 
-            arg_best_pv[1] = INVALID;
-
-            *arg_best_depth = alpha_beta_cache_slot.ABCS_depth;
+            arg_search_result->SR_depth = alpha_beta_cache_slot.ABCS_depth;
 
             goto label_return;
           }
         }
         else if (alpha_beta_cache_slot.ABCS_flags & TRUE_SCORE_BIT)
         {
+          TRACE_AB_CACHE(object, "TRUE SCORE HIT", &alpha_beta_cache_slot)
+
           ++(object->S_total_alpha_beta_cache_true_score_hits);
 
-          best_score = alpha_beta_cache_slot.ABCS_score;
+          construct_search_result(arg_search_result,
+                                  alpha_beta_cache_slot.ABCS_score,
+                                  SR_NULL);
 
-          arg_best_pv[0] = alpha_beta_cache_slot.ABCS_moves[0];
+          update_pv(&(arg_search_result->SR_pv),
+                    object->S_board.B_key,
+                    alpha_beta_cache_slot.ABCS_moves[0]);
 
-          arg_best_pv[1] = INVALID;
-
-          *arg_best_depth = alpha_beta_cache_slot.ABCS_depth;
+          arg_search_result->SR_depth = alpha_beta_cache_slot.ABCS_depth;
 
           goto label_return;
         }
@@ -1514,9 +3112,11 @@ local int alpha_beta(search_t *object,
 
   if (moves_list.ML_nmoves == 0)
   {
-    best_score = SCORE_LOST_ABSOLUTE + object->S_board.B_inode;
+    construct_search_result(arg_search_result,
+                            SCORE_LOST_ABSOLUTE + object->S_board.B_inode,
+                            SR_LOST_BIT);
 
-    *arg_best_depth = DEPTH_MAX;
+    arg_search_result->SR_depth = DEPTH_MAX;
 
     goto label_return;
   }
@@ -1544,718 +3144,188 @@ local int alpha_beta(search_t *object,
     }
   }
 
-  best_score = SCORE_MINUS_INFINITY;
+  int sort[NMOVES_MAX];
 
-  best_move = INVALID;
+  sort_moves_weight(moves_list.ML_nmoves, moves_weight, sort);
 
-  SOFTBUG(*arg_best_depth != INVALID)
+  construct_search_result(arg_search_result, SCORE_MINUS_INFINITY, SR_NULL);
 
-  int your_tweaks = 0;
+  HARDBUG(arg_search_result->SR_depth != INVALID)
 
   arg_history =
-      (arg_history << 4) | (moves_list.ML_ncaptx & 0xF) | 0xF000000000000000ULL;
+    (arg_history << 4) | (moves_list.ML_ncaptx & 0xF) | 0xF000000000000000ULL;
 
   if (((moves_list.ML_nmoves <= 3) and !move_repetition(&(object->S_board))) or
       (options.captures_are_transparent and (moves_list.ML_ncaptx > 0)))
   {
-    for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
-    {
-      int jmove = 0;
+    alpha_beta_captures(object,
+                        arg_my_alpha,
+                        arg_my_beta,
+                        arg_my_depth,
+                        arg_node_type,
+                        arg_reduction_depth_root,
+                        arg_my_tweaks,
+                        &moves_list,
+                        sort,
+                        arg_history,
+                        arg_search_result);
 
-      for (int kmove = 1; kmove < moves_list.ML_nmoves; kmove++)
-      {
-        if (moves_weight[kmove] == L_MIN)
-          continue;
+    if (IS_SCORE_NAN(arg_search_result->SR_score))
+      goto label_return;
 
-        if (moves_weight[kmove] > moves_weight[jmove])
-          jmove = kmove;
-      }
-
-      SOFTBUG(moves_weight[jmove] == L_MIN)
-
-      moves_weight[jmove] = L_MIN;
-
-      int temp_alpha;
-      pv_t temp_pv[PV_MAX];
-      int temp_depth;
-
-      if (best_score < arg_my_alpha)
-        temp_alpha = arg_my_alpha;
-      else
-        temp_alpha = best_score;
-
-      int temp_score = SCORE_MINUS_INFINITY;
-
-      if (IS_MINIMAL_WINDOW(arg_node_type))
-      {
-        do_move(&(object->S_board), jmove, &moves_list, FALSE);
-
-        temp_score = -alpha_beta(object,
-                                 -arg_my_beta,
-                                 -temp_alpha,
-                                 arg_my_depth,
-                                 arg_node_type,
-                                 arg_reduction_depth_root,
-                                 your_tweaks,
-                                 arg_history,
-                                 temp_pv + 1,
-                                 &temp_depth);
-
-        undo_move(&(object->S_board), jmove, &moves_list, FALSE);
-      }
-      else
-      {
-        if (imove == 0)
-        {
-          do_move(&(object->S_board), jmove, &moves_list, FALSE);
-
-          temp_score = -alpha_beta(object,
-                                   -arg_my_beta,
-                                   -temp_alpha,
-                                   arg_my_depth,
-                                   arg_node_type,
-                                   arg_reduction_depth_root,
-                                   your_tweaks,
-                                   arg_history,
-                                   temp_pv + 1,
-                                   &temp_depth);
-
-          undo_move(&(object->S_board), jmove, &moves_list, FALSE);
-        }
-        else
-        {
-          int temp_beta = temp_alpha + 1;
-
-          do_move(&(object->S_board), jmove, &moves_list, FALSE);
-
-          temp_score = -alpha_beta(object,
-                                   -temp_beta,
-                                   -temp_alpha,
-                                   arg_my_depth,
-                                   MINIMAL_WINDOW_BIT,
-                                   arg_reduction_depth_root,
-                                   your_tweaks,
-                                   arg_history,
-                                   temp_pv + 1,
-                                   &temp_depth);
-
-          if ((object->S_interrupt == 0) and (temp_score >= temp_beta) and
-              (temp_score < arg_my_beta))
-          {
-            temp_score = -alpha_beta(object,
-                                     -arg_my_beta,
-                                     -temp_alpha,
-                                     arg_my_depth,
-                                     arg_node_type,
-                                     arg_reduction_depth_root,
-                                     your_tweaks,
-                                     arg_history,
-                                     temp_pv + 1,
-                                     &temp_depth);
-          }
-
-          undo_move(&(object->S_board), jmove, &moves_list, FALSE);
-        }
-      }
-
-      if (object->S_interrupt != 0)
-      {
-        best_score = SCORE_PLUS_INFINITY;
-
-        goto label_return;
-      }
-
-      if (temp_score > best_score)
-      {
-        best_score = temp_score;
-
-        best_move = jmove;
-
-        *arg_best_pv = jmove;
-
-        for (int ipv = 1; (arg_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++)
-          ;
-
-        *arg_best_depth = temp_depth;
-
-        if (options.alpha_beta_cache_size > 0)
-          update_alpha_beta_cache_slot_moves(&alpha_beta_cache_slot, jmove);
-
-        if (best_score >= arg_my_beta)
-          break;
-      }
-    }
-    goto label_break;
+    goto label_store;
   }
-
-  SOFTBUG(
-      ((moves_list.ML_nmoves <= 2) and !move_repetition(&(object->S_board))) or
-      (options.captures_are_transparent and (moves_list.ML_ncaptx > 0)))
 
   if (arg_reduction_depth_root > 0)
     arg_reduction_depth_root--;
 
-  int your_depth = arg_my_depth - 1;
-
-  if (your_depth < 0)
+  if (arg_my_depth == 0)
   {
-    best_score = quiescence(object,
-                            arg_my_alpha,
-                            arg_my_beta,
-                            arg_node_type,
-                            &moves_list,
-                            FALSE,
-                            options.quiescence_capture_extensions,
-                            arg_history,
-                            arg_best_pv,
-                            arg_best_depth);
+    int quiescence_score;
 
-    if (object->S_interrupt != 0)
-      best_score = SCORE_PLUS_INFINITY;
+    quiescence(object,
+               arg_my_alpha,
+               arg_my_beta,
+               arg_node_type,
+               &moves_list,
+               FALSE,
+               options.quiescence_capture_extensions,
+               arg_history,
+               &quiescence_score,
+               &(arg_search_result->SR_pv));
+
+    construct_search_result(arg_search_result, quiescence_score, SR_NULL);
+
+    arg_search_result->SR_depth = 0;
 
     goto label_return;
   }
 
   if (IS_MINIMAL_WINDOW(arg_node_type))
   {
-    int allow_reductions =
-        options.use_reductions and
-        !(arg_my_tweaks & TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT) and
-        !(arg_my_tweaks & TWEAK_PREVIOUS_MOVE_NULL_BIT) and
-        !(arg_my_tweaks & TWEAK_PREVIOUS_MOVE_REDUCED_BIT) and
-        !(arg_my_tweaks & TWEAK_PREVIOUS_MOVE_EXTENDED_BIT) and
-        (moves_list.ML_ncaptx == 0) and
-        (moves_list.ML_nmoves >= options.reduction_moves_min) and
-        (your_depth >= options.reduction_depth_leaf) and
-        (arg_reduction_depth_root == 0) and
-        (arg_my_alpha >= (SCORE_LOST + NODE_MAX)) and
-        (arg_my_beta <= (SCORE_WON - NODE_MAX));
-
-    if (allow_reductions and (options.reduction_combination_length > 0) and
-        (return_combination_length(arg_history) >=
-         options.reduction_combination_length))
-    {
-      object->S_total_reductions_combinations++;
-
-      allow_reductions = FALSE;
-    }
-
-    int stage[NMOVES_MAX];
-    int reduced_score[NMOVES_MAX];
-
-    for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
-    {
-      stage[imove] = STAGE_SEARCH_MOVE_AT_REDUCED_DEPTH;
-
-      reduced_score[imove] = SCORE_MINUS_INFINITY;
-
-      if (!allow_reductions or
-          MOVE_DO_NOT_REDUCE(moves_list.ML_move_flags[imove]))
-      {
-        stage[imove] = STAGE_SEARCH_MOVE_AT_FULL_DEPTH;
-      }
-    }
-
-    int nmoves_searched_at_full_depth = 0;
-
-    for (int ipass = 1; ipass <= 2; ++ipass)
-    {
-      for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
-      {
-        int jmove = INVALID;
-
-        if (ipass == 1)
-        {
-          for (jmove = 0; jmove < moves_list.ML_nmoves; jmove++)
-          {
-            if ((stage[jmove] == STAGE_SEARCH_MOVE_AT_REDUCED_DEPTH) or
-                (stage[jmove] == STAGE_SEARCH_MOVE_AT_FULL_DEPTH))
-              break;
-          }
-
-          HARDBUG(jmove >= moves_list.ML_nmoves)
-
-          for (int kmove = jmove + 1; kmove < moves_list.ML_nmoves; kmove++)
-          {
-            if ((stage[kmove] != STAGE_SEARCH_MOVE_AT_REDUCED_DEPTH) and
-                (stage[kmove] != STAGE_SEARCH_MOVE_AT_FULL_DEPTH))
-              continue;
-
-            if (moves_weight[kmove] > moves_weight[jmove])
-              jmove = kmove;
-          }
-        }
-        else
-        {
-          jmove = 0;
-
-          for (jmove = 0; jmove < moves_list.ML_nmoves; jmove++)
-            if (stage[jmove] == STAGE_RESEARCH_MOVE_AT_FULL_DEPTH)
-              break;
-
-          if (jmove >= moves_list.ML_nmoves)
-            break;
-
-          for (int kmove = 1; kmove < moves_list.ML_nmoves; kmove++)
-          {
-            if (stage[kmove] != stage[jmove])
-              continue;
-
-            if (reduced_score[kmove] > reduced_score[jmove])
-              jmove = kmove;
-          }
-
-          if (reduced_score[jmove] <
-              (best_score - options.reduction_research_margin))
-            break;
-
-          stage[jmove] = STAGE_SEARCH_MOVE_AT_FULL_DEPTH;
-        }
-
-        SOFTBUG(jmove == INVALID)
-
-        HARDBUG(stage[jmove] == STAGE_SEARCHED_MOVE_AT_REDUCED_DEPTH)
-        HARDBUG(stage[jmove] == STAGE_SEARCHED_MOVE_AT_FULL_DEPTH)
-
-        int temp_score = SCORE_MINUS_INFINITY;
-
-        pv_t temp_pv[PV_MAX];
-
-        int temp_depth;
-
-        do_move(&(object->S_board), jmove, &moves_list, FALSE);
-
-        int reduced_depth = your_depth / options.reduction_strength;
-
-        if (nmoves_searched_at_full_depth < options.reduction_full_min)
-          stage[jmove] = STAGE_SEARCH_MOVE_AT_FULL_DEPTH;
-
-        if (stage[jmove] == STAGE_SEARCH_MOVE_AT_REDUCED_DEPTH)
-        {
-          for (int iprobe = options.reduction_probes; iprobe >= 0; --iprobe)
-          {
-            if ((reduced_depth - iprobe) < 0)
-              continue;
-
-            ++(object->S_total_reductions);
-
-            int reduced_alpha =
-                best_score - iprobe * options.reduction_probe_window;
-
-            int reduced_beta = reduced_alpha + 1;
-
-            temp_score =
-                -alpha_beta(object,
-                            -reduced_beta,
-                            -reduced_alpha,
-                            reduced_depth - iprobe,
-                            arg_node_type,
-                            arg_reduction_depth_root,
-                            your_tweaks | TWEAK_PREVIOUS_MOVE_REDUCED_BIT,
-                            arg_history,
-                            temp_pv + 1,
-                            &temp_depth);
-
-            if (object->S_interrupt != 0)
-            {
-              undo_move(&(object->S_board), jmove, &moves_list, FALSE);
-
-              best_score = SCORE_PLUS_INFINITY;
-
-              goto label_return;
-            }
-            if (temp_score <= reduced_alpha)
-              break;
-          }
-
-          if (temp_score < (SCORE_LOST + NODE_MAX))
-          {
-            ++(object->S_total_reductions_lost);
-
-            stage[jmove] = STAGE_SEARCHED_MOVE_AT_FULL_DEPTH;
-
-            ++nmoves_searched_at_full_depth;
-          }
-          else if (temp_score <= best_score)
-          {
-            ++(object->S_total_reductions_le_alpha);
-
-            stage[jmove] = STAGE_RESEARCH_MOVE_AT_FULL_DEPTH;
-
-            reduced_score[jmove] = temp_score;
-          }
-          else
-          {
-            ++(object->S_total_reductions_ge_beta);
-
-            stage[jmove] = STAGE_SEARCH_MOVE_AT_FULL_DEPTH;
-          }
-        } // if (stage[jmove]
-
-        if (stage[jmove] == STAGE_SEARCH_MOVE_AT_FULL_DEPTH)
-        {
-          temp_score = -alpha_beta(object,
-                                   -arg_my_beta,
-                                   -arg_my_alpha,
-                                   your_depth,
-                                   arg_node_type,
-                                   arg_reduction_depth_root,
-                                   your_tweaks,
-                                   arg_history,
-                                   temp_pv + 1,
-                                   &temp_depth);
-
-          stage[jmove] = STAGE_SEARCHED_MOVE_AT_FULL_DEPTH;
-
-          nmoves_searched_at_full_depth++;
-        }
-
-        undo_move(&(object->S_board), jmove, &moves_list, FALSE);
-
-        if (object->S_interrupt != 0)
-        {
-          best_score = SCORE_PLUS_INFINITY;
-
-          goto label_return;
-        }
-
-        SOFTBUG(temp_score == SCORE_MINUS_INFINITY)
-
-        if (temp_score > best_score)
-        {
-          HARDBUG(stage[jmove] != STAGE_SEARCHED_MOVE_AT_FULL_DEPTH)
-
-          best_score = temp_score;
-
-          best_move = jmove;
-
-          *arg_best_pv = jmove;
-
-          for (int ipv = 1; (arg_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++)
-            ;
-
-          if ((options.returned_depth_includes_captures or
-               (moves_list.ML_ncaptx == 0)) and
-              (temp_depth < (DEPTH_MAX - 1)))
-          {
-            temp_depth++;
-          }
-
-          *arg_best_depth = temp_depth;
-
-          if (options.alpha_beta_cache_size > 0)
-            update_alpha_beta_cache_slot_moves(&alpha_beta_cache_slot, jmove);
-
-          if (best_score >= arg_my_beta)
-            goto label_break;
-        }
-      } // for (int imove
-    }   // for (int ipass
-
-    HARDBUG(nmoves_searched_at_full_depth == 0)
-  }
-  else // IS_MINIMAL_WINDOW(node_type) NEW
-  {
-    // check if position should be extended
-
-    if (!(arg_my_tweaks & TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT) and
-        !(arg_my_tweaks & TWEAK_PREVIOUS_MOVE_EXTENDED_BIT) and
-        (arg_my_alpha >= (SCORE_LOST + NODE_MAX)))
-    {
-      if ((options.pv_combination_length > 0) and
-          (return_combination_length(arg_history) >=
-           options.pv_combination_length))
-      {
-        object->S_total_pv_extension_searches_combination++;
-
-        your_depth++;
-
-        your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
-      }
-      else if (options.pv_extension_search_window > 0)
-      {
-        object->S_total_pv_extension_searches++;
-
-        int reduced_alpha = arg_my_alpha - options.pv_extension_search_window;
-        int reduced_beta = reduced_alpha + 1;
-
-        int reduced_depth = your_depth;
-
-        pv_t temp_pv[PV_MAX];
-
-        int temp_depth;
-
-        int temp_score =
-            alpha_beta(object,
-                       reduced_alpha,
-                       reduced_beta,
-                       reduced_depth,
-                       MINIMAL_WINDOW_BIT,
+    alpha_beta_minimal(object,
+                       arg_my_alpha,
+                       arg_my_beta,
+                       arg_my_depth,
+                       arg_node_type,
                        arg_reduction_depth_root,
-                       arg_my_tweaks | TWEAK_PREVIOUS_SEARCH_EXTENDED_BIT,
+                       arg_my_tweaks,
+                       &moves_list,
+                       sort,
                        arg_history,
-                       temp_pv,
-                       &temp_depth);
+                       arg_search_result);
 
-        if (object->S_interrupt != 0)
-        {
-          best_score = SCORE_PLUS_INFINITY;
+    if (IS_SCORE_NAN(arg_search_result->SR_score))
+      goto label_return;
+  }
+  else
+  {
+    alpha_beta_pv(object,
+                  arg_my_alpha,
+                  arg_my_beta,
+                  arg_my_depth,
+                  arg_node_type,
+                  arg_reduction_depth_root,
+                  arg_my_tweaks,
+                  &moves_list,
+                  sort,
+                  arg_history,
+                  arg_search_result);
 
-          goto label_return;
-        }
+    if (IS_SCORE_NAN(arg_search_result->SR_score))
+      goto label_return;
+  }
 
-        if (temp_score <= reduced_alpha)
-        {
-          object->S_total_pv_extension_searches_le_alpha++;
-
-          your_depth = your_depth + 1;
-
-          your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
-        }
-        else
-        {
-          object->S_total_pv_extension_searches_ge_beta++;
-        }
-      }
-    }
-
-    for (int ipass = 1; ipass <= 2; ++ipass)
-    {
-      int nsingle_replies = 0;
-
-      for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
-      {
-        int jmove = 0;
-
-        for (int kmove = 1; kmove < moves_list.ML_nmoves; kmove++)
-        {
-          if (moves_weight[kmove] == L_MIN)
-            continue;
-
-          if (moves_weight[kmove] > moves_weight[jmove])
-            jmove = kmove;
-        }
-
-        if (moves_weight[jmove] == L_MIN)
-        {
-          if (ipass == 1)
-            HARDBUG(moves_weight[jmove] == L_MIN)
-          else
-            break;
-        }
-
-        moves_weight[jmove] = L_MIN;
-
-        int temp_alpha;
-
-        if (best_score < arg_my_alpha)
-          temp_alpha = arg_my_alpha;
-        else
-          temp_alpha = best_score;
-
-        int temp_score = SCORE_MINUS_INFINITY;
-
-        pv_t temp_pv[PV_MAX];
-
-        int temp_depth;
-
-        if (imove == 0)
-        {
-          do_move(&(object->S_board), jmove, &moves_list, FALSE);
-
-          temp_score = -alpha_beta(object,
-                                   -arg_my_beta,
-                                   -temp_alpha,
-                                   your_depth,
-                                   arg_node_type,
-                                   arg_reduction_depth_root,
-                                   your_tweaks,
-                                   arg_history,
-                                   temp_pv + 1,
-                                   &temp_depth);
-
-          undo_move(&(object->S_board), jmove, &moves_list, FALSE);
-        }
-        else
-        {
-          int temp_beta = temp_alpha + 1;
-
-          do_move(&(object->S_board), jmove, &moves_list, FALSE);
-
-          temp_score = -alpha_beta(object,
-                                   -temp_beta,
-                                   -temp_alpha,
-                                   your_depth,
-                                   MINIMAL_WINDOW_BIT,
-                                   arg_reduction_depth_root,
-                                   your_tweaks,
-                                   arg_history,
-                                   temp_pv + 1,
-                                   &temp_depth);
-
-          if ((object->S_interrupt == 0) and (temp_score >= temp_beta) and
-              (temp_score < arg_my_beta))
-          {
-            temp_score = -alpha_beta(object,
-                                     -arg_my_beta,
-                                     -temp_alpha,
-                                     your_depth,
-                                     arg_node_type,
-                                     arg_reduction_depth_root,
-                                     your_tweaks,
-                                     arg_history,
-                                     temp_pv + 1,
-                                     &temp_depth);
-          }
-
-          undo_move(&(object->S_board), jmove, &moves_list, FALSE);
-        }
-
-        if (object->S_interrupt != 0)
-        {
-          best_score = SCORE_PLUS_INFINITY;
-
-          goto label_return;
-        }
-
-        SOFTBUG(temp_score == SCORE_MINUS_INFINITY)
-
-        if (temp_score > arg_my_alpha)
-        {
-          SOFTBUG(!IS_PV(arg_node_type))
-
-          nsingle_replies++;
-        }
-
-        if (temp_score > best_score)
-        {
-          best_score = temp_score;
-
-          best_move = jmove;
-
-          *arg_best_pv = jmove;
-
-          for (int ipv = 1; (arg_best_pv[ipv] = temp_pv[ipv]) != INVALID; ipv++)
-            ;
-
-          if ((options.returned_depth_includes_captures or
-               (moves_list.ML_ncaptx == 0)) and
-              (temp_depth < (DEPTH_MAX - 1)))
-          {
-            temp_depth++;
-          }
-
-          *arg_best_depth = temp_depth;
-
-          if (options.alpha_beta_cache_size > 0)
-            update_alpha_beta_cache_slot_moves(&alpha_beta_cache_slot, jmove);
-
-          if (best_score >= arg_my_beta)
-            goto label_break;
-        }
-      } // imove
-
-      if ((ipass == 1) and (options.use_single_reply_extensions) and
-          (nsingle_replies == 1))
-      {
-        object->S_total_single_reply_extensions++;
-
-        *arg_best_pv = INVALID;
-
-        *arg_best_depth = INVALID;
-
-        best_score = SCORE_MINUS_INFINITY;
-
-        your_depth = your_depth + 1;
-
-        your_tweaks |= TWEAK_PREVIOUS_MOVE_EXTENDED_BIT;
-
-        for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
-          moves_weight[imove] = moves_list.ML_move_weights[imove];
-
-        moves_weight[best_move] = L_MAX;
-
-        continue;
-      }
-
-      break;
-    } // ipass
-  }   // IS_MINIMAL_WINDOW(node_type) NEW
-
-label_break:
+label_store:
 
   // we always searched move 0
 
-  SOFTBUG(best_move == INVALID)
+  HARDBUG(arg_search_result->SR_score == SCORE_MINUS_INFINITY)
 
-  SOFTBUG(best_score == SCORE_MINUS_INFINITY)
+  HARDBUG(arg_search_result->SR_depth == INVALID)
 
-  SOFTBUG(*arg_best_depth == INVALID)
+  HARDBUG(arg_search_result->SR_depth > DEPTH_MAX)
 
-  SOFTBUG(*arg_best_depth > DEPTH_MAX)
+  // #ifdef DEBUG
+  int frequency[NMOVES_MAX] = {0};
 
-  // if (best_score == 0) goto label_return;
-
-#ifdef DEBUG
-  if (options.alpha_beta_cache_size > 0)
+  for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
   {
-    for (int idebug = 0; idebug < NMOVES; idebug++)
-    {
-      if (alpha_beta_cache_slot.ABCS_moves[idebug] == INVALID)
-      {
-        for (int jdebug = idebug + 1; jdebug < NMOVES; jdebug++)
-          HARDBUG(alpha_beta_cache_slot.ABCS_moves[jdebug] != INVALID)
+    int key = sort[imove];
 
-        break;
-      }
+    HARDBUG((key < 0) or (key >= moves_list.ML_nmoves))
 
-      int ndebug = 0;
-
-      for (int jdebug = 0; jdebug < NMOVES; jdebug++)
-      {
-        if (alpha_beta_cache_slot.ABCS_moves[jdebug] ==
-            alpha_beta_cache_slot.ABCS_moves[idebug])
-          ndebug++;
-      }
-      HARDBUG(ndebug != 1)
-    }
+    frequency[key]++;
   }
-#endif
 
-  if (options.alpha_beta_cache_size > 0)
+  for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
+    HARDBUG(frequency[sort[imove]] != 1)
+
+  // #endif
+
+  if (FALSE and (options.alpha_beta_cache_size > 0) and
+      IS_SR_DRAW_BY_REP(arg_search_result->SR_flags))
   {
-    SOFTBUG(best_score > SCORE_PLUS_INFINITY)
-    SOFTBUG(best_score < SCORE_MINUS_INFINITY)
+    // HARDBUG(arg_search_result->SR_score != 0)
 
-    alpha_beta_cache_slot.ABCS_score = best_score;
+    my_printf(object->S_my_printf, "NOT STORING DRAW BY REP!\n");
+  }
 
-    alpha_beta_cache_slot.ABCS_depth = *arg_best_depth;
+  if ((options.alpha_beta_cache_size > 0) and
+      !IS_SR_DRAW_BY_REP(arg_search_result->SR_flags))
+  {
+    HARDBUG(arg_search_result->SR_score > SCORE_PLUS_INFINITY)
+    HARDBUG(arg_search_result->SR_score < SCORE_MINUS_INFINITY)
 
-    if (best_score <= arg_my_alpha)
+    alpha_beta_cache_slot.ABCS_key = object->S_board.B_key;
+
+    alpha_beta_cache_slot.ABCS_score = arg_search_result->SR_score;
+
+    alpha_beta_cache_slot.ABCS_depth = arg_search_result->SR_depth;
+
+    for (int imove = 0; imove < NMOVES; imove++)
+      alpha_beta_cache_slot.ABCS_moves[imove] = INVALID;
+
+    int nmoves = NMOVES;
+    if (moves_list.ML_nmoves < nmoves)
+      nmoves = moves_list.ML_nmoves;
+
+    for (int imove = 0; imove < nmoves; imove++)
+      alpha_beta_cache_slot.ABCS_moves[imove] = sort[imove];
+
+    if (arg_search_result->SR_score <= arg_my_alpha)
     {
+      HARDBUG(IS_SR_GE_BETA(arg_search_result->SR_flags))
+
       ++(object->S_total_alpha_beta_cache_le_alpha_stored);
 
       alpha_beta_cache_slot.ABCS_flags = LE_ALPHA_BIT;
+
+      TRACE_AB_CACHE(object, "STORE LE ALPHA", &alpha_beta_cache_slot)
     }
-    else if (best_score >= arg_my_beta)
+    else if (arg_search_result->SR_score >= arg_my_beta)
     {
+      HARDBUG(IS_SR_LE_ALPHA(arg_search_result->SR_flags))
+
       ++(object->S_total_alpha_beta_cache_ge_beta_stored);
 
       alpha_beta_cache_slot.ABCS_score = arg_my_beta;
 
       alpha_beta_cache_slot.ABCS_flags = GE_BETA_BIT;
+
+      TRACE_AB_CACHE(object, "STORE GE BETA", &alpha_beta_cache_slot)
     }
     else
     {
       ++(object->S_total_alpha_beta_cache_true_score_stored);
 
       alpha_beta_cache_slot.ABCS_flags = TRUE_SCORE_BIT;
+
+      TRACE_AB_CACHE(object, "STORE TRUE SCORE", &alpha_beta_cache_slot)
     }
 
-    alpha_beta_cache_slot.ABCS_key = object->S_board.B_key;
-
     alpha_beta_cache_slot.ABCS_crc64 =
-        return_crc64_from_crc32(&alpha_beta_cache_slot);
+      return_crc64_from_crc32(&alpha_beta_cache_slot);
 
     update_alpha_beta_cache(object,
                             arg_node_type,
@@ -2265,27 +3335,41 @@ label_break:
 
 label_return:
 
-  if (FALSE and (*arg_best_depth == DEPTH_MAX))
+  if (FALSE and (arg_search_result->SR_depth == DEPTH_MAX))
   {
-    HARDBUG((best_score < (SCORE_WON - NODE_MAX)) and
-            (best_score > (SCORE_LOST + NODE_MAX)) and (best_score != 0))
+    HARDBUG(!IS_SCORE_WON(arg_search_result->SR_score) and
+            !IS_SCORE_LOST(arg_search_result->SR_score) and
+            (arg_search_result->SR_score != 0))
   }
 
-  if (best_score >= arg_my_beta)
+  if (!IS_SCORE_NAN(arg_search_result->SR_score) and
+      (arg_search_result->SR_depth < arg_my_depth))
   {
-    best_score = arg_my_beta;
-    //*arg_best_depth = arg_my_depth;
+    PRINTF("arg_search_result->SR_depth=%d arg_my_depth=%d\n",
+           arg_search_result->SR_depth,
+           arg_my_depth);
+
+    FATAL("eh?", EXIT_FAILURE)
   }
+
+  fail_hard(arg_my_alpha, arg_my_beta, arg_search_result);
+
+  TRACE_AB_EXIT(object,
+                arg_my_alpha,
+                arg_my_beta,
+                arg_node_type,
+                arg_my_depth,
+                arg_search_result);
+
+  check_search_result(arg_my_alpha, arg_my_beta, arg_search_result);
 
   END_BLOCK
 
   POP_NAME(__FUNC__)
-
-  return (best_score);
 }
 
 void do_pv(search_t *object,
-           pv_t *arg_best_pv,
+           pv_entries_t *arg_best_pv,
            int arg_pv_score,
            bstring arg_bpv_string)
 {
@@ -2368,7 +3452,7 @@ void do_pv(search_t *object,
     return;
   }
 
-  int jmove = *arg_best_pv;
+  int jmove = probe_pv(arg_best_pv, object->S_board.B_key);
 
   if (jmove == INVALID)
   {
@@ -2397,14 +3481,14 @@ void do_pv(search_t *object,
     if ((options.alpha_beta_cache_size > 0) and (options.pv2cache))
     {
       alpha_beta_cache_slot_t alpha_beta_cache_slot =
-          alpha_beta_cache_slot_default;
+        alpha_beta_cache_slot_default;
 
       alpha_beta_cache_slot.ABCS_moves[0] = jmove;
 
       alpha_beta_cache_slot.ABCS_key = object->S_board.B_key;
 
       alpha_beta_cache_slot.ABCS_crc64 =
-          return_crc64_from_crc32(&alpha_beta_cache_slot);
+        return_crc64_from_crc32(&alpha_beta_cache_slot);
 
       update_alpha_beta_cache(object,
                               PV_BIT,
@@ -2424,7 +3508,7 @@ void do_pv(search_t *object,
 
     do_move(&(object->S_board), jmove, &moves_list, FALSE);
 
-    do_pv(object, arg_best_pv + 1, -arg_pv_score, arg_bpv_string);
+    do_pv(object, arg_best_pv, -arg_pv_score, arg_bpv_string);
 
     undo_move(&(object->S_board), jmove, &moves_list, FALSE);
   }
@@ -2436,7 +3520,7 @@ local void print_pv(search_t *object,
                     int arg_jmove,
                     moves_list_t *arg_moves_list,
                     int arg_move_score,
-                    pv_t *arg_best_pv,
+                    pv_entries_t *arg_best_pv,
                     char *arg_move_status)
 {
   BSTRING(bmove_string)
@@ -2466,7 +3550,7 @@ local void print_pv(search_t *object,
              (float)arg_move_score / (float)SCORE_MAN,
              return_my_timer(&(object->S_timer), FALSE),
              global_nodes / return_my_timer(&(object->S_timer), TRUE) /
-                 1000000.0,
+               1000000.0,
              bdata(bmove_string));
   }
   else
@@ -2491,7 +3575,7 @@ local void print_pv(search_t *object,
 
   do_move(&(object->S_board), arg_jmove, arg_moves_list, FALSE);
 
-  do_pv(object, arg_best_pv + 1, -arg_move_score, bpv_string);
+  do_pv(object, arg_best_pv, -arg_move_score, bpv_string);
 
   undo_move(&(object->S_board), arg_jmove, arg_moves_list, FALSE);
 
@@ -2556,14 +3640,12 @@ void do_search(search_t *object,
 
   int my_depth = INVALID;
 
-  SOFTBUG(arg_moves_list->ML_nmoves == 0)
+  HARDBUG(arg_moves_list->ML_nmoves == 0)
 
   if (arg_depth_min == INVALID)
     arg_depth_min = 1;
   if (arg_depth_max == INVALID)
     arg_depth_max = options.depth_limit;
-
-  object->S_interrupt = 0;
 
   object->S_board.B_root_inode = object->S_board.B_inode;
 
@@ -2602,7 +3684,7 @@ void do_search(search_t *object,
 
       int temp_mate = read_endgame(object, your_colour, NULL);
 
-      SOFTBUG(temp_mate == ENDGAME_UNKNOWN)
+      HARDBUG(temp_mate == ENDGAME_UNKNOWN)
 
       int temp_score;
 
@@ -2639,9 +3721,6 @@ void do_search(search_t *object,
 
         object->S_best_move = jmove;
 
-        object->S_best_pv[0] = jmove;
-        object->S_best_pv[1] = INVALID;
-
         your_mate = temp_mate;
       }
 #ifdef DEBUG
@@ -2656,7 +3735,7 @@ void do_search(search_t *object,
 #endif
     }
 
-    SOFTBUG(object->S_best_score == SCORE_MINUS_INFINITY)
+    HARDBUG(object->S_best_score == SCORE_MINUS_INFINITY)
 
     object->S_best_score_kind = SEARCH_BEST_SCORE_EGTB;
 
@@ -2718,47 +3797,47 @@ void do_search(search_t *object,
 
   int your_tweaks = 0;
 
-  return_network_score_scaled(&(object->S_board.B_network_thread));
-
   object->S_root_simple_score = return_score(object);
 
-  pv_t temp_pv[PV_MAX];
+  search_result_t temp_result;
 
-  int temp_depth;
+  temp_result.SR_pv = pv_entries_default;
 
   if (FALSE and (arg_moves_list->ML_ncaptx == 0) and
       (arg_moves_list->ML_nmoves > 2))
   {
     do_move(&(object->S_board), INVALID, NULL, FALSE);
 
-    object->S_root_score = -alpha_beta(object,
-                                       SCORE_MINUS_INFINITY,
-                                       SCORE_PLUS_INFINITY,
-                                       1,
-                                       PV_BIT,
-                                       options.reduction_depth_root,
-                                       TWEAK_PREVIOUS_MOVE_NULL_BIT,
-                                       0xFULL,
-                                       temp_pv + 1,
-                                       &temp_depth);
+    alpha_beta(object,
+               SCORE_MINUS_INFINITY,
+               SCORE_PLUS_INFINITY,
+               1,
+               PV_BIT,
+               options.reduction_depth_root,
+               TWEAK_PREVIOUS_MOVE_NULL_BIT,
+               0xFULL,
+               &temp_result);
+
+    object->S_root_score = -temp_result.SR_score;
 
     undo_move(&(object->S_board), INVALID, NULL, FALSE);
   }
   else
   {
-    object->S_root_score = alpha_beta(object,
-                                      SCORE_MINUS_INFINITY,
-                                      SCORE_PLUS_INFINITY,
-                                      1,
-                                      PV_BIT,
-                                      options.reduction_depth_root,
-                                      0,
-                                      0xFULL,
-                                      temp_pv,
-                                      &temp_depth);
+    alpha_beta(object,
+               SCORE_MINUS_INFINITY,
+               SCORE_PLUS_INFINITY,
+               1,
+               PV_BIT,
+               options.reduction_depth_root,
+               0,
+               0xFULL,
+               &temp_result);
+
+    object->S_root_score = temp_result.SR_score;
   }
 
-  if (object->S_interrupt != 0)
+  if (IS_SCORE_NAN(temp_result.SR_score))
   {
     object->S_root_score = return_score(object);
 
@@ -2767,9 +3846,6 @@ void do_search(search_t *object,
     object->S_best_move = 0;
 
     object->S_best_depth = INVALID;
-
-    object->S_best_pv[0] = 0;
-    object->S_best_pv[1] = INVALID;
 
     goto label_limit;
   }
@@ -2784,9 +3860,6 @@ void do_search(search_t *object,
   object->S_best_move = 0;
 
   object->S_best_depth = 0;
-
-  object->S_best_pv[0] = 0;
-  object->S_best_pv[1] = INVALID;
 
   if (arg_root_score == SCORE_MINUS_INFINITY)
     object->S_best_score = object->S_root_score;
@@ -2852,6 +3925,10 @@ void do_search(search_t *object,
 
   for (my_depth = arg_depth_min; my_depth <= arg_depth_max; ++my_depth)
   {
+#ifdef TRACE_AB
+    PRINTF("my_depth=%d\n", my_depth);
+#endif
+
     int your_depth = my_depth - 1;
 
     int nbest_moves = 0;
@@ -2932,22 +4009,48 @@ void do_search(search_t *object,
           if (my_beta > SCORE_PLUS_INFINITY)
             my_beta = SCORE_PLUS_INFINITY;
 
+          TRACE_KEY(object)
+
           do_move(&(object->S_board), jmove, arg_moves_list, FALSE);
 
-          move_score = -alpha_beta(object,
-                                   -my_beta,
-                                   -my_alpha,
-                                   your_depth,
-                                   node_type,
-                                   options.reduction_depth_root,
-                                   your_tweaks,
-                                   0xFULL,
-                                   temp_pv + 1,
-                                   &temp_depth);
+          TRACE_AB_WINDOW(trace_key,
+                          "search",
+                          my_alpha,
+                          my_beta,
+                          arg_moves_list,
+                          jmove)
+
+          TRACE_INDENT(arg_moves_list, jmove)
+
+          alpha_beta(object,
+                     -my_beta,
+                     -my_alpha,
+                     your_depth,
+                     node_type,
+                     options.reduction_depth_root,
+                     your_tweaks,
+                     0xFULL,
+                     &temp_result);
+
+          TRACE_DEDENT
+
+          TRACE_AB_RESULT(trace_key,
+                          "result search",
+                          my_alpha,
+                          my_beta,
+                          arg_moves_list,
+                          jmove,
+                          &temp_result);
+
+          flip_search_result(&temp_result);
+
+          check_search_result(my_alpha, my_beta, &temp_result);
+
+          move_score = temp_result.SR_score;
 
           undo_move(&(object->S_board), jmove, arg_moves_list, FALSE);
 
-          if (object->S_interrupt != 0)
+          if (IS_SCORE_NAN(temp_result.SR_score))
             goto label_limit;
 
           if (iteration == 0)
@@ -3012,7 +4115,7 @@ void do_search(search_t *object,
                      jmove,
                      arg_moves_list,
                      move_score,
-                     temp_pv,
+                     &(temp_result.SR_pv),
                      "<=");
 
             if (iteration > 0)
@@ -3029,7 +4132,7 @@ void do_search(search_t *object,
                      jmove,
                      arg_moves_list,
                      move_score,
-                     temp_pv,
+                     &(temp_result.SR_pv),
                      ">=");
 
             if (iteration > 0)
@@ -3053,7 +4156,7 @@ void do_search(search_t *object,
                      jmove,
                      arg_moves_list,
                      move_score,
-                     temp_pv,
+                     &(temp_result.SR_pv),
                      "==");
             break;
           }
@@ -3120,17 +4223,9 @@ void do_search(search_t *object,
 
           object->S_best_move = jmove;
 
-          // with->S_best_depth = temp_depth + my_depth - your_depth;
-
           object->S_best_depth = my_depth;
 
           object->S_best_score_by_depth[my_depth] = object->S_best_score;
-
-          object->S_best_pv[0] = jmove;
-
-          for (int ipv = 1; (object->S_best_pv[ipv] = temp_pv[ipv]) != INVALID;
-               ipv++)
-            ;
 
           print_pv(object,
                    my_depth,
@@ -3138,7 +4233,7 @@ void do_search(search_t *object,
                    jmove,
                    arg_moves_list,
                    move_score,
-                   object->S_best_pv,
+                   &(temp_result.SR_pv),
                    "===");
 
           nbest_moves++;
@@ -3161,10 +4256,10 @@ void do_search(search_t *object,
       label_next_move:;
       } // for (int imove)
 
-      if (object->S_best_score > (SCORE_WON - NODE_MAX))
-        break;
-      if (object->S_best_score < (SCORE_LOST + NODE_MAX))
-        break;
+      if (IS_SCORE_WON(object->S_best_score))
+        goto label_limit;
+      if (IS_SCORE_LOST(object->S_best_score))
+        goto label_limit;
 
       if (nbest_moves > 0)
         break;
@@ -3233,10 +4328,10 @@ label_limit:
 
   move2bstring(arg_moves_list, object->S_best_move, bmove_string),
 
-      my_printf(object->S_my_printf,
-                "best_move=%s best_score=%d\n",
-                bdata(bmove_string),
-                object->S_best_score);
+    my_printf(object->S_my_printf,
+              "best_move=%s best_score=%d\n",
+              bdata(bmove_string),
+              object->S_best_score);
 
   BDESTROY(bmove_string)
 
@@ -3283,7 +4378,7 @@ label_limit:
          ++ndelta_king)
     {
       mean_sigma(
-          &(lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]));
+        &(lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]));
 
       if (lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX].S_n >
           0)
@@ -3291,7 +4386,7 @@ label_limit:
         PRINTF("ndelta_man=%d ndelta_king=%d\n", ndelta_man, ndelta_king);
 
         printf_stats(
-            &(lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]));
+          &(lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]));
       }
     }
   }
@@ -3392,14 +4487,14 @@ void init_search(void)
     float alpha_beta_cache_size = options.alpha_beta_cache_size * MBYTE / 2;
 
     nalpha_beta_pv_cache_entries = first_prime_below(
-        roundf(alpha_beta_cache_size * (options.pv_cache_fraction / 100.0f) /
-               sizeof(alpha_beta_cache_entry_t)));
+      roundf(alpha_beta_cache_size * (options.pv_cache_fraction / 100.0f) /
+             sizeof(alpha_beta_cache_entry_t)));
 
     HARDBUG(nalpha_beta_pv_cache_entries < 3)
 
     nalpha_beta_cache_entries = first_prime_below(roundf(
-        alpha_beta_cache_size * ((100 - options.pv_cache_fraction) / 100.0f) /
-        sizeof(alpha_beta_cache_entry_t)));
+      alpha_beta_cache_size * ((100 - options.pv_cache_fraction) / 100.0f) /
+      sizeof(alpha_beta_cache_entry_t)));
 
     HARDBUG(nalpha_beta_cache_entries < 3)
 
@@ -3416,11 +4511,11 @@ void init_search(void)
     alpha_beta_cache_slot_default.ABCS_pad = 0;
 
     alpha_beta_cache_slot_default.ABCS_crc64 =
-        return_crc64_from_crc32(&alpha_beta_cache_slot_default);
+      return_crc64_from_crc32(&alpha_beta_cache_slot_default);
 
     for (int islot = 0; islot < NSLOTS; islot++)
       alpha_beta_cache_entry_default.ABCE_slots[islot] =
-          alpha_beta_cache_slot_default;
+        alpha_beta_cache_slot_default;
 
     MY_MALLOC_BY_TYPE(alpha_beta_cache[WHITE_ENUM],
                       alpha_beta_cache_entry_t,
@@ -3432,6 +4527,12 @@ void init_search(void)
 
     clear_alpha_beta_caches();
   }
+
+  for (int islot = 0; islot < NPV_SLOTS; islot++)
+    pv_entry_default.PVE_slots[islot] = PV_SLOT_IMOVE_MASK;
+
+  for (int ientry = 0; ientry < NPV_ENTRIES; ientry++)
+    pv_entries_default.PVE_entries[ientry] = pv_entry_default;
 
   construct_bucket(&bucket_depth,
                    "bucket_depth",
@@ -3447,8 +4548,8 @@ void init_search(void)
          ++ndelta_king)
     {
       construct_stats(
-          &(lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]),
-          "lazy_stats");
+        &(lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]),
+        "lazy_stats");
     }
   }
 #endif

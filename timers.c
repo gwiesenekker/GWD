@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0
@@ -185,10 +184,10 @@ void update_progress(progress_t *arg_progress)
       arg_progress->P_ndelta)
   {
     arg_progress->P_seconds_done =
-        return_my_timer(&(arg_progress->P_timer), FALSE);
+      return_my_timer(&(arg_progress->P_timer), FALSE);
 
     double seconds_delta =
-        arg_progress->P_seconds_done - arg_progress->P_seconds_previous;
+      arg_progress->P_seconds_done - arg_progress->P_seconds_previous;
 
     if (seconds_delta >= arg_progress->P_seconds)
     {
@@ -220,7 +219,7 @@ void update_progress(progress_t *arg_progress)
 void finalize_progress(progress_t *arg_progress)
 {
   arg_progress->P_seconds_done =
-      return_my_timer(&(arg_progress->P_timer), FALSE);
+    return_my_timer(&(arg_progress->P_timer), FALSE);
 
   PRINTF("progress took %.0f seconds for %lld entries %.0f entries/second\n",
          arg_progress->P_seconds_done,
@@ -258,7 +257,7 @@ void configure_time_control(int arg_game_time,
       //(imove - 1) can be negative
 
       object->TC_game_time_per_move[imove] =
-          cdf(arg_game_time, imove) - cdf(arg_game_time, imove - 1);
+        cdf(arg_game_time, imove) - cdf(arg_game_time, imove - 1);
 
       game_time_left -= object->TC_game_time_per_move[imove];
     }
@@ -268,7 +267,7 @@ void configure_time_control(int arg_game_time,
     double game_time_half = (double)arg_game_time / 2.0;
 
     object->TC_game_time_per_move[options.time_control_mean] =
-        game_time_half / options.time_control_sigma;
+      game_time_half / options.time_control_sigma;
 
     game_time_left -= object->TC_game_time_per_move[options.time_control_mean];
 
@@ -278,7 +277,7 @@ void configure_time_control(int arg_game_time,
       game_time_half -= object->TC_game_time_per_move[imove - 1];
 
       object->TC_game_time_per_move[imove] =
-          game_time_half / options.time_control_sigma;
+        game_time_half / options.time_control_sigma;
 
       game_time_left -= object->TC_game_time_per_move[imove];
     }
@@ -290,7 +289,7 @@ void configure_time_control(int arg_game_time,
       game_time_half -= object->TC_game_time_per_move[imove + 1];
 
       object->TC_game_time_per_move[imove] =
-          game_time_half / options.time_control_sigma;
+        game_time_half / options.time_control_sigma;
 
       game_time_left -= object->TC_game_time_per_move[imove];
     }
@@ -359,7 +358,7 @@ void set_time_limit(int arg_jmove, time_control_t *object)
     if ((arg_jmove + itrouble + 1) <= object->TC_ngame_moves)
     {
       options.time_trouble[itrouble] =
-          object->TC_game_time_per_move[arg_jmove + itrouble + 1];
+        object->TC_game_time_per_move[arg_jmove + itrouble + 1];
       if (options.time_trouble[itrouble] < 0.1)
         options.time_trouble[itrouble] = 0.1;
     }

@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 /*
  * This source file is part of the bstring string library.  This code was
  * written by Paul Hsieh in 2002-2015, and is covered by the BSD open source
@@ -1622,11 +1621,11 @@ struct charField
 #define testInCharField(cf, c)               \
   ((cf)->content[(c) >> LONG_LOG_BITS_QTY] & \
    (((long)1) << ((c) & (LONG_BITS_QTY - 1))))
-#define setInCharField(cf, idx)                        \
-  {                                                    \
-    unsigned int c = (unsigned int)(idx);              \
-    (cf)->content[c >> LONG_LOG_BITS_QTY] |=           \
-        (LONG_TYPE)(1ul << (c & (LONG_BITS_QTY - 1))); \
+#define setInCharField(cf, idx)                      \
+  {                                                  \
+    unsigned int c = (unsigned int)(idx);            \
+    (cf)->content[c >> LONG_LOG_BITS_QTY] |=         \
+      (LONG_TYPE)(1ul << (c & (LONG_BITS_QTY - 1))); \
   }
 
 #else

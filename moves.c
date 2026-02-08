@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 local int white_dir[4] = {-6, -5, 5, 6};
@@ -16,17 +15,14 @@ local void update_patterns(board_t *self,
 {
   board_t *object = self;
 
-  // loop over all PS_patterns in which ifield occurs
-
-  patterns_shared_t *with_patterns_shared = &patterns_shared;
+  // loop over all PSS_patterns in which ifield occurs
 
   patterns_thread_t *with_patterns_thread =
-      &(object->B_network_thread.NT_patterns);
+    &(object->B_network_thread.NT_patterns);
 
-  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
-       ipattern++)
+  for (int ipattern = 0; ipattern < patterns_shared.PSS_npatterns; ipattern++)
   {
-    int jpattern = with_patterns_shared->PS_patterns_map[arg_ifield][ipattern];
+    int jpattern = patterns_shared.PSS_patterns_map[arg_ifield][ipattern];
 
     // last pattern
 
@@ -36,10 +32,10 @@ local void update_patterns(board_t *self,
     // ifield occurs in pattern jpattern
 
     pattern_shared_t *with_pattern_shared =
-        with_patterns_shared->PS_patterns + jpattern;
+      patterns_shared.PSS_patterns + jpattern;
 
     pattern_thread_t *with_pattern_thread =
-        with_patterns_thread->PT_patterns + jpattern;
+      with_patterns_thread->PT_patterns + jpattern;
 
     int ilinear = with_pattern_shared->PS_field2linear[arg_ifield];
 
@@ -132,7 +128,7 @@ void gen_moves(board_t *object, moves_list_t *arg_moves_list)
         {
           if (empty_bb & BITULL(jfield1))
           {
-            SOFTBUG(arg_moves_list->ML_nmoves >= NMOVES_MAX)
+            HARDBUG(arg_moves_list->ML_nmoves >= NMOVES_MAX)
 
             move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
 
@@ -154,7 +150,7 @@ void gen_moves(board_t *object, moves_list_t *arg_moves_list)
         {
           if (arg_moves_list->ML_ncaptx == 0)
           {
-            SOFTBUG(arg_moves_list->ML_nmoves >= NMOVES_MAX)
+            HARDBUG(arg_moves_list->ML_nmoves >= NMOVES_MAX)
 
             move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
 
@@ -214,7 +210,7 @@ void gen_moves(board_t *object, moves_list_t *arg_moves_list)
             {
               print_board(object);
             }
-            SOFTBUG(arg_moves_list->ML_nmoves >= NMOVES_MAX)
+            HARDBUG(arg_moves_list->ML_nmoves >= NMOVES_MAX)
 
             move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
 
@@ -635,7 +631,7 @@ label_null:
 
   object->B_inode++;
 
-  SOFTBUG(object->B_inode >= NODE_MAX)
+  HARDBUG(object->B_inode >= NODE_MAX)
 
   node = object->B_nodes + object->B_inode;
 
@@ -734,7 +730,7 @@ void undo_move(board_t *object,
 
   object->B_inode--;
 
-  SOFTBUG(object->B_inode < 0)
+  HARDBUG(object->B_inode < 0)
 
   node_t *node = object->B_nodes + object->B_inode;
 

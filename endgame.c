@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 
 #include "globals.h"
 
@@ -96,7 +95,7 @@ typedef struct
 typedef ui8_t wdl_t;
 
 local endgame_t
-    endgames[NENDGAME_MAX][NENDGAME_MAX][NENDGAME_MAX][NENDGAME_MAX];
+  endgames[NENDGAME_MAX][NENDGAME_MAX][NENDGAME_MAX][NENDGAME_MAX];
 
 local int egtb_level_warning = TRUE;
 
@@ -592,10 +591,9 @@ void init_endgame(void)
 
           HARDBUG(version != EGTB_COMPRESSED_VERSION)
 
-          HARDBUG(fread(&nblock_entries,
-                        sizeof(i16_t),
-                        1,
-                        with_endgame->fendgame) != 1)
+          HARDBUG(
+            fread(&nblock_entries, sizeof(i16_t), 1, with_endgame->fendgame) !=
+            1)
 
           HARDBUG(nblock_entries != NPAGE_ENTRIES)
 
@@ -864,7 +862,7 @@ void update_endgame_index(int arg_nlist,
     SOFTBUG(list0 > list1)
 
     *endgame_index =
-        *endgame_index * SUM2(49) + SUM2(list0) + list1 - list0 - 1;
+      *endgame_index * SUM2(49) + SUM2(list0) + list1 - list0 - 1;
   }
   else if (arg_nlist == 3)
   {
@@ -1454,8 +1452,8 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     // read the page from memory or file
 
 #ifndef ZSTD
-    i64_t seek = sizeof(i64_t) +
-                 ipage * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui64_t));
+    i64_t seek =
+      sizeof(i64_t) + ipage * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui64_t));
 #else
     i64_t seek = sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) +
                  ipage * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
@@ -1828,12 +1826,12 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
   PRINTF("npage_old=%lld npage_new=%lld\n", npage_old, npage_new);
 
   i64_t fixed_size_old =
-      sizeof(i64_t) +
-      npage_old * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
+    sizeof(i64_t) +
+    npage_old * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
 
   i64_t fixed_size_new =
-      sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) +
-      npage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
+    sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) +
+    npage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
 
   size_new = fixed_size_new;
 
@@ -1854,8 +1852,8 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
     }
 
     i64_t seek_old =
-        sizeof(i64_t) +
-        ipage_old * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui64_t));
+      sizeof(i64_t) +
+      ipage_old * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui64_t));
 
     HARDBUG(compat_fseeko(fold, seek_old, SEEK_SET) != 0)
 
@@ -1885,8 +1883,8 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
         HARDBUG(ipage_new >= npage_new)
 
         i64_t seek_new =
-            sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) +
-            ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
+          sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) +
+          ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
 
         HARDBUG(compat_fseeko(fnew, seek_new, SEEK_SET) != 0)
 
@@ -2010,9 +2008,9 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
           source_new[ientry].entry_white_mate =
-              page_i16[jentry + ientry].entry_white_mate;
+            page_i16[jentry + ientry].entry_white_mate;
           source_new[ientry].entry_black_mate =
-              page_i16[jentry + ientry].entry_black_mate;
+            page_i16[jentry + ientry].entry_black_mate;
         }
 
         crc32 = HW_CRC32_U8(crc32, ALL_I8);
@@ -2076,9 +2074,9 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
         for (int ientry = 0; ientry < nblock_entries; ientry++)
         {
           crc32 =
-              HW_CRC32_U16(crc32, page_i16[jentry + ientry].entry_white_mate);
+            HW_CRC32_U16(crc32, page_i16[jentry + ientry].entry_white_mate);
           crc32 =
-              HW_CRC32_U16(crc32, page_i16[jentry + ientry].entry_black_mate);
+            HW_CRC32_U16(crc32, page_i16[jentry + ientry].entry_black_mate);
         }
 
         size_t sourceLen_new = sizeof(entry_i16_t) * nblock_entries;
@@ -2128,8 +2126,8 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
       HARDBUG(ipage_new >= npage_new)
 
       i64_t seek_new =
-          sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) +
-          ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
+        sizeof(i8_t) + sizeof(i16_t) + sizeof(i64_t) +
+        ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
 
       HARDBUG(compat_fseeko(fnew, seek_new, SEEK_SET) != 0)
 
@@ -2152,7 +2150,7 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
   PRINTF("npage_old=%lld npage_new=%lld\n", npage_old, npage_new);
 
   double compress_ratio_old =
-      100.0 - compressed_size_old * 100.0 / uncompressed_size_old;
+    100.0 - compressed_size_old * 100.0 / uncompressed_size_old;
 
   PRINTF("fixed_size_old=%lld\n", fixed_size_old);
 
@@ -2177,7 +2175,7 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
   }
 
   double compress_ratio_new =
-      100.0 - compressed_size_new * 100.0 / uncompressed_size_old;
+    100.0 - compressed_size_new * 100.0 / uncompressed_size_old;
 
   PRINTF("fixed_size_new=%lld\n", fixed_size_new);
 
@@ -2228,8 +2226,8 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
     }
 
     i64_t seek_new =
-        sizeof(i8_t) + sizeof(i64_t) + sizeof(i16_t) +
-        ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
+      sizeof(i8_t) + sizeof(i64_t) + sizeof(i16_t) +
+      ipage_new * (sizeof(i64_t) + sizeof(i16_t) + sizeof(ui32_t));
 
     HARDBUG(compat_fseeko(fnew, seek_new, SEEK_SET) != 0)
 
@@ -2285,7 +2283,7 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
       --sourceLen_new;
 
       destLen_new =
-          ZSTD_decompress(dest_new, destLen_new, source_new + 1, sourceLen_new);
+        ZSTD_decompress(dest_new, destLen_new, source_new + 1, sourceLen_new);
 
       HARDBUG(ZSTD_isError(destLen_new))
 
@@ -2322,7 +2320,7 @@ void recompress_endgame(char *arg_name, int arg_level, int arg_nblock)
       --sourceLen_new;
 
       destLen_new =
-          ZSTD_decompress(dest_new, destLen_new, source_new + 1, sourceLen_new);
+        ZSTD_decompress(dest_new, destLen_new, source_new + 1, sourceLen_new);
 
       HARDBUG(ZSTD_isError(destLen_new))
 

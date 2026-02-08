@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #undef read
@@ -437,7 +436,7 @@ int return_physical_cpus(void)
         {
           PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = plpi;
           DWORD numSlots =
-              returnLength / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+            returnLength / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
 
           while (ptr < plpi + numSlots)
           {
@@ -608,12 +607,8 @@ void compat_thread_create(my_thread_t *thread,
     exit(EXIT_FAILURE);
   }
 #elif COMPAT_CSTD == COMPAT_CSTD_WIN
-  HANDLE hThread = CreateThread(NULL,
-                                0,
-                                (unsigned long (*)(void *))thread_func,
-                                arg,
-                                0,
-                                NULL);
+  HANDLE hThread =
+    CreateThread(NULL, 0, (unsigned long (*)(void *))thread_func, arg, 0, NULL);
 
   if (hThread == NULL)
   {

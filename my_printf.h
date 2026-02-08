@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef MyPrintfH
 #define MyPrintfH
 
@@ -30,7 +29,7 @@ extern bstring my_printf_logs_dir;
 
 void construct_my_printf(my_printf_t *, char *, int);
 void my_printf(my_printf_t *, char *, ...)
-    __attribute__((format(printf, 2, 3)));
+  __attribute__((format(printf, 2, 3)));
 void pause_my_printf(my_printf_t *);
 void resume_my_printf(my_printf_t *);
 void init_my_printf(void);

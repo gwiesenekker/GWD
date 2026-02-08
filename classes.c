@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 // objects are derived from a class
@@ -217,7 +216,7 @@ void test_my_object_class(void)
   // initialize the class
 
   my_object_class =
-      init_class(3, construct_my_object, destroy_my_object, iterate_my_object);
+    init_class(3, construct_my_object, destroy_my_object, iterate_my_object);
 
   my_object_t *a = my_object_class->objects_ctor();
 

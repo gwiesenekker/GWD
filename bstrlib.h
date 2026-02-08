@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 /*
  * This source file is part of the bstring string library.  This code was
  * written by Paul Hsieh in 2002-2015, and is covered by the BSD open source
@@ -162,31 +161,31 @@ extern "C"
   extern int bassignformat(bstring b, const char *fmt, ...);
   extern int bvcformata(bstring b, int count, const char *fmt, va_list arglist);
 
-#define bvformata(ret, b, fmt, lastarg)                                    \
-  {                                                                        \
-    bstring bstrtmp_b = (b);                                               \
-    const char *bstrtmp_fmt = (fmt);                                       \
-    int bstrtmp_r = BSTR_ERR, bstrtmp_sz = 16;                             \
-    for (;;)                                                               \
-    {                                                                      \
-      va_list bstrtmp_arglist;                                             \
-      va_start(bstrtmp_arglist, lastarg);                                  \
-      bstrtmp_r =                                                          \
-          bvcformata(bstrtmp_b, bstrtmp_sz, bstrtmp_fmt, bstrtmp_arglist); \
-      va_end(bstrtmp_arglist);                                             \
-      if (bstrtmp_r >= 0)                                                  \
-      { /* Everything went ok */                                           \
-        bstrtmp_r = BSTR_OK;                                               \
-        break;                                                             \
-      }                                                                    \
-      else if (-bstrtmp_r <= bstrtmp_sz)                                   \
-      { /* A real error? */                                                \
-        bstrtmp_r = BSTR_ERR;                                              \
-        break;                                                             \
-      }                                                                    \
-      bstrtmp_sz = -bstrtmp_r; /* Doubled or target size */                \
-    }                                                                      \
-    ret = bstrtmp_r;                                                       \
+#define bvformata(ret, b, fmt, lastarg)                                  \
+  {                                                                      \
+    bstring bstrtmp_b = (b);                                             \
+    const char *bstrtmp_fmt = (fmt);                                     \
+    int bstrtmp_r = BSTR_ERR, bstrtmp_sz = 16;                           \
+    for (;;)                                                             \
+    {                                                                    \
+      va_list bstrtmp_arglist;                                           \
+      va_start(bstrtmp_arglist, lastarg);                                \
+      bstrtmp_r =                                                        \
+        bvcformata(bstrtmp_b, bstrtmp_sz, bstrtmp_fmt, bstrtmp_arglist); \
+      va_end(bstrtmp_arglist);                                           \
+      if (bstrtmp_r >= 0)                                                \
+      { /* Everything went ok */                                         \
+        bstrtmp_r = BSTR_OK;                                             \
+        break;                                                           \
+      }                                                                  \
+      else if (-bstrtmp_r <= bstrtmp_sz)                                 \
+      { /* A real error? */                                              \
+        bstrtmp_r = BSTR_ERR;                                            \
+        break;                                                           \
+      }                                                                  \
+      bstrtmp_sz = -bstrtmp_r; /* Doubled or target size */              \
+    }                                                                    \
+    ret = bstrtmp_r;                                                     \
   }
 
 #endif

@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -361,8 +360,8 @@ void hub(void)
           options.time_trouble[0] = 0.1;
 
         options.time_trouble[1] =
-            (time_left - options.time_limit - options.time_trouble[0]) /
-            moves_left;
+          (time_left - options.time_limit - options.time_trouble[0]) /
+          moves_left;
 
         if (options.time_trouble[1] <= 0.1)
           options.time_trouble[1] = 0.1;
@@ -392,7 +391,7 @@ void hub(void)
           options.time_trouble[0] = 0.1;
 
         options.time_trouble[1] =
-            (t - options.time_limit - options.time_trouble[0]) / GAME_MOVES;
+          (t - options.time_limit - options.time_trouble[0]) / GAME_MOVES;
 
         if (options.time_trouble[1] <= 0.1)
           options.time_trouble[1] = 0.1;
@@ -939,7 +938,7 @@ local int play_game(search_t *object,
       cJSON_ArrayForEach(game_move, game_state.get_moves(&game_state))
       {
         cJSON *move_string =
-            cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
+          cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
 
         HARDBUG(!cJSON_IsString(move_string))
 
@@ -965,7 +964,7 @@ local int play_game(search_t *object,
       write_to_hub_client(line, arg_parent2child);
 
       int nyour_game_moves_left =
-          options.hub_server_game_moves - nyour_game_moves_done;
+        options.hub_server_game_moves - nyour_game_moves_done;
 
       PRINTF("you have %.2f seconds left for %d moves\n",
              your_game_time_left,
@@ -1468,7 +1467,7 @@ local void hub_server_game_initiator(pipe_t arg_parent2child,
       print_board(&(with->S_board));
 
       int result =
-          play_game(with, my_colour, arg_parent2child, arg_child2parent);
+        play_game(with, my_colour, arg_parent2child, arg_child2parent);
 
       if (result == 2)
       {

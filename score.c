@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 typedef struct
@@ -20,7 +19,7 @@ local int probe_score_cache(search_t *object,
   int result = FALSE;
 
   *arg_score_cache_slot =
-      arg_score_cache[object->S_board.B_key % nscore_cache_entries];
+    arg_score_cache[object->S_board.B_key % nscore_cache_entries];
 
   ui32_t crc32 = 0xFFFFFFFF;
   crc32 = HW_CRC32_U64(crc32, arg_score_cache_slot->SCS_key);
@@ -46,7 +45,7 @@ local void update_score_cache(search_t *object,
                               score_cache_slot_t *arg_score_cache_slot)
 {
   arg_score_cache[object->S_board.B_key % nscore_cache_entries] =
-      *arg_score_cache_slot;
+    *arg_score_cache_slot;
 }
 
 #undef GEN_CSV
@@ -57,54 +56,52 @@ int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
 
   network_thread_t *network_thread = &(object->B_network_thread);
 
-  patterns_shared_t *with_patterns_shared = &patterns_shared;
-
   patterns_thread_t *with_patterns_thread = &(network_thread->NT_patterns);
 
-  for (int input = 0; input < 2 * network_shared.NS_ninputs; input++)
-    network_thread->NT_inputs[input] = 0;
+  for (int input = 0;
+       input < network_global.NG_pattern_dense_network_shared.DNS_ninputs;
+       input++)
+    network_thread->NT_pattern_dense_network_thread.DNT_inputs[input] = 0;
 
-  layer_shared_t *with_current = network_shared.NS_layers;
+  layer_shared_t *with_current =
+    network_global.NG_pattern_dense_network_shared.DNS_layers;
 
-  layer_thread_t *with_current_thread = network_thread->NT_layers;
+  layer_thread_t *with_current_thread =
+    network_thread->NT_pattern_dense_network_thread.DNT_layers;
 
   for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
     with_current_thread->LT_dot[ioutput] = 0;
 
-  for (int ipattern = 0; ipattern < with_patterns_shared->PS_npatterns;
-       ipattern++)
+  for (int ipattern = 0; ipattern < patterns_shared.PSS_npatterns; ipattern++)
   {
     pattern_shared_t *with_pattern_shared =
-        with_patterns_shared->PS_patterns + ipattern;
+      patterns_shared.PSS_patterns + ipattern;
 
     pattern_thread_t *with_pattern_thread =
-        with_patterns_thread->PT_patterns + ipattern;
+      with_patterns_thread->PT_patterns + ipattern;
 
     int istate = base3_index(with_pattern_thread->PT_embed,
                              with_pattern_shared->PS_nlinear);
 
-    if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
-        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2) or
-        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
-        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT))
+    if (network_global.NG_architecture == NETWORK_ARCHITECTURE_ADD)
     {
       vadd_ab2a(with_pattern_shared->PS_nembed,
-                network_thread->NT_inputs + with_pattern_shared->PS_offset,
+                network_thread->NT_pattern_dense_network_thread.DNT_inputs +
+                  with_pattern_shared->PS_offset,
                 with_pattern_shared->PS_weights_nstatesxnembed[istate]);
     }
-    else if (network_shared.NS_embedding == NETWORK_EMBEDDING_CONCAT)
+    else
     {
       if (arg_network_score_scaled != NULL)
         vcopy_a2b(with_pattern_shared->PS_nembed,
                   with_pattern_shared->PS_weights_nstatesxnembed[istate],
-                  network_thread->NT_inputs + with_pattern_shared->PS_offset);
+                  network_thread->NT_pattern_dense_network_thread.DNT_inputs +
+                    with_pattern_shared->PS_offset);
 
       vadd_ab2a(with_current->LS_noutputs,
                 with_current_thread->LT_dot,
                 with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
     }
-    else
-      FATAL("unknown embedding", EXIT_FAILURE)
   }
 
   int nwhite_man = BIT_COUNT(object->B_white_man_bb);
@@ -126,9 +123,23 @@ int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
     delta_king = DELTA_KING_MAX;
   delta_king += DELTA_KING_MAX;
 
-  for (int imaterial = 0; imaterial < network_shared.NS_nmaterial; imaterial++)
+  for (int input = 0;
+       input < network_global.NG_material_dense_network_shared.DNS_ninputs;
+       input++)
+    network_thread->NT_material_dense_network_thread.DNT_inputs[input] = 0;
+
+  with_current = network_global.NG_material_dense_network_shared.DNS_layers;
+
+  with_current_thread =
+    network_thread->NT_material_dense_network_thread.DNT_layers;
+
+  for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
+    with_current_thread->LT_dot[ioutput] = 0;
+
+  for (int imaterial = 0; imaterial < materials_global.MSS_nmaterial;
+       imaterial++)
   {
-    int istate;
+    int istate = INVALID;
 
     if (imaterial == 0)
       istate = nwhite_man;
@@ -140,7 +151,7 @@ int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
       istate = nblack_king;
     else
     {
-      if (network_shared.NS_nmaterial == 5)
+      if (materials_global.MSS_nmaterial == 5)
       {
         HARDBUG(imaterial != 4)
 
@@ -153,10 +164,10 @@ int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
           mblack_king = COMBINED_KING_MAX;
 
         istate = (nwhite_man * (COMBINED_KING_MAX + 1) + mwhite_king) * 21 *
-                     (COMBINED_KING_MAX + 1) +
+                   (COMBINED_KING_MAX + 1) +
                  nblack_man * (COMBINED_KING_MAX + 1) + mblack_king;
       }
-      else if (network_shared.NS_nmaterial == 7)
+      else if (materials_global.MSS_nmaterial == 7)
       {
         if (imaterial == 4)
           istate = delta_man;
@@ -167,58 +178,73 @@ int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
       }
     }
 
-    material_shared_t *with_material_shared =
-        &(network_shared.NS_material[imaterial]);
+    HARDBUG(istate == INVALID)
 
-    if ((network_shared.NS_embedding == NETWORK_EMBEDDING_SUM) or
-        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2) or
-        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT) or
-        (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT))
+    material_shared_t *with_material_shared =
+      materials_global.MSS_materials + imaterial;
+
+    if (network_global.NG_architecture == NETWORK_ARCHITECTURE_ADD)
     {
-      vadd_ab2a(with_material_shared->MS_nembed,
-                network_thread->NT_inputs + with_material_shared->MS_offset,
-                with_material_shared->MS_weights_nstatesxnembed[istate]);
+      vadd_ab2a(with_material_shared->MG_nembed,
+                network_thread->NT_material_dense_network_thread.DNT_inputs +
+                  with_material_shared->MG_offset,
+                with_material_shared->MG_weights_nstatesxnembed[istate]);
     }
-    else if (network_shared.NS_embedding == NETWORK_EMBEDDING_CONCAT)
+    else
     {
       if (arg_network_score_scaled != NULL)
-        vcopy_a2b(with_material_shared->MS_nembed,
-                  with_material_shared->MS_weights_nstatesxnembed[istate],
-                  network_thread->NT_inputs + with_material_shared->MS_offset);
+        vcopy_a2b(with_material_shared->MG_nembed,
+                  with_material_shared->MG_weights_nstatesxnembed[istate],
+                  network_thread->NT_material_dense_network_thread.DNT_inputs +
+                    with_material_shared->MG_offset);
 
       vadd_ab2a(with_current->LS_noutputs,
                 with_current_thread->LT_dot,
-                with_material_shared->MS_sum[istate]);
+                with_material_shared->MG_sum_nstatesxnoutputs[istate]);
     }
-    else
-      FATAL("unknown embedding", EXIT_FAILURE)
   }
 
-  if (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCT)
-  {
-    HARDBUG(network_shared.NS_ninputs_patterns !=
-            network_shared.NS_ninputs_material)
+  double network_score_scaled = return_network_score_scaled(
+    &(network_global.NG_pattern_dense_network_shared),
+    &(object->B_network_thread.NT_pattern_dense_network_thread));
 
-    HARDBUG(network_shared.NS_ninputs_patterns != network_shared.NS_ninputs)
+  network_score_scaled = return_network_score_scaled(
+    &(network_global.NG_material_dense_network_shared),
+    &(object->B_network_thread.NT_material_dense_network_thread));
 
-    vmul_ab2a(network_shared.NS_ninputs_patterns,
-              network_thread->NT_inputs,
-              network_thread->NT_inputs + network_shared.NS_ninputs_patterns);
-  }
-  else if (network_shared.NS_embedding == NETWORK_EMBEDDING_SUM2PRODUCTCONCAT)
-  {
-    HARDBUG(network_shared.NS_ninputs_patterns !=
-            network_shared.NS_ninputs_material)
+  // prepare inputs
 
-    vmul_ab2c(network_shared.NS_ninputs_patterns,
-              network_thread->NT_inputs,
-              network_thread->NT_inputs + network_shared.NS_ninputs_patterns,
-              network_thread->NT_inputs + network_shared.NS_ninputs_patterns +
-                  network_shared.NS_ninputs_material);
-  }
+  dense_network_shared_t *with_pattern_shared =
+    &(network_global.NG_pattern_dense_network_shared);
 
-  double network_score_scaled =
-      return_network_score_scaled(&(object->B_network_thread));
+  dense_network_thread_t *with_pattern_thread =
+    &(object->B_network_thread.NT_pattern_dense_network_thread);
+
+  vcopy_a2b(
+    with_pattern_shared->DNS_layers[with_pattern_shared->DNS_nlayers - 1]
+      .LS_noutputs,
+    with_pattern_thread->DNT_layers[with_pattern_shared->DNS_nlayers - 1]
+      .LT_outputs,
+    network_thread->NT_dense_network_thread.DNT_inputs);
+
+  dense_network_shared_t *with_material_shared =
+    &(network_global.NG_material_dense_network_shared);
+
+  dense_network_thread_t *with_material_thread =
+    &(object->B_network_thread.NT_material_dense_network_thread);
+
+  vcopy_a2b(
+    with_material_shared->DNS_layers[with_material_shared->DNS_nlayers - 1]
+      .LS_noutputs,
+    with_material_thread->DNT_layers[with_material_shared->DNS_nlayers - 1]
+      .LT_outputs,
+    network_thread->NT_dense_network_thread.DNT_inputs +
+      with_pattern_shared->DNS_layers[with_pattern_shared->DNS_nlayers - 1]
+        .LS_noutputs);
+
+  network_score_scaled = return_network_score_scaled(
+    &(network_global.NG_dense_network_shared),
+    &(object->B_network_thread.NT_dense_network_thread));
 
   if (arg_network_score_scaled != NULL)
     *arg_network_score_scaled = network_score_scaled;
@@ -226,8 +252,9 @@ int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
 #ifdef DEBUG
   static int n = 0;
 
-  double network_score_double =
-      return_network_score_double(&(object->B_network_thread));
+  double network_score_double = return_network_score_double(
+    &(network_global.NG_dense_network_shared),
+    &(object->B_network_thread.NT_dense_network_thread));
 
   n++;
 
@@ -246,7 +273,7 @@ int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
 #endif
 
   result =
-      round(network_score_scaled * network_shared.NS_network2material_score);
+    round(network_score_scaled * network_global.NG_network2material_score);
 
   if (IS_BLACK(object->B_colour2move))
     result = -result;
@@ -263,8 +290,8 @@ int return_score_from_board(board_t *object, double_t *arg_network_score_scaled)
   }
 #endif
 
-  SOFTBUG(result < (SCORE_LOST + NODE_MAX))
-  SOFTBUG(result > (SCORE_WON - NODE_MAX))
+  HARDBUG(IS_SCORE_LOST(result))
+  HARDBUG(IS_SCORE_WON(result))
 
   return (result);
 }
@@ -324,8 +351,8 @@ int return_score(search_t *object)
     }
   }
 
-  SOFTBUG(result < (SCORE_LOST + NODE_MAX))
-  SOFTBUG(result > (SCORE_WON - NODE_MAX))
+  HARDBUG(IS_SCORE_LOST(result))
+  HARDBUG(IS_SCORE_WON(result))
 
   return (result);
 }
@@ -335,8 +362,8 @@ int return_npieces(board_t *self)
   board_t *object = self;
 
   return (
-      BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
-      BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb));
+    BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
+    BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb));
 }
 
 int return_material_score(board_t *self)
@@ -383,8 +410,8 @@ void init_score(void)
   {
     i64_t score_cache_size = options.score_cache_size * MBYTE / 2;
 
-    nscore_cache_entries = first_prime_below(
-        roundf(score_cache_size / sizeof(score_cache_slot_t)));
+    nscore_cache_entries =
+      first_prime_below(roundf(score_cache_size / sizeof(score_cache_slot_t)));
 
     HARDBUG(nscore_cache_entries < 3)
 

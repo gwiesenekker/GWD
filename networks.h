@@ -1,23 +1,20 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef NetworksH
 #define NetworksH
 
 // network.c
 
-#define NETWORK_EMBEDDING_SUM 1
-#define NETWORK_EMBEDDING_SUM2 2
-#define NETWORK_EMBEDDING_SUM2PRODUCT 4
-#define NETWORK_EMBEDDING_SUM2PRODUCTCONCAT 5
-#define NETWORK_EMBEDDING_CONCAT 6
+#define NETWORK_ARCHITECTURE_NULL 0
+#define NETWORK_ARCHITECTURE_ADD 1
+#define NETWORK_ARCHITECTURE_CONCAT 2
 
-#define NETWORK_ACTIVATION_RELU6 7
-#define NETWORK_ACTIVATION_TANH 8
-#define NETWORK_ACTIVATION_RSQRT 9
-#define NETWORK_ACTIVATION_GELU 10
-#define NETWORK_ACTIVATION_GELUV2 11
-#define NETWORK_ACTIVATION_LINEAR 12
-#define NETWORK_ACTIVATION_SIGMOID 13
+#define NETWORK_ACTIVATION_RELU6 1
+#define NETWORK_ACTIVATION_TANH 2
+#define NETWORK_ACTIVATION_RSQRT 3
+#define NETWORK_ACTIVATION_GELU 4
+#define NETWORK_ACTIVATION_GELUV2 5
+#define NETWORK_ACTIVATION_LINEAR 6
+#define NETWORK_ACTIVATION_SIGMOID 7
 
 #define NINPUTS_MAX 2048
 #define NMATERIAL_MAX 8
@@ -46,39 +43,49 @@ typedef struct
 
 typedef struct
 {
-  bstring NS_bshape;
+  int DNS_ninputs;
+  int DNS_nlayers;
+  int DNS_activate_layer0;
+  int DNS_compute_layer0;
+  layer_shared_t DNS_layers[NLAYERS_MAX];
+} dense_network_shared_t;
 
-  int NS_ninputs_patterns;
-  int NS_ninputs_material;
-  int NS_ninputs;
-  int NS_loaded;
+typedef struct
+{
+  ALIGN64(scaled_double_t DNT_inputs[NINPUTS_MAX]);
+  layer_thread_t DNT_layers[NLAYERS_MAX];
+} dense_network_thread_t;
 
-  double NS_network2material_score;
-  int NS_nmaterial;
-  int NS_embedding;
-  int NS_activation_inputs;
-  int NS_activation;
-  int NS_activation_last;
-  int NS_nman_min;
-  int NS_nman_max;
+typedef struct
+{
+  bstring NG_bshape;
 
-  material_shared_t NS_material[NMATERIAL_MAX];
+  int NG_loaded;
 
-  int NS_nlayers;
+  double NG_network2material_score;
+  int NG_architecture;
+  int NG_activation_inputs;
+  int NG_activation;
+  int NG_activation_last;
+  int NG_nman_min;
+  int NG_nman_max;
 
-  layer_shared_t NS_layers[NLAYERS_MAX];
-} network_shared_t;
+  dense_network_shared_t NG_pattern_dense_network_shared;
+  dense_network_shared_t NG_material_dense_network_shared;
+  dense_network_shared_t NG_dense_network_shared;
+} network_global_t;
 
 typedef struct
 {
   patterns_thread_t NT_patterns;
-  ALIGN64(scaled_double_t NT_inputs[NINPUTS_MAX]);
-  layer_thread_t NT_layers[NLAYERS_MAX];
+  dense_network_thread_t NT_pattern_dense_network_thread;
+  dense_network_thread_t NT_material_dense_network_thread;
+  dense_network_thread_t NT_dense_network_thread;
 } network_thread_t;
 
-extern network_shared_t network_shared;
+extern network_global_t network_global;
 
-void construct_network_shared(network_shared_t *, int);
+void construct_network_shared(int);
 void construct_network_thread(network_thread_t *, int);
 int base3_index(const int32_t *, int);
 void vcopy_a2b(int n, scaled_double_t *, scaled_double_t *);
@@ -88,10 +95,12 @@ void vmul_ab2c(int,
                scaled_double_t *restrict,
                scaled_double_t *restrict,
                scaled_double_t *restrict);
-double return_network_score_scaled(network_thread_t *);
-double return_network_score_double(network_thread_t *);
+double return_network_score_scaled(dense_network_shared_t *,
+                                   dense_network_thread_t *);
+double return_network_score_double(dense_network_shared_t *,
+                                   dense_network_thread_t *);
 void fen2network(char *, i64_t);
-void fen2csv(char *, int, int, int, int);
+void fen2csv(char *, int, int);
 void init_networks(void);
 
 #endif

@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #define NAG '$'
@@ -144,8 +143,8 @@ get_next_token(bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
   HARDBUG(jchar <= *arg_ichar)
 
   HARDBUG(
-      bassignmidstr(arg_btoken, arg_bstring, *arg_ichar, jchar - *arg_ichar) ==
-      BSTR_ERR)
+    bassignmidstr(arg_btoken, arg_bstring, *arg_ichar, jchar - *arg_ichar) ==
+    BSTR_ERR)
 
   *arg_ichar = jchar;
 
@@ -370,14 +369,14 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
         }
 
         append_sql_buffer(
-            arg_db,
-            "INSERT INTO positions (fen, frequency, %s) VALUES ('%s', 1, 1) "
-            "ON CONFLICT(fen) DO UPDATE SET "
-            "frequency = frequency + 1, %s = %s + 1;",
-            column,
-            bdata(bfen),
-            column,
-            column);
+          arg_db,
+          "INSERT INTO positions (fen, frequency, %s) VALUES ('%s', 1, 1) "
+          "ON CONFLICT(fen) DO UPDATE SET "
+          "frequency = frequency + 1, %s = %s + 1;",
+          column,
+          bdata(bfen),
+          column,
+          column);
 
         move2bstring(&moves_list, imove, bmove);
 
@@ -419,13 +418,13 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
 
   const char *sql = "DELETE FROM positions WHERE frequency = 1;";
 
-  HARDBUG(execute_sql(arg_db->MS_db, sql, FALSE) != SQLITE_OK)
+  HARDBUG(execute_sql(arg_db->MSQL_db, sql, FALSE) != SQLITE_OK)
 
-  HARDBUG(execute_sql(arg_db->MS_db, "VACUUM;", FALSE) != SQLITE_OK)
+  HARDBUG(execute_sql(arg_db->MSQL_db, "VACUUM;", FALSE) != SQLITE_OK)
 
   PRINTF("..done\n");
 
-  HARDBUG(execute_sql(arg_db->MS_db,
+  HARDBUG(execute_sql(arg_db->MSQL_db,
                       "INSERT INTO evaluations (move_id, evaluation) "
                       "SELECT "
                       "m.id, "
@@ -738,13 +737,13 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
 
   sqlite3_stmt *stmt;
 
-  my_sqlite3_prepare_v2(arg_db->MS_db, sql, &stmt);
+  my_sqlite3_prepare_v2(arg_db->MSQL_db, sql, &stmt);
 
   i64_t npositions = 0;
 
   int rc;
 
-  while ((rc = execute_sql(arg_db->MS_db, stmt, TRUE)) == SQLITE_ROW)
+  while ((rc = execute_sql(arg_db->MSQL_db, stmt, TRUE)) == SQLITE_ROW)
   {
     i64_t id = my_sqlite3_column_int64(stmt, 0);
 
@@ -812,11 +811,11 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
 
     sql = "SELECT fen FROM positions WHERE id = ?;";
 
-    my_sqlite3_prepare_v2(arg_db->MS_db, sql, &stmt);
+    my_sqlite3_prepare_v2(arg_db->MSQL_db, sql, &stmt);
 
     HARDBUG(my_sqlite3_bind_int64(stmt, 1, id) != SQLITE_OK)
 
-    HARDBUG((rc = execute_sql(arg_db->MS_db, stmt, TRUE)) != SQLITE_ROW)
+    HARDBUG((rc = execute_sql(arg_db->MSQL_db, stmt, TRUE)) != SQLITE_ROW)
 
     const unsigned char *fen = my_sqlite3_column_text(stmt, 0);
 
@@ -978,29 +977,29 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth)
             (IS_BLACK(with->S_board.B_colour2move) and (result == 0)))
         {
           append_sql_buffer(
-              arg_db,
-              "UPDATE positions SET "
-              "frequency = frequency + 1, nwon = nwon + 1 WHERE fen = '%s';",
-              bdata(bfen));
+            arg_db,
+            "UPDATE positions SET "
+            "frequency = frequency + 1, nwon = nwon + 1 WHERE fen = '%s';",
+            bdata(bfen));
         }
         else if ((IS_WHITE(with->S_board.B_colour2move) and (result == 0)) or
                  (IS_BLACK(with->S_board.B_colour2move) and (result == 2)))
         {
           append_sql_buffer(
-              arg_db,
-              "UPDATE positions SET "
-              "frequency = frequency + 1, nlost = nlost + 1 WHERE fen = '%s';",
-              bdata(bfen));
+            arg_db,
+            "UPDATE positions SET "
+            "frequency = frequency + 1, nlost = nlost + 1 WHERE fen = '%s';",
+            bdata(bfen));
         }
         else
         {
           HARDBUG(result != 1)
 
           append_sql_buffer(
-              arg_db,
-              "UPDATE positions SET "
-              "frequency = frequency + 1, ndraw = ndraw + 1 WHERE fen = '%s';",
-              bdata(bfen));
+            arg_db,
+            "UPDATE positions SET "
+            "frequency = frequency + 1, ndraw = ndraw + 1 WHERE fen = '%s';",
+            bdata(bfen));
         }
       }
 
@@ -1062,7 +1061,7 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 
   sqlite3_stmt *stmt;
 
-  my_sqlite3_prepare_v2(arg_db->MS_db, sql, &stmt);
+  my_sqlite3_prepare_v2(arg_db->MSQL_db, sql, &stmt);
 
   HARDBUG(my_sqlite3_bind_int(stmt, 1, arg_frequency) != SQLITE_OK)
 
@@ -1070,7 +1069,7 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 
   int rc;
 
-  while ((rc = execute_sql(arg_db->MS_db, stmt, TRUE)) == SQLITE_ROW)
+  while ((rc = execute_sql(arg_db->MSQL_db, stmt, TRUE)) == SQLITE_ROW)
   {
     i64_t id = my_sqlite3_column_int64(stmt, 0);
 
@@ -1136,11 +1135,11 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 
     sql = "SELECT fen, frequency FROM positions WHERE id = ?;";
 
-    my_sqlite3_prepare_v2(arg_db->MS_db, sql, &stmt);
+    my_sqlite3_prepare_v2(arg_db->MSQL_db, sql, &stmt);
 
     HARDBUG(my_sqlite3_bind_int64(stmt, 1, id) != SQLITE_OK)
 
-    HARDBUG((rc = execute_sql(arg_db->MS_db, stmt, TRUE)) != SQLITE_ROW)
+    HARDBUG((rc = execute_sql(arg_db->MSQL_db, stmt, TRUE)) != SQLITE_ROW)
 
     const unsigned char *fen = my_sqlite3_column_text(stmt, 0);
 
@@ -1194,16 +1193,16 @@ void update_db_v2(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
     }
 
     append_sql_buffer(
-        arg_db,
-        "UPDATE positions SET "
-        "frequency = frequency + %d,"
-        "nwon = nwon + %d, ndraw = ndraw + %d, nlost = nlost + %d "
-        "WHERE fen = '%s';",
-        nshoot_outs,
-        nwon,
-        ndraw,
-        nlost,
-        bdata(bfen));
+      arg_db,
+      "UPDATE positions SET "
+      "frequency = frequency + %d,"
+      "nwon = nwon + %d, ndraw = ndraw + %d, nlost = nlost + %d "
+      "WHERE fen = '%s';",
+      nshoot_outs,
+      nwon,
+      ndraw,
+      nlost,
+      bdata(bfen));
   }
 
   finalize_progress(&progress);

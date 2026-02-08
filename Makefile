@@ -58,9 +58,10 @@ TARGET=a.out
 ifdef MAKE_DEBUG
 CC=gcc
 CFLAGS=-g -DDEBUG
+#CFLAGS=-g 
 else
 CC=clang
-CFLAGS=-O3 -g 
+CFLAGS=-g -O3
 endif
 LFLAGS=-lm -lzstd -lpthread
 
@@ -103,11 +104,14 @@ CFLAGS+=-Wno-format-truncation
 #CFLAGS+=-Wl,--no-insert-timestamp
 CFLAGS+=-Wpointer-arith
 CFLAGS+=-Wunused-macros
+CFLAGS+=-Wshadow
 endif
 
 ifeq ($(CC), clang)
 CFLAGS+=-Wall
 endif
+
+xxhash.o: CFLAGS += -O3
 
 all: $(TARGET)
 
@@ -116,8 +120,6 @@ $(TARGET): $(OBJS)
 	REVISION=$$(./$(TARGET) --revision); echo $$REVISION;\
         mkdir -p /tmp8/gwies/dxp1/$$REVISION;\
         cp $(TARGET) gwd.json overrides.json networks.json ballot2.fen /tmp8/gwies/dxp1/$$REVISION;\
-        mkdir -p hub_client/$$REVISION;\
-        cp $(TARGET) gwd.json overrides.json networks.json hub_client/$$REVISION
 
 HEADERS=boards.h\
   bstrlib.h\

@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #define LOG_PREFIX_ID "LOG_prefix_id"
@@ -88,8 +87,8 @@ void my_printf(my_printf_t *self, char *arg_format, ...)
     time_t t = time(NULL);
 
     HARDBUG(
-        strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t)) ==
-        0)
+      strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t)) ==
+      0)
 
     i64_t pid = compat_getpid();
 
@@ -137,8 +136,8 @@ void my_printf(my_printf_t *self, char *arg_format, ...)
         btrunc(bnew_path, 0);
 
         HARDBUG(
-            bformata(bnew_path, "%s-%d", bdata(object->MP_bname), irotate) ==
-            BSTR_ERR)
+          bformata(bnew_path, "%s-%d", bdata(object->MP_bname), irotate) ==
+          BSTR_ERR)
 
         // ignore return value of remove as file might not exist
 
@@ -311,8 +310,7 @@ void construct_my_printf(my_printf_t *self, char *arg_prefix, int arg2stdout)
   time_t t = time(NULL);
 
   HARDBUG(
-      strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t)) ==
-      0)
+    strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t)) == 0)
 
   i64_t pid = compat_getpid();
 
@@ -380,8 +378,8 @@ void init_my_printf(void)
     HARDBUG(bformata(my_printf_logs_dir, "%s", LOGS_DIR) == BSTR_ERR)
   else
     HARDBUG(
-        bformata(my_printf_logs_dir, "%s_%s", getenv(WINEPREFIX), LOGS_DIR) ==
-        BSTR_ERR)
+      bformata(my_printf_logs_dir, "%s_%s", getenv(WINEPREFIX), LOGS_DIR) ==
+      BSTR_ERR)
 
   if (opendir(bdata(my_printf_logs_dir)) == NULL)
   {

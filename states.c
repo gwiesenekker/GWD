@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 // the game state is maintained in a cJSON object
@@ -85,7 +84,7 @@ local void set_result(game_state_t *self, char *arg_result)
   game_state_t *object = self;
 
   cJSON *cjson_item =
-      cJSON_GetObjectItem(object->cjson_object, CJSON_RESULT_ID);
+    cJSON_GetObjectItem(object->cjson_object, CJSON_RESULT_ID);
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
@@ -97,7 +96,7 @@ local void set_starting_position(game_state_t *self, char *arg_position)
   game_state_t *object = self;
 
   cJSON *cjson_item =
-      cJSON_GetObjectItem(object->cjson_object, CJSON_STARTING_POSITION_ID);
+    cJSON_GetObjectItem(object->cjson_object, CJSON_STARTING_POSITION_ID);
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
@@ -219,7 +218,7 @@ local void save2pdn(game_state_t *self, char *arg_pdn)
     HARDBUG(!cJSON_IsString(move_string))
 
     cJSON *comment_string =
-        cJSON_GetObjectItem(game_move, CJSON_COMMENT_STRING_ID);
+      cJSON_GetObjectItem(game_move, CJSON_COMMENT_STRING_ID);
 
     if ((iply % 2) == 0)
       compat_fdprintf(fd, " %d.", iply / 2 + 1);
@@ -307,7 +306,7 @@ local char *get_result(game_state_t *self)
   game_state_t *object = self;
 
   cJSON *cjson_item =
-      cJSON_GetObjectItem(object->cjson_object, CJSON_RESULT_ID);
+    cJSON_GetObjectItem(object->cjson_object, CJSON_RESULT_ID);
 
   HARDBUG(!cJSON_IsString(cjson_item))
 
@@ -319,7 +318,7 @@ local char *get_starting_position(game_state_t *self)
   game_state_t *object = self;
 
   cJSON *cjson_item =
-      cJSON_GetObjectItem(object->cjson_object, CJSON_STARTING_POSITION_ID);
+    cJSON_GetObjectItem(object->cjson_object, CJSON_STARTING_POSITION_ID);
 
   HARDBUG(!cJSON_IsString(cjson_item))
 

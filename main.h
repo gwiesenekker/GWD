@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef MainH
 #define MainH
 
@@ -75,10 +74,7 @@ typedef struct
   int reduction_combination_length;
 
   int reduction_full_min;
-  int reduction_strength;
-  int reduction_probes;
-  int reduction_probe_window;
-  int reduction_research_margin;
+  int reduction_percentage;
 
   int use_single_reply_extensions;
 

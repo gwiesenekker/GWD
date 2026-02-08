@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #define NPAD (4 * 64)
@@ -77,7 +76,7 @@ ui64_t return_XXH3_64(const void *data, size_t len)
   while (processed < len)
   {
     size_t toProcess =
-        (len - processed < chunkSize) ? (len - processed) : chunkSize;
+      (len - processed < chunkSize) ? (len - processed) : chunkSize;
 
     HARDBUG(XXH3_64bits_update(state, ptr + processed, toProcess) == XXH_ERROR)
 

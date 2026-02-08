@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef ProfileH
 #define ProfileH
 
@@ -109,7 +108,7 @@ void dump_profile(int, int);
     PS.block_invocation++;                                   \
     if (PS.block_id[PS.block_invocation] == PROFILE_INVALID) \
       PS.block_id[PS.block_invocation] =                     \
-          new_block(pid, X, &(PS.block_invocation));         \
+        new_block(pid, X, &(PS.block_invocation));           \
     begin_block(pid, PS.block_id[PS.block_invocation]);      \
     GET_COUNTER_BEGIN(PG.counter_pointer);                   \
   }

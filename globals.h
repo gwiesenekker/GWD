@@ -1,10 +1,9 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM gwd7
-#define REVISION "8.100"
+#define REVISION "8.1178"
 
 // generic includes
 
@@ -77,7 +76,7 @@ typedef unsigned long long ui64_t;
 #define CJSON_SHAPE_ID "shape"
 #define CJSON_NETWORK2MATERIAL_SCORE_ID "network2material_score"
 #define CJSON_NMATERIAL_ID "nmaterial"
-#define CJSON_EMBEDDING_ID "embedding"
+#define CJSON_ARCHITECTURE_ID "architecture"
 #define CJSON_ACTIVATION_INPUTS_ID "activation_inputs"
 #define CJSON_ACTIVATION_ID "activation"
 #define CJSON_ACTIVATION_LAST_ID "activation_last"

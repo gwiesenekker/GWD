@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 /*
   Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
 
@@ -123,7 +122,7 @@ CJSON_PUBLIC(double) cJSON_GetNumberValue(const cJSON *const item)
 /* This is a safeguard to prevent copy-pasters from using incompatible C and
  * header files */
 #if (CJSON_VERSION_MAJOR != 1) || (CJSON_VERSION_MINOR != 7) || \
-    (CJSON_VERSION_PATCH != 18)
+  (CJSON_VERSION_PATCH != 18)
 #error cJSON.h and cJSON.c have different versions. Make sure that both have the same.
 #endif
 
@@ -456,7 +455,7 @@ cJSON_SetValuestring(cJSON *object, const char *valuestring)
     return object->valuestring;
   }
   copy =
-      (char *)cJSON_strdup((const unsigned char *)valuestring, &global_hooks);
+    (char *)cJSON_strdup((const unsigned char *)valuestring, &global_hooks);
   if (copy == NULL)
   {
     return NULL;
@@ -598,7 +597,7 @@ static cJSON_bool print_number(const cJSON *const item,
   int length = 0;
   size_t i = 0;
   unsigned char number_buffer[26] = {
-      0}; /* temporary buffer to print the number into */
+    0}; /* temporary buffer to print the number into */
   unsigned char decimal_point = get_decimal_point();
   double test = 0.0;
 
@@ -759,7 +758,7 @@ utf16_literal_to_utf8(const unsigned char *const input_pointer,
 
     /* calculate the unicode codepoint from the surrogate pair */
     codepoint =
-        0x10000 + (((first_code & 0x3FF) << 10) | (second_code & 0x3FF));
+      0x10000 + (((first_code & 0x3FF) << 10) | (second_code & 0x3FF));
   }
   else
   {
@@ -805,14 +804,14 @@ utf16_literal_to_utf8(const unsigned char *const input_pointer,
   {
     /* 10xxxxxx */
     (*output_pointer)[utf8_position] =
-        (unsigned char)((codepoint | 0x80) & 0xBF);
+      (unsigned char)((codepoint | 0x80) & 0xBF);
     codepoint >>= 6;
   }
   /* encode first byte */
   if (utf8_length > 1)
   {
     (*output_pointer)[0] =
-        (unsigned char)((codepoint | first_byte_mark) & 0xFF);
+      (unsigned char)((codepoint | first_byte_mark) & 0xFF);
   }
   else
   {
@@ -847,8 +846,8 @@ static cJSON_bool parse_string(cJSON *const item,
     size_t allocation_length = 0;
     size_t skipped_bytes = 0;
     while (
-        ((size_t)(input_end - input_buffer->content) < input_buffer->length) &&
-        (*input_end != '\"'))
+      ((size_t)(input_end - input_buffer->content) < input_buffer->length) &&
+      (*input_end != '\"'))
     {
       /* is escape sequence */
       if (input_end[0] == '\\')
@@ -872,7 +871,7 @@ static cJSON_bool parse_string(cJSON *const item,
 
     /* This is at most how much we need for the output */
     allocation_length =
-        (size_t)(input_end - buffer_at_offset(input_buffer)) - skipped_bytes;
+      (size_t)(input_end - buffer_at_offset(input_buffer)) - skipped_bytes;
     output = (unsigned char *)input_buffer->hooks.allocate(allocation_length +
                                                            sizeof(""));
     if (output == NULL)
@@ -924,7 +923,7 @@ static cJSON_bool parse_string(cJSON *const item,
       /* UTF-16 literal */
       case 'u':
         sequence_length =
-            utf16_literal_to_utf8(input_pointer, input_end, &output_pointer);
+          utf16_literal_to_utf8(input_pointer, input_end, &output_pointer);
         if (sequence_length == 0)
         {
           /* failed to convert UTF16-literal to UTF-8 */
@@ -1305,7 +1304,7 @@ static unsigned char *print(const cJSON *const item,
   if (hooks->reallocate != NULL)
   {
     printed =
-        (unsigned char *)hooks->reallocate(buffer->buffer, buffer->offset + 1);
+      (unsigned char *)hooks->reallocate(buffer->buffer, buffer->offset + 1);
     if (printed == NULL)
     {
       goto fail;
@@ -1939,8 +1938,8 @@ static cJSON_bool print_object(const cJSON *const item,
   }
 
   output_pointer =
-      ensure(output_buffer,
-             output_buffer->format ? (output_buffer->depth + 1) : 2);
+    ensure(output_buffer,
+           output_buffer->format ? (output_buffer->depth + 1) : 2);
   if (output_pointer == NULL)
   {
     return false;
@@ -2037,8 +2036,8 @@ static cJSON *get_object_item(const cJSON *const object,
   {
     while ((current_element != NULL) &&
            (case_insensitive_strcmp(
-                (const unsigned char *)name,
-                (const unsigned char *)(current_element->string)) != 0))
+              (const unsigned char *)name,
+              (const unsigned char *)(current_element->string)) != 0))
     {
       current_element = current_element->next;
     }
@@ -2141,8 +2140,8 @@ CJSON_PUBLIC(cJSON_bool) cJSON_AddItemToArray(cJSON *array, cJSON *item)
 }
 
 #if defined(__clang__) || \
-    (defined(__GNUC__) && \
-     ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ > 5))))
+  (defined(__GNUC__) &&   \
+   ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ > 5))))
 #pragma GCC diagnostic push
 #endif
 #ifdef __GNUC__
@@ -2151,8 +2150,8 @@ CJSON_PUBLIC(cJSON_bool) cJSON_AddItemToArray(cJSON *array, cJSON *item)
 /* helper function to cast away const */
 static void *cast_away_const(const void *string) { return (void *)string; }
 #if defined(__clang__) || \
-    (defined(__GNUC__) && \
-     ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ > 5))))
+  (defined(__GNUC__) &&   \
+   ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ > 5))))
 #pragma GCC diagnostic pop
 #endif
 
@@ -2564,7 +2563,7 @@ static cJSON_bool replace_item_in_object(cJSON *object,
     cJSON_free(replacement->string);
   }
   replacement->string =
-      (char *)cJSON_strdup((const unsigned char *)string, &global_hooks);
+    (char *)cJSON_strdup((const unsigned char *)string, &global_hooks);
   if (replacement->string == NULL)
   {
     return false;
@@ -2573,9 +2572,9 @@ static cJSON_bool replace_item_in_object(cJSON *object,
   replacement->type &= ~cJSON_StringIsConst;
 
   return cJSON_ReplaceItemViaPointer(
-      object,
-      get_object_item(object, string, case_sensitive),
-      replacement);
+    object,
+    get_object_item(object, string, case_sensitive),
+    replacement);
 }
 
 CJSON_PUBLIC(cJSON_bool)
@@ -2670,7 +2669,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateString(const char *string)
   {
     item->type = cJSON_String;
     item->valuestring =
-        (char *)cJSON_strdup((const unsigned char *)string, &global_hooks);
+      (char *)cJSON_strdup((const unsigned char *)string, &global_hooks);
     if (!item->valuestring)
     {
       cJSON_Delete(item);
@@ -2724,7 +2723,7 @@ CJSON_PUBLIC(cJSON *) cJSON_CreateRaw(const char *raw)
   {
     item->type = cJSON_Raw;
     item->valuestring =
-        (char *)cJSON_strdup((const unsigned char *)raw, &global_hooks);
+      (char *)cJSON_strdup((const unsigned char *)raw, &global_hooks);
     if (!item->valuestring)
     {
       cJSON_Delete(item);
@@ -2956,7 +2955,7 @@ cJSON *cJSON_Duplicate_rec(const cJSON *item, size_t depth, cJSON_bool recurse)
   if (item->valuestring)
   {
     newitem->valuestring =
-        (char *)cJSON_strdup((unsigned char *)item->valuestring, &global_hooks);
+      (char *)cJSON_strdup((unsigned char *)item->valuestring, &global_hooks);
     if (!newitem->valuestring)
     {
       goto fail;
@@ -2964,10 +2963,10 @@ cJSON *cJSON_Duplicate_rec(const cJSON *item, size_t depth, cJSON_bool recurse)
   }
   if (item->string)
   {
-    newitem->string = (item->type & cJSON_StringIsConst)
-                          ? item->string
-                          : (char *)cJSON_strdup((unsigned char *)item->string,
-                                                 &global_hooks);
+    newitem->string =
+      (item->type & cJSON_StringIsConst)
+        ? item->string
+        : (char *)cJSON_strdup((unsigned char *)item->string, &global_hooks);
     if (!newitem->string)
     {
       goto fail;
@@ -2987,9 +2986,9 @@ cJSON *cJSON_Duplicate_rec(const cJSON *item, size_t depth, cJSON_bool recurse)
       goto fail;
     }
     newchild = cJSON_Duplicate_rec(
-        child,
-        depth + 1,
-        true); /* Duplicate (with recurse) each item in the ->next chain */
+      child,
+      depth + 1,
+      true); /* Duplicate (with recurse) each item in the ->next chain */
     if (!newchild)
     {
       goto fail;

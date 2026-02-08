@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef BoardsH
 #define BoardsH
 
@@ -21,9 +20,6 @@
 #define STARTING_POSITION2FEN                                                 \
   "W:W31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50:B01,02,03," \
   "04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20"
-
-#define BOARD_INTERRUPT_TIME BIT(0)
-#define BOARD_INTERRUPT_MESSAGE BIT(1)
 
 #define IS_WHITE(X) ((X) == WHITE_ENUM)
 #define IS_BLACK(X) ((X) == BLACK_ENUM)
@@ -49,8 +45,6 @@
 #define my_king_key hash_keys[my_colour][KING_ENUM]
 #define your_king_key hash_keys[your_colour][KING_ENUM]
 
-#define PV_MAX 256
-
 typedef enum
 {
   WHITE_ENUM = 0,
@@ -63,8 +57,6 @@ typedef enum
   KING_ENUM = 1,
   NPIECE_ENUM
 } piece_enum;
-
-typedef i8_t pv_t;
 
 typedef struct
 {

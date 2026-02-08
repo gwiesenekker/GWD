@@ -1,9 +1,11 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #ifndef SearchH
 #define SearchH
 
 #define DEPTH_MAX 127
+
+#define NPV_SLOTS 4
+#define NPV_ENTRIES 64
 
 #define MINIMAL_WINDOW_BIT BIT(0)
 #define PV_BIT BIT(1)
@@ -16,6 +18,52 @@
 
 #define SEARCH_BEST_SCORE_EGTB 0
 #define SEARCH_BEST_SCORE_AB 1
+
+#define SR_NULL 0
+#define SR_DRAW_BY_REP_BIT BIT(0)
+#define SR_LE_ALPHA_BIT BIT(1)
+#define SR_GE_BETA_BIT BIT(2)
+#define SR_TRUE_SCORE_BIT BIT(3)
+#define SR_EGTB_DRAW_BIT BIT(4)
+#define SR_WON_BIT BIT(5)
+#define SR_LOST_BIT BIT(6)
+
+#define IS_SR_DRAW_BY_REP(X) ((X) & SR_DRAW_BY_REP_BIT)
+#define IS_SR_LE_ALPHA(X) ((X) & SR_LE_ALPHA_BIT)
+#define IS_SR_GE_BETA(X) ((X) & SR_GE_BETA_BIT)
+#define IS_SR_TRUE_SCORE(X) ((X) & SR_TRUE_SCORE_BIT)
+#define IS_SR_EGTB_DRAW(X) ((X) & SR_EGTB_DRAW_BIT)
+#define IS_SR_WON(X) ((X) & SR_WON_BIT)
+#define IS_SR_LOST(X) ((X) & SR_LOST_BIT)
+
+#define PV_SLOT_IMOVE_MASK 0xFFULL
+
+typedef enum
+{
+  SR_OPERATOR_LT = 0,
+  SR_OPERATOR_LE,
+  SR_OPERATOR_EQ,
+  SR_OPERATOR_GE,
+  SR_OPERATOR_GT
+} search_result_operator_enum;
+
+typedef struct
+{
+  ui64_t PVE_slots[NPV_SLOTS];
+} pv_entry_t;
+
+typedef struct
+{
+  pv_entry_t PVE_entries[NPV_ENTRIES];
+} pv_entries_t;
+
+typedef struct
+{
+  int SR_score;
+  int SR_flags;
+  int SR_depth;
+  pv_entries_t SR_pv;
+} search_result_t;
 
 typedef struct
 {
@@ -37,11 +85,8 @@ typedef struct
   int S_best_score_kind;
   int S_best_move;
   int S_best_depth;
-  pv_t S_best_pv[PV_MAX];
 
   int S_best_score_by_depth[DEPTH_MAX];
-
-  int S_interrupt;
 
   i64_t S_total_move_repetitions;
 
@@ -53,6 +98,7 @@ typedef struct
 
   i64_t S_total_nodes;
   i64_t S_total_alpha_beta_nodes;
+  i64_t S_total_capture_nodes;
   i64_t S_total_minimal_window_nodes;
   i64_t S_total_pv_nodes;
 

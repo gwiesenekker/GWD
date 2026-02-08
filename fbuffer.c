@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #define NFBUFFER (4 * MBYTE)
@@ -96,8 +95,8 @@ void construct_fbuffer(fbuffer_t *self,
     if ((pdot = bstrrchr(arg_bname, '.')) == BSTR_ERR)
     {
       HARDBUG(
-          bformata(object->FB_bname, "%s%s", bdata(arg_bname), arg_suffix) ==
-          BSTR_ERR)
+        bformata(object->FB_bname, "%s%s", bdata(arg_bname), arg_suffix) ==
+        BSTR_ERR)
     }
     else
     {

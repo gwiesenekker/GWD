@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 // clang-format off
@@ -115,8 +114,8 @@ void push_board_state(void *self)
          sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
   state->BS_npieces =
-      BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
-      BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb);
+    BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
+    BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb);
 
   object->B_nstate++;
 }
@@ -137,10 +136,10 @@ void pop_board_state(void *self)
          state->BS_bit_boards,
          sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
-  SOFTBUG(
-      state->BS_npieces !=
-      (BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
-       BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb)))
+  HARDBUG(
+    state->BS_npieces !=
+    (BIT_COUNT(object->B_white_man_bb) + BIT_COUNT(object->B_white_king_bb) +
+     BIT_COUNT(object->B_black_man_bb) + BIT_COUNT(object->B_black_king_bb)))
 }
 
 hash_key_t return_key_from_bb(void *self)

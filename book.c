@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #define NPOSITIONS_MAX 100000000
@@ -36,12 +35,19 @@ local int help_walk_book_alpha_beta(sqlite3 *arg_db,
 
     board2fen(object, bfen, FALSE);
 
-    position_id =
-        query_position_id(arg_db, bdata(bfen), options.book_position_frequency);
+    int flags;
+
+    position_id = query_position_id(arg_db,
+                                    bdata(bfen),
+                                    options.book_position_frequency,
+                                    &flags);
 
     BDESTROY(bfen)
 
     if (position_id == INVALID)
+      return (SCORE_PLUS_INFINITY);
+
+    if (!(flags & FLAG_POSITION_MOVES_EVALUATED))
       return (SCORE_PLUS_INFINITY);
   }
 
@@ -55,50 +61,6 @@ local int help_walk_book_alpha_beta(sqlite3 *arg_db,
 
     if ((moves_list.ML_ncaptx > 0) or (moves_list.ML_nmoves == 1))
     {
-      ++nmoves;
-
-      do_move(object, imove, &moves_list, FALSE);
-
-      int minimax_score = -help_walk_book_alpha_beta(arg_db,
-                                                     object,
-                                                     arg_depth + 1,
-                                                     -arg_beta,
-                                                     -best_score);
-
-      undo_move(object, imove, &moves_list, FALSE);
-
-      if (minimax_score == SCORE_MINUS_INFINITY)
-        return (SCORE_PLUS_INFINITY);
-
-      temp_score = minimax_score;
-    }
-    else
-    {
-      BSTRING(bmove)
-
-      move2bstring(&moves_list, imove, bmove);
-
-      i64_t move_id;
-
-      move_id = query_move(arg_db,
-                           position_id,
-                           bdata(bmove),
-                           options.book_move_frequency);
-
-      BDESTROY(bmove)
-
-      if (move_id == INVALID)
-        continue;
-
-      int evaluation = query_evaluation(arg_db, move_id);
-
-      if (evaluation == SCORE_PLUS_INFINITY)
-        continue;
-
-      temp_score = evaluation;
-
-      ++nmoves;
-
       do_move(object, imove, &moves_list, FALSE);
 
       int minimax_score = -help_walk_book_alpha_beta(arg_db,
@@ -110,10 +72,59 @@ local int help_walk_book_alpha_beta(sqlite3 *arg_db,
       undo_move(object, imove, &moves_list, FALSE);
 
       if (minimax_score != SCORE_MINUS_INFINITY)
-        temp_score = minimax_score;
-    }
+      {
+        ++nmoves;
 
-    HARDBUG(temp_score == SCORE_MINUS_INFINITY)
+        temp_score = minimax_score;
+      }
+    }
+    else
+    {
+      BSTRING(bmove)
+
+      move2bstring(&moves_list, imove, bmove);
+
+      i64_t move_id;
+      int flags;
+
+      move_id = query_move(arg_db,
+                           position_id,
+                           bdata(bmove),
+                           options.book_move_frequency,
+                           &flags);
+
+      BDESTROY(bmove)
+
+      HARDBUG(move_id == INVALID)
+
+      int evaluation = query_evaluation(arg_db, move_id, FLAG_NULL);
+
+      HARDBUG(evaluation == SCORE_PLUS_INFINITY)
+
+      temp_score = evaluation;
+
+      ++nmoves;
+
+      // the move has been expanded,
+      // the position after the move has been added to the database
+      // but it could have not been evaluated yet
+
+      if (flags & FLAG_MOVE_EXPANDED)
+      {
+        do_move(object, imove, &moves_list, FALSE);
+
+        int minimax_score = -help_walk_book_alpha_beta(arg_db,
+                                                       object,
+                                                       arg_depth + 1,
+                                                       -arg_beta,
+                                                       -best_score);
+
+        undo_move(object, imove, &moves_list, FALSE);
+
+        if (minimax_score != SCORE_MINUS_INFINITY)
+          temp_score = minimax_score;
+      }
+    }
 
     if (temp_score > best_score)
       best_score = temp_score;
@@ -124,8 +135,6 @@ local int help_walk_book_alpha_beta(sqlite3 *arg_db,
 
   if (nmoves == 0)
     return (SCORE_PLUS_INFINITY);
-
-  HARDBUG(best_score == SCORE_PLUS_INFINITY)
 
   return (best_score);
 }
@@ -149,8 +158,12 @@ help_walk_book(sqlite3 *arg_db, board_t *object, int arg_depth, bstring arg_bpv)
 
     board2fen(object, bfen, FALSE);
 
-    position_id =
-        query_position_id(arg_db, bdata(bfen), options.book_position_frequency);
+    int flags;
+
+    position_id = query_position_id(arg_db,
+                                    bdata(bfen),
+                                    options.book_position_frequency,
+                                    &flags);
 
     BDESTROY(bfen)
 
@@ -160,15 +173,24 @@ help_walk_book(sqlite3 *arg_db, board_t *object, int arg_depth, bstring arg_bpv)
 
       return;
     }
+
+    if (!(flags & FLAG_POSITION_MOVES_EVALUATED))
+    {
+      PRINTF("%s !(flags & FLAG_POSITION_MOVES_EVALUATED)\n", bdata(arg_bpv));
+
+      return;
+    }
   }
 
   BSTRING(bmove)
+
+  int nmoves = 0;
 
   for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
   {
     move2bstring(&moves_list, imove, bmove);
 
-    if ((moves_list.ML_nmoves == 1) or (moves_list.ML_ncaptx > 0))
+    if ((moves_list.ML_ncaptx > 0) or (moves_list.ML_nmoves == 1))
     {
       HARDBUG(position_id != INVALID)
 
@@ -176,6 +198,8 @@ help_walk_book(sqlite3 *arg_db, board_t *object, int arg_depth, bstring arg_bpv)
 
       HARDBUG(bformata(bpv, "%s %s(--, --)", bdata(arg_bpv), bdata(bmove)) ==
               BSTR_ERR)
+
+      ++nmoves;
 
       do_move(object, imove, &moves_list, FALSE);
 
@@ -190,44 +214,52 @@ help_walk_book(sqlite3 *arg_db, board_t *object, int arg_depth, bstring arg_bpv)
       HARDBUG(position_id == INVALID)
 
       i64_t move_id;
+      int flags;
 
       move_id = query_move(arg_db,
                            position_id,
                            bdata(bmove),
-                           options.book_move_frequency);
+                           options.book_move_frequency,
+                           &flags);
 
-      if (move_id == INVALID)
-        continue;
+      HARDBUG(move_id == INVALID)
 
-      int evaluation = query_evaluation(arg_db, move_id);
+      int evaluation = query_evaluation(arg_db, move_id, FLAG_NULL);
 
-      if (evaluation == SCORE_PLUS_INFINITY)
-        continue;
+      HARDBUG(evaluation == SCORE_PLUS_INFINITY)
 
-      do_move(object, imove, &moves_list, FALSE);
+      ++nmoves;
 
-      int minimax_score = -help_walk_book_alpha_beta(arg_db,
-                                                     object,
-                                                     arg_depth,
-                                                     SCORE_MINUS_INFINITY,
-                                                     SCORE_PLUS_INFINITY);
+      if (flags & FLAG_MOVE_EXPANDED)
+      {
+        do_move(object, imove, &moves_list, FALSE);
 
-      BSTRING(bpv)
+        int minimax_score = -help_walk_book_alpha_beta(arg_db,
+                                                       object,
+                                                       arg_depth,
+                                                       SCORE_MINUS_INFINITY,
+                                                       SCORE_PLUS_INFINITY);
 
-      HARDBUG(bformata(bpv,
-                       "%s %s[%d, %d]",
-                       bdata(arg_bpv),
-                       bdata(bmove),
-                       evaluation,
-                       minimax_score) == BSTR_ERR)
+        BSTRING(bpv)
 
-      help_walk_book(arg_db, object, arg_depth + 1, bpv);
+        HARDBUG(bformata(bpv,
+                         "%s %s[%d, %d]",
+                         bdata(arg_bpv),
+                         bdata(bmove),
+                         evaluation,
+                         minimax_score) == BSTR_ERR)
 
-      undo_move(object, imove, &moves_list, FALSE);
+        help_walk_book(arg_db, object, arg_depth + 1, bpv);
 
-      BDESTROY(bpv)
+        undo_move(object, imove, &moves_list, FALSE);
+
+        BDESTROY(bpv)
+      }
     }
   }
+
+  HARDBUG(nmoves == 0)
+  // PRINTF("%s (nmoves == 0)\n", bdata(arg_bpv));
 
   BDESTROY(bmove)
 }
@@ -239,7 +271,7 @@ void open_book(void)
   sqlite3 *disk;
 
   int rc =
-      my_sqlite3_open_v2(options.book_name, &disk, SQLITE_OPEN_READONLY, NULL);
+    my_sqlite3_open_v2(options.book_name, &disk, SQLITE_OPEN_READONLY, NULL);
 
   if (rc != SQLITE_OK)
   {
@@ -288,7 +320,7 @@ void open_book(void)
     const char *table_name = (const char *)my_sqlite3_column_text(stmt, 0);
 
     const char *create_table_sql =
-        (const char *)my_sqlite3_column_text(stmt, 1);
+      (const char *)my_sqlite3_column_text(stmt, 1);
 
     if (strcmp(table_name, "sqlite_sequence") == 0)
       continue;
@@ -382,12 +414,19 @@ void return_book_move(board_t *object,
 
     board2fen(object, bfen, FALSE);
 
-    position_id =
-        query_position_id(book, bdata(bfen), options.book_position_frequency);
+    int flags;
+
+    position_id = query_position_id(book,
+                                    bdata(bfen),
+                                    options.book_position_frequency,
+                                    &flags);
 
     BDESTROY(bfen)
 
     if (position_id == INVALID)
+      return;
+
+    if (!(flags & FLAG_POSITION_MOVES_EVALUATED))
       return;
   }
 
@@ -433,32 +472,26 @@ void return_book_move(board_t *object,
     {
       HARDBUG(position_id == INVALID)
 
-      // does the move occur in the book?
-
       move2bstring(&moves_list, jmove, bmove);
 
       i64_t move_id;
+      int flags;
 
       move_id = query_move(book,
                            position_id,
                            bdata(bmove),
-                           options.book_move_frequency);
+                           options.book_move_frequency,
+                           &flags);
 
-      if (move_id == INVALID)
-        continue;
+      HARDBUG(move_id == INVALID)
 
-      // does the move have an evaluation?
+      evaluation = query_evaluation(book, move_id, FLAG_NULL);
 
-      evaluation = query_evaluation(book, move_id);
-
-      if (evaluation == SCORE_PLUS_INFINITY)
-        continue;
+      HARDBUG(evaluation == SCORE_PLUS_INFINITY)
 
       temp_score = evaluation;
 
-      // optionally the minimax score
-
-      if (options.book_minimax)
+      if (options.book_minimax and (flags & FLAG_MOVE_EXPANDED))
       {
         do_move(object, jmove, &moves_list, FALSE);
 
@@ -510,42 +543,35 @@ void return_book_move(board_t *object,
   }
 }
 
-typedef struct
-{
-  i64_t P_id;
-  int P_depth;
-} position_t;
-
 local i64_t npositions;
-local position_t *positions;
+local i64_t *position_ids;
 
-local void query_positions(sqlite3 *arg_db, int arg_depth)
+local void query_positions(sqlite3 *arg_db)
 {
-  MY_MALLOC_BY_TYPE(positions, position_t, NPOSITIONS_MAX)
+  MY_MALLOC_BY_TYPE(position_ids, i64_t, NPOSITIONS_MAX)
 
-  char *sql = "SELECT id, depth FROM positions "
-              "WHERE depth = ? ORDER BY id ASC;";
+  char *sql = "SELECT id, flags FROM positions ORDER BY id ASC;";
 
   sqlite3_stmt *stmt;
 
   my_sqlite3_prepare_v2(arg_db, sql, &stmt);
 
-  HARDBUG(my_sqlite3_bind_int(stmt, 1, arg_depth) != SQLITE_OK)
-
   npositions = 0;
 
-  int rc;
-
-  while ((rc = execute_sql(arg_db, stmt, TRUE)) == SQLITE_ROW)
+  while (execute_sql(arg_db, stmt, TRUE) == SQLITE_ROW)
   {
-    HARDBUG(npositions >= NPOSITIONS_MAX)
+    i64_t id = my_sqlite3_column_int64(stmt, 0);
 
-    position_t *with = positions + npositions;
+    int flags = my_sqlite3_column_int(stmt, 1);
 
-    with->P_id = my_sqlite3_column_int64(stmt, 0);
-    with->P_depth = my_sqlite3_column_int(stmt, 1);
+    if (flags == 0)
+    {
+      HARDBUG(npositions >= NPOSITIONS_MAX)
 
-    npositions++;
+      position_ids[npositions] = id;
+
+      npositions++;
+    }
   }
 
   HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
@@ -560,7 +586,8 @@ local void return_position_moves(sqlite3 *arg_db,
 {
   BSTRING(bfen)
 
-  HARDBUG(query_position_fen(arg_db, arg_position_id, bfen) == INVALID)
+  HARDBUG(query_position_fen(arg_db, arg_position_id, bfen, FLAG_NULL) ==
+          INVALID)
 
   fen2board(arg_board, bdata(bfen));
 
@@ -594,15 +621,13 @@ local void add_evaluations(my_sqlite3_t *arg_db,
 
   sqlite3_stmt *stmt;
 
-  my_sqlite3_prepare_v2(arg_db->MS_db, sql, &stmt);
+  my_sqlite3_prepare_v2(arg_db->MSQL_db, sql, &stmt);
 
   HARDBUG(my_sqlite3_bind_int64(stmt, 1, arg_position_id) != SQLITE_OK)
 
   int nmoves = 0;
 
-  int rc;
-
-  while ((rc = execute_sql(arg_db->MS_db, stmt, TRUE)) == SQLITE_ROW)
+  while (execute_sql(arg_db->MSQL_db, stmt, TRUE) == SQLITE_ROW)
   {
     HARDBUG(nmoves >= NMOVES_MAX)
 
@@ -711,7 +736,7 @@ local void add_evaluations2book_worker(my_sqlite3_t *arg_db,
 
     update_progress(&progress);
 
-    i64_t position_id = positions[iposition].P_id;
+    i64_t position_id = position_ids[iposition];
 
     HARDBUG(position_id < 1)
 
@@ -719,7 +744,7 @@ local void add_evaluations2book_worker(my_sqlite3_t *arg_db,
 
     moves_list_t moves_list;
 
-    return_position_moves(arg_db->MS_db,
+    return_position_moves(arg_db->MSQL_db,
                           position_id,
                           &(arg_search->S_board),
                           &moves_list);
@@ -751,9 +776,10 @@ local void add_or_update_moves(my_sqlite3_t *arg_db, board_t *arg_board)
 
   for (i64_t iposition = 0; iposition < npositions; iposition++)
   {
-    i64_t position_id = positions[iposition].P_id;
+    i64_t position_id = position_ids[iposition];
 
-    HARDBUG(query_position_fen(arg_db->MS_db, position_id, bfen) == INVALID)
+    HARDBUG(query_position_fen(arg_db->MSQL_db, position_id, bfen, FLAG_NULL) ==
+            INVALID)
 
     fen2board(arg_board, bdata(bfen));
 
@@ -796,7 +822,7 @@ void add_evaluations2book(my_sqlite3_t *arg_db,
 
   fen2board(&(search.S_board), STARTING_POSITION2FEN);
 
-  query_positions(arg_db->MS_db, 0);
+  query_positions(arg_db->MSQL_db);
 
   if (arg_add_moves > 0)
   {
@@ -818,8 +844,7 @@ void add_evaluations2book(my_sqlite3_t *arg_db,
   add_evaluations2book_worker(arg_db, &search, arg_centi_seconds);
 }
 
-local void
-add_position(my_sqlite3_t *arg_db, search_t *arg_search, int arg_depth)
+local void add_position(my_sqlite3_t *arg_db, search_t *arg_search)
 {
   moves_list_t moves_list;
 
@@ -834,10 +859,9 @@ add_position(my_sqlite3_t *arg_db, search_t *arg_search, int arg_depth)
     board2fen(&(arg_search->S_board), bfen, FALSE);
 
     append_sql_buffer(arg_db,
-                      "INSERT OR IGNORE INTO positions (fen, depth) "
-                      "VALUES ('%s', %d);",
-                      bdata(bfen),
-                      arg_depth);
+                      "INSERT OR IGNORE INTO positions (fen) "
+                      "VALUES ('%s');",
+                      bdata(bfen));
 
     BDESTROY(bfen)
   }
@@ -847,7 +871,7 @@ add_position(my_sqlite3_t *arg_db, search_t *arg_search, int arg_depth)
     {
       do_move(&(arg_search->S_board), imove, &moves_list, FALSE);
 
-      add_position(arg_db, arg_search, arg_depth);
+      add_position(arg_db, arg_search);
 
       undo_move(&(arg_search->S_board), imove, &moves_list, FALSE);
     }
@@ -857,7 +881,6 @@ add_position(my_sqlite3_t *arg_db, search_t *arg_search, int arg_depth)
 local void expand_book_worker(my_sqlite3_t *arg_db,
                               i64_t arg_position_id,
                               search_t *arg_search,
-                              int arg_depth,
                               int arg_centi_seconds)
 {
   moves_list_t moves_list;
@@ -881,14 +904,17 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
 
   for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
   {
+
     move2bstring(&moves_list, imove, bmove);
 
     append_sql_buffer(
-        arg_db,
-        "INSERT OR IGNORE INTO moves (position_id, move) VALUES (%lld, '%s');",
-        arg_position_id,
-        bdata(bmove));
+      arg_db,
+      "INSERT OR IGNORE INTO moves (position_id, move) VALUES (%lld, '%s');",
+      arg_position_id,
+      bdata(bmove));
   }
+
+  BDESTROY(bmove)
 
   flush_sql_buffer(arg_db, 0);
 
@@ -902,52 +928,43 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
 
   BSTRING(bsql)
 
-  int limit = EXPANSION_NMOVES;
-
-  if (arg_depth <= 1)
-    limit = NMOVES_MAX;
-
-  PRINTF("expanding moves limit=%d\n", limit);
+  PRINTF("checking moves..\n");
 
   bformata(bsql,
-           "SELECT m.move, e.evaluation "
+           "SELECT m.id, m.move, e.evaluation "
            "FROM moves m "
            "JOIN evaluations e ON m.id = e.move_id "
            "WHERE m.position_id = ? "
-           "AND ABS(e.evaluation) <= %d "
-           "ORDER BY e.evaluation DESC LIMIT %d;",
-           EXPANSION_EVALUATION,
-           limit);
+           "ORDER BY e.evaluation DESC");
 
   sqlite3_stmt *stmt;
 
-  my_sqlite3_prepare_v2(arg_db->MS_db, bdata(bsql), &stmt);
+  my_sqlite3_prepare_v2(arg_db->MSQL_db, bdata(bsql), &stmt);
 
   HARDBUG(my_sqlite3_bind_int64(stmt, 1, arg_position_id) != SQLITE_OK)
 
+  i64_t move_ids[NMOVES_MAX];
+  bstring bmoves[NMOVES_MAX];
+  int evaluations[NMOVES_MAX];
+
+  for (int imove = 0; imove < NMOVES_MAX; imove++)
+    HARDBUG((bmoves[imove] = bfromcstr("")) == NULL)
+
   int nmoves = 0;
 
-  while (execute_sql(arg_db->MS_db, stmt, TRUE) == SQLITE_ROW)
+  // DO NOT USE APPEND_SQL INSIDE A STEPPED QUERY!
+
+  while (execute_sql(arg_db->MSQL_db, stmt, TRUE) == SQLITE_ROW)
   {
     HARDBUG(nmoves >= NMOVES_MAX)
 
-    const unsigned char *move = my_sqlite3_column_text(stmt, 0);
+    move_ids[nmoves] = my_sqlite3_column_int64(stmt, 0);
 
-    int evaluation = my_sqlite3_column_int(stmt, 1);
+    const unsigned char *move = my_sqlite3_column_text(stmt, 1);
 
-    HARDBUG(bassigncstr(bmove, (char *)move) == BSTR_ERR)
+    HARDBUG(bassigncstr(bmoves[nmoves], (char *)move) == BSTR_ERR)
 
-    int jmove;
-
-    HARDBUG((jmove = search_move(&moves_list, bmove)) == INVALID)
-
-    PRINTF("expanding move=%s evaluation=%d\n", move, evaluation);
-
-    do_move(&(arg_search->S_board), jmove, &moves_list, FALSE);
-
-    add_position(arg_db, arg_search, arg_depth + 1);
-
-    undo_move(&(arg_search->S_board), jmove, &moves_list, FALSE);
+    evaluations[nmoves] = my_sqlite3_column_int64(stmt, 2);
 
     nmoves++;
   }
@@ -956,17 +973,78 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
 
   BDESTROY(bsql)
 
-  BDESTROY(bmove)
+  HARDBUG(nmoves != moves_list.ML_nmoves)
+
+  nmoves = 0;
+
+  for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
+  {
+    PRINTF("imove=%d move_ids[imove]=%lld"
+           " bmoves[imove]=%s evaluations[imove]=%d\n",
+           imove,
+           move_ids[imove],
+           bdata(bmoves[imove]),
+           evaluations[imove]);
+
+    if (abs(evaluations[imove]) > EXPANSION_EVALUATION)
+    {
+      PRINTF("evaluations[imove] > EXPANSION_EVALUATION\n");
+
+      append_sql_buffer(arg_db,
+                        "UPDATE moves "
+                        "SET flags = flags | %d WHERE id = %lld;",
+                        FLAG_MOVE_EVALUATION_SIZE,
+                        move_ids[imove]);
+    }
+    else if (nmoves >= EXPANSION_NMOVES)
+    {
+      PRINTF("nmoves >= EXPANSION_NMOVES\n");
+
+      append_sql_buffer(arg_db,
+                        "UPDATE moves "
+                        "SET flags = flags | %d WHERE id = %lld;",
+                        FLAG_MOVE_NMOVES_LIMIT,
+                        move_ids[imove]);
+    }
+    else
+    {
+      int jmove;
+
+      HARDBUG((jmove = search_move(&moves_list, bmoves[imove])) == INVALID)
+
+      PRINTF("expanding move and adding position after move..\n");
+
+      append_sql_buffer(arg_db,
+                        "UPDATE moves "
+                        "SET flags = flags | %d WHERE id = %lld;",
+                        FLAG_MOVE_EXPANDED,
+                        move_ids[imove]);
+
+      do_move(&(arg_search->S_board), jmove, &moves_list, FALSE);
+
+      add_position(arg_db, arg_search);
+
+      undo_move(&(arg_search->S_board), jmove, &moves_list, FALSE);
+
+      nmoves++;
+    }
+  }
 
   PRINTF("nmoves=%d\n", nmoves);
 
+  append_sql_buffer(arg_db,
+                    "UPDATE positions "
+                    "SET flags = flags | %d WHERE id = %lld;",
+                    FLAG_POSITION_MOVES_EVALUATED,
+                    arg_position_id);
+
   flush_sql_buffer(arg_db, 0);
+
+  for (int imove = 0; imove < NMOVES_MAX; imove++)
+    HARDBUG(bdestroy(bmoves[imove]) == BSTR_ERR)
 }
 
-void expand_book(my_sqlite3_t *arg_db,
-                 char *arg_fen,
-                 int arg_depth,
-                 int arg_centi_seconds)
+void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
 {
   search_t search;
 
@@ -1007,7 +1085,7 @@ void expand_book(my_sqlite3_t *arg_db,
 
       print_board(&(search.S_board));
 
-      add_position(arg_db, &search, 0);
+      add_position(arg_db, &search);
     }
 
     destroy_my_bstream(&my_bstream);
@@ -1022,7 +1100,7 @@ void expand_book(my_sqlite3_t *arg_db,
 
   // all slaves gather the positions
 
-  query_positions(arg_db->MS_db, arg_depth);
+  query_positions(arg_db->MSQL_db);
 
   my_mpi_barrier_v3("after querying positions",
                     my_mpi_globals.MMG_comm_slaves,
@@ -1057,18 +1135,16 @@ void expand_book(my_sqlite3_t *arg_db,
 
     ++npositions_mpi;
 
-    HARDBUG(query_position_fen(arg_db->MS_db,
-                               positions[iposition].P_id,
-                               bfen) == INVALID)
+    HARDBUG(query_position_fen(arg_db->MSQL_db,
+                               position_ids[iposition],
+                               bfen,
+                               FLAG_NULL) == INVALID)
 
     fen2board(&(search.S_board), bdata(bfen));
 
-    print_board(&(search.S_board));
-
     expand_book_worker(arg_db,
-                       positions[iposition].P_id,
+                       position_ids[iposition],
                        &search,
-                       arg_depth,
                        arg_centi_seconds);
   }
 
@@ -1117,6 +1193,8 @@ void walk_book(char *arg_db_name, char *arg_fen)
     string2board(with, STARTING_POSITION);
   else
     fen2board(with, arg_fen);
+
+  print_board(&board);
 
   BSTRING(bempty)
 

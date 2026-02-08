@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 #include "globals.h"
 
 #undef ALIGN8
@@ -49,8 +48,8 @@ local void printf_cache(void *self)
   for (i64_t icache_entry = 0; icache_entry < object->C_nentries;
        icache_entry++)
   {
-    void *cache_entry = (i8_t *)object->C_entry_values +
-                        CACHE_ENTRY_SIZE(object) * icache_entry;
+    void *cache_entry =
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * icache_entry;
 
     if (memcmp(cache_entry,
                object->C_entry_key_default,
@@ -81,8 +80,8 @@ int check_entry_in_cache(void *self, void *arg_entry_key, void *arg_entry_value)
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *)object->C_entry_values +
-                  CACHE_ENTRY_SIZE(object) * icache_entry;
+    cache_entry =
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else if (object->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
   {
@@ -92,8 +91,8 @@ int check_entry_in_cache(void *self, void *arg_entry_key, void *arg_entry_value)
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *)object->C_entry_values +
-                  CACHE_ENTRY_SIZE(object) * icache_entry;
+    cache_entry =
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else if (object->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
   {
@@ -103,8 +102,8 @@ int check_entry_in_cache(void *self, void *arg_entry_key, void *arg_entry_value)
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *)object->C_entry_values +
-                  CACHE_ENTRY_SIZE(object) * icache_entry;
+    cache_entry =
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else
     FATAL("unknown C_entry_key_type", EXIT_FAILURE)
@@ -142,8 +141,8 @@ int store_entry_in_cache(void *self, void *arg_entry_key, void *arg_entry_value)
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *)object->C_entry_values +
-                  CACHE_ENTRY_SIZE(object) * icache_entry;
+    cache_entry =
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else if (object->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
   {
@@ -153,8 +152,8 @@ int store_entry_in_cache(void *self, void *arg_entry_key, void *arg_entry_value)
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *)object->C_entry_values +
-                  CACHE_ENTRY_SIZE(object) * icache_entry;
+    cache_entry =
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else if (object->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
   {
@@ -164,8 +163,8 @@ int store_entry_in_cache(void *self, void *arg_entry_key, void *arg_entry_value)
 
     i64_t icache_entry = key % object->C_nentries;
 
-    cache_entry = (i8_t *)object->C_entry_values +
-                  CACHE_ENTRY_SIZE(object) * icache_entry;
+    cache_entry =
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * icache_entry;
   }
   else
     FATAL("unknown C_entry_key_type", EXIT_FAILURE)
@@ -208,7 +207,7 @@ void clear_cache(void *self)
   while (itarget < object->C_nentries)
   {
     void *target =
-        (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * itarget;
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * itarget;
 
     while ((itarget + nsource) > object->C_nentries)
       nsource--;
@@ -269,7 +268,7 @@ void construct_cache(void *self,
 #endif
 
   object->C_nentries =
-      first_prime_below(arg_cache_size / CACHE_ENTRY_SIZE(object));
+    first_prime_below(arg_cache_size / CACHE_ENTRY_SIZE(object));
 
   HARDBUG(object->C_nentries < 3)
 
@@ -292,7 +291,7 @@ void construct_cache(void *self,
   while (itarget < object->C_nentries)
   {
     void *target =
-        (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * itarget;
+      (i8_t *)object->C_entry_values + CACHE_ENTRY_SIZE(object) * itarget;
 
     while ((itarget + nsource) > object->C_nentries)
       nsource--;

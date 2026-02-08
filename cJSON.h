@@ -1,5 +1,4 @@
-//SCU REVISION 8.100 zo  4 jan 2026 13:50:23 CET
-// SCU REVISION 8.0108 zo  4 jan 2026 10:07:27 CET
+// SCU REVISION 8.1178 zo  8 feb 2026  6:06:03 CET
 /*
   Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
 
@@ -31,7 +30,7 @@ extern "C"
 #endif
 
 #if !defined(__WINDOWS__) && \
-    (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32))
+  (defined(WIN32) || defined(WIN64) || defined(_MSC_VER) || defined(_WIN32))
 #define __WINDOWS__
 #endif
 
@@ -66,7 +65,7 @@ extern "C"
 /* export symbols by default, this is necessary for copy pasting the C and
  * header file */
 #if !defined(CJSON_HIDE_SYMBOLS) && !defined(CJSON_IMPORT_SYMBOLS) && \
-    !defined(CJSON_EXPORT_SYMBOLS)
+  !defined(CJSON_EXPORT_SYMBOLS)
 #define CJSON_EXPORT_SYMBOLS
 #endif
 
@@ -82,7 +81,7 @@ extern "C"
 #define CJSON_STDCALL
 
 #if (defined(__GNUC__) || defined(__SUNPRO_CC) || defined(__SUNPRO_C)) && \
-    defined(CJSON_API_VISIBILITY)
+  defined(CJSON_API_VISIBILITY)
 #define CJSON_PUBLIC(type) __attribute__((visibility("default"))) type
 #else
 #define CJSON_PUBLIC(type) type
@@ -313,9 +312,9 @@ extern "C"
   /* Update array items. */
   CJSON_PUBLIC(cJSON_bool)
   cJSON_InsertItemInArray(
-      cJSON *array,
-      int which,
-      cJSON *newitem); /* Shifts pre-existing items to the right. */
+    cJSON *array,
+    int which,
+    cJSON *newitem); /* Shifts pre-existing items to the right. */
   CJSON_PUBLIC(cJSON_bool)
   cJSON_ReplaceItemViaPointer(cJSON *const parent,
                               cJSON *const item,
@@ -393,11 +392,11 @@ extern "C"
 
 /* If the object is not a boolean type this does nothing and returns
  * cJSON_Invalid else it returns the new type*/
-#define cJSON_SetBoolValue(object, boolValue)                                \
-  ((object != NULL && ((object)->type & (cJSON_False | cJSON_True)))         \
-       ? (object)->type = ((object)->type & (~(cJSON_False | cJSON_True))) | \
-                          ((boolValue) ? cJSON_True : cJSON_False)           \
-       : cJSON_Invalid)
+#define cJSON_SetBoolValue(object, boolValue)                              \
+  ((object != NULL && ((object)->type & (cJSON_False | cJSON_True)))       \
+     ? (object)->type = ((object)->type & (~(cJSON_False | cJSON_True))) | \
+                        ((boolValue) ? cJSON_True : cJSON_False)           \
+     : cJSON_Invalid)
 
 /* Macro for iterating over an array or object */
 #define cJSON_ArrayForEach(element, array)                                 \
