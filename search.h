@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef SearchH
 #define SearchH
 
@@ -9,9 +9,6 @@
 
 #define MINIMAL_WINDOW_BIT BIT(0)
 #define PV_BIT BIT(1)
-#define GE_BETA_BIT BIT(2)
-#define LE_ALPHA_BIT BIT(3)
-#define TRUE_SCORE_BIT BIT(4)
 
 #define IS_MINIMAL_WINDOW(X) ((X) & MINIMAL_WINDOW_BIT)
 #define IS_PV(X) ((X) & PV_BIT)
@@ -35,6 +32,7 @@
 #define IS_SR_EGTB_DRAW(X) ((X) & SR_EGTB_DRAW_BIT)
 #define IS_SR_WON(X) ((X) & SR_WON_BIT)
 #define IS_SR_LOST(X) ((X) & SR_LOST_BIT)
+#define IS_SR_SINGULAR_REDUCTION(X) ((X) & SR_SINGULAR_REDUCTION_BIT)
 
 #define PV_SLOT_WHITE_MOVE_MASK 0xFFULL
 #define PV_SLOT_BLACK_MOVE_MASK 0xFF00ULL
@@ -61,8 +59,9 @@ typedef struct
 
 typedef struct
 {
-  int SR_score;
-  int SR_flags;
+  score_t SR_raw_score;
+  score_t SR_score;
+  ui32_t SR_flags;
   int SR_depth;
   pv_entries_t SR_pv;
 } search_result_t;
@@ -71,6 +70,7 @@ typedef struct
 {
   my_printf_t *S_my_printf;
   void *S_thread;
+  int S_network_id;
 
   board_t S_board;
 
@@ -81,18 +81,17 @@ typedef struct
   cache_t S_endgame_entry_cache;
   cache_t S_endgame_wdl_entry_cache;
 
-  int S_root_simple_score;
-  int S_root_score;
-  int S_best_score;
+  score_t S_root_simple_score;
+  score_t S_root_score;
+  score_t S_best_score;
   int S_best_score_kind;
   int S_best_move;
   int S_best_depth;
 
-  int S_best_score_by_depth[DEPTH_MAX];
-
   i64_t S_total_move_repetitions;
 
   i64_t S_total_quiescence_nodes;
+  i64_t S_total_quiescence_1move;
   i64_t S_total_quiescence_all_moves_captures_only;
   i64_t S_total_quiescence_all_moves_le2_moves;
   i64_t S_total_quiescence_all_moves_combination;
@@ -100,20 +99,14 @@ typedef struct
 
   i64_t S_total_nodes;
   i64_t S_total_alpha_beta_nodes;
+  i64_t S_total_alpha_beta_1move;
   i64_t S_total_capture_nodes;
   i64_t S_total_minimal_window_nodes;
   i64_t S_total_pv_nodes;
 
-  i64_t S_total_quiescence_extension_searches;
   i64_t S_total_quiescence_extension_searches_combination;
-  i64_t S_total_quiescence_extension_searches_le_alpha;
-  i64_t S_total_quiescence_extension_searches_ge_beta;
-  i64_t S_total_quiescence_capture_extensions;
 
-  i64_t S_total_pv_extension_searches;
   i64_t S_total_pv_extension_searches_combination;
-  i64_t S_total_pv_extension_searches_le_alpha;
-  i64_t S_total_pv_extension_searches_ge_beta;
 
   i64_t S_total_reductions_combinations;
   i64_t S_total_reductions;
@@ -121,7 +114,11 @@ typedef struct
   i64_t S_total_reductions_le_alpha;
   i64_t S_total_reductions_ge_beta;
 
-  i64_t S_total_single_reply_extensions;
+  i64_t S_total_singular_extension_probes;
+  i64_t S_total_singular_extension_probes_le_alpha;
+  i64_t S_total_singular_extension_probes_ge_beta;
+  i64_t S_total_singular_extensions;
+  i64_t S_total_singular_reductions;
 
   i64_t S_total_evaluations;
   i64_t S_total_lazy_alpha_evaluations;
@@ -129,6 +126,8 @@ typedef struct
   i64_t S_total_material_only_evaluations;
   i64_t S_total_network_evaluations;
 
+  i64_t S_total_alpha_beta_cache_updates;
+  i64_t S_total_alpha_beta_cache_aged;
   i64_t S_total_alpha_beta_cache_hits;
   i64_t S_total_alpha_beta_cache_depth_hits;
   i64_t S_total_alpha_beta_cache_le_alpha_hits;
@@ -140,18 +139,22 @@ typedef struct
   i64_t S_total_alpha_beta_cache_ge_beta_stored;
   i64_t S_total_alpha_beta_cache_true_score_stored;
   i64_t S_total_alpha_beta_cache_nmoves_errors;
-  i64_t S_total_alpha_beta_cache_crc64_errors;
+  i64_t S_total_alpha_beta_cache_nprobes;
+  i64_t S_total_alpha_beta_cache_memory_hits;
+  i64_t S_total_alpha_beta_cache_local_hits;
+  i64_t S_total_alpha_beta_cache_crc_errors;
 
   i64_t S_total_score_cache_hits;
-  i64_t S_total_score_cache_crc32_errors;
+  i64_t S_total_score_cache_crc_errors;
 } search_t;
 
 int draw_by_repetition(board_t *, int);
+int move_repetition(board_t *);
 void clear_totals(search_t *);
 void print_totals(search_t *);
-void do_search(search_t *, moves_list_t *, int, int, int, my_random_t *);
+void do_search(search_t *, moves_list_t *, int, int, score_t, my_random_t *);
 void clear_caches(void);
-void construct_search(void *, my_printf_t *, void *);
+void construct_search(search_t *, my_printf_t *, void *, int);
 void init_search(void);
 void fin_search(void);
 

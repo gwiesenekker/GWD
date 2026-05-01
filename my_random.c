@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 /*
@@ -72,23 +72,23 @@ void shuffle(int *s, int n, my_random_t *r)
   }
 }
 
-void construct_my_random(my_random_t *self, i64_t arg_seed)
+void construct_my_random(my_random_t *arg_with_my_random, ui64_t *arg_seed)
 {
-  my_random_t *object = self;
-
   ui64_t seed;
 
-  if (arg_seed == INVALID)
+  if (arg_seed == NULL)
   {
-    compat_getrandom_u64(&seed);
+    seed = 0;
   }
   else
   {
-    seed = arg_seed;
+    compat_getrandom_u64(arg_seed);
+
+    seed = *arg_seed;
   }
 
   for (int i = 0; i < 4; i++)
-    object->MR_state[i] = splitmix64(&seed);
+    arg_with_my_random->MR_state[i] = splitmix64(&seed);
 }
 
 /*
@@ -108,22 +108,22 @@ uint64_t xoshiro256pp(void) {
 }
 */
 
-ui64_t return_my_random(my_random_t *self)
+ui64_t return_my_random(my_random_t *arg_with_my_random)
 {
-  my_random_t *object = self;
-
   ui64_t result =
-    rotl(object->MR_state[0] + object->MR_state[3], 23) + object->MR_state[0];
+    rotl(arg_with_my_random->MR_state[0] + arg_with_my_random->MR_state[3],
+         23) +
+    arg_with_my_random->MR_state[0];
 
-  ui64_t t = object->MR_state[1] << 17;
+  ui64_t t = arg_with_my_random->MR_state[1] << 17;
 
-  object->MR_state[2] ^= object->MR_state[0];
-  object->MR_state[3] ^= object->MR_state[1];
-  object->MR_state[1] ^= object->MR_state[2];
-  object->MR_state[0] ^= object->MR_state[3];
+  arg_with_my_random->MR_state[2] ^= arg_with_my_random->MR_state[0];
+  arg_with_my_random->MR_state[3] ^= arg_with_my_random->MR_state[1];
+  arg_with_my_random->MR_state[1] ^= arg_with_my_random->MR_state[2];
+  arg_with_my_random->MR_state[0] ^= arg_with_my_random->MR_state[3];
 
-  object->MR_state[2] ^= t;
-  object->MR_state[3] = rotl(object->MR_state[3], 45);
+  arg_with_my_random->MR_state[2] ^= t;
+  arg_with_my_random->MR_state[3] = rotl(arg_with_my_random->MR_state[3], 45);
 
   return result;
 }
@@ -147,7 +147,7 @@ void test_my_random(void)
 
     my_random_t test_random;
 
-    construct_my_random(&test_random, 0);
+    construct_my_random(&test_random, NULL);
 
     stats_t stats;
     construct_stats(&stats, "test_random");
@@ -214,7 +214,7 @@ void test_my_random(void)
 
   my_random_t test_random;
 
-  construct_my_random(&test_random, 0);
+  construct_my_random(&test_random, NULL);
 
   shuffle(s, TEST_NBUCKETS, NULL);
   shuffle(s, TEST_NBUCKETS, &test_random);

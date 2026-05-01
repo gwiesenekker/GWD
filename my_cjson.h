@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef My_cjsonH
 #define My_cjsonH
 
@@ -9,17 +9,17 @@ typedef struct
   bstring MCJ_bstring;
 } my_cjson_t;
 
-void construct_my_cjson(void *);
+void construct_my_cjson(my_cjson_t *);
 
-void my_cjson_add_int(void *, char *, int);
-void my_cjson_set_int(void *, char *, int);
-int my_cjson_get_int(void *, char *);
+void my_cjson_add_int(my_cjson_t *, char *, int);
+void my_cjson_set_int(my_cjson_t *, char *, int);
+int my_cjson_get_int(my_cjson_t *, char *);
 
-void my_cjson_add_cstring(void *, char *, char *);
-void my_cjson_set_cstring(void *, char *, char *);
-char *my_cjson_get_cstring(void *, char *);
+void my_cjson_add_cstring(my_cjson_t *, char *, char *);
+void my_cjson_set_cstring(my_cjson_t *, char *, char *);
+char *my_cjson_get_cstring(my_cjson_t *, char *);
 
-char *my_cjson2cstring(void *);
+char *my_cjson2cstring(my_cjson_t *);
 
 void test_my_cjson(void);
 

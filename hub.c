@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -18,10 +18,10 @@ typedef struct
   arg_t command_args[NARGS_MAX];
 } command_t;
 
-local void line2command(char *arg_line, command_t *object)
+local void line2command(char *arg_line, command_t *arg_with_command)
 {
-  object->command = NULL;
-  object->command_nargs = 0;
+  arg_with_command->command = NULL;
+  arg_with_command->command_nargs = 0;
 
   char *c = arg_line;
 
@@ -32,7 +32,7 @@ local void line2command(char *arg_line, command_t *object)
   if (*c == '\0')
     return;
 
-  object->command = c;
+  arg_with_command->command = c;
 
   while (isgraph(*c))
     c++;
@@ -44,7 +44,7 @@ local void line2command(char *arg_line, command_t *object)
 
   c++;
 
-  PRINTF("command=%s\n", object->command);
+  PRINTF("command=%s\n", arg_with_command->command);
 
   // params
 
@@ -56,9 +56,10 @@ local void line2command(char *arg_line, command_t *object)
     if (*c == '\0')
       return;
 
-    HARDBUG(object->command_nargs >= NARGS_MAX)
+    HARDBUG(arg_with_command->command_nargs >= NARGS_MAX)
 
-    arg_t *with_param = object->command_args + object->command_nargs;
+    arg_t *with_param =
+      arg_with_command->command_args + arg_with_command->command_nargs;
 
     with_param->arg_name = c;
     with_param->arg_value = NULL;
@@ -117,7 +118,7 @@ local void line2command(char *arg_line, command_t *object)
       }
       PRINTF("arg_value=%s\n", with_param->arg_value);
     }
-    object->command_nargs++;
+    arg_with_command->command_nargs++;
   }
 }
 
@@ -190,11 +191,11 @@ void hub(void)
 {
   search_t search;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
 
-  search_t *with = &search;
+  search_t *with_search = &search;
 
-  string2board(&(with->S_board), STARTING_POSITION);
+  string2board(&(with_search->S_board), STARTING_POSITION);
 
   game_state_t game_state;
 
@@ -230,13 +231,13 @@ void hub(void)
 
       HARDBUG(compat_strcasecmp(name, "pos") != 0)
 
-      string2board(&(with->S_board), start_board);
+      string2board(&(with_search->S_board), start_board);
 
-      print_board(&(with->S_board));
+      print_board(&(with_search->S_board));
 
       BSTRING(bfen)
 
-      board2fen(&(with->S_board), bfen, FALSE);
+      board2fen(&(with_search->S_board), bfen, FALSE);
 
       game_state.set_starting_position(&game_state, bdata(bfen));
 
@@ -436,22 +437,22 @@ void hub(void)
         options.time_ntrouble = 0;
       }
 
-      print_board(&(with->S_board));
+      print_board(&(with_search->S_board));
 
       moves_list_t moves_list;
 
       construct_moves_list(&moves_list);
 
-      gen_moves(&(with->S_board), &moves_list);
+      gen_moves(&(with_search->S_board), &moves_list);
 
       HARDBUG(moves_list.ML_nmoves == 0)
 
-      check_moves(&(with->S_board), &moves_list);
+      check_moves(&(with_search->S_board), &moves_list);
 
       BSTRING(bmove_string)
 
       if (options.use_book)
-        return_book_move(&(with->S_board), &moves_list, bmove_string);
+        return_book_move(&(with_search->S_board), &moves_list, bmove_string);
 
       HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
 
@@ -463,7 +464,7 @@ void hub(void)
       else
       {
         if ((compat_strcasecmp(name, "think") == 0) and options.use_book)
-          return_book_move(&(with->S_board), &moves_list, bmove_string);
+          return_book_move(&(with_search->S_board), &moves_list, bmove_string);
 
         if (compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
         {
@@ -826,7 +827,7 @@ local char your_name[MY_LINE_MAX];
 
 local double return_sigmoid(double x) { return (2.0 / (1.0 + exp(-x)) - 1.0); }
 
-local int play_game(search_t *object,
+local int play_game(search_t *arg_with_search,
                     int arg_my_colour,
                     pipe_t arg_parent2child,
                     pipe_t arg_child2parent)
@@ -852,13 +853,13 @@ local int play_game(search_t *object,
 
   BSTRING(bfen)
 
-  board2fen(&(object->S_board), bfen, FALSE);
+  board2fen(&(arg_with_search->S_board), bfen, FALSE);
 
   game_state.set_starting_position(&game_state, bdata(bfen));
 
   char pos[MY_LINE_MAX];
 
-  strcpy(pos, board2string(&(object->S_board), TRUE));
+  strcpy(pos, board2string(&(arg_with_search->S_board), TRUE));
 
   PRINTF("pos=%s\n", pos);
 
@@ -878,23 +879,23 @@ local int play_game(search_t *object,
 
   while (TRUE)
   {
-    print_board(&(object->S_board));
+    print_board(&(arg_with_search->S_board));
 
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(object->S_board), &moves_list);
+    gen_moves(&(arg_with_search->S_board), &moves_list);
 
     PRINTF("nmy_game_moves_done=%d nyour_game_moves_done=%d\n",
            nmy_game_moves_done,
            nyour_game_moves_done);
 
-    if (object->S_board.B_colour2move != arg_my_colour)
+    if (arg_with_search->S_board.B_colour2move != arg_my_colour)
     {
       if (moves_list.ML_nmoves == 0)
       {
-        if (IS_WHITE(object->S_board.B_colour2move))
+        if (IS_WHITE(arg_with_search->S_board.B_colour2move))
           result = 0;
         else
           result = 2;
@@ -1056,7 +1057,7 @@ local int play_game(search_t *object,
 
       game_state.push_move(&game_state, bdata(bmove_string), NULL);
 
-      do_move(&(object->S_board), imove, &moves_list, FALSE);
+      do_move(&(arg_with_search->S_board), imove, &moves_list);
 
       BDESTROY(bmove_string)
     }
@@ -1066,7 +1067,7 @@ local int play_game(search_t *object,
 
       if (moves_list.ML_nmoves == 0)
       {
-        if (IS_WHITE(object->S_board.B_colour2move))
+        if (IS_WHITE(arg_with_search->S_board.B_colour2move))
           result = 0;
         else
           result = 2;
@@ -1076,7 +1077,7 @@ local int play_game(search_t *object,
 
       // check for known endgame
 
-      int egtb_mate = read_endgame(object, object->S_board.B_colour2move, NULL);
+      int egtb_mate = read_endgame(arg_with_search, NULL);
 
       if (egtb_mate != ENDGAME_UNKNOWN)
       {
@@ -1088,14 +1089,14 @@ local int play_game(search_t *object,
         }
         else if (egtb_mate > 0)
         {
-          if (IS_WHITE(object->S_board.B_colour2move))
+          if (IS_WHITE(arg_with_search->S_board.B_colour2move))
             result = 2;
           else
             result = 0;
         }
         else
         {
-          if (IS_WHITE(object->S_board.B_colour2move))
+          if (IS_WHITE(arg_with_search->S_board.B_colour2move))
             result = 0;
           else
             result = 2;
@@ -1139,7 +1140,9 @@ local int play_game(search_t *object,
       else
       {
         if (options.use_book)
-          return_book_move(&(object->S_board), &moves_list, bbest_move);
+          return_book_move(&(arg_with_search->S_board),
+                           &moves_list,
+                           bbest_move);
 
         if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
         {
@@ -1292,7 +1295,7 @@ local int play_game(search_t *object,
 
         btrunc(bfen, 0);
 
-        board2fen(&(object->S_board), bfen, FALSE);
+        board2fen(&(arg_with_search->S_board), bfen, FALSE);
 
         compat_fdprintf(fd,
                         "%s {%.5f}\n",
@@ -1306,7 +1309,7 @@ local int play_game(search_t *object,
 
       BDESTROY(bbest_move)
 
-      do_move(&(object->S_board), imove, &moves_list, FALSE);
+      do_move(&(arg_with_search->S_board), imove, &moves_list);
     }
   }
 
@@ -1343,14 +1346,14 @@ local int play_game(search_t *object,
 local void hub_server_game_initiator(pipe_t arg_parent2child,
                                      pipe_t arg_child2parent)
 {
-  snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.network_name);
+  snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.network0);
   snprintf(your_name, MY_LINE_MAX, "%s", options.hub_server_client);
 
   search_t search;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
 
-  search_t *with = &search;
+  search_t *with_search = &search;
 
   int nwon = 0;
   int ndraw = 0;
@@ -1428,7 +1431,7 @@ local void hub_server_game_initiator(pipe_t arg_parent2child,
     if (ifen > options.hub_server_games)
       break;
 
-    if ((my_mpi_globals.MMG_id_slave != INVALID) and
+    if ((my_mpi_globals.MMG_is_slave) and
         (((ifen - 1) % my_mpi_globals.MMG_nslaves) !=
          my_mpi_globals.MMG_id_slave))
       continue;
@@ -1462,12 +1465,12 @@ local void hub_server_game_initiator(pipe_t arg_parent2child,
 
       PRINTF("game=%d opening=%s\n", igame, opening);
 
-      fen2board(&(with->S_board), fen);
+      fen2board(&(with_search->S_board), fen);
 
-      print_board(&(with->S_board));
+      print_board(&(with_search->S_board));
 
       int result =
-        play_game(with, my_colour, arg_parent2child, arg_child2parent);
+        play_game(with_search, my_colour, arg_parent2child, arg_child2parent);
 
       if (result == 2)
       {
@@ -1500,7 +1503,7 @@ local void hub_server_game_initiator(pipe_t arg_parent2child,
 
 label_break:
 
-  if (my_mpi_globals.MMG_id_slave != INVALID)
+  if (my_mpi_globals.MMG_is_slave)
   {
     my_mpi_allreduce(MPI_IN_PLACE,
                      &nfen_mpi,
@@ -1546,8 +1549,7 @@ label_break:
          nlost,
          nunknown);
 
-  if ((my_mpi_globals.MMG_id_slave == INVALID) or
-      (my_mpi_globals.MMG_id_slave == 0))
+  if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_lead_slave)
     results2csv(nwon, ndraw, nlost, nunknown);
 }
 

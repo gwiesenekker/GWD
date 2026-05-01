@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "profile.h"
 
 #ifdef PROFILE
@@ -16,7 +16,7 @@
 #define or ||
 
 #define NAME_MAX 32
-#define BLOCK_MAX 100
+#define BLOCK_MAX 200
 #define STACK_MAX 100
 
 #define TICKS(TV) (TV)
@@ -212,7 +212,20 @@ local void mangle(char *dest, const char *source)
 
 int new_block(int pid, const char *name, int *invocation_pointer)
 {
-  PROFILE_BUG(PL.nblock >= BLOCK_MAX)
+  if (PL.nblock >= BLOCK_MAX)
+  {
+    for (int iblock = 0; iblock < PL.nblock; iblock++)
+    {
+      block_t *with_block = PL.block + iblock;
+
+      fprintf(stderr,
+              "iblock=%d block_name=%s\n",
+              iblock,
+              with_block->block_name);
+    }
+
+    PROFILE_BUG(PL.nblock >= BLOCK_MAX)
+  }
 
   int block_id = PL.nblock;
 
@@ -424,13 +437,13 @@ void init_profile(void)
   {
     tids[ithread] = PROFILE_INVALID;
 
-    profile_local_t *with = profile_local + ithread;
+    profile_local_t *with_profile_local = profile_local + ithread;
 
-    with->nblock = 0;
+    with_profile_local->nblock = 0;
 
-    with->nstack = 0;
+    with_profile_local->nstack = 0;
 
-    with->time_total = 0.0;
+    with_profile_local->time_total = 0.0;
   }
 
   (void)remove("profile.txt");

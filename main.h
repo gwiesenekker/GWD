@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef MainH
 #define MainH
 
@@ -16,8 +16,8 @@ typedef struct
 
   int verbose;
 
-  char networks[MY_LINE_MAX];
-  char network_name[MY_LINE_MAX];
+  char network0[MY_LINE_MAX];
+  char network1[MY_LINE_MAX];
 
   int network_evaluation_min;
   int network_evaluation_max;
@@ -52,38 +52,33 @@ typedef struct
 
   int material_only;
 
-  int captures_are_transparent;
-  int returned_depth_includes_captures;
-
   int quiescence_evaluation_policy;
   int quiescence_combination_length;
-  int quiescence_extension_search_window;
-  int quiescence_capture_extensions;
 
   int pv_combination_length;
-  int pv_extension_search_window;
 
-  int aspiration_window;
   int best_score_margin;
+  int aspiration_margin;
+  int research_margin;
 
   int use_reductions;
 
   int reduction_depth_root;
   int reduction_depth_leaf;
-  int reduction_moves_min;
   int reduction_combination_length;
-
   int reduction_full_min;
   int reduction_percentage;
+  int reduction_margin;
 
-  int use_single_reply_extensions;
+  int singular_probe_depth;
+  int singular_probe_margin;
+  int singular_probe_percentage;
+  int singular_extension_moves;
 
   int sync_clock;
 
   i64_t alpha_beta_cache_size;
-  int alpha_beta_cache_depth_margin;
-  int pv_cache_fraction;
-  int pv2cache;
+  int cache_draw_results;
 
   i64_t score_cache_size;
 

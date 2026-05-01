@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef MctsH
 #define MctsH
 
@@ -19,10 +19,10 @@ typedef struct
 
 extern mcts_globals_t mcts_globals;
 
-int mcts_search(search_t *, int, int, int, moves_list_t *, int *, int);
+void mcts_search(search_t *, int, int, moves_list_t *, int *, score_t *, int);
 
 double
-mcts_shoot_outs(search_t *, int, int *, int, double, int *, int *, int *);
+mcts_shoot_outs(search_t *, int, int, double, int *, int *, int *, int *, int);
 
 void init_mcts(void);
 

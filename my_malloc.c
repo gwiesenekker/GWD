@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define NPAD (4 * 64)
@@ -106,19 +106,20 @@ void mark_pointer_read_only(void *arg_pointer)
 
   for (imalloc = 0; imalloc < nmy_mallocs; imalloc++)
   {
-    my_malloc_t *object = my_mallocs + imalloc;
+    my_malloc_t *with_my_malloc = my_mallocs + imalloc;
 
-    if (object->MM_pointer == arg_pointer)
+    if (with_my_malloc->MM_pointer == arg_pointer)
       break;
   }
 
   HARDBUG(imalloc >= nmy_mallocs)
 
-  my_malloc_t *object = my_mallocs + imalloc;
+  my_malloc_t *with_my_malloc = my_mallocs + imalloc;
 
-  object->MM_read_only = TRUE;
+  with_my_malloc->MM_read_only = TRUE;
 
-  object->MM_crc64 = return_XXH3_64(object->MM_pointer, object->MM_size);
+  with_my_malloc->MM_crc64 =
+    return_XXH3_64(with_my_malloc->MM_pointer, with_my_malloc->MM_size);
 
   HARDBUG(compat_mutex_unlock(&my_malloc_mutex) != 0)
 }
@@ -155,54 +156,58 @@ void register_heap(char *arg_name,
     HARDBUG(my_mallocs == NULL)
   }
 
-  my_malloc_t *object = my_mallocs + nmy_mallocs;
+  my_malloc_t *with_my_malloc = my_mallocs + nmy_mallocs;
 
-  HARDBUG((object->MM_name = bfromcstr(arg_name)) == NULL)
+  HARDBUG((with_my_malloc->MM_name = bfromcstr(arg_name)) == NULL)
 
-  HARDBUG((object->MM_file = bfromcstr(arg_file)) == NULL)
+  HARDBUG((with_my_malloc->MM_file = bfromcstr(arg_file)) == NULL)
 
-  HARDBUG((object->MM_func = bfromcstr(arg_func)) == NULL)
+  HARDBUG((with_my_malloc->MM_func = bfromcstr(arg_func)) == NULL)
 
-  object->MM_line = arg_line;
+  with_my_malloc->MM_line = arg_line;
 
-  object->MM_size = arg_size;
+  with_my_malloc->MM_size = arg_size;
 
-  object->MM_pad = arg_pad;
+  with_my_malloc->MM_pad = arg_pad;
 
-  object->MM_heap = arg_heap;
+  with_my_malloc->MM_heap = arg_heap;
 
   if (!arg_pad)
   {
-    object->MM_pointer = arg_heap;
+    with_my_malloc->MM_pointer = arg_heap;
 
-    object->MM_prefix = object->MM_postfix = NULL;
-    object->MM_prefix_crc64 = object->MM_postfix_crc64 = 0;
+    with_my_malloc->MM_prefix = with_my_malloc->MM_postfix = NULL;
+    with_my_malloc->MM_prefix_crc64 = with_my_malloc->MM_postfix_crc64 = 0;
   }
   else
   {
-    object->MM_prefix = arg_heap;
+    with_my_malloc->MM_prefix = arg_heap;
 
     for (int i = 0; i < NPAD; i++)
-      object->MM_prefix[i] = return_my_random(&my_malloc_random) % 256;
+      with_my_malloc->MM_prefix[i] = return_my_random(&my_malloc_random) % 256;
 
-    object->MM_prefix_crc64 = return_XXH3_64(object->MM_prefix, NPAD);
+    with_my_malloc->MM_prefix_crc64 =
+      return_XXH3_64(with_my_malloc->MM_prefix, NPAD);
 
-    object->MM_pointer = (char *)arg_heap + NPAD;
+    with_my_malloc->MM_pointer = (char *)arg_heap + NPAD;
 
-    object->MM_postfix = (ui8_t *)((char *)arg_heap + NPAD + object->MM_size);
+    with_my_malloc->MM_postfix =
+      (ui8_t *)((char *)arg_heap + NPAD + with_my_malloc->MM_size);
 
     for (int i = 0; i < NPAD; i++)
-      object->MM_postfix[i] = return_my_random(&my_malloc_random) % 256;
+      with_my_malloc->MM_postfix[i] = return_my_random(&my_malloc_random) % 256;
 
-    object->MM_postfix_crc64 = return_XXH3_64(object->MM_postfix, NPAD);
+    with_my_malloc->MM_postfix_crc64 =
+      return_XXH3_64(with_my_malloc->MM_postfix, NPAD);
   }
 
-  object->MM_read_only = arg_read_only;
+  with_my_malloc->MM_read_only = arg_read_only;
 
-  object->MM_crc64 = 0;
+  with_my_malloc->MM_crc64 = 0;
 
   if (arg_read_only)
-    object->MM_crc64 = return_XXH3_64(object->MM_pointer, object->MM_size);
+    with_my_malloc->MM_crc64 =
+      return_XXH3_64(with_my_malloc->MM_pointer, with_my_malloc->MM_size);
 
   nmy_mallocs++;
 
@@ -223,18 +228,20 @@ void *deregister_heap(void *arg_pointer)
 
   for (imalloc = 0; imalloc < nmy_mallocs; imalloc++)
   {
-    my_malloc_t *object = my_mallocs + imalloc;
+    my_malloc_t *with_my_malloc = my_mallocs + imalloc;
 
-    if (object->MM_pointer != arg_pointer)
+    if (with_my_malloc->MM_pointer != arg_pointer)
       continue;
 
-    result = object->MM_heap;
+    result = with_my_malloc->MM_heap;
 
-    if (object->MM_pad)
+    if (with_my_malloc->MM_pad)
     {
-      if (object->MM_prefix_crc64 != return_XXH3_64(object->MM_prefix, NPAD))
+      if (with_my_malloc->MM_prefix_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_prefix, NPAD))
       {
-        PRINTF("WARNING: PREFIX BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+        PRINTF("WARNING: PREFIX BLOCK %s CORRUPT!\n",
+               bdata(with_my_malloc->MM_name));
 
         result = NULL;
 
@@ -242,12 +249,14 @@ void *deregister_heap(void *arg_pointer)
       }
       else
       {
-        PRINTF("PREFIX BLOCK %s OK!\n", bdata(object->MM_name));
+        PRINTF("PREFIX BLOCK %s OK!\n", bdata(with_my_malloc->MM_name));
       }
 
-      if (object->MM_postfix_crc64 != return_XXH3_64(object->MM_postfix, NPAD))
+      if (with_my_malloc->MM_postfix_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_postfix, NPAD))
       {
-        PRINTF("WARNING: POSTFIX BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+        PRINTF("WARNING: POSTFIX BLOCK %s CORRUPT!\n",
+               bdata(with_my_malloc->MM_name));
 
         result = NULL;
 
@@ -255,16 +264,17 @@ void *deregister_heap(void *arg_pointer)
       }
       else
       {
-        PRINTF("POSTFIX BLOCK %s OK!\n", bdata(object->MM_name));
+        PRINTF("POSTFIX BLOCK %s OK!\n", bdata(with_my_malloc->MM_name));
       }
     }
 
-    if (object->MM_read_only)
+    if (with_my_malloc->MM_read_only)
     {
-      if (object->MM_crc64 !=
-          return_XXH3_64(object->MM_pointer, object->MM_size))
+      if (with_my_malloc->MM_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_pointer, with_my_malloc->MM_size))
       {
-        PRINTF("WARNING: READONLY BLOCK %s CORRUPT!\n", bdata(object->MM_name));
+        PRINTF("WARNING: READONLY BLOCK %s CORRUPT!\n",
+               bdata(with_my_malloc->MM_name));
 
         result = NULL;
 
@@ -273,8 +283,8 @@ void *deregister_heap(void *arg_pointer)
       else
       {
         PRINTF("READONLY BLOCK %s(%llX) OK!\n",
-               bdata(object->MM_name),
-               object->MM_crc64);
+               bdata(with_my_malloc->MM_name),
+               with_my_malloc->MM_crc64);
       }
     }
 
@@ -450,7 +460,7 @@ void pop_name(char *arg_name,
 
 void init_my_malloc(void)
 {
-  construct_my_random(&my_malloc_random, 0);
+  construct_my_random(&my_malloc_random, NULL);
 
   my_mallocs = malloc(sizeof(my_malloc_t) * nmy_mallocs_max);
 
@@ -535,15 +545,15 @@ local void printf_imalloc(int imalloc)
   HARDBUG(imalloc < 0)
   HARDBUG(imalloc >= nmy_mallocs)
 
-  my_malloc_t *object = my_mallocs + imalloc;
+  my_malloc_t *with_my_malloc = my_mallocs + imalloc;
 
   PRINTF("imalloc=%d name=%s file=%s func=%s line=%d size=%lld\n",
          imalloc,
-         bdata(object->MM_name),
-         bdata(object->MM_file),
-         bdata(object->MM_func),
-         object->MM_line,
-         object->MM_size);
+         bdata(with_my_malloc->MM_name),
+         bdata(with_my_malloc->MM_file),
+         bdata(with_my_malloc->MM_func),
+         with_my_malloc->MM_line,
+         with_my_malloc->MM_size);
 }
 
 void check_my_malloc(void)
@@ -552,11 +562,12 @@ void check_my_malloc(void)
 
   for (int imalloc = 0; imalloc < nmy_mallocs; imalloc++)
   {
-    my_malloc_t *object = my_mallocs + imalloc;
+    my_malloc_t *with_my_malloc = my_mallocs + imalloc;
 
-    if (object->MM_pad)
+    if (with_my_malloc->MM_pad)
     {
-      if (object->MM_prefix_crc64 != return_XXH3_64(object->MM_prefix, NPAD))
+      if (with_my_malloc->MM_prefix_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_prefix, NPAD))
       {
         printf_imalloc(imalloc);
 
@@ -565,7 +576,8 @@ void check_my_malloc(void)
         corrupt = TRUE;
       }
 
-      if (object->MM_postfix_crc64 != return_XXH3_64(object->MM_postfix, NPAD))
+      if (with_my_malloc->MM_postfix_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_postfix, NPAD))
       {
         printf_imalloc(imalloc);
 
@@ -575,10 +587,10 @@ void check_my_malloc(void)
       }
     }
 
-    if (object->MM_read_only)
+    if (with_my_malloc->MM_read_only)
     {
-      if (object->MM_crc64 !=
-          return_XXH3_64(object->MM_pointer, object->MM_size))
+      if (with_my_malloc->MM_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_pointer, with_my_malloc->MM_size))
       {
         printf_imalloc(imalloc);
 
@@ -613,9 +625,9 @@ void fin_my_malloc(int arg_verbose)
 
   for (int imalloc = 0; imalloc < nmy_mallocs; imalloc++)
   {
-    my_malloc_t *object = my_mallocs + imalloc;
+    my_malloc_t *with_my_malloc = my_mallocs + imalloc;
 
-    sizes[imalloc] = object->MM_size;
+    sizes[imalloc] = with_my_malloc->MM_size;
     psizes[imalloc] = imalloc;
   }
 
@@ -623,13 +635,14 @@ void fin_my_malloc(int arg_verbose)
 
   for (int imalloc = 0; imalloc < nmy_mallocs; imalloc++)
   {
-    my_malloc_t *object = my_mallocs + imalloc;
+    my_malloc_t *with_my_malloc = my_mallocs + imalloc;
 
-    S_total_size += object->MM_size;
+    S_total_size += with_my_malloc->MM_size;
 
-    if (object->MM_pad)
+    if (with_my_malloc->MM_pad)
     {
-      if (object->MM_prefix_crc64 != return_XXH3_64(object->MM_prefix, NPAD))
+      if (with_my_malloc->MM_prefix_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_prefix, NPAD))
       {
         printf_imalloc(imalloc);
 
@@ -638,7 +651,8 @@ void fin_my_malloc(int arg_verbose)
         corrupt = TRUE;
       }
 
-      if (object->MM_postfix_crc64 != return_XXH3_64(object->MM_postfix, NPAD))
+      if (with_my_malloc->MM_postfix_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_postfix, NPAD))
       {
         printf_imalloc(imalloc);
 
@@ -648,10 +662,10 @@ void fin_my_malloc(int arg_verbose)
       }
     }
 
-    if (object->MM_read_only)
+    if (with_my_malloc->MM_read_only)
     {
-      if (object->MM_crc64 !=
-          return_XXH3_64(object->MM_pointer, object->MM_size))
+      if (with_my_malloc->MM_crc64 !=
+          return_XXH3_64(with_my_malloc->MM_pointer, with_my_malloc->MM_size))
       {
         printf_imalloc(imalloc);
 
@@ -663,8 +677,8 @@ void fin_my_malloc(int arg_verbose)
       {
         if (arg_verbose)
           PRINTF("READONLY BLOCK %s(%llX) OK!\n",
-                 bdata(object->MM_name),
-                 object->MM_crc64);
+                 bdata(with_my_malloc->MM_name),
+                 with_my_malloc->MM_crc64);
       }
     }
   }
@@ -679,13 +693,13 @@ void fin_my_malloc(int arg_verbose)
 
   for (int imalloc = 0; imalloc < nmy_mallocs; imalloc++)
   {
-    my_malloc_t *object = my_mallocs + psizes[imalloc];
+    my_malloc_t *with_my_malloc = my_mallocs + psizes[imalloc];
 
-    S_total_size += object->MM_size;
+    S_total_size += with_my_malloc->MM_size;
 
     printf_imalloc(imalloc);
 
-    if (!arg_verbose and (object->MM_size < MBYTE))
+    if (!arg_verbose and (with_my_malloc->MM_size < MBYTE))
       break;
   }
 

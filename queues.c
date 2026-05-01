@@ -1,31 +1,30 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
-void construct_queue(void *self,
+void construct_queue(queue_t *arg_with_queue,
                      char *arg_queue_name,
                      my_printf_t *arg_queue_my_printf)
 {
-  queue_t *object = self;
+  HARDBUG((arg_with_queue->Q_name = bfromcstr(arg_queue_name)) == NULL)
 
-  HARDBUG((object->Q_name = bfromcstr(arg_queue_name)) == NULL)
-
-  object->Q_my_printf = arg_queue_my_printf;
+  arg_with_queue->Q_my_printf = arg_queue_my_printf;
 
   for (int imessage = 0; imessage < NMESSAGES_MAX; imessage++)
-    HARDBUG((object->Q_messages[imessage].message_text = bfromcstr("")) == NULL)
+    HARDBUG((arg_with_queue->Q_messages[imessage].message_text =
+               bfromcstr("")) == NULL)
 
-  object->Q_nread = 0;
-  object->Q_nwrite = -1;
-  object->Q_length_max = 0;
+  arg_with_queue->Q_nread = 0;
+  arg_with_queue->Q_nwrite = -1;
+  arg_with_queue->Q_length_max = 0;
 
-  HARDBUG(compat_mutex_init(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_init(&(arg_with_queue->Q_mutex)) != 0)
 }
 
-void enqueue(void *self, int arg_message_id, char *arg_message_text)
+void enqueue(queue_t *arg_with_queue,
+             int arg_message_id,
+             char *arg_message_text)
 {
-  queue_t *object = self;
-
-  HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(arg_with_queue->Q_mutex)) != 0)
 
   // nread, nwrite
   // 0      -1     : 0 messages in queue
@@ -33,16 +32,19 @@ void enqueue(void *self, int arg_message_id, char *arg_message_text)
   // 0      1      : 2 messages in queue
   // number of messages = (nwrite - nread + 1)
 
-  if ((object->Q_nwrite - object->Q_nread + 1) >= NMESSAGES_MAX)
+  if ((arg_with_queue->Q_nwrite - arg_with_queue->Q_nread + 1) >= NMESSAGES_MAX)
   {
-    my_printf(object->Q_my_printf, "Q_name=%s", bdata(object->Q_name));
+    my_printf(arg_with_queue->Q_my_printf,
+              "Q_name=%s",
+              bdata(arg_with_queue->Q_name));
 
     FATAL("NMESSAGE_MAX", EXIT_FAILURE)
   }
 
-  object->Q_nwrite++;
+  arg_with_queue->Q_nwrite++;
 
-  message_t *message = &(object->Q_messages[object->Q_nwrite % NMESSAGES_MAX]);
+  message_t *message =
+    &(arg_with_queue->Q_messages[arg_with_queue->Q_nwrite % NMESSAGES_MAX]);
 
   message->message_id = arg_message_id;
 
@@ -50,58 +52,56 @@ void enqueue(void *self, int arg_message_id, char *arg_message_text)
 
   message->message_read = FALSE;
 
-  int length = object->Q_nwrite - object->Q_nread + 1;
+  int length = arg_with_queue->Q_nwrite - arg_with_queue->Q_nread + 1;
 
-  if (length > object->Q_length_max)
+  if (length > arg_with_queue->Q_length_max)
   {
 #ifdef DEBUG
-    my_printf(object->Q_my_printf,
+    my_printf(arg_with_queue->Q_my_printf,
               "length queue %s after enqueue is %d message_id=%d message=%s\n",
-              bdata(object->Q_name),
+              bdata(arg_with_queue->Q_name),
               length,
               arg_message_id,
               arg_message_text);
 #endif
-    object->Q_length_max = length;
+    arg_with_queue->Q_length_max = length;
   }
 
-  HARDBUG(compat_mutex_unlock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(arg_with_queue->Q_mutex)) != 0)
 }
 
-int poll_queue(void *self)
+int poll_queue(queue_t *arg_with_queue)
 {
-  queue_t *object = self;
-
   int result = INVALID;
 
-  if (object == NULL)
+  if (arg_with_queue == NULL)
     return (result);
 
-  HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(arg_with_queue->Q_mutex)) != 0)
 
-  if (object->Q_nread <= object->Q_nwrite)
-    result = object->Q_messages[object->Q_nread % NMESSAGES_MAX].message_id;
+  if (arg_with_queue->Q_nread <= arg_with_queue->Q_nwrite)
+    result = arg_with_queue->Q_messages[arg_with_queue->Q_nread % NMESSAGES_MAX]
+               .message_id;
 
-  HARDBUG(compat_mutex_unlock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(arg_with_queue->Q_mutex)) != 0)
 
   return (result);
 }
 
-int dequeue(void *self, message_t *arg_message)
+int dequeue(queue_t *arg_with_queue, message_t *arg_message)
 {
-  queue_t *object = self;
-
   int result = INVALID;
 
-  HARDBUG(compat_mutex_lock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(arg_with_queue->Q_mutex)) != 0)
 
-  if (object->Q_nread <= object->Q_nwrite)
+  if (arg_with_queue->Q_nread <= arg_with_queue->Q_nwrite)
   {
-    message_t *message = &(object->Q_messages[object->Q_nread % NMESSAGES_MAX]);
+    message_t *message =
+      &(arg_with_queue->Q_messages[arg_with_queue->Q_nread % NMESSAGES_MAX]);
 
     message->message_read = TRUE;
 
-    object->Q_nread++;
+    arg_with_queue->Q_nread++;
 
     result = message->message_id;
 
@@ -109,7 +109,7 @@ int dequeue(void *self, message_t *arg_message)
       *arg_message = *message;
   }
 
-  HARDBUG(compat_mutex_unlock(&(object->Q_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(arg_with_queue->Q_mutex)) != 0)
 
   return (result);
 }

@@ -1,9 +1,9 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef GlobalsH
 #define GlobalsH
 
 #define PROGRAM gwd7
-#define REVISION "8.1181"
+#define REVISION "8.1236"
 
 // generic includes
 
@@ -20,9 +20,11 @@
 
 #ifdef USE_VALGRIND
 #include <valgrind/valgrind.h>
+#include <valgrind/memcheck.h>
 #include <sys/syscall.h>
 #else
 #define RUNNING_ON_VALGRIND 0
+#define VALGRIND_CHECK_MEM_IS_DEFINED
 #endif
 
 #ifdef USE_OPENMPI
@@ -75,13 +77,17 @@ typedef unsigned long long ui64_t;
 #define CJSON_TWEAKS_ID "tweaks"
 #define CJSON_SHAPE_ID "shape"
 #define CJSON_NETWORK2MATERIAL_SCORE_ID "network2material_score"
-#define CJSON_NMATERIAL_ID "nmaterial"
-#define CJSON_ARCHITECTURE_ID "architecture"
+#define CJSON_MATERIALS_ID "materials"
+#define CJSON_MATERIAL_NAME_ID "name"
+#define CJSON_ARCHITECTURE_PATTERNS_ID "architecture_patterns"
+#define CJSON_ARCHITECTURE_MATERIAL_ID "architecture_material"
 #define CJSON_ACTIVATION_INPUTS_ID "activation_inputs"
 #define CJSON_ACTIVATION_ID "activation"
 #define CJSON_ACTIVATION_LAST_ID "activation_last"
 #define CJSON_NMAN_MIN_ID "nman_min"
 #define CJSON_NMAN_MAX_ID "nman_max"
+#define CJSON_SIGNALS_ID "signals"
+#define CJSON_SIGNAL_NAME_ID "name"
 
 #define CJSON_EVENT_ID "event"
 #define CJSON_DATE_ID "date"
@@ -235,6 +241,25 @@ typedef float scaled_double_t;
 #else
 typedef i32_t scaled_double_t;
 #endif
+
+#define SCORE_T_INT 1
+#define SCORE_T_FLOAT 2
+
+#define SCORE_T SCORE_T_INT
+
+#if SCORE_T == SCORE_T_INT
+typedef i32_t score_t;
+#define SCANF_SCORE_T "%d"
+#define PRINTF_SCORE_T "%d"
+#elif SCORE_T == SCORE_T_FLOAT
+typedef float score_t;
+#define SCANF_SCORE_T "%f"
+#define PRINTF_SCORE_T "%.2f"
+#else
+#error unknown SCORE_T
+#endif
+
+#define SCORE(S) ((score_t)(S))
 
 // I have to get rid of this!
 

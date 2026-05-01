@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define NPOSITIONS_MAX 100000000
@@ -10,22 +10,35 @@ local my_random_t book_random;
 
 local sqlite3 *book;
 
-void init_book(void) { construct_my_random(&book_random, INVALID); }
+void init_book(void) { construct_my_random(&book_random, NULL); }
 
-local int help_walk_book_alpha_beta(sqlite3 *arg_db,
-                                    board_t *object,
-                                    int arg_depth,
-                                    int arg_alpha,
-                                    int arg_beta)
+local void inline flip_score(score_t *arg_score)
+{
+  if (!IS_SCORE_NAN(*arg_score))
+    *arg_score = -*arg_score;
+}
+
+local void help_walk_book_alpha_beta(sqlite3 *arg_db,
+                                     board_t *arg_with_board,
+                                     int arg_depth,
+                                     score_t arg_alpha,
+                                     score_t arg_beta,
+                                     score_t *arg_best_score)
 {
   moves_list_t moves_list;
 
   construct_moves_list(&moves_list);
 
-  gen_moves(object, &moves_list);
+  gen_moves(arg_with_board, &moves_list);
+
+  *arg_best_score = SCORE(SCORE_MINUS_INFINITY);
 
   if (moves_list.ML_nmoves == 0)
-    return (SCORE_LOST + arg_depth);
+  {
+    *arg_best_score = SCORE(SCORE_LOST_ABSOLUTE + arg_depth);
+
+    return;
+  }
 
   i64_t position_id = INVALID;
 
@@ -33,7 +46,7 @@ local int help_walk_book_alpha_beta(sqlite3 *arg_db,
   {
     BSTRING(bfen)
 
-    board2fen(object, bfen, FALSE);
+    board2fen(arg_with_board, bfen, FALSE);
 
     int flags;
 
@@ -45,33 +58,46 @@ local int help_walk_book_alpha_beta(sqlite3 *arg_db,
     BDESTROY(bfen)
 
     if (position_id == INVALID)
-      return (SCORE_PLUS_INFINITY);
+    {
+      *arg_best_score = SCORE_NOT_A_NUMBER;
+
+      return;
+    }
 
     if (!(flags & FLAG_POSITION_MOVES_EVALUATED))
-      return (SCORE_PLUS_INFINITY);
+    {
+      *arg_best_score = SCORE_NOT_A_NUMBER;
+
+      return;
+    }
   }
 
-  int best_score = arg_alpha;
+  *arg_best_score = arg_alpha;
 
   int nmoves = 0;
 
   for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
   {
-    int temp_score = SCORE_MINUS_INFINITY;
+    score_t temp_score = SCORE(SCORE_MINUS_INFINITY);
 
     if ((moves_list.ML_ncaptx > 0) or (moves_list.ML_nmoves == 1))
     {
-      do_move(object, imove, &moves_list, FALSE);
+      do_move(arg_with_board, imove, &moves_list);
 
-      int minimax_score = -help_walk_book_alpha_beta(arg_db,
-                                                     object,
-                                                     arg_depth + 1,
-                                                     -arg_beta,
-                                                     -best_score);
+      score_t minimax_score;
 
-      undo_move(object, imove, &moves_list, FALSE);
+      help_walk_book_alpha_beta(arg_db,
+                                arg_with_board,
+                                arg_depth + 1,
+                                -arg_beta,
+                                -(*arg_best_score),
+                                &minimax_score);
 
-      if (minimax_score != SCORE_MINUS_INFINITY)
+      flip_score(&minimax_score);
+
+      undo_move(arg_with_board, imove, &moves_list);
+
+      if (!IS_SCORE_NAN(minimax_score))
       {
         ++nmoves;
 
@@ -97,9 +123,9 @@ local int help_walk_book_alpha_beta(sqlite3 *arg_db,
 
       HARDBUG(move_id == INVALID)
 
-      int evaluation = query_evaluation(arg_db, move_id, FLAG_NULL);
+      score_t evaluation = query_evaluation(arg_db, move_id, FLAG_NULL);
 
-      HARDBUG(evaluation == SCORE_PLUS_INFINITY)
+      HARDBUG(IS_SCORE_NAN(evaluation))
 
       temp_score = evaluation;
 
@@ -111,42 +137,51 @@ local int help_walk_book_alpha_beta(sqlite3 *arg_db,
 
       if (flags & FLAG_MOVE_EXPANDED)
       {
-        do_move(object, imove, &moves_list, FALSE);
+        do_move(arg_with_board, imove, &moves_list);
 
-        int minimax_score = -help_walk_book_alpha_beta(arg_db,
-                                                       object,
-                                                       arg_depth + 1,
-                                                       -arg_beta,
-                                                       -best_score);
+        score_t minimax_score;
 
-        undo_move(object, imove, &moves_list, FALSE);
+        help_walk_book_alpha_beta(arg_db,
+                                  arg_with_board,
+                                  arg_depth + 1,
+                                  -arg_beta,
+                                  -(*arg_best_score),
+                                  &minimax_score);
 
-        if (minimax_score != SCORE_MINUS_INFINITY)
+        flip_score(&minimax_score);
+
+        undo_move(arg_with_board, imove, &moves_list);
+
+        if (!IS_SCORE_NAN(minimax_score))
           temp_score = minimax_score;
       }
     }
 
-    if (temp_score > best_score)
-      best_score = temp_score;
+    if (temp_score > *arg_best_score)
+      *arg_best_score = temp_score;
 
-    if (best_score >= arg_beta)
+    if (*arg_best_score >= arg_beta)
       break;
   }
 
   if (nmoves == 0)
-    return (SCORE_PLUS_INFINITY);
+  {
+    *arg_best_score = SCORE_NOT_A_NUMBER;
 
-  return (best_score);
+    return;
+  }
 }
 
-local void
-help_walk_book(sqlite3 *arg_db, board_t *object, int arg_depth, bstring arg_bpv)
+local void help_walk_book(sqlite3 *arg_db,
+                          board_t *arg_with_board,
+                          int arg_depth,
+                          bstring arg_bpv)
 {
   moves_list_t moves_list;
 
   construct_moves_list(&moves_list);
 
-  gen_moves(object, &moves_list);
+  gen_moves(arg_with_board, &moves_list);
 
   HARDBUG(moves_list.ML_nmoves == 0)
 
@@ -156,7 +191,7 @@ help_walk_book(sqlite3 *arg_db, board_t *object, int arg_depth, bstring arg_bpv)
   {
     BSTRING(bfen)
 
-    board2fen(object, bfen, FALSE);
+    board2fen(arg_with_board, bfen, FALSE);
 
     int flags;
 
@@ -201,11 +236,11 @@ help_walk_book(sqlite3 *arg_db, board_t *object, int arg_depth, bstring arg_bpv)
 
       ++nmoves;
 
-      do_move(object, imove, &moves_list, FALSE);
+      do_move(arg_with_board, imove, &moves_list);
 
-      help_walk_book(arg_db, object, arg_depth + 1, bpv);
+      help_walk_book(arg_db, arg_with_board, arg_depth + 1, bpv);
 
-      undo_move(object, imove, &moves_list, FALSE);
+      undo_move(arg_with_board, imove, &moves_list);
 
       BDESTROY(bpv)
     }
@@ -224,36 +259,55 @@ help_walk_book(sqlite3 *arg_db, board_t *object, int arg_depth, bstring arg_bpv)
 
       HARDBUG(move_id == INVALID)
 
-      int evaluation = query_evaluation(arg_db, move_id, FLAG_NULL);
+      score_t evaluation = query_evaluation(arg_db, move_id, FLAG_NULL);
 
-      HARDBUG(evaluation == SCORE_PLUS_INFINITY)
+      HARDBUG(IS_SCORE_NAN(evaluation))
 
       ++nmoves;
 
       if (flags & FLAG_MOVE_EXPANDED)
       {
-        do_move(object, imove, &moves_list, FALSE);
+        do_move(arg_with_board, imove, &moves_list);
 
-        int minimax_score = -help_walk_book_alpha_beta(arg_db,
-                                                       object,
-                                                       arg_depth,
-                                                       SCORE_MINUS_INFINITY,
-                                                       SCORE_PLUS_INFINITY);
+        score_t minimax_score;
+
+        help_walk_book_alpha_beta(arg_db,
+                                  arg_with_board,
+                                  arg_depth,
+                                  SCORE(SCORE_MINUS_INFINITY),
+                                  SCORE(SCORE_PLUS_INFINITY),
+                                  &minimax_score);
+
+        flip_score(&minimax_score);
 
         BSTRING(bpv)
 
         HARDBUG(bformata(bpv,
-                         "%s %s[%d, %d]",
+                         "%s %s[" PRINTF_SCORE_T ", " PRINTF_SCORE_T "]",
                          bdata(arg_bpv),
                          bdata(bmove),
                          evaluation,
                          minimax_score) == BSTR_ERR)
 
-        help_walk_book(arg_db, object, arg_depth + 1, bpv);
+        help_walk_book(arg_db, arg_with_board, arg_depth + 1, bpv);
 
-        undo_move(object, imove, &moves_list, FALSE);
+        undo_move(arg_with_board, imove, &moves_list);
 
         BDESTROY(bpv)
+      }
+      else
+      {
+        BSTRING(bfen)
+
+        board2fen(arg_with_board, bfen, FALSE);
+
+        PRINTF("%s %s[" PRINTF_SCORE_T ", %s]\n",
+               bdata(arg_bpv),
+               bdata(bmove),
+               evaluation,
+               bdata(bfen));
+
+        BDESTROY(bfen)
       }
     }
   }
@@ -377,7 +431,7 @@ void open_book(void)
   {
     board_t board;
 
-    construct_board(&board, STDOUT);
+    construct_board(&board, STDOUT, NETWORK0_ID);
 
     board_t *with = &board;
 
@@ -391,7 +445,7 @@ void open_book(void)
   }
 }
 
-void return_book_move(board_t *object,
+void return_book_move(board_t *arg_with_board,
                       moves_list_t *arg_moves_list,
                       bstring arg_bbook_move)
 {
@@ -401,7 +455,7 @@ void return_book_move(board_t *object,
 
   construct_moves_list(&moves_list);
 
-  gen_moves(object, &moves_list);
+  gen_moves(arg_with_board, &moves_list);
 
   if (moves_list.ML_nmoves == 0)
     return;
@@ -412,7 +466,7 @@ void return_book_move(board_t *object,
   {
     BSTRING(bfen)
 
-    board2fen(object, bfen, FALSE);
+    board2fen(arg_with_board, bfen, FALSE);
 
     int flags;
 
@@ -437,7 +491,7 @@ void return_book_move(board_t *object,
   else
     shuffle(sort, arg_moves_list->ML_nmoves, &book_random);
 
-  int best_score = SCORE_MINUS_INFINITY;
+  score_t best_score = SCORE(SCORE_MINUS_INFINITY);
 
   BSTRING(bmove)
 
@@ -445,25 +499,28 @@ void return_book_move(board_t *object,
   {
     int jmove = sort[imove];
 
-    int evaluation = SCORE_MINUS_INFINITY;
-    int minimax_score = SCORE_MINUS_INFINITY;
-    int temp_score = SCORE_MINUS_INFINITY;
+    score_t evaluation = SCORE(SCORE_MINUS_INFINITY);
+    score_t minimax_score = SCORE(SCORE_MINUS_INFINITY);
+    score_t temp_score = SCORE(SCORE_MINUS_INFINITY);
 
     if ((moves_list.ML_ncaptx > 0) or (moves_list.ML_nmoves == 1))
     {
       HARDBUG(position_id != INVALID)
 
-      do_move(object, jmove, &moves_list, FALSE);
+      do_move(arg_with_board, jmove, &moves_list);
 
-      minimax_score = -help_walk_book_alpha_beta(book,
-                                                 object,
-                                                 0,
-                                                 SCORE_MINUS_INFINITY,
-                                                 SCORE_PLUS_INFINITY);
+      help_walk_book_alpha_beta(book,
+                                arg_with_board,
+                                0,
+                                SCORE(SCORE_MINUS_INFINITY),
+                                SCORE(SCORE_PLUS_INFINITY),
+                                &minimax_score);
 
-      undo_move(object, jmove, &moves_list, FALSE);
+      flip_score(&minimax_score);
 
-      if (minimax_score == SCORE_MINUS_INFINITY)
+      undo_move(arg_with_board, jmove, &moves_list);
+
+      if (IS_SCORE_NAN(minimax_score))
         continue;
 
       temp_score = minimax_score;
@@ -487,34 +544,39 @@ void return_book_move(board_t *object,
 
       evaluation = query_evaluation(book, move_id, FLAG_NULL);
 
-      HARDBUG(evaluation == SCORE_PLUS_INFINITY)
+      HARDBUG(IS_SCORE_NAN(evaluation))
 
       temp_score = evaluation;
 
       if (options.book_minimax and (flags & FLAG_MOVE_EXPANDED))
       {
-        do_move(object, jmove, &moves_list, FALSE);
+        do_move(arg_with_board, jmove, &moves_list);
 
-        minimax_score = -help_walk_book_alpha_beta(book,
-                                                   object,
-                                                   0,
-                                                   SCORE_MINUS_INFINITY,
-                                                   SCORE_PLUS_INFINITY);
+        help_walk_book_alpha_beta(book,
+                                  arg_with_board,
+                                  0,
+                                  SCORE(SCORE_MINUS_INFINITY),
+                                  SCORE(SCORE_PLUS_INFINITY),
+                                  &minimax_score);
 
-        undo_move(object, jmove, &moves_list, FALSE);
+        flip_score(&minimax_score);
+
+        undo_move(arg_with_board, jmove, &moves_list);
 
         // the minimax score is always preferred
 
-        if (minimax_score != SCORE_MINUS_INFINITY)
+        if (!IS_SCORE_NAN(minimax_score))
           temp_score = minimax_score;
       }
     }
 
-    HARDBUG(temp_score == SCORE_MINUS_INFINITY)
+    HARDBUG(temp_score == SCORE(SCORE_MINUS_INFINITY))
 
     move2bstring(&moves_list, jmove, bmove);
 
-    PRINTF("book_move=%s evaluation=%d minimax_score=%d temp_score=%d\n",
+    PRINTF("book_move=%s"
+           " evaluation=" PRINTF_SCORE_T " minimax_score=" PRINTF_SCORE_T
+           " temp_score=" PRINTF_SCORE_T "\n",
            bdata(bmove),
            evaluation,
            minimax_score,
@@ -533,7 +595,10 @@ void return_book_move(board_t *object,
 
   BDESTROY(bmove)
 
-  PRINTF("book_move=%s best_score=%d\n", bdata(arg_bbook_move), best_score);
+  PRINTF("book_move=%s"
+         " best_score=" PRINTF_SCORE_T "\n",
+         bdata(arg_bbook_move),
+         best_score);
 
   if (best_score < 0)
   {
@@ -650,7 +715,7 @@ local void add_evaluations(my_sqlite3_t *arg_db,
 
     HARDBUG((jmove = search_move(arg_moves_list, bmoves[imove])) == INVALID)
 
-    do_move(&(arg_search->S_board), jmove, arg_moves_list, FALSE);
+    do_move(&(arg_search->S_board), jmove, arg_moves_list);
 
     moves_list_t your_moves_list;
 
@@ -658,11 +723,11 @@ local void add_evaluations(my_sqlite3_t *arg_db,
 
     gen_moves(&(arg_search->S_board), &your_moves_list);
 
-    int evaluation = SCORE_MINUS_INFINITY;
+    score_t evaluation = SCORE(SCORE_MINUS_INFINITY);
 
     if (your_moves_list.ML_nmoves == 0)
     {
-      evaluation = SCORE_WON_ABSOLUTE;
+      evaluation = SCORE(SCORE_WON_ABSOLUTE);
     }
     else
     {
@@ -675,29 +740,30 @@ local void add_evaluations(my_sqlite3_t *arg_db,
                 &your_moves_list,
                 INVALID,
                 INVALID,
-                SCORE_MINUS_INFINITY,
-                FALSE);
+                SCORE(SCORE_MINUS_INFINITY),
+                NULL);
 
       resume_my_printf(arg_search->S_my_printf);
 
       evaluation = -arg_search->S_best_score;
     }
 
-    HARDBUG(evaluation == SCORE_MINUS_INFINITY)
-    HARDBUG(evaluation == SCORE_PLUS_INFINITY)
+    HARDBUG(IS_SCORE_NAN(evaluation))
+    HARDBUG(evaluation == SCORE(SCORE_MINUS_INFINITY))
+    HARDBUG(evaluation == SCORE(SCORE_PLUS_INFINITY))
 
-    undo_move(&(arg_search->S_board), jmove, arg_moves_list, FALSE);
+    undo_move(&(arg_search->S_board), jmove, arg_moves_list);
 
     PRINTF("adding imove=%d move_ids[imove]=%lld bdata(bmoves[imove])=%s"
-           " evaluation=%d\n",
+           " evaluation=" PRINTF_SCORE_T "\n",
            imove,
            move_ids[imove],
            bdata(bmoves[imove]),
            evaluation);
 
     append_sql_buffer(arg_db,
-                      "INSERT OR IGNORE INTO evaluations (move_id, evaluation) "
-                      "VALUES (%lld, %d);",
+                      "INSERT OR IGNORE INTO evaluations (move_id, evaluation)"
+                      " VALUES (%lld, " PRINTF_SCORE_T ");",
                       move_ids[imove],
                       evaluation);
   }
@@ -714,27 +780,14 @@ local void add_evaluations2book_worker(my_sqlite3_t *arg_db,
                                        search_t *arg_search,
                                        int arg_centi_seconds)
 {
-  i64_t ntodo = npositions;
-
-  if (my_mpi_globals.MMG_nslaves > 0)
-    ntodo = npositions / my_mpi_globals.MMG_nslaves + 1;
-
-  PRINTF("ntodo=%lld\n", ntodo);
-
   progress_t progress;
 
-  construct_progress(&progress, ntodo, 10);
+  construct_progress(&progress, npositions, 10);
 
   for (i64_t iposition = 0; iposition < npositions; iposition++)
   {
-    if (my_mpi_globals.MMG_nslaves > 0)
-    {
-      if ((iposition % my_mpi_globals.MMG_nslaves) !=
-          my_mpi_globals.MMG_id_slave)
-        continue;
-    }
-
-    update_progress(&progress);
+    if (!make_progress(&progress, iposition))
+      continue;
 
     i64_t position_id = position_ids[iposition];
 
@@ -755,7 +808,7 @@ local void add_evaluations2book_worker(my_sqlite3_t *arg_db,
                     &moves_list,
                     arg_centi_seconds);
 
-  } // for (int iposition
+  } // for (i64_t iposition
 
   finalize_progress(&progress);
 
@@ -818,7 +871,7 @@ void add_evaluations2book(my_sqlite3_t *arg_db,
 
   search_t search;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
 
   fen2board(&(search.S_board), STARTING_POSITION2FEN);
 
@@ -826,7 +879,7 @@ void add_evaluations2book(my_sqlite3_t *arg_db,
 
   if (arg_add_moves > 0)
   {
-    if (my_mpi_globals.MMG_id_slave <= 0)
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_lead_slave)
     {
       PRINTF("adding moves to positions..\n");
 
@@ -869,11 +922,11 @@ local void add_position(my_sqlite3_t *arg_db, search_t *arg_search)
   {
     for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
     {
-      do_move(&(arg_search->S_board), imove, &moves_list, FALSE);
+      do_move(&(arg_search->S_board), imove, &moves_list);
 
       add_position(arg_db, arg_search);
 
-      undo_move(&(arg_search->S_board), imove, &moves_list, FALSE);
+      undo_move(&(arg_search->S_board), imove, &moves_list);
     }
   }
 }
@@ -945,7 +998,7 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
 
   i64_t move_ids[NMOVES_MAX];
   bstring bmoves[NMOVES_MAX];
-  int evaluations[NMOVES_MAX];
+  score_t evaluations[NMOVES_MAX];
 
   for (int imove = 0; imove < NMOVES_MAX; imove++)
     HARDBUG((bmoves[imove] = bfromcstr("")) == NULL)
@@ -979,8 +1032,10 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
 
   for (int imove = 0; imove < moves_list.ML_nmoves; imove++)
   {
-    PRINTF("imove=%d move_ids[imove]=%lld"
-           " bmoves[imove]=%s evaluations[imove]=%d\n",
+    PRINTF("imove=%d"
+           "  move_ids[imove]=%lld"
+           " bmoves[imove]=%s"
+           " evaluations[imove]=" PRINTF_SCORE_T "\n",
            imove,
            move_ids[imove],
            bdata(bmoves[imove]),
@@ -1020,11 +1075,11 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
                         FLAG_MOVE_EXPANDED,
                         move_ids[imove]);
 
-      do_move(&(arg_search->S_board), jmove, &moves_list, FALSE);
+      do_move(&(arg_search->S_board), jmove, &moves_list);
 
       add_position(arg_db, arg_search);
 
-      undo_move(&(arg_search->S_board), jmove, &moves_list, FALSE);
+      undo_move(&(arg_search->S_board), jmove, &moves_list);
 
       nmoves++;
     }
@@ -1048,13 +1103,13 @@ void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
 {
   search_t search;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
 
   BSTRING(bfen)
 
   // slave 0 adds all positions to the book
 
-  if (my_mpi_globals.MMG_id_slave <= 0)
+  if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_lead_slave)
   {
     PRINTF("adding positions..\n");
 
@@ -1109,31 +1164,14 @@ void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
 
   // now we analyze the positions in parallel
 
-  i64_t ntodo = npositions;
-
-  if (my_mpi_globals.MMG_nslaves > 0)
-    ntodo = npositions / my_mpi_globals.MMG_nslaves + 1;
-
-  PRINTF("ntodo=%lld\n", ntodo);
-
   progress_t progress;
 
-  construct_progress(&progress, ntodo, 10);
-
-  i64_t npositions_mpi = 0;
+  construct_progress(&progress, npositions, 10);
 
   for (i64_t iposition = 0; iposition < npositions; iposition++)
   {
-    if (my_mpi_globals.MMG_nslaves > 0)
-    {
-      if ((iposition % my_mpi_globals.MMG_nslaves) !=
-          my_mpi_globals.MMG_id_slave)
-        continue;
-    }
-
-    update_progress(&progress);
-
-    ++npositions_mpi;
+    if (!make_progress(&progress, iposition))
+      continue;
 
     HARDBUG(query_position_fen(arg_db->MSQL_db,
                                position_ids[iposition],
@@ -1151,17 +1189,6 @@ void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
   finalize_progress(&progress);
 
   flush_sql_buffer(arg_db, 0);
-
-  PRINTF("npositions_mpi=%lld\n", npositions_mpi);
-
-  my_mpi_allreduce(MPI_IN_PLACE,
-                   &npositions_mpi,
-                   1,
-                   MPI_LONG_LONG_INT,
-                   MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
-
-  HARDBUG(npositions != npositions_mpi)
 }
 
 void walk_book(char *arg_db_name, char *arg_fen)
@@ -1185,7 +1212,7 @@ void walk_book(char *arg_db_name, char *arg_fen)
 
   board_t board;
 
-  construct_board(&board, STDOUT);
+  construct_board(&board, STDOUT, NETWORK0_ID);
 
   board_t *with = &board;
 

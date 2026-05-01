@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef ScoreH
 #define ScoreH
 
@@ -12,17 +12,17 @@
 #define SCORE_PLUS_INFINITY 30000
 #define SCORE_MINUS_INFINITY (-SCORE_PLUS_INFINITY)
 
-#define SCORE_NOT_A_NUMBER 40000
+#define SCORE_NOT_A_NUMBER SCORE(40000)
 
-#define IS_SCORE_WON(S) ((S) >= (SCORE_WON - NODE_MAX))
-#define IS_SCORE_LOST(S) ((S) <= (SCORE_LOST + NODE_MAX))
+#define IS_SCORE_WON(S) ((S) >= SCORE(SCORE_WON - NODE_MAX))
+#define IS_SCORE_LOST(S) ((S) <= SCORE(SCORE_LOST + NODE_MAX))
 #define IS_SCORE_NAN(S) ((S) == SCORE_NOT_A_NUMBER)
 
-int return_score_from_board(board_t *, double_t *);
-int return_score(search_t *);
+score_t return_score_from_board(board_t *, double_t *);
+score_t return_score(search_t *);
 
 int return_npieces(board_t *);
-int return_material_score(board_t *);
+score_t return_material_score(board_t *);
 
 void init_score(void);
 

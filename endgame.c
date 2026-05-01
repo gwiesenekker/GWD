@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 
 #include "globals.h"
 
@@ -462,7 +462,7 @@ void init_endgame(void)
 {
   PRINTF("init_endgame..\n");
 
-  if (my_mpi_globals.MMG_nglobal == 0)
+  if (my_mpi_globals.MMG_is_master == 0)
     convert2wdl();
 
   my_mpi_barrier_v3("convert2wdl",
@@ -515,23 +515,23 @@ void init_endgame(void)
       {
         for (nbm = 0; nbm < NENDGAME_MAX; nbm++)
         {
-          endgame_t *with = &(endgames[nwk][nwm][nbk][nbm]);
+          endgame_t *with_endgame = &(endgames[nwk][nwm][nbk][nbm]);
 
-          with->endgame_status = INVALID;
+          with_endgame->endgame_status = INVALID;
 
-          strncpy(with->endgame_name, "NULL", MY_LINE_MAX);
+          strncpy(with_endgame->endgame_name, "NULL", MY_LINE_MAX);
 
-          with->endgame_ref = NULL;
+          with_endgame->endgame_ref = NULL;
 
-          with->endgame_unavailable_warning = FALSE;
+          with_endgame->endgame_unavailable_warning = FALSE;
 
-          with->fendgame = NULL;
-          with->fendgame_wdl = NULL;
-          with->pendgame = NULL;
+          with_endgame->fendgame = NULL;
+          with_endgame->fendgame_wdl = NULL;
+          with_endgame->pendgame = NULL;
 
-          with->endgame_nreads = 0;
-          with->endgame_nentry_hits = 0;
-          with->endgame_npage_hits = 0;
+          with_endgame->endgame_nreads = 0;
+          with_endgame->endgame_nentry_hits = 0;
+          with_endgame->endgame_npage_hits = 0;
         }
       }
     }
@@ -689,7 +689,7 @@ void init_endgame(void)
 
             wdl_t *pwdl_t = with_endgame->pendgame;
 
-            if (my_mpi_globals.MMG_id_global <= 0)
+            if (my_mpi_globals.MMG_is_master)
             {
               for (i64_t iwdl = 0; iwdl < nwdl; iwdl++)
                 pwdl_t[iwdl] = 0;
@@ -704,13 +704,13 @@ void init_endgame(void)
 
               if (options.verbose > 1)
                 PRINTF("..done size in RAM=%lld\n", wdl_size);
-
-              MARK_ARRAY_READ_ONLY(with_endgame->pendgame, wdl_size);
             }
 
             my_mpi_sync_shared(my_mpi_globals.MMG_comm_global,
                                with_endgame->wendgame,
                                "WDL EGTB");
+
+            MARK_ARRAY_READ_ONLY(with_endgame->pendgame, wdl_size);
 
             endgame_ram += wdl_size;
 
@@ -740,7 +740,7 @@ void init_endgame(void)
 
               // sharing of compressed EGTBs not implemented yet
 
-              HARDBUG(my_mpi_globals.MMG_nglobal > 0)
+              HARDBUG(my_mpi_globals.MMG_nglobal > 1)
 
               MY_MALLOC_BY_TYPE(with_endgame->pendgame, i8_t, size)
 
@@ -1034,17 +1034,17 @@ local void decode(i8_t *arg_flag,
 }
 #endif
 
-int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
+int read_endgame(search_t *arg_with_search, int *arg_wdl)
 {
   BEGIN_BLOCK(__FUNC__)
 
   int result = ENDGAME_UNKNOWN;
 
-  int nwk = BIT_COUNT(object->S_board.B_white_king_bb);
-  int nwm = BIT_COUNT(object->S_board.B_white_man_bb);
+  int nwk = BIT_COUNT(arg_with_search->S_board.B_white_king_bb);
+  int nwm = BIT_COUNT(arg_with_search->S_board.B_white_man_bb);
 
-  int nbk = BIT_COUNT(object->S_board.B_black_king_bb);
-  int nbm = BIT_COUNT(object->S_board.B_black_man_bb);
+  int nbk = BIT_COUNT(arg_with_search->S_board.B_black_king_bb);
+  int nbm = BIT_COUNT(arg_with_search->S_board.B_black_man_bb);
 
   int npieces = nwk + nwm + nbk + nbm;
 
@@ -1095,7 +1095,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
 
   if ((nwk + nwm) == 0)
   {
-    if (IS_WHITE(arg_colour2move))
+    if (IS_WHITE(arg_with_search->S_board.B_colour2move))
     {
       result = 0;
       if (arg_wdl != NULL)
@@ -1110,7 +1110,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
   }
   if ((nbk + nbm) == 0)
   {
-    if (IS_BLACK(arg_colour2move))
+    if (IS_BLACK(arg_with_search->S_board.B_colour2move))
     {
       result = 0;
       if (arg_wdl != NULL)
@@ -1130,7 +1130,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
   {
     if (with_endgame->endgame_unavailable_warning)
     {
-      my_printf(object->S_my_printf,
+      my_printf(arg_with_search->S_my_printf,
                 "WARNING: endgame database %s not available\n",
                 with_endgame->endgame_name);
 
@@ -1173,7 +1173,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     ui64_t bb;
     int nbb;
 
-    bb = object->S_board.B_white_king_bb;
+    bb = arg_with_search->S_board.B_white_king_bb;
     nbb = 0;
 
     while (bb != 0)
@@ -1184,7 +1184,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nwk)
 
-    bb = object->S_board.B_white_man_bb;
+    bb = arg_with_search->S_board.B_white_man_bb;
     nbb = 0;
 
     while (bb != 0)
@@ -1195,7 +1195,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nwm)
 
-    bb = object->S_board.B_black_king_bb;
+    bb = arg_with_search->S_board.B_black_king_bb;
     nbb = 0;
 
     while (bb != 0)
@@ -1206,7 +1206,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nbk)
 
-    bb = object->S_board.B_black_man_bb;
+    bb = arg_with_search->S_board.B_black_man_bb;
     nbb = 0;
 
     while (bb != 0)
@@ -1222,7 +1222,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     ui64_t bb;
     int nbb;
 
-    bb = object->S_board.B_white_king_bb;
+    bb = arg_with_search->S_board.B_white_king_bb;
     nbb = 0;
 
     while (bb != 0)
@@ -1233,7 +1233,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nwk)
 
-    bb = object->S_board.B_white_man_bb;
+    bb = arg_with_search->S_board.B_white_man_bb;
     nbb = 0;
 
     while (bb != 0)
@@ -1244,7 +1244,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nwm)
 
-    bb = object->S_board.B_black_king_bb;
+    bb = arg_with_search->S_board.B_black_king_bb;
     nbb = 0;
 
     while (bb != 0)
@@ -1255,7 +1255,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     }
     HARDBUG(nbb != nbk)
 
-    bb = object->S_board.B_black_man_bb;
+    bb = arg_with_search->S_board.B_black_man_bb;
     nbb = 0;
 
     while (bb != 0)
@@ -1362,7 +1362,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
 
     i64_t endgame_index_key = (endgame_index << 16) | endgame_id;
 
-    if (check_entry_in_cache(&(object->S_endgame_wdl_entry_cache),
+    if (check_entry_in_cache(&(arg_with_search->S_endgame_wdl_entry_cache),
                              &endgame_index_key,
                              &entry))
     {
@@ -1421,7 +1421,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
     else
       FATAL("unknown wdl_entry", EXIT_FAILURE)
 
-    store_entry_in_cache(&(object->S_endgame_wdl_entry_cache),
+    store_entry_in_cache(&(arg_with_search->S_endgame_wdl_entry_cache),
                          &endgame_index_key,
                          &entry);
   }
@@ -1437,7 +1437,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
 
     i64_t endgame_index_key = (endgame_index << 16) | endgame_id;
 
-    if (check_entry_in_cache(&(object->S_endgame_entry_cache),
+    if (check_entry_in_cache(&(arg_with_search->S_endgame_entry_cache),
                              &endgame_index_key,
                              &entry))
     {
@@ -1669,7 +1669,7 @@ int read_endgame(search_t *object, colour_enum arg_colour2move, int *arg_wdl)
       FATAL("eh", EXIT_FAILURE)
 #endif
 
-    store_entry_in_cache(&(object->S_endgame_entry_cache),
+    store_entry_in_cache(&(arg_with_search->S_endgame_entry_cache),
                          &endgame_index_key,
                          &entry);
   }
@@ -1678,14 +1678,14 @@ label_result:
 
   if (mirror)
   {
-    if (IS_WHITE(arg_colour2move))
+    if (IS_WHITE(arg_with_search->S_board.B_colour2move))
       result = entry.entry_black_mate;
     else
       result = entry.entry_white_mate;
   }
   else
   {
-    if (IS_WHITE(arg_colour2move))
+    if (IS_WHITE(arg_with_search->S_board.B_colour2move))
       result = entry.entry_white_mate;
     else
       result = entry.entry_black_mate;
@@ -1696,6 +1696,50 @@ label_return:
 
   if (arg_wdl != NULL)
     HARDBUG((result != ENDGAME_UNKNOWN) and (*arg_wdl != 0) and (*arg_wdl != 1))
+
+  return (result);
+}
+
+score_t return_endgame_score(search_t *arg_with_search, int arg_wdl)
+{
+  score_t result = SCORE_NOT_A_NUMBER;
+
+  int temp_mate = ENDGAME_UNKNOWN;
+
+  if (arg_wdl)
+    temp_mate = read_endgame(arg_with_search, &arg_wdl);
+  else
+    temp_mate = read_endgame(arg_with_search, NULL);
+
+  if (temp_mate == ENDGAME_UNKNOWN)
+    return (result);
+
+  if (temp_mate == INVALID)
+  {
+    result = SCORE(0);
+  }
+  else
+  {
+    int inode = 0;
+
+    if (arg_with_search != NULL)
+      inode = arg_with_search->S_board.B_inode;
+
+    if (temp_mate > 0)
+    {
+      if (arg_wdl)
+        result = SCORE(SCORE_WON - inode - temp_mate);
+      else
+        result = SCORE(SCORE_WON_ABSOLUTE - inode - temp_mate);
+    }
+    else
+    {
+      if (arg_wdl)
+        result = SCORE(SCORE_LOST + inode - temp_mate);
+      else
+        result = SCORE(SCORE_LOST_ABSOLUTE + inode - temp_mate);
+    }
+  }
 
   return (result);
 }
@@ -1711,33 +1755,33 @@ void fin_endgame(void)
       {
         for (int nbm = 0; nbm < NENDGAME_MAX; nbm++)
         {
-          endgame_t *with = &(endgames[nwk][nwm][nbk][nbm]);
+          endgame_t *with_endgame = &(endgames[nwk][nwm][nbk][nbm]);
 
-          if (with->pendgame != NULL)
+          if (with_endgame->pendgame != NULL)
           {
             PRINTF("ab %1d %1d %1d %1d %s",
                    nwk,
                    nwm,
                    nbk,
                    nbm,
-                   with->endgame_name);
+                   with_endgame->endgame_name);
             PRINTF("%10lld %10lld %10lld\n",
-                   with->endgame_nreads,
-                   with->endgame_nentry_hits,
-                   with->endgame_npage_hits);
+                   with_endgame->endgame_nreads,
+                   with_endgame->endgame_nentry_hits,
+                   with_endgame->endgame_npage_hits);
           }
-          else if (with->fendgame != NULL)
+          else if (with_endgame->fendgame != NULL)
           {
             PRINTF("ro %1d %1d %1d %1d %s",
                    nwk,
                    nwm,
                    nbk,
                    nbm,
-                   with->endgame_name);
+                   with_endgame->endgame_name);
             PRINTF("%10lld %10lld %10lld\n",
-                   with->endgame_nreads,
-                   with->endgame_nentry_hits,
-                   with->endgame_npage_hits);
+                   with_endgame->endgame_nreads,
+                   with_endgame->endgame_nentry_hits,
+                   with_endgame->endgame_npage_hits);
           }
         }
       }

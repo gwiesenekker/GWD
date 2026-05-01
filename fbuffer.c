@@ -1,92 +1,88 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define NFBUFFER (4 * MBYTE)
 
-void flush_fbuffer(fbuffer_t *self, int arg_nfbuffer)
+void flush_fbuffer(fbuffer_t *arg_with_fbuffer, int arg_nfbuffer)
 {
-  fbuffer_t *object = self;
-
-  if (object->FB_nfbuffer > arg_nfbuffer)
+  if (arg_with_fbuffer->FB_nfbuffer > arg_nfbuffer)
   {
-    int fd = compat_lock_file(bdata(object->FB_bname));
+    int fd = compat_lock_file(bdata(arg_with_fbuffer->FB_bname));
 
     HARDBUG(fd == -1)
 
-    HARDBUG(compat_write(fd, object->FB_fbuffer, object->FB_nfbuffer) !=
-            object->FB_nfbuffer)
+    HARDBUG(compat_write(fd,
+                         arg_with_fbuffer->FB_fbuffer,
+                         arg_with_fbuffer->FB_nfbuffer) !=
+            arg_with_fbuffer->FB_nfbuffer)
 
     compat_unlock_file(fd);
 
-    object->FB_nfbuffer = 0;
+    arg_with_fbuffer->FB_nfbuffer = 0;
   }
 }
 
-void append_fbuffer_fmt(fbuffer_t *self, const char *arg_fmt, ...)
+void append_fbuffer_fmt(fbuffer_t *arg_with_fbuffer, const char *arg_fmt, ...)
 {
-  fbuffer_t *object = self;
-
   int ret;
 
-  bvformata(ret, object->FB_bstring, arg_fmt, arg_fmt);
+  bvformata(ret, arg_with_fbuffer->FB_bstring, arg_fmt, arg_fmt);
 
   HARDBUG(ret == BSTR_ERR)
 
-  bstring b = object->FB_bstring;
+  bstring b = arg_with_fbuffer->FB_bstring;
 
   if (bchar(b, blength(b) - 1) == '\n')
   {
-    HARDBUG((object->FB_nfbuffer + blength(b)) >= (2 * NFBUFFER))
+    HARDBUG((arg_with_fbuffer->FB_nfbuffer + blength(b)) >= (2 * NFBUFFER))
 
-    memcpy((i8_t *)object->FB_fbuffer + object->FB_nfbuffer,
+    memcpy((i8_t *)arg_with_fbuffer->FB_fbuffer + arg_with_fbuffer->FB_nfbuffer,
            bdata(b),
            blength(b));
 
-    object->FB_nfbuffer += blength(b);
+    arg_with_fbuffer->FB_nfbuffer += blength(b);
 
-    HARDBUG(bassigncstr(object->FB_bstring, "") == BSTR_ERR)
+    HARDBUG(bassigncstr(arg_with_fbuffer->FB_bstring, "") == BSTR_ERR)
 
-    flush_fbuffer(object, NFBUFFER);
+    flush_fbuffer(arg_with_fbuffer, NFBUFFER);
   }
 }
 
-void append_fbuffer_bin(fbuffer_t *self, void *arg_data, size_t ldata)
+void append_fbuffer_bin(fbuffer_t *arg_with_fbuffer,
+                        void *arg_data,
+                        size_t ldata)
 {
-  fbuffer_t *object = self;
-
   if (arg_data == NULL)
   {
-    flush_fbuffer(object, NFBUFFER);
+    flush_fbuffer(arg_with_fbuffer, NFBUFFER);
 
     return;
   }
 
-  HARDBUG((object->FB_nfbuffer + ldata) >= (2 * NFBUFFER))
+  HARDBUG((arg_with_fbuffer->FB_nfbuffer + ldata) >= (2 * NFBUFFER))
 
-  memcpy((i8_t *)object->FB_fbuffer + object->FB_nfbuffer, arg_data, ldata);
+  memcpy((i8_t *)arg_with_fbuffer->FB_fbuffer + arg_with_fbuffer->FB_nfbuffer,
+         arg_data,
+         ldata);
 
-  object->FB_nfbuffer += ldata;
+  arg_with_fbuffer->FB_nfbuffer += ldata;
 }
 
-bstring return_fbuffer_bname(fbuffer_t *self)
+bstring return_fbuffer_bname(fbuffer_t *arg_with_fbuffer)
 {
-  fbuffer_t *object = self;
-
-  return (object->FB_bname);
+  return (arg_with_fbuffer->FB_bname);
 }
 
-void construct_fbuffer(fbuffer_t *self,
+void construct_fbuffer(fbuffer_t *arg_with_fbuffer,
                        bstring arg_bname,
                        char *arg_suffix,
                        int arg_remove)
 {
-  fbuffer_t *object = self;
-
-  HARDBUG((object->FB_bname = bfromcstr("")) == NULL)
+  HARDBUG((arg_with_fbuffer->FB_bname = bfromcstr("")) == NULL)
 
   if (arg_suffix == NULL)
   {
-    HARDBUG(bassign(object->FB_bname, arg_bname) == BSTR_ERR)
+    HARDBUG(bassign(arg_with_fbuffer->FB_bname, arg_bname) == BSTR_ERR)
   }
   else
   {
@@ -94,9 +90,10 @@ void construct_fbuffer(fbuffer_t *self,
 
     if ((pdot = bstrrchr(arg_bname, '.')) == BSTR_ERR)
     {
-      HARDBUG(
-        bformata(object->FB_bname, "%s%s", bdata(arg_bname), arg_suffix) ==
-        BSTR_ERR)
+      HARDBUG(bformata(arg_with_fbuffer->FB_bname,
+                       "%s%s",
+                       bdata(arg_bname),
+                       arg_suffix) == BSTR_ERR)
     }
     else
     {
@@ -104,20 +101,24 @@ void construct_fbuffer(fbuffer_t *self,
 
       HARDBUG(bassignmidstr(bprefix, arg_bname, 0, pdot) == BSTR_ERR)
 
-      HARDBUG(bformata(object->FB_bname, "%s%s", bdata(bprefix), arg_suffix) ==
-              BSTR_ERR)
+      HARDBUG(bformata(arg_with_fbuffer->FB_bname,
+                       "%s%s",
+                       bdata(bprefix),
+                       arg_suffix) == BSTR_ERR)
 
       BDESTROY(bprefix)
     }
   }
 
-  object->FB_nfbuffer = 0;
-  MY_MALLOC_VOID(object->FB_fbuffer, 2 * NFBUFFER)
+  arg_with_fbuffer->FB_nfbuffer = 0;
+  MY_MALLOC_VOID(arg_with_fbuffer->FB_fbuffer, 2 * NFBUFFER)
 
-  HARDBUG((object->FB_bstring = bfromcstr("")) == NULL)
+  HARDBUG((arg_with_fbuffer->FB_bstring = bfromcstr("")) == NULL)
+
+  PRINTF("debug=%s\n", bdata(arg_with_fbuffer->FB_bname));
 
   if (arg_remove)
-    remove(bdata(object->FB_bname));
+    remove(bdata(arg_with_fbuffer->FB_bname));
 }
 
 void test_fbuffer(void)

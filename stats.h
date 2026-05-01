@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef StatsH
 #define StatsH
 
@@ -25,42 +25,42 @@ typedef struct
   double S_sigma_sum2;
 } stats_t;
 
-void clear_stats(void *);
+void clear_stats(stats_t *);
 
-inline local void update_stats(void *self, double x)
+inline local void update_stats(stats_t *arg_with_stats, double x)
 {
-  stats_t *object = self;
+  arg_with_stats->S_n++;
 
-  object->S_n++;
-
-  if (object->S_n == 1)
+  if (arg_with_stats->S_n == 1)
   {
-    object->S_min = x;
-    object->S_max = x;
+    arg_with_stats->S_min = x;
+    arg_with_stats->S_max = x;
   }
   else
   {
-    if (x > object->S_max)
-      object->S_max = x;
-    if (x < object->S_min)
-      object->S_min = x;
+    if (x > arg_with_stats->S_max)
+      arg_with_stats->S_max = x;
+    if (x < arg_with_stats->S_min)
+      arg_with_stats->S_min = x;
   }
 
-  double mnm1 = object->S_mean_welford;
-  double snm1 = object->S_sigma_welford;
+  double mnm1 = arg_with_stats->S_mean_welford;
+  double snm1 = arg_with_stats->S_sigma_welford;
 
-  object->S_mean_welford = mnm1 + (x - mnm1) / object->S_n;
+  arg_with_stats->S_mean_welford =
+    mnm1 + (x - mnm1) / (double)arg_with_stats->S_n;
 
-  object->S_sigma_welford = snm1 + (x - mnm1) * (x - object->S_mean_welford);
+  arg_with_stats->S_sigma_welford =
+    snm1 + (x - mnm1) * (x - arg_with_stats->S_mean_welford);
 
-  object->S_sum += x;
-  object->S_sum2 += x * x;
+  arg_with_stats->S_sum += x;
+  arg_with_stats->S_sum2 += x * x;
 }
 
-void construct_stats(void *, char *);
-void mean_sigma(void *);
-void printf_stats(void *);
-void my_stats_aggregate(void *, MPI_Comm);
+void construct_stats(stats_t *, char *);
+void mean_sigma(stats_t *);
+void printf_stats(stats_t *);
+void my_stats_aggregate(stats_t *, MPI_Comm);
 
 void test_stats();
 

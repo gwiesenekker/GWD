@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef MpiH
 #define MpiH
 
@@ -55,6 +55,12 @@ typedef struct
   MPI_Comm MMG_comm_global;
   MPI_Comm MMG_comm_slaves;
 
+  int MMG_is_master;
+  int MMG_is_single;
+  int MMG_has_slaves;
+  int MMG_is_slave;
+  int MMG_is_lead_slave;
+
   int MMG_semkey_offset;
 
   int MMG_semkey_gen_book_barrier;
@@ -67,10 +73,12 @@ typedef struct
   int MMG_semkey_construct_my_sqlite3_barrier;
   int MMG_semkey_close_my_sqlite3;
   int MMG_semkey_close_my_sqlite3_barrier;
+  int MMG_semkey_auto_play_barrier;
   int MMG_semkey_gen_db_barrier;
   int MMG_semkey_update_db_barrier;
   int MMG_semkey_add_positions_barrier;
   int MMG_semkey_query_positions_barrier;
+  int MMG_semkey_fen2csv_barrier;
 } my_mpi_globals_t;
 
 extern my_mpi_globals_t my_mpi_globals;

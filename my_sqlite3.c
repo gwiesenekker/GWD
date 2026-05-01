@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define NRETRIES 1000000
@@ -170,7 +170,11 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
 
   if (!retry_random_init)
   {
-    construct_my_random(&retry_random, 0);
+    ui64_t seed;
+
+    construct_my_random(&retry_random, &seed);
+
+    PRINTF("execute_sql seed=%llX\n", seed);
 
     retry_random_init = TRUE;
   }
@@ -313,6 +317,7 @@ void create_tables(sqlite3 *arg_db)
     "CREATE TABLE IF NOT EXISTS positions "
     "(id INTEGER PRIMARY KEY AUTOINCREMENT,"
     "fen TEXT UNIQUE,"
+    "material INTEGER,"
     "frequency INTEGER DEFAULT 0,"
     "nwon INTEGER DEFAULT 0,"
     "ndraw INTEGER DEFAULT 0,"
@@ -463,7 +468,7 @@ i64_t query_move(sqlite3 *arg_db,
 #endif
 }
 
-int query_evaluation(sqlite3 *arg_db, i64_t arg_move_id, int *arg_flags)
+score_t query_evaluation(sqlite3 *arg_db, i64_t arg_move_id, int *arg_flags)
 {
 #ifdef USE_SQLITE3
   const char *sql =
@@ -479,7 +484,7 @@ int query_evaluation(sqlite3 *arg_db, i64_t arg_move_id, int *arg_flags)
   {
     HARDBUG(sqlite3_finalize(stmt) != SQLITE_OK)
 
-    return (SCORE_PLUS_INFINITY);
+    return (SCORE_NOT_A_NUMBER);
   }
 
   int evaluation = sqlite3_column_int(stmt, 0);
@@ -561,29 +566,28 @@ void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name)
 #endif
 }
 
-void flush_sql_buffer(my_sqlite3_t *self, int nsql_buffer)
+void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int nsql_buffer)
 {
-  my_sqlite3_t *object = self;
-
-  if (blength(object->MSQL_bbuffer) > nsql_buffer)
+  if (blength(arg_with_my_sqlite3->MSQL_bbuffer) > nsql_buffer)
   {
-    if (object->MSQL_verbose > 0)
-      PRINTF("blength(object->MSQL_bbuffer)=%d\n$",
-             blength(object->MSQL_bbuffer));
+    if (arg_with_my_sqlite3->MSQL_verbose > 0)
+      PRINTF("blength(arg_with_my_sqlite3->MSQL_bbuffer)=%d\n$",
+             blength(arg_with_my_sqlite3->MSQL_bbuffer));
 
-    if (object->MSQL_comm != MPI_COMM_NULL)
+    if (arg_with_my_sqlite3->MSQL_comm != MPI_COMM_NULL)
     {
       PRINTF("acquiring semaphore..\n$");
 
-      my_mpi_acquire_semaphore_v3(object->MSQL_comm,
+      my_mpi_acquire_semaphore_v3(arg_with_my_sqlite3->MSQL_comm,
                                   my_mpi_globals.MMG_semkey_flush_sql_buffer);
     }
 
-    if (object->MSQL_verbose > 0)
+    if (arg_with_my_sqlite3->MSQL_verbose > 0)
       PRINTF("executing BEGIN TRANSACTION..\n$");
 
-    HARDBUG(execute_sql(object->MSQL_db, "BEGIN TRANSACTION;", FALSE) !=
-            SQLITE_OK)
+    HARDBUG(execute_sql(arg_with_my_sqlite3->MSQL_db,
+                        "BEGIN TRANSACTION;",
+                        FALSE) != SQLITE_OK)
 
 #ifdef SPLIT_SQL_BUFFER
     BSTRING(b)
@@ -592,12 +596,13 @@ void flush_sql_buffer(my_sqlite3_t *self, int nsql_buffer)
 
     struct bstrList *bsql;
 
-    HARDBUG((bsql = bsplits(object->MSQL_bbuffer, b)) == NULL)
+    HARDBUG((bsql = bsplits(arg_with_my_sqlite3->MSQL_bbuffer, b)) == NULL)
 
     for (int isql = 0; isql < bsql->qty; isql++)
     {
-      HARDBUG(execute_sql(object->MSQL_db, bdata(bsql->entry[isql]), FALSE) !=
-              SQLITE_OK)
+      HARDBUG(execute_sql(arg_with_my_sqlite3->MSQL_db,
+                          bdata(bsql->entry[isql]),
+                          FALSE) != SQLITE_OK)
     }
 
     HARDBUG(bstrListDestroy(bsql) == BSTR_ERR)
@@ -606,63 +611,63 @@ void flush_sql_buffer(my_sqlite3_t *self, int nsql_buffer)
 #else
     PRINTF("executing SQL\n$");
 
-    HARDBUG(execute_sql(object->MSQL_db, bdata(object->MSQL_bbuffer), FALSE) !=
-            SQLITE_OK)
+    HARDBUG(execute_sql(arg_with_my_sqlite3->MSQL_db,
+                        bdata(arg_with_my_sqlite3->MSQL_bbuffer),
+                        FALSE) != SQLITE_OK)
 #endif
 
-    if (object->MSQL_verbose > 0)
+    if (arg_with_my_sqlite3->MSQL_verbose > 0)
       PRINTF("executing COMMIT..\n$");
 
-    HARDBUG(execute_sql(object->MSQL_db, "COMMIT;", FALSE) != SQLITE_OK)
+    HARDBUG(execute_sql(arg_with_my_sqlite3->MSQL_db, "COMMIT;", FALSE) !=
+            SQLITE_OK)
 
-    if (object->MSQL_comm != MPI_COMM_NULL)
+    if (arg_with_my_sqlite3->MSQL_comm != MPI_COMM_NULL)
     {
       PRINTF("releasing semaphore..\n$");
 
-      my_mpi_release_semaphore_v3(object->MSQL_comm,
+      my_mpi_release_semaphore_v3(arg_with_my_sqlite3->MSQL_comm,
                                   my_mpi_globals.MMG_semkey_flush_sql_buffer);
     }
 
-    if (object->MSQL_verbose > 0)
+    if (arg_with_my_sqlite3->MSQL_verbose > 0)
       PRINTF("done\n$");
 
-    HARDBUG(bassigncstr(object->MSQL_bbuffer, "") == BSTR_ERR)
+    HARDBUG(bassigncstr(arg_with_my_sqlite3->MSQL_bbuffer, "") == BSTR_ERR)
   }
 }
 
-void append_sql_buffer(my_sqlite3_t *self, const char *arg_fmt, ...)
+void append_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3,
+                       const char *arg_fmt,
+                       ...)
 {
-  my_sqlite3_t *object = self;
-
   int ret;
 
-  bvformata(ret, object->MSQL_bbuffer, arg_fmt, arg_fmt);
+  bvformata(ret, arg_with_my_sqlite3->MSQL_bbuffer, arg_fmt, arg_fmt);
 
   HARDBUG(ret == BSTR_ERR)
 
-  flush_sql_buffer(object, NSQL_BUFFER);
+  flush_sql_buffer(arg_with_my_sqlite3, NSQL_BUFFER);
 }
 
-void construct_my_sqlite3(my_sqlite3_t *self,
+void construct_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3,
                           char *arg_db_name,
                           MPI_Comm arg_comm)
 {
-  my_sqlite3_t *object = self;
-
-  object->MSQL_comm = arg_comm;
+  arg_with_my_sqlite3->MSQL_comm = arg_comm;
 
   int iproc = INVALID;
 
-  if (object->MSQL_comm != MPI_COMM_NULL)
-    my_mpi_comm_rank(object->MSQL_comm, &iproc);
+  if (arg_with_my_sqlite3->MSQL_comm != MPI_COMM_NULL)
+    my_mpi_comm_rank(arg_with_my_sqlite3->MSQL_comm, &iproc);
 
   if (iproc <= 0)
   {
-    int rc = my_sqlite3_open(arg_db_name, &(object->MSQL_db));
+    int rc = my_sqlite3_open(arg_db_name, &(arg_with_my_sqlite3->MSQL_db));
 
     if (rc != SQLITE_OK)
     {
-      if (object->MSQL_db == NULL)
+      if (arg_with_my_sqlite3->MSQL_db == NULL)
       {
         PRINTF("Cannot open database: %s err_msg=NULL\n", arg_db_name);
       }
@@ -670,22 +675,25 @@ void construct_my_sqlite3(my_sqlite3_t *self,
       {
         PRINTF("Cannot open database: %s err_msg=%s\n",
                arg_db_name,
-               my_sqlite3_errmsg(object->MSQL_db));
+               my_sqlite3_errmsg(arg_with_my_sqlite3->MSQL_db));
       }
 
       FATAL("sqlite3", EXIT_FAILURE)
     }
 
-    create_tables(object->MSQL_db);
+    create_tables(arg_with_my_sqlite3->MSQL_db);
 
-    HARDBUG(execute_sql(object->MSQL_db, "PRAGMA foreign_keys = ON;", FALSE) !=
-            SQLITE_OK)
+    HARDBUG(execute_sql(arg_with_my_sqlite3->MSQL_db,
+                        "PRAGMA foreign_keys = ON;",
+                        FALSE) != SQLITE_OK)
 
-    HARDBUG(execute_sql(object->MSQL_db, "PRAGMA journal_mode = WAL;", FALSE) !=
-            SQLITE_OK)
+    HARDBUG(execute_sql(arg_with_my_sqlite3->MSQL_db,
+                        "PRAGMA journal_mode = WAL;",
+                        FALSE) != SQLITE_OK)
 
-    HARDBUG(execute_sql(object->MSQL_db, "PRAGMA cache_size=-131072;", FALSE) !=
-            SQLITE_OK)
+    HARDBUG(execute_sql(arg_with_my_sqlite3->MSQL_db,
+                        "PRAGMA cache_size=-131072;",
+                        FALSE) != SQLITE_OK)
   }
 
   my_mpi_barrier_v3("after open database",
@@ -695,11 +703,11 @@ void construct_my_sqlite3(my_sqlite3_t *self,
 
   if (iproc > 0)
   {
-    int rc = my_sqlite3_open(arg_db_name, &(object->MSQL_db));
+    int rc = my_sqlite3_open(arg_db_name, &(arg_with_my_sqlite3->MSQL_db));
 
     if (rc != SQLITE_OK)
     {
-      if (object->MSQL_db == NULL)
+      if (arg_with_my_sqlite3->MSQL_db == NULL)
       {
         PRINTF("Cannot open database: %s err_msg=NULL\n", arg_db_name);
       }
@@ -707,47 +715,46 @@ void construct_my_sqlite3(my_sqlite3_t *self,
       {
         PRINTF("Cannot open database: %s err_msg=%s\n",
                arg_db_name,
-               my_sqlite3_errmsg(object->MSQL_db));
+               my_sqlite3_errmsg(arg_with_my_sqlite3->MSQL_db));
       }
       FATAL("sqlite3", EXIT_FAILURE)
     }
 
-    HARDBUG(execute_sql(object->MSQL_db, "PRAGMA cache_size=-131072;", FALSE) !=
-            SQLITE_OK)
+    HARDBUG(execute_sql(arg_with_my_sqlite3->MSQL_db,
+                        "PRAGMA cache_size=-131072;",
+                        FALSE) != SQLITE_OK)
   }
 
-  HARDBUG((object->MSQL_bbuffer = bfromcstr("")) == NULL)
+  HARDBUG((arg_with_my_sqlite3->MSQL_bbuffer = bfromcstr("")) == NULL)
 
-  object->MSQL_verbose = 1;
+  arg_with_my_sqlite3->MSQL_verbose = 1;
 }
 
-void close_my_sqlite3(my_sqlite3_t *self)
+void close_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3)
 {
 #ifdef USE_SQLITE3
-  my_sqlite3_t *object = self;
-
   int iproc = INVALID;
 
-  if (object->MSQL_comm != MPI_COMM_NULL)
-    my_mpi_comm_rank(object->MSQL_comm, &iproc);
+  if (arg_with_my_sqlite3->MSQL_comm != MPI_COMM_NULL)
+    my_mpi_comm_rank(arg_with_my_sqlite3->MSQL_comm, &iproc);
 
   if (iproc > 0)
   {
     PRINTF("%s::closing db iproc=%d\n$", __FUNC__, iproc);
 
-    my_mpi_acquire_semaphore_v3(object->MSQL_comm,
+    my_mpi_acquire_semaphore_v3(arg_with_my_sqlite3->MSQL_comm,
                                 my_mpi_globals.MMG_semkey_close_my_sqlite3);
 
-    HARDBUG(my_sqlite3_close(object->MSQL_db) != SQLITE_OK)
+    HARDBUG(my_sqlite3_close(arg_with_my_sqlite3->MSQL_db) != SQLITE_OK)
 
-    my_mpi_release_semaphore_v3(object->MSQL_comm,
+    my_mpi_release_semaphore_v3(arg_with_my_sqlite3->MSQL_comm,
                                 my_mpi_globals.MMG_semkey_close_my_sqlite3);
 
     PRINTF("%s::closed db iproc=%d\n$", __FUNC__, iproc);
   }
 
   my_mpi_barrier_v3("after my_sqlite3_close",
-                    object->MSQL_comm,
+                    arg_with_my_sqlite3->MSQL_comm,
                     my_mpi_globals.MMG_semkey_close_my_sqlite3_barrier,
                     TRUE);
 
@@ -760,7 +767,7 @@ void close_my_sqlite3(my_sqlite3_t *self)
       int frames_in_wal;
       int frames_checkpointed;
 
-      int rc = sqlite3_wal_checkpoint_v2(object->MSQL_db,
+      int rc = sqlite3_wal_checkpoint_v2(arg_with_my_sqlite3->MSQL_db,
                                          NULL,
                                          SQLITE_CHECKPOINT_TRUNCATE,
                                          &frames_in_wal,
@@ -768,7 +775,7 @@ void close_my_sqlite3(my_sqlite3_t *self)
       if (rc != SQLITE_OK)
       {
         PRINTF("Failed wal_checkpoint_v2: %s\n",
-               sqlite3_errmsg(object->MSQL_db));
+               sqlite3_errmsg(arg_with_my_sqlite3->MSQL_db));
 
         FATAL("sqlite3", EXIT_FAILURE);
       }
@@ -789,7 +796,7 @@ void close_my_sqlite3(my_sqlite3_t *self)
     if (ntries > 0)
       PRINTF("needed %d tries to flush wal\n$", ntries);
 
-    HARDBUG(sqlite3_close(object->MSQL_db) != SQLITE_OK)
+    HARDBUG(sqlite3_close(arg_with_my_sqlite3->MSQL_db) != SQLITE_OK)
   }
 #endif
 }

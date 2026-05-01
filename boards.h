@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef BoardsH
 #define BoardsH
 
@@ -75,6 +75,8 @@ typedef struct board
 {
   my_printf_t *B_my_printf;
 
+  int B_network_id;
+
   ui64_t B_valid_bb;
 
   colour_enum B_colour2move;
@@ -88,7 +90,7 @@ typedef struct board
 
   node_t B_nodes[NODE_MAX];
 
-  network_thread_t B_network_thread;
+  network_state_t B_network_state;
 
   char B_string[MY_LINE_MAX];
 
@@ -107,11 +109,11 @@ extern int black_row[BOARD_MAX];
 
 extern hash_key_t hash_keys[NCOLOUR_ENUM][NPIECE_ENUM][BOARD_MAX];
 
-void construct_board(void *, my_printf_t *);
-void push_board_state(void *self);
-void pop_board_state(void *self);
+void construct_board(board_t *, my_printf_t *, int);
+void push_board_state(board_t *);
+void pop_board_state(board_t *);
 
-hash_key_t return_key_from_bb(void *);
+hash_key_t return_key_from_bb(board_t *);
 void string2board(board_t *, char *);
 void fen2board(board_t *, char *);
 void board2fen(board_t *, bstring, int);

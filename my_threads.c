@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define THREAD_ALPHA_BETA_MASTER 0
@@ -10,7 +10,7 @@ thread_t *thread_alpha_beta_master = NULL;
 
 local void solve_problems(void *self, char *arg_name)
 {
-  thread_t *object = self;
+  thread_t *arg_with_thread = self;
 
   FILE *ftmp;
 
@@ -67,13 +67,13 @@ local void solve_problems(void *self, char *arg_name)
                 "threads/solve_problems");
     }
 
-    my_printf(&(object->T_my_printf), "problem #%d\n", nproblems);
+    my_printf(&(arg_with_thread->T_my_printf), "problem #%d\n", nproblems);
 
-    fen2board(&(object->T_search.S_board), bdata(bfen));
+    fen2board(&(arg_with_thread->T_search.S_board), bdata(bfen));
 
-    board_t *with_board = &(object->T_search.S_board);
+    board_t *with_board = &(arg_with_thread->T_search.S_board);
 
-    print_board(&(object->T_search.S_board));
+    print_board(&(arg_with_thread->T_search.S_board));
 
     moves_list_t moves_list;
 
@@ -85,22 +85,24 @@ local void solve_problems(void *self, char *arg_name)
 
     if (moves_list.ML_nmoves > 0)
     {
-      do_search(&(object->T_search),
+      do_search(&(arg_with_thread->T_search),
                 &moves_list,
                 INVALID,
                 INVALID,
-                SCORE_MINUS_INFINITY,
-                FALSE);
+                SCORE(SCORE_MINUS_INFINITY),
+                NULL);
 
-      if ((object->T_search.S_best_score -
-           object->T_search.S_root_simple_score) > (SCORE_MAN / 2))
+      if ((arg_with_thread->T_search.S_best_score -
+           arg_with_thread->T_search.S_root_simple_score) > (SCORE_MAN / 2))
       {
         ++nsolved;
-        my_printf(&(object->T_my_printf), "solved problem #%d\n", nproblems);
+        my_printf(&(arg_with_thread->T_my_printf),
+                  "solved problem #%d\n",
+                  nproblems);
       }
       else
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "did not solve problem #%d\n",
                   nproblems);
 
@@ -134,31 +136,31 @@ local void solve_problems(void *self, char *arg_name)
 
 local void thread_func_alpha_beta_master(void *self)
 {
-  thread_t *object = self;
+  thread_t *arg_with_thread = self;
 
   // wait for message
 
-  my_printf(&(object->T_my_printf), "alpha_beta master thread\n");
-  my_printf(&(object->T_my_printf), "$");
+  my_printf(&(arg_with_thread->T_my_printf), "alpha_beta master thread\n");
+  my_printf(&(arg_with_thread->T_my_printf), "$");
   while (TRUE)
   {
     message_t message;
 
-    if (dequeue(&(object->T_queue), &message) != INVALID)
+    if (dequeue(&(arg_with_thread->T_queue), &message) != INVALID)
     {
       if (message.message_id == MESSAGE_SOLVE)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got SOLVE message %s\n",
                   bdata(message.message_text));
 
-        stop_my_timer(&(object->T_idle_timer));
-        start_my_timer(&(object->T_busy_timer));
+        stop_my_timer(&(arg_with_thread->T_idle_timer));
+        start_my_timer(&(arg_with_thread->T_busy_timer));
 
-        solve_problems(object, bdata(message.message_text));
+        solve_problems(arg_with_thread, bdata(message.message_text));
 
-        stop_my_timer(&(object->T_busy_timer));
-        start_my_timer(&(object->T_idle_timer));
+        stop_my_timer(&(arg_with_thread->T_busy_timer));
+        start_my_timer(&(arg_with_thread->T_idle_timer));
 
         enqueue(&main_queue,
                 MESSAGE_READY,
@@ -166,24 +168,25 @@ local void thread_func_alpha_beta_master(void *self)
       }
       else if (message.message_id == MESSAGE_EXIT_THREAD)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got EXIT THREAD message %s\n",
                   bdata(message.message_text));
 
-        stop_my_timer(&(object->T_idle_timer));
+        stop_my_timer(&(arg_with_thread->T_idle_timer));
 
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "%.2f seconds idle\n%.2f seconds busy\n",
-                  return_my_timer(&(object->T_idle_timer), FALSE),
-                  return_my_timer(&(object->T_busy_timer), FALSE));
+                  return_my_timer(&(arg_with_thread->T_idle_timer), FALSE),
+                  return_my_timer(&(arg_with_thread->T_busy_timer), FALSE));
 
-        object->T_idle = return_my_timer(&(object->T_idle_timer), FALSE);
+        arg_with_thread->T_idle =
+          return_my_timer(&(arg_with_thread->T_idle_timer), FALSE);
 
         break;
       }
       else if (message.message_id == MESSAGE_ABORT_SEARCH)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got ABORT SEARCH message %s\n",
                   bdata(message.message_text));
 
@@ -199,7 +202,7 @@ local void thread_func_alpha_beta_master(void *self)
       }
       else if (message.message_id == MESSAGE_STATE)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got STATE message %s\n",
                   bdata(message.message_text));
 
@@ -219,7 +222,7 @@ local void thread_func_alpha_beta_master(void *self)
 
         game_state.set_game_state(&game_state, bdata(message.message_text));
 
-        board_t *with_board = &(object->T_search.S_board);
+        board_t *with_board = &(arg_with_thread->T_search.S_board);
 
         state2board(with_board, &game_state);
 
@@ -227,7 +230,7 @@ local void thread_func_alpha_beta_master(void *self)
       }
       else if (message.message_id == MESSAGE_GO)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got GO message %s\n",
                   bdata(message.message_text));
 
@@ -241,9 +244,9 @@ local void thread_func_alpha_beta_master(void *self)
                     "threads/thread_alha_beta_master");
         }
 
-        board_t *with_board = &(object->T_search.S_board);
+        board_t *with_board = &(arg_with_thread->T_search.S_board);
 
-        print_board(&(object->T_search.S_board));
+        print_board(&(arg_with_thread->T_search.S_board));
 
         moves_list_t moves_list;
 
@@ -255,18 +258,18 @@ local void thread_func_alpha_beta_master(void *self)
 
         check_moves(with_board, &moves_list);
 
-        stop_my_timer(&(object->T_idle_timer));
-        start_my_timer(&(object->T_busy_timer));
+        stop_my_timer(&(arg_with_thread->T_idle_timer));
+        start_my_timer(&(arg_with_thread->T_busy_timer));
 
-        do_search(&(object->T_search),
+        do_search(&(arg_with_thread->T_search),
                   &moves_list,
                   INVALID,
                   INVALID,
-                  SCORE_MINUS_INFINITY,
-                  FALSE);
+                  SCORE(SCORE_MINUS_INFINITY),
+                  NULL);
 
-        stop_my_timer(&(object->T_busy_timer));
-        start_my_timer(&(object->T_idle_timer));
+        stop_my_timer(&(arg_with_thread->T_busy_timer));
+        start_my_timer(&(arg_with_thread->T_idle_timer));
 
         // message_t *sent[NTHREADS_MAX];
 
@@ -274,13 +277,15 @@ local void thread_func_alpha_beta_master(void *self)
 
         BSTRING(bmove_string)
 
-        move2bstring(&moves_list, object->T_search.S_best_move, bmove_string);
+        move2bstring(&moves_list,
+                     arg_with_thread->T_search.S_best_move,
+                     bmove_string);
 
         HARDBUG(bformata(btext,
-                         "%s %d %d",
+                         "%s " PRINTF_SCORE_T " %d",
                          bdata(bmove_string),
-                         object->T_search.S_best_score,
-                         object->T_search.S_best_depth) == BSTR_ERR)
+                         arg_with_thread->T_search.S_best_score,
+                         arg_with_thread->T_search.S_best_depth) == BSTR_ERR)
 
         enqueue(&main_queue, MESSAGE_RESULT, bdata(btext));
 
@@ -305,55 +310,57 @@ local void thread_func_alpha_beta_master(void *self)
   }
 }
 
-local void thread_func_alpha_beta_slave(thread_t *object)
+local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  my_printf(&(object->T_my_printf), "alpha_beta slave thread\n");
-  my_printf(&(object->T_my_printf), "$");
+  my_printf(&(arg_with_thread->T_my_printf), "alpha_beta slave thread\n");
+  my_printf(&(arg_with_thread->T_my_printf), "$");
 
   while (TRUE)
   {
     message_t message;
 
-    if (dequeue(&(object->T_queue), &message) != INVALID)
+    if (dequeue(&(arg_with_thread->T_queue), &message) != INVALID)
     {
       if (message.message_id == MESSAGE_FEN)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got FEN message %s\n",
                   bdata(message.message_text));
 
-        fen2board(&(object->T_search.S_board), bdata(message.message_text));
+        fen2board(&(arg_with_thread->T_search.S_board),
+                  bdata(message.message_text));
 
-        print_board(&(object->T_search.S_board));
+        print_board(&(arg_with_thread->T_search.S_board));
       }
       else if (message.message_id == MESSAGE_EXIT_THREAD)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got EXIT THREAD message %s\n",
                   bdata(message.message_text));
 
-        stop_my_timer(&(object->T_idle_timer));
+        stop_my_timer(&(arg_with_thread->T_idle_timer));
 
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "%.2f seconds idle\n%.2f seconds busy\n",
-                  return_my_timer(&(object->T_idle_timer), FALSE),
-                  return_my_timer(&(object->T_busy_timer), FALSE));
+                  return_my_timer(&(arg_with_thread->T_idle_timer), FALSE),
+                  return_my_timer(&(arg_with_thread->T_busy_timer), FALSE));
 
-        object->T_idle = return_my_timer(&(object->T_idle_timer), FALSE);
+        arg_with_thread->T_idle =
+          return_my_timer(&(arg_with_thread->T_idle_timer), FALSE);
 
         break;
       }
       else if (message.message_id == MESSAGE_ABORT_SEARCH)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got ABORT SEARCH message %s\n",
                   bdata(message.message_text));
       }
       else if (message.message_id == MESSAGE_STATE)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got STATE message %s\n",
                   bdata(message.message_text));
 
@@ -363,7 +370,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
         game_state.set_game_state(&game_state, bdata(message.message_text));
 
-        board_t *with_board = &(object->T_search.S_board);
+        board_t *with_board = &(arg_with_thread->T_search.S_board);
 
         state2board(with_board, &game_state);
 
@@ -371,13 +378,13 @@ local void thread_func_alpha_beta_slave(thread_t *object)
       }
       else if (message.message_id == MESSAGE_GO)
       {
-        my_printf(&(object->T_my_printf),
+        my_printf(&(arg_with_thread->T_my_printf),
                   "got GO message %s\n",
                   bdata(message.message_text));
 
         while (TRUE)
         {
-          if (dequeue(&(object->T_queue), &message) == INVALID)
+          if (dequeue(&(arg_with_thread->T_queue), &message) == INVALID)
           {
             compat_sleep(CENTI_SECOND);
             continue;
@@ -392,11 +399,11 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
           int depth_min;
           int depth_max;
-          int root_score;
+          score_t root_score;
           int minimal_window;
 
           HARDBUG(my_sscanf(bdata(message.message_text),
-                            "%s%d%d%d%d",
+                            "%s%d%d" SCANF_SCORE_T "%d",
                             cmove_string,
                             &depth_min,
                             &depth_max,
@@ -407,7 +414,7 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
           CDESTROY(cmove_string)
 
-          board_t *with_board = &(object->T_search.S_board);
+          board_t *with_board = &(arg_with_thread->T_search.S_board);
 
           moves_list_t moves_list;
 
@@ -423,61 +430,65 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
           if ((imove = search_move(&moves_list, bmove_string)) == INVALID)
           {
-            print_board(&(object->T_search.S_board));
+            print_board(&(arg_with_thread->T_search.S_board));
 
-            my_printf(&(object->T_my_printf), "move=%s\n", bdata(bmove_string));
+            my_printf(&(arg_with_thread->T_my_printf),
+                      "move=%s\n",
+                      bdata(bmove_string));
 
-            fprintf_moves_list(&moves_list, &(object->T_my_printf), TRUE);
+            fprintf_moves_list(&moves_list,
+                               &(arg_with_thread->T_my_printf),
+                               TRUE);
 
             FATAL("move not found", EXIT_FAILURE)
           }
 
           if (message.message_id == MESSAGE_SEARCH_FIRST)
           {
-            my_printf(&(object->T_my_printf),
+            my_printf(&(arg_with_thread->T_my_printf),
                       "got SEARCH FIRST message %s\n",
                       bdata(message.message_text));
 
-            my_printf(&(object->T_my_printf),
-                      "%s %d %d %d %d\n",
+            my_printf(&(arg_with_thread->T_my_printf),
+                      "%s %d %d " PRINTF_SCORE_T " %d\n",
                       bdata(bmove_string),
                       depth_min,
                       depth_max,
                       root_score,
                       minimal_window);
 
-            clear_totals(&(object->T_search));
+            clear_totals(&(arg_with_thread->T_search));
 
-            stop_my_timer(&(object->T_idle_timer));
-            start_my_timer(&(object->T_busy_timer));
+            stop_my_timer(&(arg_with_thread->T_idle_timer));
+            start_my_timer(&(arg_with_thread->T_busy_timer));
 
-            do_search(&(object->T_search),
+            do_search(&(arg_with_thread->T_search),
                       &moves_list,
                       depth_min,
                       depth_max,
                       root_score,
-                      FALSE);
+                      NULL);
 
-            stop_my_timer(&(object->T_busy_timer));
-            start_my_timer(&(object->T_idle_timer));
+            stop_my_timer(&(arg_with_thread->T_busy_timer));
+            start_my_timer(&(arg_with_thread->T_idle_timer));
 
-            print_totals(&(object->T_search));
+            print_totals(&(arg_with_thread->T_search));
           }
           else if (message.message_id == MESSAGE_SEARCH_AHEAD)
           {
-            my_printf(&(object->T_my_printf),
+            my_printf(&(arg_with_thread->T_my_printf),
                       "got SEARCH AHEAD message %s\n",
                       bdata(message.message_text));
 
-            my_printf(&(object->T_my_printf),
-                      "%s %d %d %d %d\n",
+            my_printf(&(arg_with_thread->T_my_printf),
+                      "%s %d %d " PRINTF_SCORE_T " %d\n",
                       bdata(bmove_string),
                       depth_min,
                       depth_max,
                       root_score,
                       minimal_window);
 
-            do_move(with_board, imove, &moves_list, FALSE);
+            do_move(with_board, imove, &moves_list);
 
             moves_list_t your_moves_list;
 
@@ -487,34 +498,34 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
             if (your_moves_list.ML_nmoves > 0)
             {
-              clear_totals(&(object->T_search));
+              clear_totals(&(arg_with_thread->T_search));
 
-              stop_my_timer(&(object->T_idle_timer));
-              start_my_timer(&(object->T_busy_timer));
+              stop_my_timer(&(arg_with_thread->T_idle_timer));
+              start_my_timer(&(arg_with_thread->T_busy_timer));
 
-              do_search(&(object->T_search),
+              do_search(&(arg_with_thread->T_search),
                         &your_moves_list,
                         depth_min,
                         depth_max,
                         -root_score,
-                        FALSE);
+                        NULL);
 
-              stop_my_timer(&(object->T_busy_timer));
-              start_my_timer(&(object->T_idle_timer));
+              stop_my_timer(&(arg_with_thread->T_busy_timer));
+              start_my_timer(&(arg_with_thread->T_idle_timer));
 
-              print_totals(&(object->T_search));
+              print_totals(&(arg_with_thread->T_search));
             }
 
-            undo_move(with_board, imove, &moves_list, FALSE);
+            undo_move(with_board, imove, &moves_list);
           }
           else if (message.message_id == MESSAGE_SEARCH_SECOND)
           {
-            my_printf(&(object->T_my_printf),
+            my_printf(&(arg_with_thread->T_my_printf),
                       "got SEARCH SECOND message %s\n",
                       bdata(message.message_text));
 
-            my_printf(&(object->T_my_printf),
-                      "%s %d %d %d %d\n",
+            my_printf(&(arg_with_thread->T_my_printf),
+                      "%s %d %d " PRINTF_SCORE_T " %d\n",
                       bdata(bmove_string),
                       depth_min,
                       depth_max,
@@ -532,22 +543,22 @@ local void thread_func_alpha_beta_slave(thread_t *object)
               moves_list.ML_nmoves--;
             }
 
-            clear_totals(&(object->T_search));
+            clear_totals(&(arg_with_thread->T_search));
 
-            stop_my_timer(&(object->T_idle_timer));
-            start_my_timer(&(object->T_busy_timer));
+            stop_my_timer(&(arg_with_thread->T_idle_timer));
+            start_my_timer(&(arg_with_thread->T_busy_timer));
 
-            do_search(&(object->T_search),
+            do_search(&(arg_with_thread->T_search),
                       &moves_list,
                       depth_min,
                       depth_max,
                       root_score,
-                      FALSE);
+                      NULL);
 
-            stop_my_timer(&(object->T_busy_timer));
-            start_my_timer(&(object->T_idle_timer));
+            stop_my_timer(&(arg_with_thread->T_busy_timer));
+            start_my_timer(&(arg_with_thread->T_idle_timer));
 
-            print_totals(&(object->T_search));
+            print_totals(&(arg_with_thread->T_search));
           }
           else
             FATAL("unknown message_id", EXIT_FAILURE)
@@ -567,11 +578,11 @@ local void thread_func_alpha_beta_slave(thread_t *object)
 
 local void *thread_func(void *self)
 {
-  thread_t *object = self;
+  thread_t *arg_with_thread = self;
 
-  my_printf(&(object->T_my_printf),
+  my_printf(&(arg_with_thread->T_my_printf),
             "thread=%p pthread_self=%#lX\n",
-            object,
+            arg_with_thread,
             compat_pthread_self());
 
   BEGIN_BLOCK("main-thread")
@@ -580,38 +591,38 @@ local void *thread_func(void *self)
 
   HARDBUG(bformata(bname, "thread-%#lX", compat_pthread_self()) == BSTR_ERR)
 
-  construct_my_timer(&(object->T_idle_timer),
+  construct_my_timer(&(arg_with_thread->T_idle_timer),
                      bdata(bname),
-                     &(object->T_my_printf),
+                     &(arg_with_thread->T_my_printf),
                      FALSE);
 
-  construct_my_timer(&(object->T_busy_timer),
+  construct_my_timer(&(arg_with_thread->T_busy_timer),
                      bdata(bname),
-                     &(object->T_my_printf),
+                     &(arg_with_thread->T_my_printf),
                      FALSE);
 
   BDESTROY(bname)
 
-  object->T_idle = 0.0;
+  arg_with_thread->T_idle = 0.0;
 
-  reset_my_timer(&(object->T_idle_timer));
+  reset_my_timer(&(arg_with_thread->T_idle_timer));
 
-  reset_my_timer(&(object->T_busy_timer));
+  reset_my_timer(&(arg_with_thread->T_busy_timer));
 
-  stop_my_timer(&(object->T_busy_timer));
+  stop_my_timer(&(arg_with_thread->T_busy_timer));
 
-  if (object->thread_role == THREAD_ALPHA_BETA_MASTER)
+  if (arg_with_thread->thread_role == THREAD_ALPHA_BETA_MASTER)
   {
-    thread_func_alpha_beta_master(object);
+    thread_func_alpha_beta_master(arg_with_thread);
   }
-  else if (object->thread_role == THREAD_ALPHA_BETA_SLAVE)
+  else if (arg_with_thread->thread_role == THREAD_ALPHA_BETA_SLAVE)
   {
-    thread_func_alpha_beta_slave(object);
+    thread_func_alpha_beta_slave(arg_with_thread);
   }
   else
     FATAL("unknown thread_role", EXIT_FAILURE);
 
-  // solve_random(object);
+  // solve_random(arg_with_thread);
 
   END_BLOCK
 
@@ -622,37 +633,46 @@ local void *thread_func(void *self)
 
 local void create_thread(void *self, int arg_role)
 {
-  thread_t *object = self;
+  thread_t *arg_with_thread = self;
 
-  object->thread_role = arg_role;
+  arg_with_thread->thread_role = arg_role;
 
-  construct_my_printf(&(object->T_my_printf), "log", FALSE);
+  construct_my_printf(&(arg_with_thread->T_my_printf), "log", FALSE);
 
-  construct_my_random(&(object->T_random), INVALID);
+  ui64_t seed;
+
+  construct_my_random(&(arg_with_thread->T_random), &seed);
+
+  my_printf(&(arg_with_thread->T_my_printf), "create_thread seed=%llX\n", seed);
 
   BSTRING(queue_name)
 
   HARDBUG(bformata(queue_name, "thread-%p", self) == BSTR_ERR)
 
-  construct_queue(&(object->T_queue),
+  construct_queue(&(arg_with_thread->T_queue),
                   bdata(queue_name),
-                  &(object->T_my_printf));
+                  &(arg_with_thread->T_my_printf));
 
   BDESTROY(queue_name)
 
-  construct_search(&(object->T_search), &(object->T_my_printf), object);
+  construct_search(&(arg_with_thread->T_search),
+                   &(arg_with_thread->T_my_printf),
+                   arg_with_thread,
+                   NETWORK0_ID);
 
-  compat_thread_create(&(object->T_thread), thread_func, object);
+  compat_thread_create(&(arg_with_thread->T_thread),
+                       thread_func,
+                       arg_with_thread);
 }
 
 queue_t *return_thread_queue(void *self)
 {
-  thread_t *object = self;
+  thread_t *arg_with_thread = self;
 
-  if (object == NULL)
+  if (arg_with_thread == NULL)
     return (NULL);
 
-  return (&(object->T_queue));
+  return (&(arg_with_thread->T_queue));
 }
 
 void start_threads(void)
@@ -676,11 +696,11 @@ void join_threads(void)
 
   for (int ithread = 0; ithread < options.nthreads; ithread++)
   {
-    thread_t *object = threads + ithread;
+    thread_t *with_thread = threads + ithread;
 
-    compat_thread_join(object->T_thread);
+    compat_thread_join(with_thread->T_thread);
 
-    idle += object->T_idle;
+    idle += with_thread->T_idle;
   }
   PRINTF("total idle time=%.2f seconds\n", idle);
 }
@@ -696,8 +716,8 @@ void test_threads(void)
 
   for (int itest = 0; itest < NTEST; itest++)
   {
-    thread_t *object = test + itest;
+    thread_t *with_thread = test + itest;
 
-    compat_thread_join(object->T_thread);
+    compat_thread_join(with_thread->T_thread);
   }
 }

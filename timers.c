@@ -1,92 +1,88 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0
 #define MY_TIMER_STARTED 1
 
-void construct_my_timer(my_timer_t *self,
+void construct_my_timer(my_timer_t *arg_with_my_timer,
                         char *arg_name,
                         my_printf_t *arg_my_printf,
                         int arg_suppress_warnings)
 {
-  my_timer_t *object = self;
+  HARDBUG((arg_with_my_timer->MT_bname = bfromcstr(arg_name)) == NULL)
 
-  HARDBUG((object->MT_bname = bfromcstr(arg_name)) == NULL)
-
-  object->MT_my_printf = arg_my_printf;
+  arg_with_my_timer->MT_my_printf = arg_my_printf;
 
   if (arg_suppress_warnings)
   {
-    object->MT_return_wall_clock_warning_given = TRUE;
+    arg_with_my_timer->MT_return_wall_clock_warning_given = TRUE;
   }
   else
   {
-    object->MT_return_wall_clock_warning_given = FALSE;
+    arg_with_my_timer->MT_return_wall_clock_warning_given = FALSE;
   }
 
-  object->MT_status = INVALID;
+  arg_with_my_timer->MT_status = INVALID;
 }
 
-void reset_my_timer(my_timer_t *self)
+void reset_my_timer(my_timer_t *arg_with_my_timer)
 {
-  my_timer_t *object = self;
+  arg_with_my_timer->MT_cpu_time_used = 0.0;
+  arg_with_my_timer->MT_wall_time_used = 0.0;
 
-  object->MT_cpu_time_used = 0.0;
-  object->MT_wall_time_used = 0.0;
+  arg_with_my_timer->MT_start_cpu_clock = return_my_clock();
 
-  object->MT_start_cpu_clock = return_my_clock();
+  arg_with_my_timer->MT_start_wall_clock = compat_time();
 
-  object->MT_start_wall_clock = compat_time();
-
-  object->MT_status = MY_TIMER_STARTED;
+  arg_with_my_timer->MT_status = MY_TIMER_STARTED;
 }
 
-local void return_time_used(my_timer_t *object,
+local void return_time_used(my_timer_t *arg_with_my_timer,
                             double *arg_cpu_time_used,
                             double *arg_wall_time_used)
 {
   double current_cpu_clock = return_my_clock();
 
-  *arg_cpu_time_used = current_cpu_clock - object->MT_start_cpu_clock;
+  *arg_cpu_time_used =
+    current_cpu_clock - arg_with_my_timer->MT_start_cpu_clock;
 
   HARDBUG(*arg_cpu_time_used < 0.0)
 
   double current_wall_clock = compat_time();
 
-  *arg_wall_time_used = current_wall_clock - object->MT_start_wall_clock;
+  *arg_wall_time_used =
+    current_wall_clock - arg_with_my_timer->MT_start_wall_clock;
 
   if (*arg_wall_time_used < 0.0)
   {
-    my_printf(object->MT_my_printf,
+    my_printf(arg_with_my_timer->MT_my_printf,
               "WARNING: SYSTEM TIME ADJUSTMENT DETECTED!\n");
 
     *arg_wall_time_used = 0.0;
   }
 }
 
-double return_my_timer(my_timer_t *self, int arg_wall)
+double return_my_timer(my_timer_t *arg_with_my_timer, int arg_wall)
 {
-  my_timer_t *object = self;
-
   double cpu_time_used = 0.0;
   double wall_time_used = 0.0;
 
-  if (object->MT_status == MY_TIMER_STARTED)
+  if (arg_with_my_timer->MT_status == MY_TIMER_STARTED)
   {
-    return_time_used(object, &cpu_time_used, &wall_time_used);
+    return_time_used(arg_with_my_timer, &cpu_time_used, &wall_time_used);
 
-    cpu_time_used += object->MT_cpu_time_used;
+    cpu_time_used += arg_with_my_timer->MT_cpu_time_used;
 
-    wall_time_used += object->MT_wall_time_used;
+    wall_time_used += arg_with_my_timer->MT_wall_time_used;
   }
-  else if (object->MT_status == MY_TIMER_STOPPED)
+  else if (arg_with_my_timer->MT_status == MY_TIMER_STOPPED)
   {
-    cpu_time_used = object->MT_cpu_time_used;
+    cpu_time_used = arg_with_my_timer->MT_cpu_time_used;
 
-    wall_time_used = object->MT_wall_time_used;
+    wall_time_used = arg_with_my_timer->MT_wall_time_used;
   }
   else
-    FATAL("object->MT_status error", EXIT_FAILURE)
+    FATAL("arg_with_my_timer->MT_status error", EXIT_FAILURE)
 
   double result = cpu_time_used;
 
@@ -97,13 +93,13 @@ double return_my_timer(my_timer_t *self, int arg_wall)
   else if ((wall_time_used > options.wall_time_threshold) and
            (wall_time_used > (1.2 * cpu_time_used)))
   {
-    if (!object->MT_return_wall_clock_warning_given)
+    if (!arg_with_my_timer->MT_return_wall_clock_warning_given)
     {
-      my_printf(object->MT_my_printf,
+      my_printf(arg_with_my_timer->MT_my_printf,
                 "WARNING: RETURNING WALL CLOCK FOR TIMER %s!\n",
-                bdata(object->MT_bname));
+                bdata(arg_with_my_timer->MT_bname));
 
-      object->MT_return_wall_clock_warning_given = TRUE;
+      arg_with_my_timer->MT_return_wall_clock_warning_given = TRUE;
     }
     result = wall_time_used;
   }
@@ -111,63 +107,86 @@ double return_my_timer(my_timer_t *self, int arg_wall)
   return (result);
 }
 
-void stop_my_timer(my_timer_t *self)
+void stop_my_timer(my_timer_t *arg_with_my_timer)
 {
-  my_timer_t *object = self;
-
-  HARDBUG(object->MT_status != MY_TIMER_STARTED)
+  HARDBUG(arg_with_my_timer->MT_status != MY_TIMER_STARTED)
 
   double cpu_time_used;
 
   double wall_time_used;
 
-  return_time_used(object, &cpu_time_used, &wall_time_used);
+  return_time_used(arg_with_my_timer, &cpu_time_used, &wall_time_used);
 
-  object->MT_cpu_time_used += cpu_time_used;
+  arg_with_my_timer->MT_cpu_time_used += cpu_time_used;
 
-  object->MT_wall_time_used += wall_time_used;
+  arg_with_my_timer->MT_wall_time_used += wall_time_used;
 
-  object->MT_status = MY_TIMER_STOPPED;
+  arg_with_my_timer->MT_status = MY_TIMER_STOPPED;
 
-  my_printf(object->MT_my_printf,
+  my_printf(arg_with_my_timer->MT_my_printf,
             "TIMER=%s CPU=%.2f WALL=%.2f\n",
-            bdata(object->MT_bname),
-            object->MT_cpu_time_used,
-            object->MT_wall_time_used);
+            bdata(arg_with_my_timer->MT_bname),
+            arg_with_my_timer->MT_cpu_time_used,
+            arg_with_my_timer->MT_wall_time_used);
 }
 
-void start_my_timer(my_timer_t *self)
+void start_my_timer(my_timer_t *arg_with_my_timer)
 {
-  my_timer_t *object = self;
+  HARDBUG(arg_with_my_timer->MT_status != MY_TIMER_STOPPED)
 
-  HARDBUG(object->MT_status != MY_TIMER_STOPPED)
+  arg_with_my_timer->MT_start_cpu_clock = return_my_clock();
 
-  object->MT_start_cpu_clock = return_my_clock();
+  arg_with_my_timer->MT_start_wall_clock = compat_time();
 
-  object->MT_start_wall_clock = compat_time();
-
-  object->MT_status = MY_TIMER_STARTED;
+  arg_with_my_timer->MT_status = MY_TIMER_STARTED;
 }
 
 void construct_progress(progress_t *arg_progress,
-                        i64_t arg_ntodo,
+                        i64_t arg_ntotal,
                         double arg_seconds)
 {
   construct_my_timer(&(arg_progress->P_timer), "progress", STDOUT, FALSE);
 
   reset_my_timer(&(arg_progress->P_timer));
 
-  arg_progress->P_ntodo = arg_ntodo;
+  arg_progress->P_ntotal = arg_ntotal;
+
+  if ((arg_progress->P_ntotal == 0) or !my_mpi_globals.MMG_is_slave)
+  {
+    arg_progress->P_ntodo = arg_ntotal;
+  }
+  else
+  {
+    i64_t nslaves = my_mpi_globals.MMG_nslaves;
+    i64_t id_slave = my_mpi_globals.MMG_id_slave;
+
+    arg_progress->P_ntodo = (arg_ntotal + nslaves - 1 - id_slave) / nslaves;
+
+    arg_progress->P_ntodo = arg_ntotal / my_mpi_globals.MMG_nslaves + 1;
+  }
+
   arg_progress->P_seconds = arg_seconds;
   arg_progress->P_ndone = 0;
   arg_progress->P_ndone_previous = 0;
   arg_progress->P_seconds_done = 0.0;
   arg_progress->P_seconds_previous = 0.0;
   arg_progress->P_ndelta = 0;
+
+  PRINTF("arg_progress->P_ntotal=%lld"
+         " arg_progress->P_ntodo=%lld\n",
+         arg_progress->P_ntotal,
+         arg_progress->P_ntodo);
 }
 
-void update_progress(progress_t *arg_progress)
+int make_progress(progress_t *arg_progress, i64_t idone)
 {
+  if ((arg_progress->P_ntotal > 0) and (idone > 0) and
+      (my_mpi_globals.MMG_is_slave) and
+      ((idone % my_mpi_globals.MMG_nslaves) != my_mpi_globals.MMG_id_slave))
+    return (FALSE);
+
+  arg_progress->P_ndone++;
+
   if ((arg_progress->P_ntodo > 0) and
       (arg_progress->P_ndone > arg_progress->P_ntodo))
   {
@@ -177,8 +196,6 @@ void update_progress(progress_t *arg_progress)
 
     // FATAL("P_ndone > P_ntodo", EXIT_FAILURE)
   }
-
-  arg_progress->P_ndone++;
 
   if ((arg_progress->P_ndone - arg_progress->P_ndone_previous) >=
       arg_progress->P_ndelta)
@@ -214,6 +231,7 @@ void update_progress(progress_t *arg_progress)
         arg_progress->P_ndelta = 1;
     }
   }
+  return (TRUE);
 }
 
 void finalize_progress(progress_t *arg_progress)
@@ -221,13 +239,36 @@ void finalize_progress(progress_t *arg_progress)
   arg_progress->P_seconds_done =
     return_my_timer(&(arg_progress->P_timer), FALSE);
 
-  PRINTF("progress took %.0f seconds for %lld entries %.0f entries/second\n",
+  PRINTF("progress took %.0f seconds for %lld items %.0f items/second\n",
          arg_progress->P_seconds_done,
          arg_progress->P_ndone,
          (double)arg_progress->P_ndone / arg_progress->P_seconds_done);
+
+  if (arg_progress->P_ntotal > 0)
+  {
+    i64_t ntotal_mpi = arg_progress->P_ndone;
+
+    my_mpi_allreduce(MPI_IN_PLACE,
+                     &ntotal_mpi,
+                     1,
+                     MPI_LONG_LONG_INT,
+                     MPI_SUM,
+                     my_mpi_globals.MMG_comm_slaves);
+
+    HARDBUG(ntotal_mpi < arg_progress->P_ntotal);
+
+    if (ntotal_mpi > arg_progress->P_ntotal)
+    {
+      PRINTF("WARNING: ntotal_mpi=%lld"
+             " arg_progress->P_notal=%lld\n",
+             ntotal_mpi,
+             arg_progress->P_ntotal);
+    }
+  }
 }
 
 i64_t return_ndone(progress_t *arg_progress) { return (arg_progress->P_ndone); }
+i64_t return_ntodo(progress_t *arg_progress) { return (arg_progress->P_ntodo); }
 
 local double cdf(int arg_game_time, int arg_imove)
 {
@@ -238,13 +279,13 @@ local double cdf(int arg_game_time, int arg_imove)
 
 void configure_time_control(int arg_game_time,
                             int arg_ngame_moves,
-                            time_control_t *object)
+                            time_control_t *arg_with_time_control)
 {
-  object->TC_game_time = arg_game_time;
+  arg_with_time_control->TC_game_time = arg_game_time;
 
   arg_ngame_moves += options.time_control_ntrouble;
 
-  object->TC_ngame_moves = arg_ngame_moves;
+  arg_with_time_control->TC_ngame_moves = arg_ngame_moves;
 
   double game_time_left = arg_game_time;
 
@@ -256,42 +297,43 @@ void configure_time_control(int arg_game_time,
     {
       //(imove - 1) can be negative
 
-      object->TC_game_time_per_move[imove] =
+      arg_with_time_control->TC_game_time_per_move[imove] =
         cdf(arg_game_time, imove) - cdf(arg_game_time, imove - 1);
 
-      game_time_left -= object->TC_game_time_per_move[imove];
+      game_time_left -= arg_with_time_control->TC_game_time_per_move[imove];
     }
   }
   else
   {
     double game_time_half = (double)arg_game_time / 2.0;
 
-    object->TC_game_time_per_move[options.time_control_mean] =
+    arg_with_time_control->TC_game_time_per_move[options.time_control_mean] =
       game_time_half / options.time_control_sigma;
 
-    game_time_left -= object->TC_game_time_per_move[options.time_control_mean];
+    game_time_left -=
+      arg_with_time_control->TC_game_time_per_move[options.time_control_mean];
 
     for (int imove = options.time_control_mean + 1; imove <= arg_ngame_moves;
          ++imove)
     {
-      game_time_half -= object->TC_game_time_per_move[imove - 1];
+      game_time_half -= arg_with_time_control->TC_game_time_per_move[imove - 1];
 
-      object->TC_game_time_per_move[imove] =
+      arg_with_time_control->TC_game_time_per_move[imove] =
         game_time_half / options.time_control_sigma;
 
-      game_time_left -= object->TC_game_time_per_move[imove];
+      game_time_left -= arg_with_time_control->TC_game_time_per_move[imove];
     }
 
     game_time_half = (double)arg_game_time / 2.0;
 
     for (int imove = options.time_control_mean - 1; imove >= 0; --imove)
     {
-      game_time_half -= object->TC_game_time_per_move[imove + 1];
+      game_time_half -= arg_with_time_control->TC_game_time_per_move[imove + 1];
 
-      object->TC_game_time_per_move[imove] =
+      arg_with_time_control->TC_game_time_per_move[imove] =
         game_time_half / options.time_control_sigma;
 
-      game_time_left -= object->TC_game_time_per_move[imove];
+      game_time_left -= arg_with_time_control->TC_game_time_per_move[imove];
     }
   }
 
@@ -303,13 +345,14 @@ void configure_time_control(int arg_game_time,
 
   for (int imove = 0; imove <= arg_ngame_moves; ++imove)
   {
-    object->TC_game_time_per_move[imove] += game_time_left / arg_ngame_moves;
+    arg_with_time_control->TC_game_time_per_move[imove] +=
+      game_time_left / arg_ngame_moves;
 
     PRINTF("imove=%d time_per_move[imove]=%.2f\n",
            imove,
-           object->TC_game_time_per_move[imove]);
+           arg_with_time_control->TC_game_time_per_move[imove]);
 
-    S_total_game_time += object->TC_game_time_per_move[imove];
+    S_total_game_time += arg_with_time_control->TC_game_time_per_move[imove];
   }
 
   PRINTF("game_time=%d S_total_game_time=%.2f\n",
@@ -319,34 +362,37 @@ void configure_time_control(int arg_game_time,
 
 void update_time_control(int arg_jmove,
                          double arg_move_time,
-                         time_control_t *object)
+                         time_control_t *arg_with_time_control)
 {
-  double delta = (arg_move_time - object->TC_game_time_per_move[arg_jmove]);
+  double delta =
+    (arg_move_time - arg_with_time_control->TC_game_time_per_move[arg_jmove]);
 
   PRINTF("jmove=%d delta=%.2f\n", arg_jmove, delta);
 
-  int moves2go = object->TC_ngame_moves - (arg_jmove + 1);
+  int moves2go = arg_with_time_control->TC_ngame_moves - (arg_jmove + 1);
 
   PRINTF("moves2go=%d\n", moves2go);
 
   if (moves2go > 0)
   {
-    for (int imove = arg_jmove + 1; imove <= object->TC_ngame_moves; ++imove)
+    for (int imove = arg_jmove + 1;
+         imove <= arg_with_time_control->TC_ngame_moves;
+         ++imove)
     {
-      object->TC_game_time_per_move[imove] -= delta / moves2go;
+      arg_with_time_control->TC_game_time_per_move[imove] -= delta / moves2go;
 
       PRINTF("imove=%d time_per_move[imove]=%.2f\n",
              imove,
-             object->TC_game_time_per_move[imove]);
+             arg_with_time_control->TC_game_time_per_move[imove]);
     }
   }
 }
 
-void set_time_limit(int arg_jmove, time_control_t *object)
+void set_time_limit(int arg_jmove, time_control_t *arg_with_time_control)
 {
-  HARDBUG(arg_jmove > object->TC_ngame_moves);
+  HARDBUG(arg_jmove > arg_with_time_control->TC_ngame_moves);
 
-  options.time_limit = object->TC_game_time_per_move[arg_jmove];
+  options.time_limit = arg_with_time_control->TC_game_time_per_move[arg_jmove];
 
   if (options.time_limit < 0.1)
     options.time_limit = 0.1;
@@ -355,10 +401,10 @@ void set_time_limit(int arg_jmove, time_control_t *object)
   {
     options.time_trouble[itrouble] = 0.1;
 
-    if ((arg_jmove + itrouble + 1) <= object->TC_ngame_moves)
+    if ((arg_jmove + itrouble + 1) <= arg_with_time_control->TC_ngame_moves)
     {
       options.time_trouble[itrouble] =
-        object->TC_game_time_per_move[arg_jmove + itrouble + 1];
+        arg_with_time_control->TC_game_time_per_move[arg_jmove + itrouble + 1];
       if (options.time_trouble[itrouble] < 0.1)
         options.time_trouble[itrouble] = 0.1;
     }

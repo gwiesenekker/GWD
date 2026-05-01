@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define CJSON_FIELDS_ID "fields"
@@ -32,25 +32,23 @@ local cJSON *find_field(cJSON *fields, char *arg_field_name)
   return (result);
 }
 
-void construct_record(void *self)
+void construct_record(record_t *arg_with_record)
 {
-  record_t *object = self;
+  arg_with_record->R_cjson = cJSON_CreateObject();
 
-  object->R_cjson = cJSON_CreateObject();
+  HARDBUG(cJSON_AddArrayToObject(arg_with_record->R_cjson, CJSON_FIELDS_ID) ==
+          NULL)
 
-  HARDBUG(cJSON_AddArrayToObject(object->R_cjson, CJSON_FIELDS_ID) == NULL)
-
-  HARDBUG((object->R_string = bfromcstr("")) == NULL)
+  HARDBUG((arg_with_record->R_string = bfromcstr("")) == NULL)
 }
 
-void add_field(void *self,
+void add_field(record_t *arg_with_record,
                char *arg_field_name,
                int arg_field_type,
                void *arg_field_value)
 {
-  record_t *object = self;
-
-  cJSON *fields = cJSON_GetObjectItem(object->R_cjson, CJSON_FIELDS_ID);
+  cJSON *fields =
+    cJSON_GetObjectItem(arg_with_record->R_cjson, CJSON_FIELDS_ID);
 
   HARDBUG(!cJSON_IsArray(fields))
 
@@ -107,11 +105,10 @@ void add_field(void *self,
     FATAL("unsopported field_type", EXIT_FAILURE)
 }
 
-void set_field(void *self, char *arg_field_name, void *arg_value)
+void set_field(record_t *arg_with_record, char *arg_field_name, void *arg_value)
 {
-  record_t *object = self;
-
-  cJSON *fields = cJSON_GetObjectItem(object->R_cjson, CJSON_FIELDS_ID);
+  cJSON *fields =
+    cJSON_GetObjectItem(arg_with_record->R_cjson, CJSON_FIELDS_ID);
 
   HARDBUG(!cJSON_IsArray(fields))
 
@@ -141,11 +138,10 @@ void set_field(void *self, char *arg_field_name, void *arg_value)
   }
 }
 
-void get_field(void *self, char *arg_field_name, void *arg_value)
+void get_field(record_t *arg_with_record, char *arg_field_name, void *arg_value)
 {
-  record_t *object = self;
-
-  cJSON *fields = cJSON_GetObjectItem(object->R_cjson, CJSON_FIELDS_ID);
+  cJSON *fields =
+    cJSON_GetObjectItem(arg_with_record->R_cjson, CJSON_FIELDS_ID);
 
   HARDBUG(!cJSON_IsArray(fields))
 
@@ -176,13 +172,11 @@ void get_field(void *self, char *arg_field_name, void *arg_value)
   }
 }
 
-void set_record(void *self, bstring arg_bstring)
+void set_record(record_t *arg_with_record, bstring arg_bstring)
 {
-  record_t *object = self;
+  arg_with_record->R_cjson = cJSON_Parse(bdata(arg_bstring));
 
-  object->R_cjson = cJSON_Parse(bdata(arg_bstring));
-
-  if (object->R_cjson == NULL)
+  if (arg_with_record->R_cjson == NULL)
   {
     const char *error = cJSON_GetErrorPtr();
 
@@ -193,19 +187,17 @@ void set_record(void *self, bstring arg_bstring)
   }
 }
 
-bstring get_record(void *self)
+bstring get_record(record_t *arg_with_record)
 {
-  record_t *object = self;
-
   char *cstring;
 
-  HARDBUG((cstring = cJSON_Print(object->R_cjson)) == NULL)
+  HARDBUG((cstring = cJSON_Print(arg_with_record->R_cjson)) == NULL)
 
-  HARDBUG(bassigncstr(object->R_string, cstring) == BSTR_ERR)
+  HARDBUG(bassigncstr(arg_with_record->R_string, cstring) == BSTR_ERR)
 
   free(cstring);
 
-  return (object->R_string);
+  return (arg_with_record->R_string);
 }
 
 void test_records(void)

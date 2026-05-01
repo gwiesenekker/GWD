@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef DbaseH
 #define DbaseH
 
@@ -78,7 +78,7 @@ i64_t query_position_id(sqlite3 *, const char *, int, int *);
 
 i64_t query_move(sqlite3 *, i64_t, const char *, int, int *);
 
-int query_evaluation(sqlite3 *, i64_t, int *);
+score_t query_evaluation(sqlite3 *, i64_t, int *);
 
 void backup_db(sqlite3 *, const char *);
 

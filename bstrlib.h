@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 /*
  * This source file is part of the bstring string library.  This code was
  * written by Paul Hsieh in 2002-2015, and is covered by the BSD open source
@@ -157,7 +157,8 @@ extern "C"
 
 #if !defined(BSTRLIB_NOVSNP)
   extern bstring bformat(const char *fmt, ...);
-  extern int bformata(bstring b, const char *fmt, ...);
+  extern int bformata(bstring b, const char *fmt, ...)
+    __attribute__((format(printf, 2, 3)));
   extern int bassignformat(bstring b, const char *fmt, ...);
   extern int bvcformata(bstring b, int count, const char *fmt, va_list arglist);
 

@@ -1,41 +1,47 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
-void construct_my_bstream(my_bstream_t *object, char *arg_name)
+void construct_my_bstream(my_bstream_t *arg_with_my_bstream, char *arg_name)
 {
-  HARDBUG((object->BS_file = fopen(arg_name, "r")) == NULL)
+  HARDBUG((arg_with_my_bstream->BS_file = fopen(arg_name, "r")) == NULL)
 
-  HARDBUG((object->BS_bfile = bsopen((bNread)fread, object->BS_file)) == NULL)
+  HARDBUG((arg_with_my_bstream->BS_bfile =
+             bsopen((bNread)fread, arg_with_my_bstream->BS_file)) == NULL)
 
-  HARDBUG((object->BS_bline = bfromcstr("")) == NULL)
+  HARDBUG((arg_with_my_bstream->BS_bline = bfromcstr("")) == NULL)
 
-  HARDBUG((object->BS_newline = bfromcstr("\n")) == NULL)
+  HARDBUG((arg_with_my_bstream->BS_newline = bfromcstr("\n")) == NULL)
 
-  HARDBUG((object->BS_empty = bfromcstr("")) == NULL)
+  HARDBUG((arg_with_my_bstream->BS_empty = bfromcstr("")) == NULL)
 }
 
-int my_bstream_readln(my_bstream_t *object, int remove_newline)
+int my_bstream_readln(my_bstream_t *arg_with_my_bstream, int remove_newline)
 {
-  int result = bsreadln(object->BS_bline, object->BS_bfile, (char)'\n');
+  int result = bsreadln(arg_with_my_bstream->BS_bline,
+                        arg_with_my_bstream->BS_bfile,
+                        (char)'\n');
 
   if (result != BSTR_OK)
     return (result);
 
   if (remove_newline)
-    bfindreplace(object->BS_bline, object->BS_newline, object->BS_empty, 0);
+    bfindreplace(arg_with_my_bstream->BS_bline,
+                 arg_with_my_bstream->BS_newline,
+                 arg_with_my_bstream->BS_empty,
+                 0);
 
   return (result);
 }
 
-void destroy_my_bstream(my_bstream_t *object)
+void destroy_my_bstream(my_bstream_t *arg_with_my_bstream)
 {
-  HARDBUG(bdestroy(object->BS_empty) == BSTR_ERR)
+  HARDBUG(bdestroy(arg_with_my_bstream->BS_empty) == BSTR_ERR)
 
-  HARDBUG(bdestroy(object->BS_newline) == BSTR_ERR)
+  HARDBUG(bdestroy(arg_with_my_bstream->BS_newline) == BSTR_ERR)
 
-  HARDBUG(bdestroy(object->BS_bline) == BSTR_ERR)
+  HARDBUG(bdestroy(arg_with_my_bstream->BS_bline) == BSTR_ERR)
 
-  HARDBUG(bsclose(object->BS_bfile) == NULL)
+  HARDBUG(bsclose(arg_with_my_bstream->BS_bfile) == NULL)
 
-  FCLOSE(object->BS_file)
+  FCLOSE(arg_with_my_bstream->BS_file)
 }

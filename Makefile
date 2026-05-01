@@ -61,7 +61,7 @@ CFLAGS=-g -DDEBUG
 #CFLAGS=-g 
 else
 CC=clang
-CFLAGS=-g -O3
+CFLAGS=-g -O3 
 endif
 LFLAGS=-lm -lzstd -lpthread
 
@@ -108,18 +108,19 @@ CFLAGS+=-Wshadow
 endif
 
 ifeq ($(CC), clang)
-CFLAGS+=-Wall
+CFLAGS+=-Wall -Wshadow
 endif
 
 xxhash.o: CFLAGS += -O3
-
+#score.o: CFLAGS += -Wall -Wextra -Wconversion -Wfloat-conversion 
+#search.o: CFLAGS += -Wall -Wextra -Wconversion -Wfloat-conversion 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CC) -o $@ $(CFLAGS) $(OBJS) $(LFLAGS)
 	REVISION=$$(./$(TARGET) --revision); echo $$REVISION;\
         mkdir -p /tmp8/gwies/dxp1/$$REVISION;\
-        cp $(TARGET) gwd.json overrides.json networks.json ballot2.fen /tmp8/gwies/dxp1/$$REVISION;\
+        cp $(TARGET) gwd.json overrides.json network0.json ballot2.fen /tmp8/gwies/dxp1/$$REVISION;\
 
 HEADERS=boards.h\
   bstrlib.h\

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef CachesH
 #define CachesH
 
@@ -37,10 +37,10 @@ typedef struct
   my_mutex_t C_mutex;
 } cache_t;
 
-int check_entry_in_cache(void *, void *, void *);
-int store_entry_in_cache(void *, void *, void *);
-void clear_cache(void *);
-void construct_cache(void *, char *, i64_t, int, void *, size_t, void *);
+int check_entry_in_cache(cache_t *, void *, void *);
+int store_entry_in_cache(cache_t *, void *, void *);
+void clear_cache(cache_t *);
+void construct_cache(cache_t *, char *, i64_t, int, void *, size_t, void *);
 
 void test_caches(void);
 

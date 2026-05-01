@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef MovesH
 #define MovesH
 
@@ -30,20 +30,23 @@ typedef struct
   move_t ML_moves[NMOVES_MAX];
 
   int ML_move_weights[NMOVES_MAX];
-  int ML_move_flags[NMOVES_MAX];
+  ui32_t ML_move_flags[NMOVES_MAX];
 } moves_list_t;
 
 void gen_moves(board_t *, moves_list_t *);
+int return_mobility(board_t *, colour_enum);
+int return_immobility(board_t *, colour_enum);
+int return_unsupported(board_t *, colour_enum);
 int can_capture(board_t *, int);
-void do_move(board_t *, int, moves_list_t *, int);
-void undo_move(board_t *, int, moves_list_t *, int);
+void do_move(board_t *, int, moves_list_t *);
+void undo_move(board_t *, int, moves_list_t *);
 void check_moves(board_t *, moves_list_t *);
 
-void move2bstring(void *, int, bstring);
-int search_move(void *, bstring);
+void move2bstring(moves_list_t *, int, bstring);
+int search_move(moves_list_t *, bstring);
 
-void construct_moves_list(void *);
+void construct_moves_list(moves_list_t *);
 
-void fprintf_moves_list(void *, my_printf_t *, int);
+void fprintf_moves_list(moves_list_t *, my_printf_t *, int);
 
 #endif

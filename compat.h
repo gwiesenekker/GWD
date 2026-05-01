@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef CompatH
 #define CompatH
 
@@ -120,7 +120,7 @@ typedef pthread_t my_thread_t;
 #define HW_CRC32_U8 _mm_crc32_u8
 #define HW_CRC32_U16 _mm_crc32_u16
 #define HW_CRC32_U32 _mm_crc32_u32
-#define HW_CRC32_U64 _mm_crc32_u64
+#define HW_CRC32_U64 (ui32_t) _mm_crc32_u64
 
 #else
 #include <arm_acle.h>

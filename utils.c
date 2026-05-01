@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #if COMPAT_ARCH == COMPAT_ARCH_X86_64
@@ -261,13 +261,25 @@ void file2bstring(char *arg_name, bstring arg_bstring)
   BDESTROY(newline)
 }
 
-void file2cjson(char *arg_name, cJSON **arg_json)
+void file2cjson(char *arg_name, cJSON **arg_cjson)
 {
-  BSTRING(string)
+  i64_t fsize;
 
-  file2bstring(arg_name, string);
+  HARDBUG((fsize = compat_size(arg_name)) == -1)
 
-  if ((*arg_json = cJSON_Parse(bdata(string))) == NULL)
+  CSTRING(cstring, fsize + 1)
+
+  FILE *fcjson;
+
+  HARDBUG((fcjson = fopen(arg_name, "rb")) == NULL)
+
+  FREAD(fcjson, cstring, char, fsize)
+
+  FCLOSE(fcjson)
+
+  cstring[fsize] = '\0';
+
+  if ((*arg_cjson = cJSON_Parse(cstring)) == NULL)
   {
     const char *error = cJSON_GetErrorPtr();
 
@@ -276,16 +288,16 @@ void file2cjson(char *arg_name, cJSON **arg_json)
     FATAL("cJSON error", EXIT_FAILURE)
   }
 
-  BDESTROY(string)
+  CDESTROY(cstring)
 }
 
-cJSON *cJSON_FindItemInObject(cJSON *object, char *arg_name)
+cJSON *cJSON_FindItemInObject(cJSON *arg_cjson, char *arg_name)
 {
   cJSON *result = NULL;
 
   cJSON *entry;
 
-  cJSON_ArrayForEach(entry, object)
+  cJSON_ArrayForEach(entry, arg_cjson)
   {
     if (compat_strcasecmp(entry->string, arg_name) == 0)
     {

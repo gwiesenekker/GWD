@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define GWD_JSON "gwd.json"
@@ -24,7 +24,7 @@ local void fen2score(char *arg_name)
 
   search_t search;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
 
   board_t *with_board = &(search.S_board);
 
@@ -71,9 +71,11 @@ local void fen2score(char *arg_name)
 
     int positional_score = return_score_from_board(with_board, NULL);
 
-    if ((abs(material_score) >= (3 * SCORE_MAN)) and
-          ((material_score > 0) and (positional_score < 0)) or
-        ((material_score < 0) and (positional_score > 0)))
+    /*
+        if ((abs(material_score) >= (3 * SCORE_MAN)) and
+              ((material_score > 0) and (positional_score < 0)) or
+            ((material_score < 0) and (positional_score > 0)))
+    */
     {
       print_board(with_board);
 
@@ -100,13 +102,24 @@ local void solve_problems(char *arg_name)
 
   HARDBUG((ftmp = fopen("tmp.fen", "w")) == NULL)
 
-  search_t search;
+  search_t search0;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search0, STDOUT, NULL, NETWORK0_ID);
 
-  search_t *with = &search;
+  search_t *with_search0 = &search0;
 
-  // print_board(&(with->S_board));
+  search_t search1;
+
+  search_t *with_search1 = NULL;
+
+  if (networks[NETWORK1_ID].N_network_id != INVALID)
+  {
+    construct_search(&search1, STDOUT, NULL, NETWORK1_ID);
+
+    with_search1 = &search1;
+  }
+
+  // print_board(&(with_search->S_board));
 
   my_bstream_t my_bstream;
 
@@ -135,28 +148,28 @@ local void solve_problems(char *arg_name)
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
-    fen2board(&(with->S_board), bdata(bfen));
+    fen2board(&(with_search0->S_board), bdata(bfen));
 
     CDESTROY(cfen)
 
     ++nproblems;
 
-    print_board(&(with->S_board));
+    print_board(&(with_search0->S_board));
 
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->S_board), &moves_list);
+    gen_moves(&(with_search0->S_board), &moves_list);
 
-    check_moves(&(with->S_board), &moves_list);
+    check_moves(&(with_search0->S_board), &moves_list);
 
     fprintf_moves_list(&moves_list, STDOUT, FALSE);
 
     BSTRING(book_move)
 
     if (options.use_book)
-      return_book_move(&(with->S_board), &moves_list, book_move);
+      return_book_move(&(with_search0->S_board), &moves_list, book_move);
     else
       PRINTF("WARNING: book is not enabled!\n");
 
@@ -166,14 +179,15 @@ local void solve_problems(char *arg_name)
     {
       // options.hub=1;
 
-      do_search(with,
+      do_search(with_search0,
                 &moves_list,
                 INVALID,
                 INVALID,
                 SCORE_MINUS_INFINITY,
-                FALSE);
+                NULL);
 
-      if ((with->S_best_score - with->S_root_simple_score) > (SCORE_MAN / 2))
+      if ((with_search0->S_best_score - with_search0->S_root_simple_score) >
+          (SCORE_MAN / 2))
       {
         ++nsolved;
         PRINTF("solved problem #%d\n", nproblems);
@@ -183,6 +197,26 @@ local void solve_problems(char *arg_name)
         PRINTF("did not solve problem #%d\n", nproblems);
 
         HARDBUG(fprintf(ftmp, "%s\n", bdata(bfen)) < 0)
+      }
+
+      if (with_search1 != NULL)
+      {
+        fen2board(&(with_search1->S_board), bdata(bfen));
+
+        print_board(&(with_search1->S_board));
+
+        gen_moves(&(with_search1->S_board), &moves_list);
+
+        check_moves(&(with_search1->S_board), &moves_list);
+
+        fprintf_moves_list(&moves_list, STDOUT, FALSE);
+
+        do_search(with_search1,
+                  &moves_list,
+                  INVALID,
+                  INVALID,
+                  SCORE_MINUS_INFINITY,
+                  NULL);
       }
     }
   }
@@ -197,19 +231,19 @@ local void solve_problems(char *arg_name)
 }
 
 local void solve_problems_mcts(char *arg_name,
-                               int arg_nshoot_outs,
                                int arg_mcts_depth,
-                               double arg_mcts_time_limit)
+                               double arg_mcts_time_limit,
+                               int arg_nshoot_outs)
 {
   BEGIN_BLOCK(__FUNC__)
 
   search_t search;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
 
-  search_t *with = &search;
+  search_t *with_search = &search;
 
-  // print_board(&(with->S_board));
+  // print_board(&(with_search->S_board));
 
   fbuffer_t fcsv;
 
@@ -223,10 +257,7 @@ local void solve_problems_mcts(char *arg_name,
 
   construct_my_bstream(&my_bstream, arg_name);
 
-  BSTRING(bfen)
-
-  i64_t nproblems = 0;
-  i64_t nproblems_mpi = 0;
+  i64_t nfen = 0;
 
   while (my_bstream_readln(&my_bstream, TRUE) == BSTR_OK)
   {
@@ -237,7 +268,34 @@ local void solve_problems_mcts(char *arg_name,
     if (bchar(bline, 0) == '#')
       continue;
 
-    ++nproblems;
+    nfen++;
+  }
+
+  PRINTF("nfen=%lld\n", nfen);
+
+  destroy_my_bstream(&my_bstream);
+
+  progress_t progress;
+
+  construct_progress(&progress, nfen, 10);
+
+  construct_my_bstream(&my_bstream, arg_name);
+
+  BSTRING(bfen)
+
+  for (i64_t ifen = 0; ifen < nfen; ifen++)
+  {
+    HARDBUG(my_bstream_readln(&my_bstream, TRUE) == BSTR_ERR)
+
+    bstring bline = my_bstream.BS_bline;
+
+    if (bchar(bline, 0) == '*')
+      break;
+    if (bchar(bline, 0) == '#')
+      continue;
+
+    if (!make_progress(&progress, ifen))
+      continue;
 
     CSTRING(cfen, blength(bline))
 
@@ -247,41 +305,65 @@ local void solve_problems_mcts(char *arg_name,
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
-    fen2board(&(with->S_board), bdata(bfen));
+    fen2board(&(with_search->S_board), bdata(bfen));
 
     CDESTROY(cfen)
 
-    if ((my_mpi_globals.MMG_nslaves > 0) and
-        (((nproblems - 1) % my_mpi_globals.MMG_nslaves) !=
-         my_mpi_globals.MMG_id_slave))
-      continue;
+    if (IS_BLACK(with_search->S_board.B_colour2move))
+      result = -result;
 
-    ++nproblems_mpi;
-
-    print_board(&(with->S_board));
+    print_board(&(with_search->S_board));
 
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->S_board), &moves_list);
+    gen_moves(&(with_search->S_board), &moves_list);
 
-    check_moves(&(with->S_board), &moves_list);
+    check_moves(&(with_search->S_board), &moves_list);
 
     fprintf_moves_list(&moves_list, STDOUT, FALSE);
 
     if (moves_list.ML_nmoves > 0)
     {
-      int nshoot_outs = arg_nshoot_outs;
+      double mcts_result = 0.0;
 
-      double mcts_result = mcts_shoot_outs(with,
-                                           0,
-                                           &nshoot_outs,
-                                           arg_mcts_depth,
-                                           arg_mcts_time_limit,
-                                           NULL,
-                                           NULL,
-                                           NULL);
+      if (arg_mcts_depth > 0)
+      {
+        int nshoot_outs = arg_nshoot_outs;
+
+        mcts_result = mcts_shoot_outs(with_search,
+                                      arg_mcts_depth,
+                                      0,
+                                      arg_mcts_time_limit,
+                                      &nshoot_outs,
+                                      NULL,
+                                      NULL,
+                                      NULL,
+                                      FALSE);
+      }
+      else
+      {
+        mcts_globals.mcts_globals_time_limit = arg_mcts_time_limit;
+
+        mcts_globals.mcts_globals_nodes = 0;
+
+        reset_my_timer(&(with_search->S_timer));
+
+        int sort[NMOVES_MAX];
+
+        score_t best_score;
+
+        mcts_search(with_search,
+                    -arg_mcts_depth,
+                    0,
+                    &moves_list,
+                    sort,
+                    &best_score,
+                    TRUE);
+
+        mcts_result = best_score;
+      }
 
       PRINTF("mcts_result=%.6f\n", mcts_result);
 
@@ -291,20 +373,11 @@ local void solve_problems_mcts(char *arg_name,
 
   BDESTROY(bfen)
 
-  flush_fbuffer(&fcsv, 0);
+  finalize_progress(&progress);
 
   destroy_my_bstream(&my_bstream);
 
-  PRINTF("nproblems=%lld nproblems_mpi=%lld\n", nproblems, nproblems_mpi);
-
-  my_mpi_allreduce(MPI_IN_PLACE,
-                   &nproblems_mpi,
-                   1,
-                   MPI_LONG_LONG_INT,
-                   MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
-
-  HARDBUG(nproblems != nproblems_mpi)
+  flush_fbuffer(&fcsv, 0);
 
   BDESTROY(barg_name)
 
@@ -363,7 +436,7 @@ void play_game(char arg_name[MY_LINE_MAX],
 {
   my_random_t play_random;
 
-  construct_my_random(&play_random, 0);
+  construct_my_random(&play_random, NULL);
 
   game_state_t game_state;
 
@@ -399,9 +472,9 @@ void play_game(char arg_name[MY_LINE_MAX],
 
   search_t search;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
 
-  search_t *with = &search;
+  search_t *with_search = &search;
 
   int automatic = FALSE;
 
@@ -413,15 +486,15 @@ void play_game(char arg_name[MY_LINE_MAX],
             MESSAGE_STATE,
             game_state.get_game_state(&game_state));
 
-    state2board(&(with->S_board), &game_state);
+    state2board(&(with_search->S_board), &game_state);
 
-    print_board(&(with->S_board));
+    print_board(&(with_search->S_board));
 
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(with->S_board), &moves_list);
+    gen_moves(&(with_search->S_board), &moves_list);
 
     if (moves_list.ML_nmoves == 0)
     {
@@ -430,7 +503,7 @@ void play_game(char arg_name[MY_LINE_MAX],
       goto label_return;
     }
 
-    if (with->S_board.B_colour2move == human_colour)
+    if (with_search->S_board.B_colour2move == human_colour)
     {
       // configure thread for pondering
 
@@ -521,7 +594,7 @@ void play_game(char arg_name[MY_LINE_MAX],
           BSTRING(book_move)
 
           if (options.use_book)
-            return_book_move(&(with->S_board), &moves_list, book_move);
+            return_book_move(&(with_search->S_board), &moves_list, book_move);
           else
             PRINTF("WARNING: book is not enabled!\n");
 
@@ -644,7 +717,7 @@ void play_game(char arg_name[MY_LINE_MAX],
       HARDBUG(bassigncstr(bbest_move, "NULL") == BSTR_ERR)
 
       if (options.use_book)
-        return_book_move(&(with->S_board), &moves_list, bbest_move);
+        return_book_move(&(with_search->S_board), &moves_list, bbest_move);
 
       if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
       {
@@ -825,9 +898,9 @@ local int add_man_random(int arg_nwhite_man,
                          int arg_shape,
                          int arg_scale,
                          my_random_t *arg_random,
-                         search_t *arg_with,
+                         search_t *arg_with_search,
                          char *arg_s,
-                         int *arg_best_score)
+                         score_t *arg_best_score)
 {
   int result = FALSE;
 
@@ -896,13 +969,13 @@ local int add_man_random(int arg_nwhite_man,
 
     arg_s[51] = '\0';
 
-    string2board(&(arg_with->S_board), arg_s);
+    string2board(&(arg_with_search->S_board), arg_s);
 
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(arg_with->S_board), &moves_list);
+    gen_moves(&(arg_with_search->S_board), &moves_list);
 
     if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
     {
@@ -910,19 +983,19 @@ local int add_man_random(int arg_nwhite_man,
         result = TRUE;
       else
       {
-        int root_score = return_material_score(&(arg_with->S_board));
+        reset_my_timer(&(arg_with_search->S_timer));
 
-        reset_my_timer(&(arg_with->S_timer));
+        int sort[NMOVES_MAX];
 
-        int best_pv;
+        mcts_search(arg_with_search,
+                    MCTS_PLY_MAX,
+                    0,
+                    &moves_list,
+                    sort,
+                    arg_best_score,
+                    FALSE);
 
-        *arg_best_score = mcts_search(arg_with,
-                                      root_score,
-                                      0,
-                                      MCTS_PLY_MAX,
-                                      &moves_list,
-                                      &best_pv,
-                                      FALSE);
+        score_t root_score = return_material_score(&(arg_with_search->S_board));
 
         if (abs(root_score - *arg_best_score) <= (SCORE_MAN / 4))
         {
@@ -933,7 +1006,8 @@ local int add_man_random(int arg_nwhite_man,
           if (ntry <= 10)
           {
             PRINTF("add_man_random rejected"
-                   " ntry=%d root_score=%d *arg_best_score=%d\n",
+                   " ntry=%d root_score=" PRINTF_SCORE_T
+                   " *arg_best_score=" PRINTF_SCORE_T "\n",
                    ntry,
                    root_score,
                    *arg_best_score);
@@ -987,11 +1061,11 @@ int return_random_set_bit(my_random_t *arg_random, uint64_t arg_mask)
 local int add_kings_random(int arg_nwhite_kings,
                            int arg_nblack_kings,
                            my_random_t *arg_random,
-                           search_t *arg_with,
+                           search_t *arg_with_search,
                            ui64_t *arg_white_kings_mask,
                            ui64_t *arg_black_kings_mask,
                            char *arg_s,
-                           int *arg_best_score)
+                           score_t *arg_best_score)
 {
   HARDBUG((arg_nwhite_kings + arg_nblack_kings) == 0)
 
@@ -1027,11 +1101,11 @@ local int add_kings_random(int arg_nwhite_kings,
     int squares[NPIECES_MAX];
     int nsquares = 0;
 
-    string2board(&(arg_with->S_board), arg_s);
+    string2board(&(arg_with_search->S_board), arg_s);
 
     /*
         PRINTF("before while\n");
-        print_board(&(arg_with->S_board));
+        print_board(&(arg_with_search->S_board));
         PRINTF("white mask:");
         for (int i = 1; i <= 50; ++i)
           if (*arg_white_kings_mask & BITULL(i)) PRINTF(" %d", i);
@@ -1130,8 +1204,8 @@ local int add_kings_random(int arg_nwhite_kings,
 
     /*
         PRINTF("after while\n");
-        string2board(&(arg_with->S_board), arg_s);
-        print_board(&(arg_with->S_board));
+        string2board(&(arg_with_search->S_board), arg_s);
+        print_board(&(arg_with_search->S_board));
     */
 
     if (nsquares == 0)
@@ -1143,13 +1217,13 @@ local int add_kings_random(int arg_nwhite_kings,
 
     HARDBUG((nwhite_kings + nblack_kings) != nsquares)
 
-    string2board(&(arg_with->S_board), arg_s);
+    string2board(&(arg_with_search->S_board), arg_s);
 
     moves_list_t moves_list;
 
     construct_moves_list(&moves_list);
 
-    gen_moves(&(arg_with->S_board), &moves_list);
+    gen_moves(&(arg_with_search->S_board), &moves_list);
 
     if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
     {
@@ -1157,19 +1231,19 @@ local int add_kings_random(int arg_nwhite_kings,
         result = TRUE;
       else
       {
-        int root_score = return_material_score(&(arg_with->S_board));
+        reset_my_timer(&(arg_with_search->S_timer));
 
-        reset_my_timer(&(arg_with->S_timer));
+        int sort[NMOVES_MAX];
 
-        int best_pv;
+        mcts_search(arg_with_search,
+                    MCTS_PLY_MAX,
+                    0,
+                    &moves_list,
+                    sort,
+                    arg_best_score,
+                    FALSE);
 
-        *arg_best_score = mcts_search(arg_with,
-                                      root_score,
-                                      0,
-                                      MCTS_PLY_MAX,
-                                      &moves_list,
-                                      &best_pv,
-                                      FALSE);
+        score_t root_score = return_material_score(&(arg_with_search->S_board));
 
         if (abs(root_score - *arg_best_score) <= (SCORE_MAN / 4))
         {
@@ -1180,7 +1254,9 @@ local int add_kings_random(int arg_nwhite_kings,
           if (ntry <= 10)
           {
             PRINTF("add_kings_random rejected"
-                   " ntry=%d root_score=%d *arg_best_score=%d\n",
+                   " ntry=%d"
+                   " root_score=" PRINTF_SCORE_T
+                   " *arg_best_score=" PRINTF_SCORE_T "\n",
                    ntry,
                    root_score,
                    *arg_best_score);
@@ -1242,10 +1318,16 @@ local void gen_random(char *arg_fen_name,
 {
   my_random_t temp_random;
 
-  if (my_mpi_globals.MMG_nslaves == 0)
-    construct_my_random(&temp_random, 0);
+  if (my_mpi_globals.MMG_is_single)
+    construct_my_random(&temp_random, NULL);
   else
-    construct_my_random(&temp_random, INVALID);
+  {
+    ui64_t seed;
+
+    construct_my_random(&temp_random, &seed);
+
+    PRINTF("gen_random seed=%llX\n", seed);
+  }
 
   my_timer_t timer;
 
@@ -1263,7 +1345,7 @@ local void gen_random(char *arg_fen_name,
 
   search_t search;
 
-  construct_search(&search, STDOUT, NULL);
+  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
 
   moves_list_t moves_list;
 
@@ -1271,11 +1353,11 @@ local void gen_random(char *arg_fen_name,
 
   mcts_globals.mcts_globals_time_limit = arg_time_limit;
 
-  search_t *with = &search;
+  search_t *with_search = &search;
 
   i64_t npositions = arg_npositions_max;
 
-  if (my_mpi_globals.MMG_nslaves > 0)
+  if (my_mpi_globals.MMG_has_slaves)
   {
     npositions = arg_npositions_max / my_mpi_globals.MMG_nslaves;
 
@@ -1513,7 +1595,7 @@ local void gen_random(char *arg_fen_name,
                               shape,
                               scale,
                               &temp_random,
-                              with,
+                              with_search,
                               s,
                               &best_score);
     }
@@ -1524,7 +1606,7 @@ local void gen_random(char *arg_fen_name,
                               shape,
                               scale,
                               &temp_random,
-                              with,
+                              with_search,
                               s,
                               NULL);
     }
@@ -1548,7 +1630,7 @@ local void gen_random(char *arg_fen_name,
         if (!add_kings_random(nwhite_kings,
                               nblack_kings,
                               &temp_random,
-                              with,
+                              with_search,
                               &white_kings_mask,
                               &black_kings_mask,
                               s,
@@ -1562,14 +1644,14 @@ local void gen_random(char *arg_fen_name,
 
       ++nsame;
 
-      HARDBUG(BIT_COUNT(with->S_board.B_white_man_bb) != nwhite_man)
-      HARDBUG(BIT_COUNT(with->S_board.B_black_man_bb) != nblack_man)
+      HARDBUG(BIT_COUNT(with_search->S_board.B_white_man_bb) != nwhite_man)
+      HARDBUG(BIT_COUNT(with_search->S_board.B_black_man_bb) != nblack_man)
 
       HARDBUG(best_score == SCORE_PLUS_INFINITY)
 
-      int root_score = return_material_score(&(with->S_board));
+      int root_score = return_material_score(&(with_search->S_board));
 
-      print_board(&(with->S_board));
+      print_board(&(with_search->S_board));
 
       PRINTF("accepted iposition=%lld nsame=%d"
              " npieces=%d nwhite=%d nblack=%d"
@@ -1581,10 +1663,10 @@ local void gen_random(char *arg_fen_name,
              npieces,
              nwhite,
              nblack,
-             BIT_COUNT(with->S_board.B_white_man_bb),
-             BIT_COUNT(with->S_board.B_black_man_bb),
-             BIT_COUNT(with->S_board.B_white_king_bb),
-             BIT_COUNT(with->S_board.B_black_king_bb),
+             BIT_COUNT(with_search->S_board.B_white_man_bb),
+             BIT_COUNT(with_search->S_board.B_black_man_bb),
+             BIT_COUNT(with_search->S_board.B_white_king_bb),
+             BIT_COUNT(with_search->S_board.B_black_king_bb),
              root_score,
              best_score);
 
@@ -1595,24 +1677,24 @@ local void gen_random(char *arg_fen_name,
       update_bucket(&bucket_ndelta, nwhite_man - nblack_man);
 
       update_bucket(&bucket_nwhite_man,
-                    BIT_COUNT(with->S_board.B_white_man_bb));
+                    BIT_COUNT(with_search->S_board.B_white_man_bb));
 
       update_bucket(&bucket_nblack_man,
-                    BIT_COUNT(with->S_board.B_black_man_bb));
+                    BIT_COUNT(with_search->S_board.B_black_man_bb));
 
       update_bucket(&bucket_nwhite_kings,
-                    BIT_COUNT(with->S_board.B_white_king_bb));
+                    BIT_COUNT(with_search->S_board.B_white_king_bb));
 
       update_bucket(&bucket_nblack_kings,
-                    BIT_COUNT(with->S_board.B_black_king_bb));
+                    BIT_COUNT(with_search->S_board.B_black_king_bb));
 
       update_bucket(&bucket_nkings,
-                    BIT_COUNT(with->S_board.B_white_king_bb) +
-                      BIT_COUNT(with->S_board.B_black_king_bb));
+                    BIT_COUNT(with_search->S_board.B_white_king_bb) +
+                      BIT_COUNT(with_search->S_board.B_black_king_bb));
 
       BSTRING(bfen)
 
-      board2fen(&(with->S_board), bfen, FALSE);
+      board2fen(&(with_search->S_board), bfen, FALSE);
 
       append_fbuffer_fmt(&ffen, "%s {0.000000}\n", bdata(bfen));
 
@@ -1757,8 +1839,8 @@ local void load_gwd_json(void)
 
   options.verbose = 1;
 
-  strcpy(options.networks, "NULL");
-  strcpy(options.network_name, "NULL");
+  strcpy(options.network0, "NULL");
+  strcpy(options.network1, "NULL");
 
   options.network_evaluation_min = -100;
   options.network_evaluation_max = -25;
@@ -1793,37 +1875,33 @@ local void load_gwd_json(void)
 
   options.material_only = FALSE;
 
-  options.captures_are_transparent = TRUE;
-  options.returned_depth_includes_captures = FALSE;
-
   options.quiescence_evaluation_policy = 0;
   options.quiescence_combination_length = 2;
-  options.quiescence_extension_search_window = 25;
-  options.quiescence_capture_extensions = 0;
 
   options.pv_combination_length = 2;
-  options.pv_extension_search_window = 25;
 
-  options.aspiration_window = 1;
   options.best_score_margin = 0;
+  options.aspiration_margin = 25;
+  options.research_margin = 1;
 
   options.use_reductions = TRUE;
 
   options.reduction_depth_root = 2;
   options.reduction_depth_leaf = 2;
-  options.reduction_moves_min = 4;
   options.reduction_combination_length = 2;
-
   options.reduction_full_min = 1;
   options.reduction_percentage = 50;
+  options.reduction_margin = 10;
 
-  options.use_single_reply_extensions = TRUE;
+  options.singular_probe_depth = 0;
+  options.singular_probe_margin = 50;
+  options.singular_probe_percentage = 50;
+  options.singular_extension_moves = 2;
 
   options.sync_clock = FALSE;
 
   options.alpha_beta_cache_size = 1024;
-  options.alpha_beta_cache_depth_margin = 1;
-  options.pv_cache_fraction = 10;
+  options.cache_draw_results = FALSE;
 
   options.score_cache_size = 256;
 
@@ -1967,35 +2045,23 @@ local void parse_parameters(void)
                                  "quiescence_combination_length") == 0)
         options.quiescence_combination_length = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "quiescence_extension_search_window") == 0)
-        options.quiescence_extension_search_window = ivalue;
-
-      else if (compat_strcasecmp(parameter_name,
-                                 "quiescence_capture_extensions") == 0)
-        options.quiescence_capture_extensions = ivalue;
-
       else if (compat_strcasecmp(parameter_name, "pv_combination_length") == 0)
         options.pv_combination_length = ivalue;
 
-      else if (compat_strcasecmp(parameter_name,
-                                 "pv_extension_search_window") == 0)
-        options.pv_extension_search_window = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "aspiration_window") == 0)
-        options.aspiration_window = ivalue;
-
       else if (compat_strcasecmp(parameter_name, "best_score_margin") == 0)
         options.best_score_margin = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "aspiration_margin") == 0)
+        options.aspiration_margin = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "research_margin") == 0)
+        options.research_margin = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_depth_root") == 0)
         options.reduction_depth_root = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_depth_leaf") == 0)
         options.reduction_depth_leaf = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "reduction_moves_min") == 0)
-        options.reduction_moves_min = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_full_min") == 0)
         options.reduction_full_min = ivalue;
@@ -2007,15 +2073,25 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "reduction_percentage") == 0)
         options.reduction_percentage = ivalue;
 
+      else if (compat_strcasecmp(parameter_name, "reduction_margin") == 0)
+        options.reduction_margin = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "singular_probe_depth") == 0)
+        options.singular_probe_depth = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "singular_probe_margin") == 0)
+        options.singular_probe_margin = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "singular_probe_percentage") ==
+               0)
+        options.singular_probe_percentage = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "singular_extension_moves") ==
+               0)
+        options.singular_extension_moves = ivalue;
+
       else if (compat_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)
         options.alpha_beta_cache_size = ivalue;
-
-      else if (compat_strcasecmp(parameter_name,
-                                 "alpha_beta_cache_depth_margin") == 0)
-        options.alpha_beta_cache_depth_margin = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "pv_cache_fraction") == 0)
-        options.pv_cache_fraction = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "score_cache_size") == 0)
         options.score_cache_size = ivalue;
@@ -2091,11 +2167,11 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "overrides") == 0)
         strncpy(options.overrides, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "networks") == 0)
-        strncpy(options.networks, svalue, MY_LINE_MAX);
+      else if (compat_strcasecmp(parameter_name, "network0") == 0)
+        strncpy(options.network0, svalue, MY_LINE_MAX);
 
-      else if (compat_strcasecmp(parameter_name, "network_name") == 0)
-        strncpy(options.network_name, svalue, MY_LINE_MAX);
+      else if (compat_strcasecmp(parameter_name, "network1") == 0)
+        strncpy(options.network1, svalue, MY_LINE_MAX);
 
       else if (compat_strcasecmp(parameter_name, "book_name") == 0)
         strncpy(options.book_name, svalue, MY_LINE_MAX);
@@ -2152,26 +2228,14 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "material_only") == 0)
         options.material_only = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "captures_are_transparent") ==
-               0)
-        options.captures_are_transparent = bvalue;
-
-      else if (compat_strcasecmp(parameter_name,
-                                 "returned_depth_includes_captures") == 0)
-        options.returned_depth_includes_captures = bvalue;
-
       else if (compat_strcasecmp(parameter_name, "use_reductions") == 0)
         options.use_reductions = bvalue;
-
-      else if (compat_strcasecmp(parameter_name,
-                                 "use_single_reply_extensions") == 0)
-        options.use_single_reply_extensions = bvalue;
 
       else if (compat_strcasecmp(parameter_name, "sync_clock") == 0)
         options.sync_clock = bvalue;
 
-      else if (compat_strcasecmp(parameter_name, "pv2cache") == 0)
-        options.pv2cache = bvalue;
+      else if (compat_strcasecmp(parameter_name, "cache_draw_results") == 0)
+        options.cache_draw_results = bvalue;
 
       else if (compat_strcasecmp(parameter_name, "dxp_initiator") == 0)
         options.dxp_initiator = bvalue;
@@ -2556,10 +2620,7 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 
         HARDBUG(svalue == NULL)
 
-        if (strcmp(parameter_name, "network_name") == 0)
-          HARDBUG(fprintf(fcsv, ",\"%s\"", options.network_name) < 0)
-        else
-          HARDBUG(fprintf(fcsv, ",\"%s\"", svalue) < 0)
+        HARDBUG(fprintf(fcsv, ",\"%s\"", svalue) < 0)
 
         nfound++;
       }
@@ -2866,6 +2927,14 @@ int main(int argc, char **argv)
   PRINTF("sizeof(long)=%lld\n", (i64_t)sizeof(long));
   PRINTF("sizeof(long long)=%lld\n", (i64_t)sizeof(long long));
 
+#if SCORE_T == SCORE_T_INT
+  PRINTF("score_t is an INT\n");
+#elif SCORE_T == SCORE_T_FLOAT
+  PRINTF("score_t is a FLOAT\n");
+#else
+#error unknown SCORE_T
+#endif
+
   PRINTF("physical_memory=%d MBYTE\n", physical_memory);
 
   PRINTF("physical_cpus=%d\n", physical_cpus);
@@ -2899,8 +2968,8 @@ int main(int argc, char **argv)
 
   PRINTF_CFG_I(verbose);
 
-  PRINTF_CFG_S(networks);
-  PRINTF_CFG_S(network_name);
+  PRINTF_CFG_S(network0);
+  PRINTF_CFG_S(network1);
   PRINTF_CFG_I(network_evaluation_min);
   PRINTF_CFG_I(network_evaluation_max);
   PRINTF_CFG_I(network_evaluation_time);
@@ -2930,38 +2999,33 @@ int main(int argc, char **argv)
 
   PRINTF_CFG_B(material_only);
 
-  PRINTF_CFG_B(captures_are_transparent);
-  PRINTF_CFG_B(returned_depth_includes_captures);
-
   PRINTF_CFG_I(quiescence_evaluation_policy);
   PRINTF_CFG_I(quiescence_combination_length);
-  PRINTF_CFG_I(quiescence_extension_search_window);
-  PRINTF_CFG_I(quiescence_capture_extensions);
 
   PRINTF_CFG_I(pv_combination_length);
-  PRINTF_CFG_I(pv_extension_search_window);
 
-  PRINTF_CFG_I(aspiration_window);
   PRINTF_CFG_I(best_score_margin);
+  PRINTF_CFG_I(aspiration_margin);
+  PRINTF_CFG_I(research_margin);
 
   PRINTF_CFG_B(use_reductions);
 
   PRINTF_CFG_I(reduction_depth_root);
   PRINTF_CFG_I(reduction_depth_leaf);
-  PRINTF_CFG_I(reduction_moves_min);
   PRINTF_CFG_I(reduction_combination_length);
-
   PRINTF_CFG_I(reduction_full_min);
   PRINTF_CFG_I(reduction_percentage);
+  PRINTF_CFG_I(reduction_margin);
 
-  PRINTF_CFG_B(use_single_reply_extensions);
+  PRINTF_CFG_I(singular_probe_depth);
+  PRINTF_CFG_I(singular_probe_margin);
+  PRINTF_CFG_I(singular_probe_percentage);
+  PRINTF_CFG_I(singular_extension_moves);
 
   PRINTF_CFG_B(sync_clock);
 
   PRINTF_CFG_I64(alpha_beta_cache_size);
-  PRINTF_CFG_I(alpha_beta_cache_depth_margin);
-  PRINTF_CFG_I(pv_cache_fraction);
-  PRINTF_CFG_B(pv2cache);
+  PRINTF_CFG_B(cache_draw_results);
 
   PRINTF_CFG_I64(score_cache_size);
 
@@ -3005,8 +3069,7 @@ int main(int argc, char **argv)
          my_mpi_globals.MMG_nglobal,
          my_mpi_globals.MMG_id_global);
 
-  if (((my_mpi_globals.MMG_nslaves > 0) and
-       (my_mpi_globals.MMG_id_slave == INVALID)) or
+  if ((my_mpi_globals.MMG_is_master and my_mpi_globals.MMG_has_slaves) or
       RUNNING_ON_VALGRIND)
   {
     options.alpha_beta_cache_size = 128;
@@ -3031,34 +3094,36 @@ int main(int argc, char **argv)
 
   HARDBUG(options.quiescence_evaluation_policy < 0)
   HARDBUG(options.quiescence_combination_length < 0)
-  HARDBUG(options.quiescence_extension_search_window < 0)
-  HARDBUG(options.quiescence_capture_extensions < 0)
 
   HARDBUG(options.pv_combination_length < 0)
-  HARDBUG(options.pv_extension_search_window < 0)
 
-  HARDBUG(options.aspiration_window < 1)
   HARDBUG(options.best_score_margin < 0)
+  HARDBUG(options.aspiration_margin < 1)
+  HARDBUG(options.research_margin < 1)
 
   HARDBUG(options.alpha_beta_cache_size < 0)
-  HARDBUG(options.alpha_beta_cache_depth_margin < 0)
 
   HARDBUG(options.reduction_depth_root < 0)
   HARDBUG(options.reduction_depth_leaf < 0)
-  HARDBUG(options.reduction_moves_min < 0)
   HARDBUG(options.reduction_combination_length < 0)
-
   HARDBUG(options.reduction_percentage < 1)
   HARDBUG(options.reduction_percentage > 99)
+  HARDBUG(options.reduction_margin < 0)
+
+  HARDBUG(options.singular_probe_depth < 0)
+  HARDBUG(options.singular_probe_margin < 0)
+  HARDBUG(options.singular_probe_percentage < 1)
+  HARDBUG(options.singular_probe_percentage > 99)
+  HARDBUG(options.singular_extension_moves < 2)
 
   INIT_PROFILE
 
   // BEGIN_BLOCK("main-init")
 
-  if (my_mpi_globals.MMG_nglobal > 0)
+  if (my_mpi_globals.MMG_init)
     test_my_mpi();
 
-  construct_my_random(&main_random, 0);
+  construct_my_random(&main_random, NULL);
 
   init_utils();
 
@@ -3082,6 +3147,7 @@ int main(int argc, char **argv)
   init_search();
 
   check_my_malloc();
+
   // END_BLOCK
 
   // BEGIN_BLOCK("main-tests")
@@ -3104,6 +3170,8 @@ int main(int argc, char **argv)
   if (options.use_book)
     open_book();
   // FATAL("test_book", EXIT_FAILURE)
+
+  test_networks();
 
   test_utils();
 
@@ -3187,16 +3255,10 @@ int main(int argc, char **argv)
   {
     iarg++;
 
-    HARDBUG(argv[iarg] == NULL)
+    if (argv[iarg] == NULL)
+      FATAL("<name> <mcts_depth> <mcts_time_limit> <nshoot_outs>", EXIT_FAILURE)
 
     char *name = argv[iarg];
-
-    iarg++;
-    HARDBUG(argv[iarg] == NULL)
-
-    int nshoot_outs;
-
-    HARDBUG(my_sscanf(argv[iarg], "%d", &nshoot_outs) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -3212,10 +3274,16 @@ int main(int argc, char **argv)
 
     HARDBUG(my_sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
 
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+
+    int nshoot_outs;
+
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nshoot_outs) != 1)
+
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
-      solve_problems_mcts(name, nshoot_outs, mcts_depth, mcts_time_limit);
+      solve_problems_mcts(name, mcts_depth, mcts_time_limit, nshoot_outs);
     }
   }
   else if (compat_strcasecmp(argv[iarg], "solve_problems_multi_threaded") == 0)
@@ -3257,8 +3325,7 @@ int main(int argc, char **argv)
     else
       HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((my_mpi_globals.MMG_nslaves < 1) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
       cJSON *hub_server_client =
         cJSON_GetObjectItem(overrides_json, options.hub_server_client);
@@ -3449,8 +3516,7 @@ int main(int argc, char **argv)
              npieces,
              probability_one_king(npieces));
 
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
       gen_random(fen_name, npositions_max, nkings_max, mcts_time_limit);
   }
   else if (compat_strcasecmp(argv[iarg], "read_games") == 0)
@@ -3501,8 +3567,7 @@ int main(int argc, char **argv)
     if (argv[iarg] != NULL)
       HARDBUG(my_sscanf(argv[iarg], "%d", &arg_add_moves) != 1)
 
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
       my_sqlite3_t db;
 
@@ -3539,8 +3604,7 @@ int main(int argc, char **argv)
 
     my_sqlite3_t db;
 
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
       construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
 
@@ -3563,6 +3627,35 @@ int main(int argc, char **argv)
 
     walk_book(db_name, fen);
   }
+  else if (compat_strcasecmp(argv[iarg], "auto_play") == 0)
+  {
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+
+    char *txt_name;
+
+    txt_name = argv[iarg];
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+
+    i64_t npositions;
+
+    HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
+
+    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
+
+    HARDBUG(memory_slaves >= physical_memory)
+
+    // int nthreads_slaves =
+    //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
+    // HARDBUG(nthreads_slaves > physical_cpus)
+
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
+    {
+      auto_play(txt_name, npositions);
+    }
+  }
   else if (compat_strcasecmp(argv[iarg], "gen_db") == 0)
   {
     iarg++;
@@ -3575,16 +3668,16 @@ int main(int argc, char **argv)
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
-    i64_t npositions;
+    int mcts_depth;
 
-    HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
     iarg++;
     HARDBUG(argv[iarg] == NULL)
 
-    int mcts_depth;
+    i64_t npositions;
 
-    HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
+    HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
 
     int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
 
@@ -3594,55 +3687,18 @@ int main(int argc, char **argv)
     //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     // HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
       my_sqlite3_t db;
 
       construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
 
-      gen_db(&db, npositions, mcts_depth);
+      gen_db(&db, mcts_depth, npositions);
 
       close_my_sqlite3(&db);
     }
   }
   else if (compat_strcasecmp(argv[iarg], "update_db") == 0)
-  {
-    iarg++;
-    HARDBUG(argv[iarg] == NULL)
-
-    char *db_name;
-
-    db_name = argv[iarg];
-
-    iarg++;
-    HARDBUG(argv[iarg] == NULL)
-
-    int mcts_depth;
-
-    HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
-
-    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
-
-    HARDBUG(memory_slaves >= physical_memory)
-
-    // int nthreads_slaves =
-    //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-    // HARDBUG(nthreads_slaves > physical_cpus)
-
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
-    {
-      my_sqlite3_t db;
-
-      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
-
-      update_db(&db, mcts_depth);
-
-      close_my_sqlite3(&db);
-    }
-  }
-  else if (compat_strcasecmp(argv[iarg], "update_db_v2") == 0)
   {
     iarg++;
     HARDBUG(argv[iarg] == NULL)
@@ -3673,14 +3729,13 @@ int main(int argc, char **argv)
     //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     // HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
       my_sqlite3_t db;
 
       construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
 
-      update_db_v2(&db, mcts_depth, frequency);
+      update_db(&db, mcts_depth, frequency);
 
       close_my_sqlite3(&db);
     }
@@ -3836,8 +3891,7 @@ int main(int argc, char **argv)
     //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     // HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
       fen2network(fen_name, npositions);
     }
@@ -3874,8 +3928,7 @@ int main(int argc, char **argv)
     //   options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
     // HARDBUG(nthreads_slaves > physical_cpus)
 
-    if ((my_mpi_globals.MMG_nslaves == 0) or
-        (my_mpi_globals.MMG_id_slave != INVALID))
+    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
       fen2csv(argv[iarg], npieces_min, npieces_max);
     }
@@ -3976,7 +4029,7 @@ int main(int argc, char **argv)
 
 label_hub:
 
-  if (my_mpi_globals.MMG_nglobal > 0)
+  if (my_mpi_globals.MMG_init > 0)
     my_mpi_barrier_v3("main",
                       my_mpi_globals.MMG_comm_global,
                       my_mpi_globals.MMG_semkey_main_barrier,

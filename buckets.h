@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef BucketsH
 #define BucketsH
 
@@ -23,12 +23,12 @@ typedef struct
   i64_t *buckets;
 } bucket_t;
 
-void clear_bucket(void *);
-void update_bucket(void *, double);
-void printf_bucket(void *);
-void construct_bucket(void *, char *, double, double, double, int);
+void clear_bucket(bucket_t *);
+void update_bucket(bucket_t *, double);
+void printf_bucket(bucket_t *);
+void construct_bucket(bucket_t *, char *, double, double, double, int);
 
-void my_mpi_bucket_aggregate(void *, MPI_Comm);
+void my_mpi_bucket_aggregate(bucket_t *, MPI_Comm);
 
 void test_buckets(void);
 

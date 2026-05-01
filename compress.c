@@ -1,4 +1,4 @@
-// SCU REVISION 8.1181 zo  8 feb 2026 10:04:41 CET
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #include <zstd.h>
@@ -40,41 +40,46 @@ local ui32_t return_crc32_data(ui64_t *a)
   return (crc32);
 }
 
-local void construct_compressed_file(compressed_file_t *self, i64_t arg_nblocks)
+local void
+construct_compressed_file(compressed_file_t *arg_with_compressed_file,
+                          i64_t arg_nblocks)
 {
   HARDBUG(arg_nblocks < 1)
 
-  compressed_file_t *object = self;
+  arg_with_compressed_file->CF_nblocks = arg_nblocks;
 
-  object->CF_nblocks = arg_nblocks;
+  MY_MALLOC_BY_TYPE(arg_with_compressed_file->CF_blocks,
+                    compressed_block_t,
+                    arg_with_compressed_file->CF_nblocks)
 
-  MY_MALLOC_BY_TYPE(object->CF_blocks, compressed_block_t, object->CF_nblocks)
-
-  for (i64_t iblock = 0; iblock < object->CF_nblocks; iblock++)
+  for (i64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
+       iblock++)
   {
-    compressed_block_t *with = object->CF_blocks + iblock;
+    compressed_block_t *with_compressed_block =
+      arg_with_compressed_file->CF_blocks + iblock;
 
-    with->CB_ldata_compressed = 0;
-    with->CB_data_compressed = NULL;
-    with->CB_crc32_data = 0;
+    with_compressed_block->CB_ldata_compressed = 0;
+    with_compressed_block->CB_data_compressed = NULL;
+    with_compressed_block->CB_crc32_data = 0;
   }
 
-  object->CF_data_compressed = NULL;
+  arg_with_compressed_file->CF_data_compressed = NULL;
 }
 
-local void add_block(compressed_file_t *self, i64_t iblock, i8_t *arg_data)
+local void add_block(compressed_file_t *arg_with_compressed_file,
+                     i64_t iblock,
+                     i8_t *arg_data)
 {
-  compressed_file_t *object = self;
-
   HARDBUG(iblock < 0)
-  HARDBUG(iblock >= object->CF_nblocks)
+  HARDBUG(iblock >= arg_with_compressed_file->CF_nblocks)
 
-  compressed_block_t *with = object->CF_blocks + iblock;
+  compressed_block_t *with_compressed_block =
+    arg_with_compressed_file->CF_blocks + iblock;
 
-  HARDBUG(with->CB_ldata_compressed != 0)
-  HARDBUG(with->CB_data_compressed != NULL)
+  HARDBUG(with_compressed_block->CB_ldata_compressed != 0)
+  HARDBUG(with_compressed_block->CB_data_compressed != NULL)
 
-  with->CB_crc32_data = return_crc32_data((ui64_t *)arg_data);
+  with_compressed_block->CB_crc32_data = return_crc32_data((ui64_t *)arg_data);
 
   i8_t data_compressed[2 * BLOCK_LENGTH];
 
@@ -90,18 +95,21 @@ local void add_block(compressed_file_t *self, i64_t iblock, i8_t *arg_data)
 
   int ldata_compressed = zstd_size;
 
-  MY_MALLOC_BY_TYPE(with->CB_data_compressed, i8_t, ldata_compressed);
+  MY_MALLOC_BY_TYPE(with_compressed_block->CB_data_compressed,
+                    i8_t,
+                    ldata_compressed);
 
-  with->CB_ldata_compressed = ldata_compressed;
+  with_compressed_block->CB_ldata_compressed = ldata_compressed;
 
-  memcpy(with->CB_data_compressed, data_compressed, ldata_compressed);
+  memcpy(with_compressed_block->CB_data_compressed,
+         data_compressed,
+         ldata_compressed);
 }
 
-local void save_compressed_file(compressed_file_t *self, bstring bname)
+local void save_compressed_file(compressed_file_t *arg_with_compressed_file,
+                                bstring bname)
 {
-  compressed_file_t *object = self;
-
-  HARDBUG(object->CF_nblocks < 1)
+  HARDBUG(arg_with_compressed_file->CF_nblocks < 1)
 
   FILE *fcompressed;
 
@@ -109,18 +117,23 @@ local void save_compressed_file(compressed_file_t *self, bstring bname)
 
   // offsets
 
-  object->CF_blocks[0].CB_offset = 0;
+  arg_with_compressed_file->CF_blocks[0].CB_offset = 0;
 
-  for (i64_t iblock = 1; iblock < object->CF_nblocks; iblock++)
+  for (i64_t iblock = 1; iblock < arg_with_compressed_file->CF_nblocks;
+       iblock++)
   {
-    object->CF_blocks[iblock].CB_offset =
-      object->CF_blocks[iblock - 1].CB_offset +
-      object->CF_blocks[iblock - 1].CB_ldata_compressed;
+    arg_with_compressed_file->CF_blocks[iblock].CB_offset =
+      arg_with_compressed_file->CF_blocks[iblock - 1].CB_offset +
+      arg_with_compressed_file->CF_blocks[iblock - 1].CB_ldata_compressed;
   }
 
   i64_t ldata_compressed =
-    object->CF_blocks[object->CF_nblocks - 1].CB_offset +
-    object->CF_blocks[object->CF_nblocks - 1].CB_ldata_compressed;
+    arg_with_compressed_file
+      ->CF_blocks[arg_with_compressed_file->CF_nblocks - 1]
+      .CB_offset +
+    arg_with_compressed_file
+      ->CF_blocks[arg_with_compressed_file->CF_nblocks - 1]
+      .CB_ldata_compressed;
 
   PRINTF("ldata_compressed=%lld\n", ldata_compressed);
 
@@ -134,27 +147,30 @@ local void save_compressed_file(compressed_file_t *self, bstring bname)
 
   FWRITE(fcompressed, &level, i8_t, 1)
 
-  FWRITE(fcompressed, &(object->CF_nblocks), i64_t, 1)
+  FWRITE(fcompressed, &(arg_with_compressed_file->CF_nblocks), i64_t, 1)
 
   FWRITE(fcompressed, &ldata_compressed, i64_t, 1)
 
   // data
 
-  FWRITE(fcompressed, object->CF_blocks, compressed_block_t, object->CF_nblocks)
+  FWRITE(fcompressed,
+         arg_with_compressed_file->CF_blocks,
+         compressed_block_t,
+         arg_with_compressed_file->CF_nblocks)
 
-  for (i64_t iblock = 0; iblock < object->CF_nblocks; iblock++)
+  for (i64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
+       iblock++)
     FWRITE(fcompressed,
-           object->CF_blocks[iblock].CB_data_compressed,
+           arg_with_compressed_file->CF_blocks[iblock].CB_data_compressed,
            i8_t,
-           object->CF_blocks[iblock].CB_ldata_compressed);
+           arg_with_compressed_file->CF_blocks[iblock].CB_ldata_compressed);
 
   FCLOSE(fcompressed)
 }
 
-local void load_compressed_file(compressed_file_t *self, bstring bname)
+local void load_compressed_file(compressed_file_t *arg_with_compressed_file,
+                                bstring bname)
 {
-  compressed_file_t *object = self;
-
   FILE *fcompressed;
 
   HARDBUG((fcompressed = fopen(bdata(bname), "rb")) == NULL)
@@ -173,9 +189,9 @@ local void load_compressed_file(compressed_file_t *self, bstring bname)
 
   HARDBUG(level != ZSTD_LEVEL)
 
-  FREAD(fcompressed, &(object->CF_nblocks), i64_t, 1)
+  FREAD(fcompressed, &(arg_with_compressed_file->CF_nblocks), i64_t, 1)
 
-  HARDBUG(object->CF_nblocks < 1)
+  HARDBUG(arg_with_compressed_file->CF_nblocks < 1)
 
   i64_t ldata_compressed;
 
@@ -183,43 +199,54 @@ local void load_compressed_file(compressed_file_t *self, bstring bname)
 
   HARDBUG(ldata_compressed < 1)
 
-  MY_MALLOC_BY_TYPE(object->CF_blocks, compressed_block_t, object->CF_nblocks)
+  MY_MALLOC_BY_TYPE(arg_with_compressed_file->CF_blocks,
+                    compressed_block_t,
+                    arg_with_compressed_file->CF_nblocks)
 
-  FREAD(fcompressed, object->CF_blocks, compressed_block_t, object->CF_nblocks)
+  FREAD(fcompressed,
+        arg_with_compressed_file->CF_blocks,
+        compressed_block_t,
+        arg_with_compressed_file->CF_nblocks)
 
-  MY_MALLOC_BY_TYPE(object->CF_data_compressed, i8_t, ldata_compressed)
+  MY_MALLOC_BY_TYPE(arg_with_compressed_file->CF_data_compressed,
+                    i8_t,
+                    ldata_compressed)
 
-  FREAD(fcompressed, object->CF_data_compressed, i8_t, ldata_compressed)
+  FREAD(fcompressed,
+        arg_with_compressed_file->CF_data_compressed,
+        i8_t,
+        ldata_compressed)
 
   FCLOSE(fcompressed)
 
   PRINTF("verifying..\n");
 
-  for (i64_t iblock = 0; iblock < object->CF_nblocks; iblock++)
+  for (i64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
+       iblock++)
   {
     i8_t data_uncompressed[BLOCK_LENGTH];
 
     size_t zstd_size = ZSTD_decompress(
       data_uncompressed,
       BLOCK_LENGTH,
-      object->CF_data_compressed + object->CF_blocks[iblock].CB_offset,
-      object->CF_blocks[iblock].CB_ldata_compressed);
+      arg_with_compressed_file->CF_data_compressed +
+        arg_with_compressed_file->CF_blocks[iblock].CB_offset,
+      arg_with_compressed_file->CF_blocks[iblock].CB_ldata_compressed);
 
     HARDBUG(ZSTD_isError(zstd_size))
 
     HARDBUG(zstd_size != BLOCK_LENGTH)
 
     HARDBUG(return_crc32_data((ui64_t *)data_uncompressed) !=
-            object->CF_blocks[iblock].CB_crc32_data)
+            arg_with_compressed_file->CF_blocks[iblock].CB_crc32_data)
   }
 
   PRINTF("..OK\n");
 }
 
-local i8_t read_compressed_file(compressed_file_t *self, i64_t where)
+local i8_t read_compressed_file(compressed_file_t *arg_with_compressed_file,
+                                i64_t where)
 {
-  compressed_file_t *object = self;
-
   i64_t iblock = where / BLOCK_LENGTH;
 
   // uncompress iblock
@@ -229,15 +256,16 @@ local i8_t read_compressed_file(compressed_file_t *self, i64_t where)
   size_t zstd_size = ZSTD_decompress(
     data_uncompressed,
     BLOCK_LENGTH,
-    object->CF_data_compressed + object->CF_blocks[iblock].CB_offset,
-    object->CF_blocks[iblock].CB_ldata_compressed);
+    arg_with_compressed_file->CF_data_compressed +
+      arg_with_compressed_file->CF_blocks[iblock].CB_offset,
+    arg_with_compressed_file->CF_blocks[iblock].CB_ldata_compressed);
 
   HARDBUG(ZSTD_isError(zstd_size))
 
   HARDBUG(zstd_size != BLOCK_LENGTH)
 
   HARDBUG(return_crc32_data((ui64_t *)data_uncompressed) !=
-          object->CF_blocks[iblock].CB_crc32_data)
+          arg_with_compressed_file->CF_blocks[iblock].CB_crc32_data)
 
   return (data_uncompressed[where % BLOCK_LENGTH]);
 }
