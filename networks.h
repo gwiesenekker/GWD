@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #ifndef NetworksH
 #define NetworksH
 
@@ -12,19 +12,17 @@
 #define NETWORK_ARCHITECTURE_ADD 1
 #define NETWORK_ARCHITECTURE_CONCAT 2
 
-#define NETWORK_ACTIVATION_RELU6 1
+#define NETWORK_ACTIVATION_RELU 1
 #define NETWORK_ACTIVATION_TANH 2
 #define NETWORK_ACTIVATION_RSQRT 3
 #define NETWORK_ACTIVATION_GELU 4
 #define NETWORK_ACTIVATION_GELUV2 5
 #define NETWORK_ACTIVATION_LINEAR 6
 #define NETWORK_ACTIVATION_LOGITS 7
+#define NETWORK_ACTIVATION_2HEADS 8
 
 #define NINPUTS_MAX 2048
 #define NLAYERS_MAX 8
-
-#define DELTA_MAN_MAX 10
-#define DELTA_KING_MAX 5
 
 typedef struct
 {
@@ -33,6 +31,7 @@ typedef struct
 
   scaled_double_t **LS_weights_noutputsxninputs;
   scaled_double_t **LS_weights_ninputsxnoutputs;
+
   scaled_double_t *LS_bias;
 } layer_shared_t;
 
@@ -67,8 +66,6 @@ typedef struct
 
   bstring N_bshape;
 
-  int N_loaded;
-
   double N_network2material_score;
   int N_architecture_patterns;
   int N_architecture_material;
@@ -80,7 +77,6 @@ typedef struct
 
   patterns_shared_t N_patterns_shared;
   materials_shared_t N_materials_shared;
-  signals_shared_t N_signals_shared;
 
   dense_network_shared_t N_pattern_dense_network_shared;
   dense_network_shared_t N_material_dense_network_shared;
@@ -100,6 +96,8 @@ extern network_t networks[NETWORKS_MAX];
 void construct_network_state(network_state_t *, int, int);
 int base3_index(const int32_t *, int);
 int base3_index_v2(board_t *, ui64_t);
+int base3_index_v3(board_t *, ui64_t);
+int base3_index_v4(board_t *, ui64_t);
 
 void vcopy_a2b(int n, scaled_double_t *, scaled_double_t *);
 void vadd_ab2a(int, scaled_double_t *restrict, scaled_double_t *restrict);

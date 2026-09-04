@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #include "globals.h"
 
 #define THREAD_ALPHA_BETA_MASTER 0
@@ -282,7 +282,7 @@ local void thread_func_alpha_beta_master(void *self)
                      bmove_string);
 
         HARDBUG(bformata(btext,
-                         "%s " PRINTF_SCORE_T " %d",
+                         "%s " PRINTF_SCORE_T_RAW " %d",
                          bdata(bmove_string),
                          arg_with_thread->T_search.S_best_score,
                          arg_with_thread->T_search.S_best_depth) == BSTR_ERR)
@@ -302,6 +302,63 @@ local void thread_func_alpha_beta_master(void *self)
                     MESSAGE_ABORT_SEARCH,
                     bdata(message.message_text));
         }
+      }
+      else if (message.message_id == MESSAGE_MCTS)
+      {
+        my_printf(&(arg_with_thread->T_my_printf),
+                  "got MCTS message %s\n",
+                  bdata(message.message_text));
+
+        // single threaded
+
+        board_t *with_board = &(arg_with_thread->T_search.S_board);
+
+        print_board(&(arg_with_thread->T_search.S_board));
+
+        moves_list_t moves_list;
+
+        construct_moves_list(&moves_list);
+
+        gen_moves(with_board, &moves_list);
+
+        HARDBUG(moves_list.ML_nmoves == 0)
+
+        check_moves(with_board, &moves_list);
+
+        stop_my_timer(&(arg_with_thread->T_idle_timer));
+        start_my_timer(&(arg_with_thread->T_busy_timer));
+
+        int nshoot_outs = 1000000;
+
+        double wilson_lcb;
+        double wilson_ucb;
+
+        double result = mcts_shoot_outs(&(arg_with_thread->T_search),
+                                        2,
+                                        0,
+                                        -options.time_limit,
+                                        &nshoot_outs,
+                                        NULL,
+                                        NULL,
+                                        NULL,
+                                        &wilson_lcb,
+                                        &wilson_ucb,
+                                        FALSE);
+
+        stop_my_timer(&(arg_with_thread->T_busy_timer));
+        start_my_timer(&(arg_with_thread->T_idle_timer));
+
+        // message_t *sent[NTHREADS_MAX];
+
+        BSTRING(btext)
+
+        HARDBUG(
+          bformata(btext, "%.6f %.6f %.6f", result, wilson_lcb, wilson_ucb) ==
+          BSTR_ERR)
+
+        enqueue(&main_queue, MESSAGE_RESULT, bdata(btext));
+
+        BDESTROY(btext)
       }
       else
         FATAL("message.message_id error", EXIT_FAILURE)
@@ -393,6 +450,10 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
           if (message.message_id == MESSAGE_ABORT_SEARCH)
             break;
 
+          my_printf(&(arg_with_thread->T_my_printf),
+                    "message.message_id=%d\n",
+                    message.message_id);
+
           BSTRING(bmove_string)
 
           CSTRING(cmove_string, blength(message.message_text))
@@ -403,7 +464,7 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
           int minimal_window;
 
           HARDBUG(my_sscanf(bdata(message.message_text),
-                            "%s%d%d" SCANF_SCORE_T "%d",
+                            "%s%d%d" SCANF_SCORE_T_RAW "%d",
                             cmove_string,
                             &depth_min,
                             &depth_max,
@@ -454,7 +515,7 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
                       bdata(bmove_string),
                       depth_min,
                       depth_max,
-                      root_score,
+                      SCORE2PRINTF(root_score),
                       minimal_window);
 
             clear_totals(&(arg_with_thread->T_search));
@@ -485,7 +546,7 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
                       bdata(bmove_string),
                       depth_min,
                       depth_max,
-                      root_score,
+                      SCORE2PRINTF(root_score),
                       minimal_window);
 
             do_move(with_board, imove, &moves_list);
@@ -529,7 +590,7 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
                       bdata(bmove_string),
                       depth_min,
                       depth_max,
-                      root_score,
+                      SCORE2PRINTF(root_score),
                       minimal_window);
 
             if (moves_list.ML_nmoves > 1)
@@ -638,12 +699,6 @@ local void create_thread(void *self, int arg_role)
   arg_with_thread->thread_role = arg_role;
 
   construct_my_printf(&(arg_with_thread->T_my_printf), "log", FALSE);
-
-  ui64_t seed;
-
-  construct_my_random(&(arg_with_thread->T_random), &seed);
-
-  my_printf(&(arg_with_thread->T_my_printf), "create_thread seed=%llX\n", seed);
 
   BSTRING(queue_name)
 

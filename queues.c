@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #include "globals.h"
 
 void construct_queue(queue_t *arg_with_queue,
@@ -18,27 +18,58 @@ void construct_queue(queue_t *arg_with_queue,
   arg_with_queue->Q_length_max = 0;
 
   HARDBUG(compat_mutex_init(&(arg_with_queue->Q_mutex)) != 0)
+
+  ui64_t seed;
+
+  construct_my_random(&(arg_with_queue->Q_my_random), &seed);
+
+  PRINTF("construct_queue arg_queue_name=%s"
+         " seed=%llX\n",
+         arg_queue_name,
+         seed);
 }
 
 void enqueue(queue_t *arg_with_queue,
              int arg_message_id,
              char *arg_message_text)
 {
-  HARDBUG(compat_mutex_lock(&(arg_with_queue->Q_mutex)) != 0)
+  progress_t progress;
 
-  // nread, nwrite
-  // 0      -1     : 0 messages in queue
-  // 0      0      : 1 message in queue
-  // 0      1      : 2 messages in queue
-  // number of messages = (nwrite - nread + 1)
+  construct_progress(&progress, "enqueue", 0, 10);
 
-  if ((arg_with_queue->Q_nwrite - arg_with_queue->Q_nread + 1) >= NMESSAGES_MAX)
+  while (TRUE)
   {
-    my_printf(arg_with_queue->Q_my_printf,
-              "Q_name=%s",
-              bdata(arg_with_queue->Q_name));
+    (void)make_progress(&progress, 0);
 
-    FATAL("NMESSAGE_MAX", EXIT_FAILURE)
+    HARDBUG(compat_mutex_lock(&(arg_with_queue->Q_mutex)) != 0)
+
+    // nread, nwrite
+    // 0      -1     : 0 messages in queue
+    // 0      0      : 1 message in queue
+    // 0      1      : 2 messages in queue
+    // number of messages = (nwrite - nread + 1)
+
+    if ((arg_with_queue->Q_nwrite - arg_with_queue->Q_nread + 1) <
+        NMESSAGES_MAX)
+      break;
+
+    double delay = delay =
+      (1.0 + return_my_random(&(arg_with_queue->Q_my_random)) % 1000) *
+      MICRO_SECOND;
+
+    if ((return_ndone(&progress) % 1000) == 0)
+    {
+      PRINTF("queue full arg_message_text=%s"
+             " return_ndone(&progress)=%lld"
+             " delay=%.6f\n",
+             arg_message_text,
+             return_ndone(&progress),
+             delay);
+    }
+
+    compat_sleep(delay);
+
+    HARDBUG(compat_mutex_unlock(&(arg_with_queue->Q_mutex)) != 0)
   }
 
   arg_with_queue->Q_nwrite++;

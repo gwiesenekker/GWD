@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 /*
  * xxHash - Extremely Fast Hash algorithm
  * Header File

@@ -1,0 +1,19 @@
+# Ignore everything in the development directory by default.
+/*
+
+# Version-controlled source and documentation.
+!/*.c
+!/*.h
+!/*.cpp
+!/*.py
+!/Makefile
+!/README.md
+!/LICENSE
+
+/fen2pdn.py
+/network2json.py
+
+# Development configuration.
+!/.clang-format
+!/.clang-tidy
+!/.gitignore

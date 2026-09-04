@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #include "globals.h"
 
 typedef struct
@@ -11,6 +11,19 @@ typedef struct
 local i64_t nscore_cache_entries;
 local score_cache_slot_t score_cache_slot_default;
 local score_cache_slot_t *score_cache[NCOLOUR_ENUM];
+
+static inline void vadd_ab2a16(float *restrict a,
+                          const float *restrict b)
+{
+  __m256 a0 = _mm256_load_ps(a);
+  __m256 a1 = _mm256_load_ps(a + 8);
+
+  a0 = _mm256_add_ps(a0, _mm256_loadu_ps(b));
+  a1 = _mm256_add_ps(a1, _mm256_loadu_ps(b + 8));
+
+  _mm256_store_ps(a, a0);
+  _mm256_store_ps(a + 8, a1);
+}
 
 local int probe_score_cache(search_t *arg_with_search,
                             score_cache_slot_t *arg_score_cache,
@@ -50,10 +63,56 @@ local void update_score_cache(search_t *arg_with_search,
 
 #undef GEN_CSV
 
+static inline uint64_t mirror_bb(uint64_t bb)
+{
+  ui64_t result;
+
+  result = (bb >> 6);
+
+  result = BIT_REVERSE(result) >> (64 - 54);
+
+  result = (result << 6);
+
+#ifdef DEBUG
+  ui64_t debug = 0;
+
+  while (bb)
+  {
+    int ifield = BIT_CTZ(bb);
+
+    bb &= ~BITULL(ifield);
+
+    debug |= 1ULL << (65 - ifield);
+  }
+
+  HARDBUG(debug != result)
+#endif
+
+  return (result);
+}
+
 score_t return_score_from_board(board_t *arg_with_board,
                                 double_t *arg_network_score_scaled)
 {
   score_t result = SCORE(0);
+
+  int mirror = FALSE;
+
+  if (IS_BLACK(arg_with_board->B_colour2move))
+  {
+    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_man_bb);
+    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_man_bb);
+    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_king_bb);
+    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_king_bb);
+
+    arg_with_board->B_white_man_bb = white_man_bb;
+    arg_with_board->B_black_man_bb = black_man_bb;
+    arg_with_board->B_white_king_bb = white_king_bb;
+    arg_with_board->B_black_king_bb = black_king_bb;
+
+    arg_with_board->B_colour2move = WHITE_ENUM;
+    mirror = TRUE;
+  }
 
   network_t *with_network = networks + arg_with_board->B_network_id;
 
@@ -89,75 +148,42 @@ score_t return_score_from_board(board_t *arg_with_board,
 
     if (with_pattern_shared->PS_id == PATTERN_BASE3_INDEX_ID)
     {
-      istate = base3_index_v2(arg_with_board, with_pattern_shared->PS_bb);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_MAN_ID)
-    {
-      istate = nwhite_man;
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_MAN_ID)
-    {
-      istate = nblack_man;
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_KING_ID)
-    {
-      istate = nwhite_king;
-
-      if (istate > PATTERN_NKING_MAX)
-        istate = PATTERN_NKING_MAX;
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_KING_ID)
-    {
-      istate = nblack_king;
-
-      if (istate > PATTERN_NKING_MAX)
-        istate = PATTERN_NKING_MAX;
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_WHITE_MOBILITY_ID)
-    {
-      istate = return_mobility(arg_with_board, WHITE_ENUM);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_BLACK_MOBILITY_ID)
-    {
-      istate = return_mobility(arg_with_board, BLACK_ENUM);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_WHITE_IMMOBILITY_ID)
-    {
-      istate = return_immobility(arg_with_board, WHITE_ENUM);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_BLACK_IMMOBILITY_ID)
-    {
-      istate = return_immobility(arg_with_board, BLACK_ENUM);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_KING_DIAGONAL_5_46_ID)
-    {
-      istate = BIT_COUNT(arg_with_board->B_white_king_bb & diagonal_5_46_bb);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_KING_DIAGONAL_5_46_ID)
-    {
-      istate = BIT_COUNT(arg_with_board->B_black_king_bb & diagonal_5_46_bb);
+      istate = base3_index_v4(arg_with_board, with_pattern_shared->PS_bb);
     }
 
     HARDBUG(istate == INVALID)
 
-    if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
-    {
-      vadd_ab2a(with_pattern_shared->PS_nembed,
-                network_state->NS_pattern_dense_network_state.DNS_inputs +
-                  with_pattern_shared->PS_offset,
-                with_pattern_shared->PS_weights_nstatesxnembed[istate]);
-    }
-    else
-    {
-      if (arg_network_score_scaled != NULL)
-        vcopy_a2b(with_pattern_shared->PS_nembed,
-                  with_pattern_shared->PS_weights_nstatesxnembed[istate],
-                  network_state->NS_pattern_dense_network_state.DNS_inputs +
-                    with_pattern_shared->PS_offset);
+    HARDBUG(istate < 0)
 
-      vadd_ab2a(with_current->LS_noutputs,
-                with_current_thread->LT_dot,
-                with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
+    istate = with_pattern_shared->PS_state_map[istate];
+
+    if (istate != INVALID)
+    {
+      if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
+      {
+if (with_pattern_shared->PS_nembed == 16)
+        vadd_ab2a16(
+                  network_state->NS_pattern_dense_network_state.DNS_inputs +
+                    with_pattern_shared->PS_offset,
+                  with_pattern_shared->PS_weights_nstatesxnembed[istate]);
+else
+        vadd_ab2a(with_pattern_shared->PS_nembed,
+                  network_state->NS_pattern_dense_network_state.DNS_inputs +
+                    with_pattern_shared->PS_offset,
+                  with_pattern_shared->PS_weights_nstatesxnembed[istate]);
+      }
+      else
+      {
+        if (arg_network_score_scaled != NULL)
+          vcopy_a2b(with_pattern_shared->PS_nembed,
+                    with_pattern_shared->PS_weights_nstatesxnembed[istate],
+                    network_state->NS_pattern_dense_network_state.DNS_inputs +
+                      with_pattern_shared->PS_offset);
+
+        vadd_ab2a(with_current->LS_noutputs,
+                  with_current_thread->LT_dot,
+                  with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
+      }
     }
   }
 
@@ -197,14 +223,16 @@ score_t return_score_from_board(board_t *arg_with_board,
       {
         istate = nblack_man;
       }
-      else if (with_material_shared->MS_id == MATERIAL_NWHITE_KING_ID)
+      else if ((with_material_shared->MS_id == MATERIAL_NWHITE_KING_ID) or
+               (with_material_shared->MS_id == MATERIAL_NWHITE_KING20_ID))
       {
         istate = nwhite_king;
 
         if (istate >= with_material_shared->MS_nstates)
           istate = with_material_shared->MS_nstates - 1;
       }
-      else if (with_material_shared->MS_id == MATERIAL_NBLACK_KING_ID)
+      else if ((with_material_shared->MS_id == MATERIAL_NBLACK_KING_ID) or
+               (with_material_shared->MS_id == MATERIAL_NBLACK_KING20_ID))
       {
         istate = nblack_king;
 
@@ -225,35 +253,17 @@ score_t return_score_from_board(board_t *arg_with_board,
                    (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
                  nblack_man * (MATERIAL_KING_MAX + 1) + mblack_king;
       }
-      else if (with_material_shared->MS_id == MATERIAL_WHITE_MOBILITY_ID)
-      {
-        istate = return_mobility(arg_with_board, WHITE_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_BLACK_MOBILITY_ID)
-      {
-        istate = return_mobility(arg_with_board, BLACK_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_WHITE_IMMOBILITY_ID)
-      {
-        istate = return_immobility(arg_with_board, WHITE_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_BLACK_IMMOBILITY_ID)
-      {
-        istate = return_immobility(arg_with_board, BLACK_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_WHITE_UNSUPPORTED_ID)
-      {
-        istate = return_unsupported(arg_with_board, WHITE_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_BLACK_UNSUPPORTED_ID)
-      {
-        istate = return_unsupported(arg_with_board, BLACK_ENUM);
-      }
 
       HARDBUG(istate == INVALID)
 
       if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
       {
+if (with_material_shared->MS_nembed == 16)
+        vadd_ab2a16(
+                  network_state->NS_material_dense_network_state.DNS_inputs +
+                    with_material_shared->MS_offset,
+                  with_material_shared->MS_weights_nstatesxnembed[istate]);
+else
         vadd_ab2a(with_material_shared->MS_nembed,
                   network_state->NS_material_dense_network_state.DNS_inputs +
                     with_material_shared->MS_offset,
@@ -314,73 +324,6 @@ score_t return_score_from_board(board_t *arg_with_board,
           .LS_noutputs);
   }
 
-  for (int isignal = 0; isignal < with_network->N_signals_shared.SS_nsignals;
-       isignal++)
-  {
-    signal_shared_t *with_signal_shared =
-      with_network->N_signals_shared.SS_signals + isignal;
-
-    if (with_signal_shared->SS_id == SIGNAL_NULL_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = 0.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NWHITE_MAN_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = (float)nwhite_man / 20.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NBLACK_MAN_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = (float)nblack_man / 20.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NWHITE_KING_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = (float)nwhite_king / 20.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NBLACK_KING_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = (float)nblack_king / 20.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NPIECES_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        (float)(nwhite_man + nblack_man + nwhite_king + nblack_king) / 40.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NWHITE_KING_DIAGONAL_5_46_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        (float)BIT_COUNT(arg_with_board->B_white_king_bb & diagonal_5_46_bb) /
-        10.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NBLACK_KING_DIAGONAL_5_46_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        (float)BIT_COUNT(arg_with_board->B_black_king_bb & diagonal_5_46_bb) /
-        10.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_24_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        return_signal_24(arg_with_board);
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_27_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        return_signal_27(arg_with_board);
-    }
-    else
-      FATAL("unknown with_signal_shared->SS_id", EXIT_FAILURE)
-  }
-
   network_score_scaled = return_dense_network_score_scaled(
     &(with_network->N_dense_network_shared),
     &(arg_with_board->B_network_state.NS_dense_network_state));
@@ -411,10 +354,34 @@ score_t return_score_from_board(board_t *arg_with_board,
   }
 #endif
 
+#if SCORE_T == SCORE_T_INT
   result = round(network_score_scaled * with_network->N_network2material_score);
+#elif SCORE_T == SCORE_T_FLOAT
+  result = round(network_score_scaled * with_network->N_network2material_score *
+                 SCORE(1));
+#else
+#error unknown SCORE_T
+#endif
 
-  if (IS_BLACK(arg_with_board->B_colour2move))
-    result = -result;
+  if (mirror)
+  {
+    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_man_bb);
+    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_man_bb);
+    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_king_bb);
+    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_king_bb);
+
+    arg_with_board->B_white_man_bb = white_man_bb;
+    arg_with_board->B_black_man_bb = black_man_bb;
+    arg_with_board->B_white_king_bb = white_king_bb;
+    arg_with_board->B_black_king_bb = black_king_bb;
+
+    arg_with_board->B_colour2move = BLACK_ENUM;
+  }
+
+  /*
+    if (IS_BLACK(arg_with_board->B_colour2move))
+      result = -result;
+  */
 
 #ifdef GEN_CSV
   if ((BIT_COUNT(arg_with_board->B_black_king_bb) == 0) and
@@ -428,8 +395,8 @@ score_t return_score_from_board(board_t *arg_with_board,
   }
 #endif
 
-  HARDBUG(IS_SCORE_LOST(result))
-  HARDBUG(IS_SCORE_WON(result))
+  if (IS_SCORE_LOST(result) or IS_SCORE_WON(result))
+    result = return_material_score(arg_with_board);
 
   return (result);
 }

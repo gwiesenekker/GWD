@@ -1,21 +1,18 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #ifndef MovesH
 #define MovesH
 
 #define NMOVES_MAX 128
-#define MOVE_STRING_MAX 128
 
 #define MOVE_DO_NOT_REDUCE_BIT BIT(0)
 #define MOVE_EXTEND_IN_QUIESCENCE_BIT BIT(1)
-#define MOVE_KING_BIT BIT(2)
 
 #define MOVE_DO_NOT_REDUCE(F) ((F) & MOVE_DO_NOT_REDUCE_BIT)
 #define MOVE_EXTEND_IN_QUIESCENCE(F) ((F) & MOVE_EXTEND_IN_QUIESCENCE_BIT)
-#define MOVE_KING(F) ((F) & MOVE_KING_BIT)
 
 typedef struct
 {
-  int M_from;
+  int M_move_from;
   int M_move_to;
   ui64_t M_captures_bb;
 } move_t;
@@ -25,18 +22,12 @@ typedef struct
   int ML_nmoves;
   int ML_ncaptx;
 
-  int ML_nblocked;
-  int ML_nsafe;
   move_t ML_moves[NMOVES_MAX];
 
-  int ML_move_weights[NMOVES_MAX];
   ui32_t ML_move_flags[NMOVES_MAX];
 } moves_list_t;
 
 void gen_moves(board_t *, moves_list_t *);
-int return_mobility(board_t *, colour_enum);
-int return_immobility(board_t *, colour_enum);
-int return_unsupported(board_t *, colour_enum);
 int can_capture(board_t *, int);
 void do_move(board_t *, int, moves_list_t *);
 void undo_move(board_t *, int, moves_list_t *);

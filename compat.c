@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #include "globals.h"
 
 #undef read
@@ -6,6 +6,7 @@
 #undef close
 #undef fork
 #undef pipe
+#undef lseek
 #undef fseeko
 #undef strcasecmp
 #undef poll
@@ -42,10 +43,17 @@ int compat_close(int fd)
 #endif
 }
 
-int compat_lock_file(char *fname)
+int compat_lock_file(char *fname, int append)
 {
+  int fd = -1;
 #if COMPAT_OS == COMPAT_OS_LINUX
-  int fd = open(fname, O_WRONLY | O_CREAT | O_APPEND, 0644);
+  if (append)
+    fd = open(fname, O_WRONLY | O_CREAT | O_APPEND, 0644);
+  else
+    fd = open(fname, O_RDWR | O_CREAT, 0644);
+
+  if (fd == -1)
+    PRINTF("%s errno=%d: %s\n", fname, errno, strerror(errno));
 
   if (fd == -1)
     return (-1);
@@ -58,9 +66,16 @@ int compat_lock_file(char *fname)
   fl.l_len = 0;
 
   if (fcntl(fd, F_SETLKW, &fl) == -1)
+  {
+    HARDBUG(compat_close(fd) == -1)
+
     return (-1);
+  }
 #else
-  int fd = _open(fname, _O_WRONLY | _O_CREAT | _O_APPEND, _S_IREAD | _S_IWRITE);
+  if (append)
+    fd = _open(fname, _O_WRONLY | _O_CREAT | _O_APPEND, _S_IREAD | _S_IWRITE);
+  else
+    fd = _open(fname, _O_RDWR | _O_CREAT, _S_IREAD | _S_IWRITE);
 
   if (fd == -1)
     return (-1);
@@ -74,6 +89,8 @@ int compat_lock_file(char *fname)
                   MAXDWORD,
                   &ol))
   {
+    HARDBUG(compat_close(fd) == -1)
+
     return (-1);
   }
 #endif
@@ -92,13 +109,13 @@ void compat_unlock_file(int fd)
   fl.l_len = 0;
 
   HARDBUG(fcntl(fd, F_SETLK, &fl) == -1)
-
-  HARDBUG(compat_close(fd) == -1)
 #else
   OVERLAPPED ol = {0};
 
   HARDBUG(!UnlockFileEx((HANDLE)_get_osfhandle(fd), 0, MAXDWORD, MAXDWORD, &ol))
 #endif
+
+  HARDBUG(compat_close(fd) == -1)
 }
 
 void compat_fdprintf(int fd, char *format, ...)
@@ -233,6 +250,15 @@ int compat_pipe_close(pipe_t fd)
   return (close(fd));
 #else
   return (CloseHandle(fd) ? 0 : -1);
+#endif
+}
+
+int compat_lseek(int fd, i64_t offset, int whence)
+{
+#if COMPAT_OS == COMPAT_OS_LINUX
+  return (lseek(fd, (off_t)offset, whence));
+#else
+  return (_lseeki64(fd, offset, whence));
 #endif
 }
 

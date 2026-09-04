@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #include "globals.h"
 
 #if COMPAT_ARCH == COMPAT_ARCH_X86_64
@@ -35,7 +35,7 @@ void zzzzzz(char *arg_file,
           arg_line,
           arg_error,
           arg_code,
-          REVISION);
+          revision);
 
   if (zzzzzz_invocation > 1)
   {
@@ -54,7 +54,7 @@ void zzzzzz(char *arg_file,
            " line=%ld\n"
            " error=%s\n"
            " code=%d\n"
-           " version=%s\n$$",
+           " version=%s\n$",
            arg_code == 0 ? "OK" : "FATAL",
            my_mpi_globals.MMG_id_global,
            my_mpi_globals.MMG_nglobal,
@@ -64,7 +64,10 @@ void zzzzzz(char *arg_file,
            arg_line,
            arg_error,
            arg_code,
-           REVISION);
+           revision);
+
+    if (options.hub)
+      PRINTF("error message=%s$\n", arg_error);
   }
 
   if (my_mpi_globals.MMG_init)

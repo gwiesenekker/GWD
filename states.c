@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #include "globals.h"
 
 // the game state is maintained in a cJSON object
@@ -179,7 +179,7 @@ local void save(game_state_t *arg_with_game_state, char *arg_name)
 
 local void save2pdn(game_state_t *arg_with_game_state, char *arg_pdn)
 {
-  int fd = compat_lock_file(arg_pdn);
+  int fd = compat_lock_file(arg_pdn, TRUE);
 
   HARDBUG(fd == -1)
 
@@ -203,7 +203,14 @@ local void save2pdn(game_state_t *arg_with_game_state, char *arg_pdn)
     "[FEN \"%s\"]\n\n",
     arg_with_game_state->get_starting_position(arg_with_game_state));
 
+  char *fen = arg_with_game_state->get_starting_position(arg_with_game_state);
+
   int iply = 0;
+
+  // quick hack
+
+  if (*fen == 'B')
+    compat_fdprintf(fd, "%d...", iply + 1);
 
   cJSON *game_move;
 

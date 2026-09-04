@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.12462 vr  4 sep 2026  7:33:55 CEST
 #ifndef QueuesH
 #define QueuesH
 
@@ -11,15 +11,13 @@
 #define MESSAGE_INFO 5
 #define MESSAGE_FEN 6
 #define MESSAGE_STATE 7
-#define MESSAGE_BOARD 8
-#define MESSAGE_MOVE 9
-#define MESSAGE_GO 10
-#define MESSAGE_RESULT 11
-#define MESSAGE_LAST 12
+#define MESSAGE_GO 8
+#define MESSAGE_MCTS 9
+#define MESSAGE_RESULT 10
 
-#define MESSAGE_SEARCH_FIRST 15
-#define MESSAGE_SEARCH_AHEAD 16
-#define MESSAGE_SEARCH_SECOND 17
+#define MESSAGE_SEARCH_FIRST 11
+#define MESSAGE_SEARCH_AHEAD 12
+#define MESSAGE_SEARCH_SECOND 13
 
 typedef struct
 {
@@ -43,6 +41,7 @@ typedef struct
   int Q_length_max;
 
   my_mutex_t Q_mutex;
+  my_random_t Q_my_random;
 } queue_t;
 
 void construct_queue(queue_t *, char *, my_printf_t *);
