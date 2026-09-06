@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0
@@ -124,9 +124,7 @@ void stop_my_timer(my_timer_t *arg_with_my_timer)
   arg_with_my_timer->MT_status = MY_TIMER_STOPPED;
 
   my_printf(arg_with_my_timer->MT_my_printf,
-            "arg_with_my_timer->MT_bname=%s"
-            " arg_with_my_timer->MT_cpu_time_used=%.6f"
-            " arg_with_my_timer->MT_wall_time_used=%.0f\n",
+            "TIMER=%s CPU=%.2f WALL=%.2f\n",
             bdata(arg_with_my_timer->MT_bname),
             arg_with_my_timer->MT_cpu_time_used,
             arg_with_my_timer->MT_wall_time_used);
@@ -143,19 +141,11 @@ void start_my_timer(my_timer_t *arg_with_my_timer)
   arg_with_my_timer->MT_status = MY_TIMER_STARTED;
 }
 
-void destroy_my_timer(my_timer_t *arg_with_my_timer)
-{
-  BDESTROY(arg_with_my_timer->MT_bname)
-}
-
 void construct_progress(progress_t *arg_progress,
-                        char *arg_name,
                         i64_t arg_ntotal,
                         double arg_seconds)
 {
-  HARDBUG((arg_progress->P_bname = bfromcstr(arg_name)) == NULL)
-
-  construct_my_timer(&(arg_progress->P_timer), arg_name, STDOUT, FALSE);
+  construct_my_timer(&(arg_progress->P_timer), "progress", STDOUT, FALSE);
 
   reset_my_timer(&(arg_progress->P_timer));
 
@@ -172,7 +162,7 @@ void construct_progress(progress_t *arg_progress,
 
     arg_progress->P_ntodo = (arg_ntotal + nslaves - 1 - id_slave) / nslaves;
 
-    //arg_progress->P_ntodo = arg_ntotal / my_mpi_globals.MMG_nslaves + 1;
+    arg_progress->P_ntodo = arg_ntotal / my_mpi_globals.MMG_nslaves + 1;
   }
 
   arg_progress->P_seconds = arg_seconds;
@@ -182,15 +172,10 @@ void construct_progress(progress_t *arg_progress,
   arg_progress->P_seconds_previous = 0.0;
   arg_progress->P_ndelta = 0;
 
-  if (arg_progress->P_ntotal > 0)
-  {
-    PRINTF("arg_progress->P_bname=%s"
-           " arg_progress->P_ntotal=%lld"
-           " arg_progress->P_ntodo=%lld\n",
-           bdata(arg_progress->P_bname),
-           arg_progress->P_ntotal,
-           arg_progress->P_ntodo);
-  }
+  PRINTF("arg_progress->P_ntotal=%lld"
+         " arg_progress->P_ntodo=%lld\n",
+         arg_progress->P_ntotal,
+         arg_progress->P_ntodo);
 }
 
 int make_progress(progress_t *arg_progress, i64_t idone)
@@ -205,11 +190,7 @@ int make_progress(progress_t *arg_progress, i64_t idone)
   if ((arg_progress->P_ntodo > 0) and
       (arg_progress->P_ndone > arg_progress->P_ntodo))
   {
-    PRINTF("WARNING: arg_progress->P_ndone > arg_progress->P_ntodo"
-           " arg_progress->P_bname=%s"
-           " arg_progres->P_ndone=%lld"
-           " arg_progres->P_ntodo=%lld\n",
-           bdata(arg_progress->P_bname),
+    PRINTF("P_ndone=%lld P_ntodo=%lld\n",
            arg_progress->P_ndone,
            arg_progress->P_ntodo);
 
@@ -229,21 +210,13 @@ int make_progress(progress_t *arg_progress, i64_t idone)
     {
       double speed = arg_progress->P_ndone / arg_progress->P_seconds_done;
 
-      PRINTF("arg_progress->P_bname=%s"
-             " arg_progress->P_ndone=%lld"
-             " (%.0f items/second)\n$",
-             bdata(arg_progress->P_bname),
-             arg_progress->P_ndone,
-             speed);
+      PRINTF("ndone=%lld speed=%.2f/second\n$", arg_progress->P_ndone, speed);
 
       if (arg_progress->P_ntodo > 0)
       {
         i64_t nremaining = arg_progress->P_ntodo - arg_progress->P_ndone;
 
-        PRINTF("arg_progress->P_bname=%s"
-               " nremaining=%lld"
-               " ETA=%.6f seconds\n$",
-               bdata(arg_progress->P_bname),
+        PRINTF("nremaining=%lld ETA=%.2f seconds\n$",
                nremaining,
                (double)nremaining / speed);
       }
@@ -266,11 +239,7 @@ void finalize_progress(progress_t *arg_progress)
   arg_progress->P_seconds_done =
     return_my_timer(&(arg_progress->P_timer), FALSE);
 
-  PRINTF("progress %s"
-         " took %.6f seconds"
-         " for %lld items"
-         " (%.0f items/second)\n",
-         bdata(arg_progress->P_bname),
+  PRINTF("progress took %.0f seconds for %lld items %.0f items/second\n",
          arg_progress->P_seconds_done,
          arg_progress->P_ndone,
          (double)arg_progress->P_ndone / arg_progress->P_seconds_done);
@@ -290,22 +259,12 @@ void finalize_progress(progress_t *arg_progress)
 
     if (ntotal_mpi > arg_progress->P_ntotal)
     {
-      PRINTF("WARNING ntotal_mpi > arg_progress->P_ntotal"
-             " arg_progress->P_bname=%s"
-             " ntotal_mpi=%lld"
-             " arg_progress->P_ntotal=%lld\n",
-             bdata(arg_progress->P_bname),
+      PRINTF("WARNING: ntotal_mpi=%lld"
+             " arg_progress->P_notal=%lld\n",
              ntotal_mpi,
              arg_progress->P_ntotal);
     }
   }
-}
-
-void destroy_progress(progress_t *arg_progress)
-{
-  BDESTROY(arg_progress->P_bname)
-
-  destroy_my_timer(&(arg_progress->P_timer));
 }
 
 i64_t return_ndone(progress_t *arg_progress) { return (arg_progress->P_ndone); }
@@ -322,6 +281,8 @@ void configure_time_control(int arg_game_time,
                             int arg_ngame_moves,
                             time_control_t *arg_with_time_control)
 {
+  arg_with_time_control->TC_game_time = arg_game_time;
+
   arg_ngame_moves += options.time_control_ntrouble;
 
   arg_with_time_control->TC_ngame_moves = arg_ngame_moves;
@@ -503,7 +464,7 @@ void test_my_timers(void)
       double cpu = return_my_timer(test + itest, FALSE);
       double wall = return_my_timer(test + itest, TRUE);
 
-      PRINTF("itimer=%d cpu=%.6f wall=%.0f\n", itest, cpu, wall);
+      PRINTF("itimer=%d cpu=%.2f wall=%.2f\n", itest, cpu, wall);
     }
 
     PRINTF("burning CPU for %d +/- 0.5 seconds..\n", isecond);
@@ -515,7 +476,7 @@ void test_my_timers(void)
       double cpu = return_my_timer(test + itest, FALSE);
       double wall = return_my_timer(test + itest, TRUE);
 
-      PRINTF("itimer=%d cpu=%.6f wall=%.0f\n", itest, cpu, wall);
+      PRINTF("itimer=%d cpu=%.2f wall=%.2f\n", itest, cpu, wall);
     }
   }
 }

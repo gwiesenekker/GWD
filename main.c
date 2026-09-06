@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define GWD_JSON "gwd.json"
@@ -277,7 +277,7 @@ local void solve_problems_mcts(char *arg_name,
 
   progress_t progress;
 
-  construct_progress(&progress, "solve_problems_mcts", nfen, 10);
+  construct_progress(&progress, nfen, 10);
 
   construct_my_bstream(&my_bstream, arg_name);
 
@@ -340,8 +340,6 @@ local void solve_problems_mcts(char *arg_name,
                                       NULL,
                                       NULL,
                                       NULL,
-                                      NULL,
-                                      NULL,
                                       FALSE);
       }
       else
@@ -376,8 +374,6 @@ local void solve_problems_mcts(char *arg_name,
   BDESTROY(bfen)
 
   finalize_progress(&progress);
-
-  destroy_progress(&progress);
 
   destroy_my_bstream(&my_bstream);
 
@@ -1001,7 +997,7 @@ local int add_man_random(int arg_nwhite_man,
 
         score_t root_score = return_material_score(&(arg_with_search->S_board));
 
-        if (ABS_SCORE_T(root_score - *arg_best_score) <= SCORE(SCORE_MAN / 4))
+        if (abs(root_score - *arg_best_score) <= (SCORE_MAN / 4))
         {
           result = TRUE;
         }
@@ -1013,8 +1009,8 @@ local int add_man_random(int arg_nwhite_man,
                    " ntry=%d root_score=" PRINTF_SCORE_T
                    " *arg_best_score=" PRINTF_SCORE_T "\n",
                    ntry,
-                   SCORE2PRINTF(root_score),
-                   SCORE2PRINTF(*arg_best_score));
+                   root_score,
+                   *arg_best_score);
           }
         }
       }
@@ -1249,7 +1245,7 @@ local int add_kings_random(int arg_nwhite_kings,
 
         score_t root_score = return_material_score(&(arg_with_search->S_board));
 
-        if (ABS_SCORE_T(root_score - *arg_best_score) <= SCORE(SCORE_MAN / 4))
+        if (abs(root_score - *arg_best_score) <= (SCORE_MAN / 4))
         {
           result = TRUE;
         }
@@ -1262,8 +1258,8 @@ local int add_kings_random(int arg_nwhite_kings,
                    " root_score=" PRINTF_SCORE_T
                    " *arg_best_score=" PRINTF_SCORE_T "\n",
                    ntry,
-                   SCORE2PRINTF(root_score),
-                   SCORE2PRINTF(*arg_best_score));
+                   root_score,
+                   *arg_best_score);
           }
         }
       }
@@ -1588,7 +1584,7 @@ local void gen_random(char *arg_fen_name,
     else
       s[0] = 'b';
 
-    score_t best_score = SCORE_PLUS_INFINITY;
+    int best_score = SCORE_PLUS_INFINITY;
 
     int result = INVALID;
 
@@ -1661,7 +1657,7 @@ local void gen_random(char *arg_fen_name,
              " npieces=%d nwhite=%d nblack=%d"
              " nwhite_man=%d nblack_man=%d"
              " nwhite_kings=%d nblack_kings=%d"
-             " root_score=%d best_score=" PRINTF_SCORE_T "\n",
+             " root_score=%d best_score=%d\n",
              iposition,
              nsame,
              npieces,
@@ -1672,7 +1668,7 @@ local void gen_random(char *arg_fen_name,
              BIT_COUNT(with_search->S_board.B_white_king_bb),
              BIT_COUNT(with_search->S_board.B_black_king_bb),
              root_score,
-             SCORE2PRINTF(best_score));
+             best_score);
 
       update_bucket(&bucket_root_score, root_score);
 
@@ -1875,9 +1871,12 @@ local void load_gwd_json(void)
 
   options.ponder = TRUE;
 
+  options.egtb_level = 7;
+
   options.material_only = FALSE;
 
-  options.mobility_moves_threshold = 2;
+  options.quiescence_evaluation_policy = 0;
+  options.quiescence_combination_length = 2;
 
   options.pv_combination_length = 2;
 
@@ -1885,20 +1884,19 @@ local void load_gwd_json(void)
   options.aspiration_margin = 25;
   options.research_margin = 1;
 
-  options.use_quiescence = FALSE;
   options.use_reductions = TRUE;
-  options.reduction_moves_threshold = 2;
+
   options.reduction_depth_root = 2;
   options.reduction_depth_leaf = 2;
   options.reduction_combination_length = 2;
   options.reduction_full_min = 1;
   options.reduction_percentage = 50;
-  options.reduction_margin = 100;
+  options.reduction_margin = 10;
 
-  options.singular_probe_depth = 2;
-  options.singular_moves_threshold = 2;
+  options.singular_probe_depth = 0;
+  options.singular_probe_margin = 50;
   options.singular_probe_percentage = 50;
-  options.singular_probe_margin = 1;
+  options.singular_extension_moves = 2;
 
   options.sync_clock = FALSE;
 
@@ -2020,9 +2018,32 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "book_evaluation_time") == 0)
         options.book_evaluation_time = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "mobility_moves_threshold") ==
-               0)
-        options.mobility_moves_threshold = ivalue;
+      else if (compat_strcasecmp(parameter_name, "egtb_level") == 0)
+      {
+        if (ivalue < NENDGAME_MAX)
+        {
+          cJSON *cjson_cli = cJSON_GetObjectItem(parameter, "cli");
+
+          if (cJSON_IsBool(cjson_cli))
+          {
+            HARDBUG(!cJSON_IsTrue(cjson_cli))
+
+            options.egtb_level = ivalue;
+          }
+          else
+          {
+            PRINTF("egtb_level only accepted from command-line\n");
+          }
+        }
+      }
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "quiescence_evaluation_policy") == 0)
+        options.quiescence_evaluation_policy = ivalue;
+
+      else if (compat_strcasecmp(parameter_name,
+                                 "quiescence_combination_length") == 0)
+        options.quiescence_combination_length = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "pv_combination_length") == 0)
         options.pv_combination_length = ivalue;
@@ -2035,10 +2056,6 @@ local void parse_parameters(void)
 
       else if (compat_strcasecmp(parameter_name, "research_margin") == 0)
         options.research_margin = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "reduction_moves_threshold") ==
-               0)
-        options.reduction_moves_threshold = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_depth_root") == 0)
         options.reduction_depth_root = ivalue;
@@ -2062,16 +2079,16 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "singular_probe_depth") == 0)
         options.singular_probe_depth = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "singular_moves_threshold") ==
-               0)
-        options.singular_moves_threshold = ivalue;
+      else if (compat_strcasecmp(parameter_name, "singular_probe_margin") == 0)
+        options.singular_probe_margin = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "singular_probe_percentage") ==
                0)
         options.singular_probe_percentage = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "singular_probe_margin") == 0)
-        options.singular_probe_margin = ivalue;
+      else if (compat_strcasecmp(parameter_name, "singular_extension_moves") ==
+               0)
+        options.singular_extension_moves = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)
         options.alpha_beta_cache_size = ivalue;
@@ -2210,9 +2227,6 @@ local void parse_parameters(void)
 
       else if (compat_strcasecmp(parameter_name, "material_only") == 0)
         options.material_only = bvalue;
-
-      else if (compat_strcasecmp(parameter_name, "use_quiescence") == 0)
-        options.use_quiescence = bvalue;
 
       else if (compat_strcasecmp(parameter_name, "use_reductions") == 0)
         options.use_reductions = bvalue;
@@ -2535,7 +2549,7 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 
   HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t)) == 0)
 
-  HARDBUG(fprintf(fcsv, "\"%s\",\"%s\"", revision, stamp) < 0)
+  HARDBUG(fprintf(fcsv, "\"%s\",\"%s\"", REVISION, stamp) < 0)
 
   cJSON_ArrayForEach(column, columns)
   {
@@ -2679,7 +2693,7 @@ int main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 
-  fprintf(fversion, "%s\n", revision);
+  fprintf(fversion, "%s\n", REVISION);
 
   if (fclose(fversion) == EOF)
   {
@@ -2691,7 +2705,7 @@ int main(int argc, char **argv)
 
   if ((argc > 1) and (compat_strcasecmp(argv[1], "--revision") == 0))
   {
-    fprintf(stdout, "%s\n", revision);
+    fprintf(stdout, "%s\n", REVISION);
     exit(EXIT_SUCCESS);
   }
 
@@ -2907,7 +2921,7 @@ int main(int argc, char **argv)
 
   options.nthreads = options.nthreads_alpha_beta;
 
-  PRINTF("Version is %s\n", revision);
+  PRINTF("Version is %s\n", REVISION);
 
   PRINTF("sizeof(int)=%lld\n", (i64_t)sizeof(int));
   PRINTF("sizeof(long)=%lld\n", (i64_t)sizeof(long));
@@ -2981,9 +2995,12 @@ int main(int argc, char **argv)
 
   PRINTF_CFG_B(ponder);
 
+  PRINTF_CFG_I(egtb_level);
+
   PRINTF_CFG_B(material_only);
 
-  PRINTF_CFG_I(mobility_moves_threshold);
+  PRINTF_CFG_I(quiescence_evaluation_policy);
+  PRINTF_CFG_I(quiescence_combination_length);
 
   PRINTF_CFG_I(pv_combination_length);
 
@@ -2991,9 +3008,8 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(aspiration_margin);
   PRINTF_CFG_I(research_margin);
 
-  PRINTF_CFG_B(use_quiescence);
   PRINTF_CFG_B(use_reductions);
-  PRINTF_CFG_I(reduction_moves_threshold);
+
   PRINTF_CFG_I(reduction_depth_root);
   PRINTF_CFG_I(reduction_depth_leaf);
   PRINTF_CFG_I(reduction_combination_length);
@@ -3002,9 +3018,9 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(reduction_margin);
 
   PRINTF_CFG_I(singular_probe_depth);
-  PRINTF_CFG_I(singular_moves_threshold);
-  PRINTF_CFG_I(singular_probe_percentage);
   PRINTF_CFG_I(singular_probe_margin);
+  PRINTF_CFG_I(singular_probe_percentage);
+  PRINTF_CFG_I(singular_extension_moves);
 
   PRINTF_CFG_B(sync_clock);
 
@@ -3076,7 +3092,8 @@ int main(int argc, char **argv)
 
   // parameter checks
 
-  HARDBUG(options.mobility_moves_threshold < 1)
+  HARDBUG(options.quiescence_evaluation_policy < 0)
+  HARDBUG(options.quiescence_combination_length < 0)
 
   HARDBUG(options.pv_combination_length < 0)
 
@@ -3084,7 +3101,8 @@ int main(int argc, char **argv)
   HARDBUG(options.aspiration_margin < 1)
   HARDBUG(options.research_margin < 1)
 
-  HARDBUG(options.reduction_moves_threshold < 1)
+  HARDBUG(options.alpha_beta_cache_size < 0)
+
   HARDBUG(options.reduction_depth_root < 0)
   HARDBUG(options.reduction_depth_leaf < 0)
   HARDBUG(options.reduction_combination_length < 0)
@@ -3093,12 +3111,10 @@ int main(int argc, char **argv)
   HARDBUG(options.reduction_margin < 0)
 
   HARDBUG(options.singular_probe_depth < 0)
-  HARDBUG(options.singular_moves_threshold < 1)
+  HARDBUG(options.singular_probe_margin < 0)
   HARDBUG(options.singular_probe_percentage < 1)
   HARDBUG(options.singular_probe_percentage > 99)
-  HARDBUG(options.singular_probe_margin < 0)
-
-  HARDBUG(options.alpha_beta_cache_size < 0)
+  HARDBUG(options.singular_extension_moves < 2)
 
   INIT_PROFILE
 
@@ -3978,6 +3994,31 @@ int main(int argc, char **argv)
 
     PRINTF("before join\n");
     join_threads();
+  }
+  else if (compat_strcasecmp(argv[iarg], "recompress_endgame") == 0)
+  {
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+
+    char name[MY_LINE_MAX];
+
+    strncpy(name, argv[iarg], MY_LINE_MAX);
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+
+    int level;
+
+    HARDBUG(my_sscanf(argv[iarg], "%d", &level) != 1)
+
+    iarg++;
+    HARDBUG(argv[iarg] == NULL)
+
+    int nblock;
+
+    HARDBUG(my_sscanf(argv[iarg], "%d", &nblock) != 1)
+
+    recompress_endgame(name, level, nblock);
   }
   else
   {

@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define NPOSITIONS_MAX 100000000
@@ -286,8 +286,8 @@ local void help_walk_book(sqlite3 *arg_db,
                          "%s %s[" PRINTF_SCORE_T ", " PRINTF_SCORE_T "]",
                          bdata(arg_bpv),
                          bdata(bmove),
-                         SCORE2PRINTF(evaluation),
-                         SCORE2PRINTF(minimax_score)) == BSTR_ERR)
+                         evaluation,
+                         minimax_score) == BSTR_ERR)
 
         help_walk_book(arg_db, arg_with_board, arg_depth + 1, bpv);
 
@@ -304,7 +304,7 @@ local void help_walk_book(sqlite3 *arg_db,
         PRINTF("%s %s[" PRINTF_SCORE_T ", %s]\n",
                bdata(arg_bpv),
                bdata(bmove),
-               SCORE2PRINTF(evaluation),
+               evaluation,
                bdata(bfen));
 
         BDESTROY(bfen)
@@ -487,9 +487,9 @@ void return_book_move(board_t *arg_with_board,
   int sort[NMOVES_MAX];
 
   if (options.book_randomness == 0)
-    shuffle(sort, arg_moves_list->ML_nmoves, NULL, INVALID);
+    shuffle(sort, arg_moves_list->ML_nmoves, NULL);
   else
-    shuffle(sort, arg_moves_list->ML_nmoves, &book_random, INVALID);
+    shuffle(sort, arg_moves_list->ML_nmoves, &book_random);
 
   score_t best_score = SCORE(SCORE_MINUS_INFINITY);
 
@@ -578,9 +578,9 @@ void return_book_move(board_t *arg_with_board,
            " evaluation=" PRINTF_SCORE_T " minimax_score=" PRINTF_SCORE_T
            " temp_score=" PRINTF_SCORE_T "\n",
            bdata(bmove),
-           SCORE2PRINTF(evaluation),
-           SCORE2PRINTF(minimax_score),
-           SCORE2PRINTF(temp_score));
+           evaluation,
+           minimax_score,
+           temp_score);
 
     if (options.book_randomness > 0)
       temp_score /= options.book_randomness;
@@ -598,7 +598,7 @@ void return_book_move(board_t *arg_with_board,
   PRINTF("book_move=%s"
          " best_score=" PRINTF_SCORE_T "\n",
          bdata(arg_bbook_move),
-         SCORE2PRINTF(best_score));
+         best_score);
 
   if (best_score < 0)
   {
@@ -759,13 +759,13 @@ local void add_evaluations(my_sqlite3_t *arg_db,
            imove,
            move_ids[imove],
            bdata(bmoves[imove]),
-           SCORE2PRINTF(evaluation));
+           evaluation);
 
     append_sql_buffer(arg_db,
                       "INSERT OR IGNORE INTO evaluations (move_id, evaluation)"
                       " VALUES (%lld, " PRINTF_SCORE_T ");",
                       move_ids[imove],
-                      SCORE2PRINTF(evaluation));
+                      evaluation);
   }
 
   flush_sql_buffer(arg_db, 0);
@@ -782,7 +782,7 @@ local void add_evaluations2book_worker(my_sqlite3_t *arg_db,
 {
   progress_t progress;
 
-  construct_progress(&progress, "add_evaluations2book_worker", npositions, 10);
+  construct_progress(&progress, npositions, 10);
 
   for (i64_t iposition = 0; iposition < npositions; iposition++)
   {
@@ -811,8 +811,6 @@ local void add_evaluations2book_worker(my_sqlite3_t *arg_db,
   } // for (i64_t iposition
 
   finalize_progress(&progress);
-
-  destroy_progress(&progress);
 
   flush_sql_buffer(arg_db, 0);
 }
@@ -1041,11 +1039,11 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
            imove,
            move_ids[imove],
            bdata(bmoves[imove]),
-           SCORE2PRINTF(evaluations[imove]));
+           evaluations[imove]);
 
-    if (ABS_SCORE_T(evaluations[imove]) > SCORE(EXPANSION_EVALUATION))
+    if (abs(evaluations[imove]) > EXPANSION_EVALUATION)
     {
-      PRINTF("evaluations[imove] > SCORE(EXPANSION_EVALUATION)\n");
+      PRINTF("evaluations[imove] > EXPANSION_EVALUATION\n");
 
       append_sql_buffer(arg_db,
                         "UPDATE moves "
@@ -1168,7 +1166,7 @@ void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
 
   progress_t progress;
 
-  construct_progress(&progress, "expand_book", npositions, 10);
+  construct_progress(&progress, npositions, 10);
 
   for (i64_t iposition = 0; iposition < npositions; iposition++)
   {
@@ -1189,8 +1187,6 @@ void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
   }
 
   finalize_progress(&progress);
-
-  destroy_progress(&progress);
 
   flush_sql_buffer(arg_db, 0);
 }

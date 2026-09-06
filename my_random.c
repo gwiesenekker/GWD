@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 /*
@@ -38,7 +38,7 @@ local ui64_t rotl(ui64_t x, int k)
   return (x << k) | (x >> (64 - k));
 }
 
-void shuffle(int *s, int n, my_random_t *r, int k)
+void shuffle(int *s, int n, my_random_t *r)
 {
   for (int i = 0; i < n; i++)
     s[i] = i;
@@ -47,10 +47,7 @@ void shuffle(int *s, int n, my_random_t *r, int k)
   {
     for (int i = n - 1; i >= 1; --i)
     {
-      // int j = return_my_random(r) % (i + 1);
-      int j = (int)(((__uint128_t)return_my_random(r) * (i + 1)) >> 64);
-
-      HARDBUG(j > i)
+      int j = return_my_random(r) % (i + 1);
 
       if (j != i)
       {
@@ -63,53 +60,16 @@ void shuffle(int *s, int n, my_random_t *r, int k)
     }
   }
 
-  if (k != INVALID)
+  for (int i = 0; i < n; i++)
   {
-    for (int i = 0; i < n; i++)
-    {
-      if (s[i] == k)
-      {
-        s[i] = s[0];
+    int m = 0;
 
-        s[0] = k;
+    for (int j = 0; j < n; j++)
+      if (s[j] == i)
+        ++m;
 
-        break;
-      }
-    }
+    HARDBUG(m != 1)
   }
-
-#ifdef DEBUG
-  if (n <= NMOVES_MAX)
-  {
-    int t[NMOVES_MAX];
-
-    for (int i = 0; i < n; i++)
-      t[i] = FALSE;
-
-    for (int i = 0; i < n; i++)
-    {
-      int j = s[i];
-
-      HARDBUG((j < 0) or (j >= n))
-      HARDBUG(t[j])
-
-      t[j] = TRUE;
-    }
-  }
-  else
-  {
-    for (int i = 0; i < n; i++)
-    {
-      int t = 0;
-
-      for (int j = 0; j < n; j++)
-        if (s[j] == i)
-          ++t;
-
-      HARDBUG(t != 1)
-    }
-  }
-#endif
 }
 
 void construct_my_random(my_random_t *arg_with_my_random, ui64_t *arg_seed)
@@ -256,6 +216,6 @@ void test_my_random(void)
 
   construct_my_random(&test_random, NULL);
 
-  shuffle(s, TEST_NBUCKETS, NULL, INVALID);
-  shuffle(s, TEST_NBUCKETS, &test_random, INVALID);
+  shuffle(s, TEST_NBUCKETS, NULL);
+  shuffle(s, TEST_NBUCKETS, &test_random);
 }

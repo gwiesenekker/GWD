@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef CompatH
 #define CompatH
 
@@ -57,7 +57,6 @@
 #define BIT_COUNT(ULL) (int)__builtin_popcountll(ULL)
 #define BIT_CTZ(ULL) __builtin_ctzll(ULL)
 #define BIT_CLZ(ULL) __builtin_clzll(ULL)
-#define BIT_REVERSE(ULL) __builtin_bitreverse64(ULL)
 
 typedef int pipe_t;
 
@@ -141,7 +140,6 @@ typedef void *(*my_thread_func_t)(void *);
 
 #define fork do_not_use_fork_but_my_fork
 #define pipe do_not_use_pipe_but_my_pipe
-#define lseek do_not_use_lseek_but_my_lseek
 #define fseeko do_not_use_fseeko_but_my_fseeko
 #define strcasecmp do_not_use_strcasecmp_but_my_strcasecmp
 #define access do_not_use_access_but_my_access
@@ -154,7 +152,7 @@ typedef void *(*my_thread_func_t)(void *);
 i64_t compat_read(int, void *, i64_t);
 i64_t compat_write(int, void *, i64_t);
 int compat_close(int);
-int compat_lock_file(char *, int);
+int compat_lock_file(char *);
 void compat_unlock_file(int);
 void compat_fdprintf(int, char *, ...);
 
@@ -175,7 +173,6 @@ i64_t compat_pipe_read(pipe_t, void *, i64_t);
 i64_t compat_pipe_write(pipe_t, void *, i64_t);
 int compat_pipe_close(pipe_t);
 
-int compat_lseek(int, i64_t, int);
 int compat_fseeko(FILE *, i64_t, int);
 
 int compat_strcasecmp(char *, char *);

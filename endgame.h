@@ -1,16 +1,33 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef EndgameH
 #define EndgameH
 
-#define USE_COMPRESSED_WDL
+#define ARRAY_PAGE_SIZE 1024
+#define NPAGE_ENTRIES 256
+
+#define NENDGAME_MAX 7
+#define MATE_MAX 512
+#define MATE_DRAW (-1)
+#define MATE_INVALID (-32768)
 
 #define ENDGAME_UNKNOWN 32767
 
-extern GwdegtbWdlProbe *wdl_probe_alpha_beta_master;
+typedef struct
+{
+  i8_t entry_white_mate;
+  i8_t entry_black_mate;
+} entry_i8_t;
+
+typedef struct
+{
+  i16_t entry_white_mate;
+  i16_t entry_black_mate;
+} entry_i16_t;
 
 void init_endgame(void);
-int read_endgame(search_t *);
-score_t return_endgame_score(search_t *);
+int read_endgame(search_t *, int *);
+score_t return_endgame_score(search_t *, int);
 void fin_endgame(void);
+void recompress_endgame(char *, int, int);
 
 #endif

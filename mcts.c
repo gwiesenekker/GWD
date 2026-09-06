@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 mcts_globals_t mcts_globals;
@@ -38,18 +38,9 @@ local void mcts_alpha_beta(search_t *arg_with_search,
   {
     if ((mcts_globals.mcts_globals_nodes++ % 100) == 0)
     {
-      if (poll_queue(return_thread_queue(arg_with_search->S_thread)) != INVALID)
-      {
-        my_printf(arg_with_search->S_my_printf, "got message\n");
-
-        goto label_return;
-      }
-
       if (return_my_timer(&(arg_with_search->S_timer), FALSE) >=
           fabs(mcts_globals.mcts_globals_time_limit))
-      {
         goto label_return;
-      }
     }
   }
 
@@ -77,7 +68,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
   // check endgame
 
-  score_t endgame_score = return_endgame_score(arg_with_search);
+  score_t endgame_score = return_endgame_score(arg_with_search, TRUE);
 
   if (!IS_SCORE_NAN(endgame_score))
   {
@@ -144,12 +135,10 @@ local void mcts_alpha_beta(search_t *arg_with_search,
       goto label_return;
   }
 
-  int sort[NMOVES_MAX];
+  int moves_weight[NMOVES_MAX];
 
-  shuffle(sort,
-          arg_moves_list->ML_nmoves,
-          &(arg_with_search->S_random),
-          INVALID);
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
+    moves_weight[imove] = arg_moves_list->ML_move_weights[imove];
 
   arg_nply++;
 
@@ -169,7 +158,20 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
-    int jmove = sort[imove];
+    int jmove = 0;
+
+    for (int kmove = 1; kmove < arg_moves_list->ML_nmoves; kmove++)
+    {
+      if (moves_weight[kmove] == L_MIN)
+        continue;
+
+      if (moves_weight[kmove] > moves_weight[jmove])
+        jmove = kmove;
+    }
+
+    HARDBUG(moves_weight[jmove] == L_MIN)
+
+    moves_weight[jmove] = L_MIN;
 
     if (!all_moves)
     {
@@ -190,7 +192,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
     if (IS_PV(arg_node_type) and (imove > 0))
     {
-      temp_beta = temp_alpha + 1;
+      temp_beta = temp_alpha + SCORE(1);
 
       node_type = MINIMAL_WINDOW_BIT;
     }
@@ -285,7 +287,7 @@ void mcts_search(search_t *arg_with_search,
 
   // check endgame
 
-  score_t endgame_score = return_endgame_score(arg_with_search);
+  score_t endgame_score = return_endgame_score(arg_with_search, TRUE);
 
   if (!IS_SCORE_NAN(endgame_score))
   {
@@ -294,10 +296,7 @@ void mcts_search(search_t *arg_with_search,
     goto label_return;
   }
 
-  shuffle(arg_sort,
-          arg_moves_list->ML_nmoves,
-          &(arg_with_search->S_random),
-          INVALID);
+  shuffle(arg_sort, arg_moves_list->ML_nmoves, &(arg_with_search->S_random));
 
   *arg_best_score = return_material_score(&(arg_with_search->S_board));
 
@@ -315,7 +314,7 @@ void mcts_search(search_t *arg_with_search,
 
       score_t my_alpha = *arg_best_score;
 
-      score_t my_beta = my_alpha + 1;
+      score_t my_beta = my_alpha + SCORE(1);
 
       ui32_t node_type = MINIMAL_WINDOW_BIT;
 
@@ -424,11 +423,11 @@ void mcts_search(search_t *arg_with_search,
                     my_depth,
                     imove,
                     bdata(bmove_string),
-                    SCORE2PRINTF(*arg_best_score),
+                    *arg_best_score,
                     mcts_globals.mcts_globals_nodes,
                     return_my_timer(&(arg_with_search->S_timer), FALSE),
-                    SCORE2PRINTF(my_alpha),
-                    SCORE2PRINTF(my_beta));
+                    my_alpha,
+                    my_beta);
         }
       }
     } // for (int imove
@@ -446,9 +445,9 @@ void mcts_search(search_t *arg_with_search,
     }
     // #endif
 
-    if (IS_SCORE_WON(*arg_best_score))
+    if (IS_SCORE_WON(arg_with_search->S_best_score))
       goto label_break;
-    if (IS_SCORE_LOST(*arg_best_score))
+    if (IS_SCORE_LOST(arg_with_search->S_best_score))
       goto label_break;
 
     if (my_depth >= arg_mcts_depth)
@@ -477,7 +476,7 @@ label_break:
               " *arg_best_score=" PRINTF_SCORE_T "\n",
               my_depth,
               bdata(bmove_string),
-              SCORE2PRINTF(*arg_best_score));
+              *arg_best_score);
   }
 
 label_return:
@@ -568,54 +567,6 @@ label_return:;
   POP_NAME(__FUNC__)
 }
 
-#define z 1.96
-
-local double return_wilson_lcb(int nsucc, int ntotal)
-{
-  if (ntotal == 0)
-    return (0.0);
-
-  double n = (double)ntotal;
-  double p = (double)nsucc / n;
-  double z2 = z * z;
-
-  double denom = 1.0 + z2 / n;
-  double center = p + z2 / (2.0 * n);
-  double margin = z * sqrt((p * (1.0 - p) + z2 / (4.0 * n)) / n);
-
-  double lcb = (center - margin) / denom;
-
-  if (lcb < 0.0)
-    lcb = 0.0;
-  if (lcb > 1.0)
-    lcb = 1.0;
-
-  return (lcb);
-}
-
-static double return_wilson_ucb(int nsucc, int ntotal)
-{
-  if (ntotal == 0)
-    return (1.0);
-
-  double n = (double)ntotal;
-  double p = (double)nsucc / n;
-  double z2 = z * z;
-
-  double denom = 1.0 + z2 / n;
-  double center = p + z2 / (2.0 * n);
-  double margin = z * sqrt((p * (1.0 - p) + z2 / (4.0 * n)) / n);
-
-  double ucb = (center + margin) / denom;
-
-  if (ucb < 0.0)
-    ucb = 0.0;
-  if (ucb > 1.0)
-    ucb = 1.0;
-
-  return (ucb);
-}
-
 double mcts_shoot_outs(search_t *arg_with_search,
                        int arg_mcts_depth,
                        int arg_nply,
@@ -624,8 +575,6 @@ double mcts_shoot_outs(search_t *arg_with_search,
                        int *arg_nwon,
                        int *arg_ndraw,
                        int *arg_nlost,
-                       double *arg_wilson_lcb,
-                       double *arg_wilson_ucb,
                        int arg_verbose)
 {
   PUSH_NAME(__FUNC__)
@@ -664,7 +613,7 @@ double mcts_shoot_outs(search_t *arg_with_search,
   if (arg_nlost == NULL)
     arg_nlost = &nlost_local;
 
-  for (int ishoot_out = 1; ishoot_out <= *arg_nshoot_outs; ++ishoot_out)
+  for (int ishoot_out = 0; ishoot_out < *arg_nshoot_outs; ishoot_out++)
   {
     score_t temp_score;
 
@@ -693,51 +642,17 @@ double mcts_shoot_outs(search_t *arg_with_search,
       (*arg_nlost)++;
     else
       (*arg_ndraw)++;
-
-    if ((ishoot_out % 100) == 0)
-    {
-      BSTRING(bline)
-
-      bformata(bline,
-               "nshoot_outs=%d"
-               " nwon=%d"
-               " ndraw=%d"
-               " nlost=%d",
-               *arg_nshoot_outs,
-               *arg_nwon,
-               *arg_ndraw,
-               *arg_nlost);
-
-      PRINTF("%s\n", bdata(bline));
-
-      if ((arg_with_search->S_thread != NULL) and
-          (arg_with_search->S_thread == thread_alpha_beta_master))
-        enqueue(&main_queue, MESSAGE_INFO, bdata(bline));
-
-      BDESTROY(bline)
-    }
   }
 
   if (*arg_nshoot_outs == 0)
     my_printf(arg_with_search->S_my_printf, "WARNING: *nshoot_outs == 0\n");
 
-  double wilson_lcb = return_wilson_lcb(*arg_nwon, *arg_nshoot_outs);
-
-  double wilson_ucb = return_wilson_ucb(*arg_nlost, *arg_nshoot_outs);
-
   if ((*arg_nwon + *arg_nlost) > 0)
     result = (double)(*arg_nwon - *arg_nlost) / (*arg_nwon + *arg_nlost);
 
   my_printf(arg_with_search->S_my_printf,
-            "*arg_nshoot_outs=%d"
-            " time=%.2f"
-            " *arg_nwon=%d"
-            " *arg_nlost=%d"
-            " *arg_ndraw=%d"
-            " result=%.6f"
-            " lcb=%.6f"
-            " ucb=%.6f"
-            " lcb - ucb=%.6f"
+            "*nshoot_outs=%d time=%.2f"
+            " *nwon=%d *nlost=%d *ndraw=%d result=%.6f"
             " (%.2f shoot_outs/second)\n",
             *arg_nshoot_outs,
             return_my_timer(&mcts_timer, FALSE),
@@ -745,19 +660,11 @@ double mcts_shoot_outs(search_t *arg_with_search,
             *arg_nlost,
             *arg_ndraw,
             result,
-            wilson_lcb,
-            wilson_ucb,
-            wilson_lcb - wilson_ucb,
             *arg_nshoot_outs / return_my_timer(&mcts_timer, FALSE));
 
   END_BLOCK
 
   POP_NAME(__FUNC__)
-
-  if (arg_wilson_lcb != NULL)
-    *arg_wilson_lcb = wilson_lcb;
-  if (arg_wilson_ucb != NULL)
-    *arg_wilson_ucb = wilson_ucb;
 
   return (result);
 }

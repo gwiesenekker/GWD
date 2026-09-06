@@ -1,9 +1,6 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef BoardsH
 #define BoardsH
-
-#define BOARD_MAX 66
-#define NPIECES_MAX 20
 
 #define wO_hub "w"
 #define wX_hub "W"

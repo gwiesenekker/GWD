@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define NAG '$'
@@ -171,6 +171,8 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
 
   bucket_t bucket_nmoves[NPIECES_MAX + 1];
 
+  bucket_t bucket_nblocked[NPIECES_MAX + 1];
+
   construct_bucket(&bucket_nman,
                    "bucket_nman",
                    1,
@@ -197,6 +199,14 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
   for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
     construct_bucket(bucket_nmoves + npieces,
                      "bucket_nmoves",
+                     1,
+                     0,
+                     NMOVES_MAX,
+                     BUCKET_LINEAR);
+
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
+    construct_bucket(bucket_nblocked + npieces,
+                     "bucket_nblocked",
                      1,
                      0,
                      NMOVES_MAX,
@@ -294,11 +304,17 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
       {
         update_bucket(bucket_nmoves + BIT_COUNT(with_board->B_white_man_bb),
                       moves_list.ML_nmoves);
+
+        update_bucket(bucket_nblocked + BIT_COUNT(with_board->B_white_man_bb),
+                      moves_list.ML_nblocked);
       }
       else
       {
         update_bucket(bucket_nmoves + BIT_COUNT(with_board->B_black_man_bb),
                       moves_list.ML_nmoves);
+
+        update_bucket(bucket_nblocked + BIT_COUNT(with_board->B_black_man_bb),
+                      moves_list.ML_nblocked);
       }
 
       // update book
@@ -363,7 +379,7 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
           "ON CONFLICT(fen) DO UPDATE SET "
           "frequency = frequency + 1, %s = %s + 1;",
           column,
-          bdata(bfen),
+          bdata(bfen), 
           material,
           column,
           column);
@@ -452,6 +468,13 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
     printf_bucket(bucket_nmoves + npieces);
   }
 
+  for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
+  {
+    PRINTF("npieces=%d\n", npieces);
+
+    printf_bucket(bucket_nblocked + npieces);
+  }
+
   PRINTF("ngames=%lld nerrors=%lld\n", ngames, nerrors);
 }
 
@@ -501,7 +524,7 @@ void auto_play(char *arg_txt_name, i64_t arg_npositions)
 
   progress_t progress;
 
-  construct_progress(&progress, "auto_play", arg_npositions, 10);
+  construct_progress(&progress, arg_npositions, 10);
 
   i64_t ngames = 0;
   i64_t ngames_failed = 0;
@@ -523,7 +546,7 @@ void auto_play(char *arg_txt_name, i64_t arg_npositions)
                    1.0,
                    BUCKET_LINEAR);
 
-  while (return_ntodo(&progress) < arg_npositions)
+  while (return_ntodo(&progress) < return_ntodo(&progress))
   {
     ++ngames;
 
@@ -562,7 +585,9 @@ void auto_play(char *arg_txt_name, i64_t arg_npositions)
       else
         FATAL("with_search error", EXIT_FAILURE)
 
-      egtb_mate = read_endgame(with_search);
+      int wdl;
+
+      egtb_mate = read_endgame(with_search, &wdl);
 
       if (egtb_mate != ENDGAME_UNKNOWN)
         break;
@@ -599,12 +624,12 @@ void auto_play(char *arg_txt_name, i64_t arg_npositions)
 
       PRINTF("nply=%d"
              " with_search->S_best_move=%s"
-             " with_search->S_root_score=" PRINTF_SCORE_T
-             " with_search->S_best_score=" PRINTF_SCORE_T "\n",
+             " with_search->S_root_score=%d"
+             " with_search->S_best_score=%d\n",
              nply,
              bdata(bmove_string),
-             SCORE2PRINTF(with_search->S_root_score),
-             SCORE2PRINTF(with_search->S_best_score));
+             with_search->S_root_score,
+             with_search->S_best_score);
 
       game_state.push_move(&game_state, bdata(bmove_string), "");
 
@@ -687,7 +712,7 @@ void auto_play(char *arg_txt_name, i64_t arg_npositions)
       {
         board2fen(&(search0.S_board), bfen, FALSE);
 
-        append_fbuffer_fmt(&ftxt, "%s {%.6f}\n", bdata(bfen), result);
+        append_fbuffer_fmt(&ftxt, "%s {%.6f)\n", bdata(bfen), result);
 
         (void)make_progress(&progress, 0);
       }
@@ -712,8 +737,6 @@ void auto_play(char *arg_txt_name, i64_t arg_npositions)
          return_my_timer(&timer, FALSE));
 
   finalize_progress(&progress);
-
-  destroy_progress(&progress);
 
   flush_fbuffer(&ftxt, 0);
 
@@ -771,7 +794,7 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
 
   progress_t progress;
 
-  construct_progress(&progress, "gen_db", arg_npositions, 10);
+  construct_progress(&progress, arg_npositions, 10);
 
   i64_t ngames = 0;
   i64_t ngames_failed = 0;
@@ -849,8 +872,8 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
              " root_score=" PRINTF_SCORE_T " best_score=" PRINTF_SCORE_T "\n",
              nply,
              bdata(bmove_string),
-             SCORE2PRINTF(root_score),
-             SCORE2PRINTF(best_score));
+             root_score,
+             best_score);
 
       game_state.push_move(&game_state, bdata(bmove_string), "");
 
@@ -861,7 +884,9 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
 
     resume_my_printf(with_search->S_my_printf);
 
-    int egtb_mate = read_endgame(with_search);
+    int wdl;
+
+    int egtb_mate = read_endgame(with_search, &wdl);
 
     if (egtb_mate == ENDGAME_UNKNOWN)
     {
@@ -970,8 +995,6 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
 
   finalize_progress(&progress);
 
-  destroy_progress(&progress);
-
   flush_sql_buffer(arg_db, 0);
 
   destroy_game_state(&game_state);
@@ -986,52 +1009,47 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
                     TRUE);
 }
 
-#define IDS_NAME "ids.bin"
+#define NPOSITIONS_MAX 100000000
 
 void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 {
   mcts_globals.mcts_globals_time_limit = 0.0;
 
-  FILE *fids;
+  i64_t *ids;
+
+  MY_MALLOC_BY_TYPE(ids, i64_t, NPOSITIONS_MAX)
+
+  char *sql = "SELECT id FROM positions WHERE"
+              " frequency < ?"
+              " ORDER BY id ASC;";
+
+  sqlite3_stmt *stmt;
+
+  my_sqlite3_prepare_v2(arg_db->MSQL_db, sql, &stmt);
+
+  HARDBUG(my_sqlite3_bind_int(stmt, 1, arg_frequency) != SQLITE_OK)
 
   i64_t npositions = 0;
 
-  if (my_mpi_globals.MMG_is_lead_slave)
+  int rc;
+
+  while ((rc = execute_sql(arg_db->MSQL_db, stmt, TRUE)) == SQLITE_ROW)
   {
-    HARDBUG((fids = fopen(IDS_NAME, "wb")) == NULL)
+    i64_t id = my_sqlite3_column_int64(stmt, 0);
 
-    char *sql = "SELECT id FROM positions WHERE"
-                " frequency < ?"
-                " ORDER BY id ASC;";
+    HARDBUG(npositions >= NPOSITIONS_MAX)
 
-    sqlite3_stmt *stmt;
+    ids[npositions] = id;
 
-    my_sqlite3_prepare_v2(arg_db->MSQL_db, sql, &stmt);
-
-    HARDBUG(my_sqlite3_bind_int(stmt, 1, arg_frequency) != SQLITE_OK)
-
-    int rc;
-
-    while ((rc = execute_sql(arg_db->MSQL_db, stmt, TRUE)) == SQLITE_ROW)
-    {
-      i64_t id = my_sqlite3_column_int64(stmt, 0);
-
-      FWRITE(fids, &id, i64_t, 1)
-
-      npositions++;
-    }
-
-    HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
-
-    FCLOSE(fids)
+    npositions++;
   }
+
+  HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
 
   my_mpi_barrier_v3("after query ids",
                     my_mpi_globals.MMG_comm_slaves,
                     my_mpi_globals.MMG_semkey_update_db_barrier,
                     FALSE);
-
-  MPI_Bcast(&npositions, 1, MPI_INT64_T, 0, my_mpi_globals.MMG_comm_slaves);
 
   PRINTF("npositions=%lld\n", npositions);
 
@@ -1049,36 +1067,30 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 
   progress_t progress;
 
-  construct_progress(&progress, "update_db", npositions, 10);
+  construct_progress(&progress, npositions, 10);
 
   BSTRING(bmove_string)
 
   BSTRING(bfen)
 
-  HARDBUG((fids = fopen(IDS_NAME, "rb")) == NULL)
-
   for (i64_t iposition = 0; iposition < npositions; iposition++)
   {
-    i64_t id;
-
-    FREAD(fids, &id, i64_t, 1)
-
     if (!make_progress(&progress, iposition))
       continue;
+
+    i64_t id = ids[iposition];
 
     HARDBUG(id < 1)
 
     PRINTF("id=%lld\n", id);
 
-    char *sql = "SELECT fen, frequency FROM positions WHERE id = ?;";
-
-    sqlite3_stmt *stmt;
+    sql = "SELECT fen, frequency FROM positions WHERE id = ?;";
 
     my_sqlite3_prepare_v2(arg_db->MSQL_db, sql, &stmt);
 
     HARDBUG(my_sqlite3_bind_int64(stmt, 1, id) != SQLITE_OK)
 
-    HARDBUG(execute_sql(arg_db->MSQL_db, stmt, TRUE) != SQLITE_ROW)
+    HARDBUG((rc = execute_sql(arg_db->MSQL_db, stmt, TRUE)) != SQLITE_ROW)
 
     const unsigned char *fen = my_sqlite3_column_text(stmt, 0);
 
@@ -1112,8 +1124,6 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
                                          &nwon,
                                          &ndraw,
                                          &nlost,
-                                         NULL,
-                                         NULL,
                                          FALSE);
 
     nshoot_outs = nwon + ndraw + nlost;
@@ -1151,11 +1161,7 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
       bdata(bfen));
   }
 
-  FCLOSE(fids)
-
   finalize_progress(&progress);
-
-  destroy_progress(&progress);
 
   flush_sql_buffer(arg_db, 0);
 

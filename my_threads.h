@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef ThreadsH
 #define ThreadsH
 
@@ -9,6 +9,8 @@ typedef struct
   int thread_role;
 
   my_printf_t T_my_printf;
+
+  my_random_t T_random;
 
   queue_t T_queue;
 

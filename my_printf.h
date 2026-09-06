@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #ifndef MyPrintfH
 #define MyPrintfH
 
@@ -16,6 +16,7 @@ typedef struct
   bstring MP_bbuffer;
 
   bstring MP_bline;
+  bstring MP_bstamp;
 
   my_mutex_t MP_mutex;
 

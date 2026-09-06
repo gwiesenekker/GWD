@@ -1,7 +1,6 @@
 .PHONY: cppcheck clang-tidy clang-format clean
 
 OBJS=main.o\
-  revision.o\
   bstrlib.o\
   cJSON.o\
   xxhash.o\
@@ -42,7 +41,7 @@ OBJS=main.o\
 
 ARCH := $(shell uname -m)
 
-ifneq ($(ARCH),arm64)
+ifneq ($(ARCH), aarch64)
 #ARCH=skylake
 #ARCH=alderlake
 #ARCH=nocona
@@ -56,27 +55,22 @@ MAKE_OPENMPI=make_openmpi
 
 TARGET=a.out
 
-REVISION ?= $(shell \
-	r=$$(git describe --always --dirty --tags 2>/dev/null) && \
-	printf '%s' "$${r#v}" || printf '8-dev')
-
 ifdef MAKE_DEBUG
-CC=clang
-CFLAGS=-g -O0 -DDEBUG
+CC=gcc
+CFLAGS=-g -DDEBUG
 #CFLAGS=-g 
 else
 CC=clang
-CFLAGS=-g -O3
-#CFLAGS=-g -O3 -fsanitize=shift
+CFLAGS=-g -O3 
 endif
-LFLAGS=-L/tmp2/gwies/endgame7 -lm -lzstd -lpthread -lgwdegtb
+LFLAGS=-lm -lzstd -lpthread
 
 ifdef MAKE_VALGRIND
 CFLAGS+=-DUSE_VALGRIND 
 endif
 
 ifdef MAKE_SQLITE3
-CFLAGS+=-DUSE_SQLITE3 -I/tmp2/gwies/endgame7
+CFLAGS+=-DUSE_SQLITE3
 endif
 
 ifdef MAKE_OPENMPI
@@ -95,9 +89,8 @@ endif
 
 CFLAGS+=-D_GNU_SOURCE
 
-ifeq ($(ARCH), arm64)
-CFLAGS+=-march=native
-#CFLAGS+=-mcpu=neoverse-n1
+ifeq ($(ARCH), aarch64)
+CFLAGS+=-mcpu=neoverse-n1
 #CFLAGS+=-march=armv8-a+simd+crc
 else
 CFLAGS+=-march=$(ARCH)
@@ -130,7 +123,6 @@ $(TARGET): $(OBJS)
         cp $(TARGET) gwd.json overrides.json network0.json ballot2.fen /tmp8/gwies/dxp1/$$REVISION;\
 
 HEADERS=boards.h\
-  revision.h\
   bstrlib.h\
   cJSON.h\
   xxhash.h\
@@ -171,11 +163,6 @@ HEADERS=boards.h\
   utils.h
 
 main.o: Makefile main.c $(HEADERS)
-
-.PHONY: FORCE
-
-revision.o: Makefile revision.c revision.h FORCE
-	$(CC) $(CFLAGS) -DREVISION='"$(REVISION)"' -c -o $@ revision.c
 
 bstrlib.o: Makefile bstrlib.c $(HEADERS)
 cJSON.o: Makefile cJSON.c $(HEADERS)

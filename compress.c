@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #include <zstd.h>
@@ -25,6 +25,7 @@ typedef struct
   i64_t CF_nblocks;
   compressed_block_t *CF_blocks;
   i8_t *CF_data_compressed;
+  i64_t CF_ldata_compressed;
 } compressed_file_t;
 
 local ui32_t return_crc32_data(ui64_t *a)

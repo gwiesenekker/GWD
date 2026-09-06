@@ -1,18 +1,5 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
-
-#undef SEMS_USE_SHM
-#define SEMS_USE_SHM
-
-#ifdef SEMS_USE_SHM
-#include <sys/sem.h>
-#else
-#define IPC_NOWAIT 1
-#endif
-
-#define SEMKEYS_DIR "semkeys"
-
-#define NMY_SEMKEYS 20
 
 enum
 {
@@ -22,13 +9,6 @@ enum
   SEM_EXIT_GATE = 3,
   NSEMS
 };
-
-typedef struct
-{
-  bstring MS_bname;
-  my_random_t MS_random;
-  int MS_val[NSEMS];
-} my_semkey_t;
 
 #define TAG_REQUEST_LOCK 1
 #define TAG_LOCK_GRANTED 2
@@ -40,10 +20,6 @@ const char *tag2string[] = {"TAG_INVALID",
                             "TAG_LOCK_GRANTED",
                             "TAG_RELEASE_LOCK",
                             "TAG_FLUSH_LOCK"};
-
-#ifndef SEMS_USE_SHM
-local my_semkey_t my_semkeys[NMY_SEMKEYS];
-#endif
 
 my_mpi_globals_t my_mpi_globals = {.MMG_init = FALSE,
                                    .MMG_nglobal = 0,
@@ -78,23 +54,9 @@ my_mpi_globals_t my_mpi_globals = {.MMG_init = FALSE,
                                    .MMG_semkey_query_positions_barrier = 15,
                                    .MMG_semkey_fen2csv_barrier = 16};
 
-local int my_semget(int arg_key, int arg_nsems, int arg_semflg)
-{
-  int semid;
-#ifdef SEMS_USE_SHM
-  semid = semget(arg_key, arg_nsems, arg_semflg);
-#else
-  HARDBUG(arg_nsems != NSEMS)
-
-  semid = arg_key;
-#endif
-  return (semid);
-}
-
 local void my_sem_setval(int arg_semid, int arg_sem_num, int arg_value)
 {
 #ifdef USE_OPENMPI
-#ifdef SEMS_USE_SHM
   union semun
   {
     int val;
@@ -107,27 +69,6 @@ local void my_sem_setval(int arg_semid, int arg_sem_num, int arg_value)
   value.val = arg_value;
 
   HARDBUG(semctl(arg_semid, arg_sem_num, SETVAL, value) != 0)
-#else
-  HARDBUG((arg_semid < 0) or (arg_semid >= NMY_SEMKEYS))
-
-  my_semkey_t *with_my_semkey = my_semkeys + arg_semid;
-
-  int fd = compat_lock_file(bdata(with_my_semkey->MS_bname), FALSE);
-
-  HARDBUG(fd == -1)
-
-  HARDBUG(compat_read(fd, with_my_semkey->MS_val, sizeof(int) * NSEMS) !=
-          sizeof(int) * NSEMS)
-
-  with_my_semkey->MS_val[arg_sem_num] = arg_value;
-
-  HARDBUG(compat_lseek(fd, 0, SEEK_SET) != 0)
-
-  HARDBUG(compat_write(fd, with_my_semkey->MS_val, sizeof(int) * NSEMS) !=
-          sizeof(int) * NSEMS)
-
-  compat_unlock_file(fd);
-#endif
 #endif
 }
 
@@ -135,27 +76,9 @@ local int my_sem_getval(int arg_semid, int arg_sem_num)
 {
 #ifdef USE_OPENMPI
   int value;
-#ifdef SEMS_USE_SHM
 
   HARDBUG((value = semctl(arg_semid, arg_sem_num, GETVAL)) == -1)
 
-#else
-
-  HARDBUG((arg_semid < 0) or (arg_semid >= NMY_SEMKEYS))
-
-  my_semkey_t *with_my_semkey = my_semkeys + arg_semid;
-
-  int fd = compat_lock_file(bdata(with_my_semkey->MS_bname), FALSE);
-
-  HARDBUG(fd == -1)
-
-  HARDBUG(compat_read(fd, with_my_semkey->MS_val, sizeof(int) * NSEMS) !=
-          sizeof(int) * NSEMS)
-
-  value = with_my_semkey->MS_val[arg_sem_num];
-
-  compat_unlock_file(fd);
-#endif
   return (value);
 #else
   return (-1);
@@ -165,11 +88,10 @@ local int my_sem_getval(int arg_semid, int arg_sem_num)
 local void my_create_semaphore(int arg_semkey)
 {
 #ifdef USE_OPENMPI
-#ifdef SEMS_USE_SHM
   // removing and recreating sometimes fails?
-  int semid = my_semget(arg_semkey, NSEMS, IPC_CREAT | IPC_EXCL | 0600);
+  int semid = semget(arg_semkey, NSEMS, IPC_CREAT | IPC_EXCL | 0600);
 
-  // int semid = my_semget(arg_semkey, NSEMS, 0600);
+  // int semid = semget(arg_semkey, NSEMS, 0600);
 
   // HARDBUG(semid == -1)
 
@@ -177,11 +99,11 @@ local void my_create_semaphore(int arg_semkey)
   {
     HARDBUG(errno != EEXIST)
 
-    if ((semid = my_semget(arg_semkey, NSEMS, 0600)) == -1)
+    if ((semid = semget(arg_semkey, NSEMS, 0600)) == -1)
     {
-      perror("my_semget failed");
+      perror("semget failed");
 
-      FATAL("my_semget", EXIT_FAILURE)
+      FATAL("semget", EXIT_FAILURE)
     }
 
     if (semctl(semid, 0, IPC_RMID) == -1)
@@ -191,12 +113,11 @@ local void my_create_semaphore(int arg_semkey)
       FATAL("semctl", EXIT_FAILURE)
     }
 
-    if ((semid = my_semget(arg_semkey, NSEMS, IPC_CREAT | IPC_EXCL | 0600)) ==
-        -1)
+    if ((semid = semget(arg_semkey, NSEMS, IPC_CREAT | IPC_EXCL | 0600)) == -1)
     {
-      perror("my_semget failed");
+      perror("semget failed");
 
-      FATAL("my_semget", EXIT_FAILURE)
+      FATAL("semget", EXIT_FAILURE)
     }
   }
 
@@ -204,27 +125,6 @@ local void my_create_semaphore(int arg_semkey)
   my_sem_setval(semid, SEM_COUNT, 0);
   my_sem_setval(semid, SEM_ENTRY_GATE, 0);
   my_sem_setval(semid, SEM_EXIT_GATE, 1);
-#else
-  int semid = arg_semkey;
-
-  HARDBUG((semid < 0) or (semid >= NMY_SEMKEYS))
-
-  my_semkey_t *with_my_semkey = my_semkeys + semid;
-
-  with_my_semkey->MS_val[SEM_MUTEX] = 1;
-  with_my_semkey->MS_val[SEM_COUNT] = 0;
-  with_my_semkey->MS_val[SEM_ENTRY_GATE] = 0;
-  with_my_semkey->MS_val[SEM_EXIT_GATE] = 1;
-
-  int fd = compat_lock_file(bdata(with_my_semkey->MS_bname), FALSE);
-
-  HARDBUG(fd == -1)
-
-  HARDBUG(compat_write(fd, with_my_semkey->MS_val, sizeof(int) * NSEMS) !=
-          sizeof(int) * NSEMS)
-
-  compat_unlock_file(fd);
-#endif
 #endif
 }
 
@@ -287,45 +187,8 @@ void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
   with_my_mpi_globals->MMG_semkey_query_positions_barrier +=
     with_my_mpi_globals->MMG_semkey_offset;
 
-#ifndef SEMS_USE_SHM
-  for (int ikey = 0; ikey < NMY_SEMKEYS; ikey++)
-  {
-    my_semkey_t *with_my_semkey = my_semkeys + ikey;
-
-    HARDBUG((with_my_semkey->MS_bname = bfromcstr("")) == NULL)
-
-    HARDBUG(bformata(with_my_semkey->MS_bname, SEMKEYS_DIR "/semkey%d", ikey) ==
-            BSTR_ERR)
-
-    ui64_t seed;
-
-    construct_my_random(&(with_my_semkey->MS_random), &seed);
-
-    /* PRINTF interferes with hub
-
-        PRINTF("ikey=%d"
-               " with_my_semkey->MS_bname=%s"
-               " seed=%llX\n",
-               ikey,
-               bdata(with_my_semkey->MS_bname),
-               seed);
-    */
-  }
-#endif
-
   if (mpi_id_world == 0)
   {
-    if (opendir(SEMKEYS_DIR) == NULL)
-    {
-      HARDBUG(compat_mkdir(SEMKEYS_DIR) != 0)
-
-      DIR *dir;
-
-      HARDBUG((dir = opendir(SEMKEYS_DIR)) == NULL)
-
-      HARDBUG(closedir(dir) != 0)
-    }
-
     my_create_semaphore(with_my_mpi_globals->MMG_semkey_gen_book_barrier);
     my_create_semaphore(with_my_mpi_globals->MMG_semkey_init_endgame_barrier);
     my_create_semaphore(with_my_mpi_globals->MMG_semkey_gen_random_barrier);
@@ -827,7 +690,7 @@ void my_mpi_acquire_semaphore_v2(MPI_Comm arg_comm)
 
   progress_t progress;
 
-  construct_progress(&progress, "my_mpi_acquire_semaphore_v2", 0, 10);
+  construct_progress(&progress, 0, 10);
 
   while (TRUE)
   {
@@ -852,8 +715,6 @@ void my_mpi_acquire_semaphore_v2(MPI_Comm arg_comm)
   }
 
   finalize_progress(&progress);
-
-  destroy_progress(&progress);
 
   MPI_Recv(NULL, 0, MPI_INT, 0, tag, arg_comm, MPI_STATUS_IGNORE);
 
@@ -1122,7 +983,6 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
 local int my_semop(int arg_semid, int arg_sem_num, short arg_op, short arg_flg)
 {
 #ifdef USE_OPENMPI
-#ifdef SEMS_USE_SHM
   struct sembuf sops;
 
   sops.sem_num = arg_sem_num;
@@ -1140,91 +1000,6 @@ local int my_semop(int arg_semid, int arg_sem_num, short arg_op, short arg_flg)
   }
 
   return (rc);
-#else
-  HARDBUG((arg_semid < 0) or (arg_semid >= NMY_SEMKEYS))
-
-  my_semkey_t *with_my_semkey = my_semkeys + arg_semid;
-
-  progress_t progress;
-
-  construct_progress(&progress, "my_semop", 0, 10);
-
-  int rc = -1;
-
-  while (TRUE)
-  {
-    int fd = compat_lock_file(bdata(with_my_semkey->MS_bname), FALSE);
-
-    HARDBUG(fd == -1)
-
-    HARDBUG(compat_read(fd, with_my_semkey->MS_val, sizeof(int) * NSEMS) !=
-            sizeof(int) * NSEMS)
-
-    HARDBUG(compat_lseek(fd, 0, SEEK_SET) != 0)
-
-    int value = with_my_semkey->MS_val[arg_sem_num];
-
-    if (arg_op == 1)
-    {
-      HARDBUG(value >= 1)
-
-      with_my_semkey->MS_val[arg_sem_num] = 1;
-
-      HARDBUG(compat_write(fd, with_my_semkey->MS_val, sizeof(int) * NSEMS) !=
-              sizeof(int) * NSEMS)
-
-      rc = 0;
-    }
-    else if (arg_op == -1)
-    {
-      if (value == 1)
-      {
-        with_my_semkey->MS_val[arg_sem_num] = 0;
-
-        HARDBUG(compat_write(fd, with_my_semkey->MS_val, sizeof(int) * NSEMS) !=
-                sizeof(int) * NSEMS)
-
-        rc = 0;
-      }
-      else
-      {
-        HARDBUG(value != 0)
-      }
-    }
-    else
-      FATAL("unsupported arg_op", EXIT_FAILURE)
-
-    compat_unlock_file(fd);
-
-    if ((rc == 0) or (arg_flg == IPC_NOWAIT))
-      break;
-
-    (void)make_progress(&progress, 0);
-
-    double delay =
-      (1.0 + return_my_random(&(with_my_semkey->MS_random)) % 1000) *
-      MICRO_SECOND;
-
-    if ((return_ndone(&progress) % 1000000) == 0)
-      PRINTF("return_ndone(&progress)=%lld delay=%.6f\n",
-             return_ndone(&progress),
-             delay);
-
-    compat_sleep(delay);
-  }
-
-  finalize_progress(&progress);
-
-  destroy_progress(&progress);
-
-  PRINTF("arg_semid=%d arg_sem_num=%d arg_op=%d rc=%d\n",
-         arg_semid,
-         arg_sem_num,
-         arg_op,
-         rc);
-
-  return (rc);
-#endif
 #else
   return (0);
 #endif
@@ -1248,9 +1023,13 @@ void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
 
   MPI_Comm_rank(arg_comm, &iproc);
 
+  progress_t progress;
+
+  construct_progress(&progress, 0, 10);
+
   int semid;
 
-  HARDBUG((semid = my_semget(arg_semkey, NSEMS, 0600)) == -1);
+  HARDBUG((semid = semget(arg_semkey, NSEMS, 0600)) == -1);
 
   PRINTF("%s::acquiring lock iproc=%d arg_semkey=%d semid=%d\n$",
          __FUNC__,
@@ -1258,7 +1037,17 @@ void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
          arg_semkey,
          semid);
 
-  HARDBUG(my_semop(semid, SEM_MUTEX, -1, 0) != 0)
+  while (TRUE)
+  {
+    if (my_semop(semid, 0, -1, IPC_NOWAIT) == 0)
+      break;
+
+    (void)make_progress(&progress, 0);
+
+    compat_sleep(MILLI_SECOND);
+  }
+
+  finalize_progress(&progress);
 
   PRINTF("%s::acquired lock iproc=%d\n$", __FUNC__, iproc);
 #endif
@@ -1283,9 +1072,9 @@ void my_mpi_release_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
 
   int semid;
 
-  HARDBUG((semid = my_semget(arg_semkey, NSEMS, 0600)) == -1);
+  HARDBUG((semid = semget(arg_semkey, NSEMS, 0600)) == -1);
 
-  HARDBUG(my_semop(semid, SEM_MUTEX, 1, 0) != 0)
+  HARDBUG(my_semop(semid, 0, 1, 0) != 0)
 
   PRINTF("%s::released lock iproc=%d arg_semkey=%d semid=%d\n$",
          __FUNC__,
@@ -1319,7 +1108,7 @@ void my_mpi_barrier_v3(char *arg_info,
 
   int semid;
 
-  HARDBUG((semid = my_semget(arg_semkey, NSEMS, 0600)) == -1)
+  HARDBUG((semid = semget(arg_semkey, NSEMS, 0600)) == -1)
 
   if (arg_verbose)
     PRINTF("%s::entering barrier %s nprocs=%d iproc=%d"

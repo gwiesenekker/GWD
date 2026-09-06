@@ -1,4 +1,4 @@
-// SCU REVISION 8.12464 vr  4 sep 2026  8:14:53 CEST
+// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
 #include "globals.h"
 
 #define SA struct sockaddr
@@ -26,7 +26,7 @@ typedef struct
   int DXP_game_time;
   int DXP_game_moves;
   char DXP_move_string[MY_LINE_MAX];
-  double DXP_game_time_used;
+  int DXP_game_time_used;
   int DXP_move_number;
   char DXP_game_code;
 } dxp_t;
@@ -170,10 +170,7 @@ local void encode(char arg_type,
 
     char string[MY_LINE_MAX];
 
-    snprintf(string,
-             MY_LINE_MAX,
-             "%04d",
-             (int)round(arg_with_dxp->DXP_game_time_used));
+    snprintf(string, MY_LINE_MAX, "%04d", arg_with_dxp->DXP_game_time_used);
 
     strcpy(arg_buffer + i, string);
     i += 4;
@@ -448,7 +445,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *arg_with_dxp)
     {
       move_t *move = moves_list.ML_moves + imove;
 
-      int ifield = move->M_move_from;
+      int ifield = move->M_from;
       int kfield = move->M_move_to;
       ui64_t captures_bb = move->M_captures_bb;
 
@@ -565,8 +562,6 @@ int reads(int arg_sockfd, char arg_buffer[MY_LINE_MAX], int *arg_nbuffer)
         return (INVALID);
       }
 
-      HARDBUG(i >= MY_LINE_MAX)
-
       arg_buffer[i++] = c;
 
       if (c == '\0')
@@ -585,31 +580,19 @@ int reads(int arg_sockfd, char arg_buffer[MY_LINE_MAX], int *arg_nbuffer)
   return (i);
 }
 
-local char *secs2string(double arg_secs)
+local char *secs2string(int arg_t)
 {
   local char string[MY_LINE_MAX];
   int hours;
   int minutes;
   int seconds;
-  int centiseconds;
 
-  int secs = (int)round(arg_secs * 100.0);
+  hours = arg_t / 3600;
+  minutes = (arg_t - hours * 3600) / 60;
+  seconds = arg_t - hours * 3600 - minutes * 60;
+  HARDBUG((hours * 3600 + minutes * 60 + seconds) != arg_t)
 
-  centiseconds = secs % 100;
-
-  secs /= 100;
-  hours = secs / 3600;
-  minutes = (secs - hours * 3600) / 60;
-  seconds = secs - hours * 3600 - minutes * 60;
-
-  snprintf(string,
-           MY_LINE_MAX,
-           "%02d:%02d:%02d.%02d",
-           hours,
-           minutes,
-           seconds,
-           centiseconds);
-
+  snprintf(string, MY_LINE_MAX, "%02d:%02d:%02d", hours, minutes, seconds);
   return (string);
 }
 
@@ -661,10 +644,13 @@ local int play_game(dxp_t *arg_with_dxp, int arg_sockfd)
 
   BDESTROY(bfen)
 
+  if (IS_BLACK(arg_with_dxp->DXP_search.S_board.B_colour2move))
+    game_state.push_move(&game_state, "...", NULL);
+
   int nbuffer;
   char buffer[MY_LINE_MAX];
 
-  arg_with_dxp->DXP_game_time_used = 0.0;
+  arg_with_dxp->DXP_game_time_used = 0;
   arg_with_dxp->DXP_move_number = 0;
 
   time_control_t time_control;
@@ -805,8 +791,8 @@ local int play_game(dxp_t *arg_with_dxp, int arg_sockfd)
 
           PRINTF("DRAW score_min=" PRINTF_SCORE_T " score_max=" PRINTF_SCORE_T
                  "\n",
-                 SCORE2PRINTF(score_min),
-                 SCORE2PRINTF(score_max));
+                 score_min,
+                 score_max);
         }
         else if (arg_with_dxp->DXP_game_code == DXP_IWIN)
         {
@@ -887,7 +873,7 @@ local int play_game(dxp_t *arg_with_dxp, int arg_sockfd)
 
       // check for known endgame
 
-      int egtb_mate = read_endgame(&(arg_with_dxp->DXP_search));
+      int egtb_mate = read_endgame(&(arg_with_dxp->DXP_search), NULL);
 
       if (egtb_mate != ENDGAME_UNKNOWN)
       {
@@ -903,8 +889,8 @@ local int play_game(dxp_t *arg_with_dxp, int arg_sockfd)
 
           PRINTF("DRAW score_min=" PRINTF_SCORE_T " score_max=" PRINTF_SCORE_T
                  "\n",
-                 SCORE2PRINTF(score_min),
-                 SCORE2PRINTF(score_max));
+                 score_min,
+                 score_max);
         }
         else if (egtb_mate > 0)
         {
@@ -1062,7 +1048,7 @@ local int play_game(dxp_t *arg_with_dxp, int arg_sockfd)
                 CSTRING(cbest_move, blength(message.message_text))
 
                 HARDBUG(my_sscanf(bdata(message.message_text),
-                                  "%s" SCANF_SCORE_T_RAW "%d",
+                                  "%s" SCANF_SCORE_T "%d",
                                   cbest_move,
                                   &best_score,
                                   &best_depth) != 3)
@@ -1104,7 +1090,7 @@ local int play_game(dxp_t *arg_with_dxp, int arg_sockfd)
 
         PRINTF("\n* * * * * * * * * * %s " PRINTF_SCORE_T " %d\n\n",
                bdata(bbest_move),
-               SCORE2PRINTF(best_score),
+               best_score,
                best_depth);
 
         if (best_score < score_min)
@@ -1177,12 +1163,12 @@ local int play_game(dxp_t *arg_with_dxp, int arg_sockfd)
 local void set_my_name(void)
 {
   if (compat_strcasecmp(options.dxp_tag, "NULL") == 0)
-    snprintf(my_name, MY_LINE_MAX, "GWD %s %s", revision, options.network0);
+    snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.network0);
   else
     snprintf(my_name,
              MY_LINE_MAX,
              "GWD %s %s %s",
-             revision,
+             REVISION,
              options.dxp_tag,
              options.network0);
 
@@ -1457,17 +1443,10 @@ local void dxp_game_follower(int arg_fd)
 void dxp_server(void)
 {
   int sockfd;
-  int yes = 1;
 
   HARDBUG(compat_socket_startup() != 0)
 
   HARDBUG((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == INVALID)
-
-  HARDBUG(setsockopt(sockfd,
-                     SOL_SOCKET,
-                     SO_REUSEADDR,
-                     (const char *)&yes,
-                     sizeof(yes)) == INVALID)
 
   struct sockaddr_in server_address;
 
