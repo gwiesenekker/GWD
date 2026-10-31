@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef MyMallocH
 #define MyMallocH
 
@@ -15,12 +15,6 @@
     ((P) =                                                                   \
        (T *)my_malloc(#P, __FILE__, __FUNC__, __LINE__, sizeof(T) * (N))) == \
     NULL)
-
-#define MY_FREE_AND_NULL(P) \
-  {                         \
-    my_free(P);             \
-    (P) = NULL;             \
-  }
 
 #ifdef DEBUG
 

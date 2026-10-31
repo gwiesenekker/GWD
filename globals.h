@@ -1,9 +1,8 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef GlobalsH
 #define GlobalsH
 
-#define PROGRAM gwd7
-#define REVISION "8.1236"
+#define REVISION "8.1255"
 
 // generic includes
 
@@ -15,6 +14,9 @@
 #include <time.h>
 #include <math.h>
 #include <stdarg.h>
+#include <limits.h>
+
+_Static_assert(CHAR_BIT == 8, "GWD requires 8-bit bytes");
 
 // specific includes
 
@@ -39,6 +41,9 @@
 
 typedef long long i64_t;
 typedef unsigned long long ui64_t;
+
+_Static_assert(sizeof(i64_t) == 8 && sizeof(ui64_t) == 8,
+               "GWD requires 64-bit i64_t and ui64_t");
 
 #include "compat.h"
 
@@ -69,12 +74,10 @@ typedef unsigned long long ui64_t;
 #define USE_HARDWARE_CRC32
 #define USE_HARDWARE_RAND
 
-#define BOARD_MAX 66
 #define NODE_MAX 1024
-#define NPIECES_MAX 20
 
+#define CJSON_PRAGMA_ID "pragma"
 #define CJSON_PARAMETERS_ID "parameters"
-#define CJSON_TWEAKS_ID "tweaks"
 #define CJSON_SHAPE_ID "shape"
 #define CJSON_NETWORK2MATERIAL_SCORE_ID "network2material_score"
 #define CJSON_MATERIALS_ID "materials"
@@ -86,8 +89,6 @@ typedef unsigned long long ui64_t;
 #define CJSON_ACTIVATION_LAST_ID "activation_last"
 #define CJSON_NMAN_MIN_ID "nman_min"
 #define CJSON_NMAN_MAX_ID "nman_max"
-#define CJSON_SIGNALS_ID "signals"
-#define CJSON_SIGNAL_NAME_ID "name"
 
 #define CJSON_EVENT_ID "event"
 #define CJSON_DATE_ID "date"
@@ -106,17 +107,6 @@ typedef unsigned long long ui64_t;
 #define CJSON_HUB_CLIENT_EXE "exe"
 #define CJSON_HUB_CLIENT_ARG "arg"
 
-#define CJSON_POSITIONS_ID "positions"
-#define CJSON_POSITION_ID "position"
-#define CJSON_BOARD_STRING_ID "B_string"
-#define CJSON_MOVE_SCORE_ID "move_score"
-#define CJSON_WON_ID "won"
-#define CJSON_DRAW_ID "draw"
-#define CJSON_LOST_ID "lost"
-#define CJSON_INVALID_ID "?"
-#define CJSON_SCORE_ID "score"
-#define CJSON_FEN_ID "FEN"
-#define CJSON_PV_ID "pv"
 #define CJSON_HUB_PV_ID "hub_pv"
 
 #define CJSON_CSV_ID "csv"
@@ -127,7 +117,6 @@ typedef unsigned long long ui64_t;
 #define CJSON_DIRECTORY_NAME_ID "name"
 #define CJSON_FILES_ID "files"
 #define CJSON_FILE_NAME_ID "name"
-#define CJSON_FILE_LINES_ID "lines"
 #define CJSON_FILE_ROWS_ID "rows"
 #define CJSON_FILE_COLS_ID "cols"
 #define CJSON_FILE_DATA_ID "data"
@@ -146,7 +135,6 @@ typedef unsigned long long ui64_t;
 
 #define BIT(X) (1U << (X))
 #define BITULL(X) (1ULL << (X))
-#define MASK(X) (~(~0U << (X)))
 
 #define PRINTF(...) my_printf(STDOUT, __VA_ARGS__)
 
@@ -176,9 +164,6 @@ typedef unsigned long long ui64_t;
 #define SOFTBUG(X)
 #endif
 
-#define REALLOC(P, T, N) \
-  HARDBUG(((P) = (T *)realloc((P), sizeof(T) * (N))) == NULL)
-
 #define FREAD(F, P, T, N) HARDBUG(fread(P, sizeof(T), N, F) != N)
 #define FWRITE(F, P, T, N) HARDBUG(fwrite(P, sizeof(T), N, F) != N)
 #define FSEEKO(F, N) HARDBUG(compat_fseeko(F, N, SEEK_SET) != 0)
@@ -189,34 +174,6 @@ typedef unsigned long long ui64_t;
   {                                      \
     HARDBUG(fclose(F) == EOF)(F) = NULL; \
   }
-
-#define STRNCAT(A, B) strncat(A, B, MY_LINE_MAX - 1 - strlen(A))
-
-// specific macro's
-
-#define HASH_KEY_EQ(A, B) (A == B)
-
-#define CLR_HASH_KEY(A) \
-  {                     \
-    A = 0ULL;           \
-  }
-
-#define HASH_KEY_ZERO(A) (A == 0ULL)
-
-#define XOR_HASH_KEY(A, B) \
-  {                        \
-    A ^= B;                \
-  }
-
-#define MOD_HASH_KEY(A, B) ((A) % (B))
-
-#define HASH_KEY_GT(A, B) (A > B)
-
-#define HASH_KEY_ULL_MAX(A) (A == ULL_MAX)
-
-#define HASH_KEY_GE(A, B) (A >= B)
-
-#define HASH_KEY_LE(A, B) (A <= B)
 
 // generic typedefs
 
@@ -245,21 +202,29 @@ typedef i32_t scaled_double_t;
 #define SCORE_T_INT 1
 #define SCORE_T_FLOAT 2
 
-#define SCORE_T SCORE_T_INT
+#define SCORE_T SCORE_T_FLOAT
 
 #if SCORE_T == SCORE_T_INT
 typedef i32_t score_t;
 #define SCANF_SCORE_T "%d"
 #define PRINTF_SCORE_T "%d"
+#define SCANF_SCORE_T_RAW "%d"
+#define PRINTF_SCORE_T_RAW "%d"
+#define ABS_SCORE_T abs
+#define SCORE(S) ((score_t)(S))
+#define SCORE2PRINTF(S) (S)
 #elif SCORE_T == SCORE_T_FLOAT
-typedef float score_t;
-#define SCANF_SCORE_T "%f"
-#define PRINTF_SCORE_T "%.2f"
+typedef i32_t score_t;
+#define SCANF_SCORE_T "%d"
+#define PRINTF_SCORE_T "%.3f"
+#define SCANF_SCORE_T_RAW "%d"
+#define PRINTF_SCORE_T_RAW "%d"
+#define ABS_SCORE_T abs
+#define SCORE(S) ((score_t)((S) * 1000))
+#define SCORE2PRINTF(S) ((S) / 1000.0)
 #else
 #error unknown SCORE_T
 #endif
-
-#define SCORE(S) ((score_t)(S))
 
 // I have to get rid of this!
 
@@ -290,6 +255,8 @@ extern void *STDOUT;
 #include "timers.h"
 #include "utils.h"
 #include "patterns.h"
+
+#include "gwdegtb.h"
 
 #include "networks.h"
 #include "boards.h"

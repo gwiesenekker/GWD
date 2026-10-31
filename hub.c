@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -233,6 +233,8 @@ void hub(void)
 
       string2board(&(with_search->S_board), start_board);
 
+      PRINTF("starting position\n");
+
       print_board(&(with_search->S_board));
 
       BSTRING(bfen)
@@ -250,39 +252,56 @@ void hub(void)
       {
         name = command.command_args[1].arg_name;
 
-        char *moves = command.command_args[1].arg_value;
-
         HARDBUG(compat_strcasecmp(name, "moves") != 0)
 
-        int nmoves = 0;
+        BSTRING(b)
 
-        while (TRUE)
+        bassigncstr(b, " ");
+
+        BSTRING(bmoves)
+
+        HARDBUG(bassigncstr(bmoves, command.command_args[1].arg_value) ==
+                BSTR_ERR)
+
+        struct bstrList *btokens;
+
+        HARDBUG((btokens = bsplits(bmoves, b)) == NULL)
+
+        PRINTF("got %d moves\n", btokens->qty);
+
+        moves_list_t moves_list;
+
+        construct_moves_list(&moves_list);
+
+        for (int itoken = 0; itoken < btokens->qty; itoken++)
         {
-          while (isspace(*moves))
-            moves++;
+          PRINTF("got move %s\n", bdata(btokens->entry[itoken]));
 
-          if (*moves == '\0')
-            break;
+          gen_moves(&(with_search->S_board), &moves_list);
 
-          char *move_string = moves;
+          int imove;
 
-          while (isgraph(*moves))
-            moves++;
+          HARDBUG((imove = search_move(&moves_list, btokens->entry[itoken])) ==
+                  INVALID)
 
-          if (*moves == ' ')
-          {
-            *moves = '\0';
-            moves++;
-          }
+          game_state.push_move(&game_state,
+                               bdata(btokens->entry[itoken]),
+                               NULL);
 
-          PRINTF("got move %s\n", move_string);
-
-          game_state.push_move(&game_state, move_string, NULL);
-
-          nmoves++;
+          do_move(&(with_search->S_board), imove, &moves_list);
         }
-        PRINTF("got %d moves\n", nmoves);
+
+        HARDBUG(bstrListDestroy(btokens) == BSTR_ERR)
+
+        BDESTROY(bmoves)
+
+        BDESTROY(b)
+
+        PRINTF("current position\n");
+
+        print_board(&(with_search->S_board));
       }
+
       continue;
     }
     else if (compat_strcasecmp(command.command, "level") == 0)
@@ -449,97 +468,183 @@ void hub(void)
 
       check_moves(&(with_search->S_board), &moves_list);
 
-      BSTRING(bmove_string)
-
-      if (options.use_book)
-        return_book_move(&(with_search->S_board), &moves_list, bmove_string);
-
-      HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
-
-      if ((compat_strcasecmp(name, "think") == 0) and
-          (moves_list.ML_nmoves == 1))
+      if (compat_strcasecmp(name, "mcts") == 0)
       {
-        move2bstring(&moves_list, 0, bmove_string);
+        enqueue(return_thread_queue(thread_alpha_beta_master),
+                MESSAGE_STATE,
+                game_state.get_game_state(&game_state));
+
+        enqueue(return_thread_queue(thread_alpha_beta_master),
+                MESSAGE_MCTS,
+                "hub/hub");
+
+        // poll
+
+        int abort = FALSE;
+        message_t message;
+
+        while (TRUE)
+        {
+          if (!abort and hub_input())
+          {
+            PRINTF("got input!\n");
+
+            enqueue(return_thread_queue(thread_alpha_beta_master),
+                    MESSAGE_ABORT_SEARCH,
+                    "hub/hub");
+
+            abort = TRUE;
+          }
+
+          if (dequeue(&main_queue, &message) == INVALID)
+          {
+            HARDBUG(compat_sleep(CENTI_SECOND) != 0)
+
+            continue;
+          }
+
+          if (message.message_id == MESSAGE_INFO)
+          {
+            PRINTF("got info %s\n", bdata(message.message_text));
+
+            char info[MY_LINE_MAX];
+
+            snprintf(info,
+                     MY_LINE_MAX,
+                     "info %s\n",
+                     bdata(message.message_text));
+
+            write_to_hub(info);
+          }
+          else if (message.message_id == MESSAGE_RESULT)
+          {
+            PRINTF("got result %s\n", bdata(message.message_text));
+
+            break;
+          }
+          else
+            FATAL("message.message_id error", EXIT_FAILURE)
+        } // while(TRUE)
+
+        double result, lcb, ucb;
+
+        HARDBUG(my_sscanf(bdata(message.message_text),
+                          "%lf%lf%lf",
+                          &result,
+                          &lcb,
+                          &ucb) != 3)
+
+        snprintf(line,
+                 MY_LINE_MAX,
+                 "done result=%.6f"
+                 " lcb=%.6f"
+                 " ucb=%.6f"
+                 " lcb-ucb=%.6f\n",
+                 result,
+                 lcb,
+                 ucb,
+                 lcb - ucb);
+
+        write_to_hub(line);
       }
       else
       {
-        if ((compat_strcasecmp(name, "think") == 0) and options.use_book)
+        // think, ponder or analyze
+
+        BSTRING(bmove_string)
+
+        if (options.use_book)
           return_book_move(&(with_search->S_board), &moves_list, bmove_string);
 
-        if (compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
+        HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
+
+        if ((compat_strcasecmp(name, "think") == 0) and
+            (moves_list.ML_nmoves == 1))
         {
-          enqueue(return_thread_queue(thread_alpha_beta_master),
-                  MESSAGE_STATE,
-                  game_state.get_game_state(&game_state));
-
-          enqueue(return_thread_queue(thread_alpha_beta_master),
-                  MESSAGE_GO,
-                  "hub/hub");
-
-          int abort = FALSE;
-          message_t message;
-
-          while (TRUE)
-          {
-            if (!abort and hub_input())
-            {
-              PRINTF("got input!\n");
-
-              enqueue(return_thread_queue(thread_alpha_beta_master),
-                      MESSAGE_ABORT_SEARCH,
-                      "hub/hub");
-
-              abort = TRUE;
-            }
-
-            if (dequeue(&main_queue, &message) == INVALID)
-            {
-              compat_sleep(CENTI_SECOND);
-
-              continue;
-            }
-
-            if (message.message_id == MESSAGE_INFO)
-            {
-              PRINTF("got info %s\n", bdata(message.message_text));
-
-              char info[MY_LINE_MAX];
-
-              snprintf(info,
-                       MY_LINE_MAX,
-                       "info %s\n",
-                       bdata(message.message_text));
-
-              write_to_hub(info);
-            }
-            else if (message.message_id == MESSAGE_RESULT)
-            {
-              PRINTF("got result %s\n", bdata(message.message_text));
-
-              break;
-            }
-            else
-              FATAL("message.message_id error", EXIT_FAILURE)
-          } // while(TRUE)
-
-          CSTRING(cmove_string, blength(message.message_text))
-
-          HARDBUG(my_sscanf(bdata(message.message_text), "%s", cmove_string) !=
-                  1)
-
-          HARDBUG(bassigncstr(bmove_string, cmove_string) == BSTR_ERR)
-
-          CDESTROY(cmove_string)
+          move2bstring(&moves_list, 0, bmove_string);
         }
+        else
+        {
+          if ((compat_strcasecmp(name, "think") == 0) and options.use_book)
+            return_book_move(&(with_search->S_board),
+                             &moves_list,
+                             bmove_string);
+
+          if (compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
+          {
+            enqueue(return_thread_queue(thread_alpha_beta_master),
+                    MESSAGE_STATE,
+                    game_state.get_game_state(&game_state));
+
+            enqueue(return_thread_queue(thread_alpha_beta_master),
+                    MESSAGE_GO,
+                    "hub/hub");
+
+            int abort = FALSE;
+            message_t message;
+
+            while (TRUE)
+            {
+              if (!abort and hub_input())
+              {
+                PRINTF("got input!\n");
+
+                enqueue(return_thread_queue(thread_alpha_beta_master),
+                        MESSAGE_ABORT_SEARCH,
+                        "hub/hub");
+
+                abort = TRUE;
+              }
+
+              if (dequeue(&main_queue, &message) == INVALID)
+              {
+                HARDBUG(compat_sleep(CENTI_SECOND) != 0)
+
+                continue;
+              }
+
+              if (message.message_id == MESSAGE_INFO)
+              {
+                PRINTF("got info %s\n", bdata(message.message_text));
+
+                char info[MY_LINE_MAX];
+
+                snprintf(info,
+                         MY_LINE_MAX,
+                         "info %s\n",
+                         bdata(message.message_text));
+
+                write_to_hub(info);
+              }
+              else if (message.message_id == MESSAGE_RESULT)
+              {
+                PRINTF("got result %s\n", bdata(message.message_text));
+
+                break;
+              }
+              else
+                FATAL("message.message_id error", EXIT_FAILURE)
+            } // while(TRUE)
+
+            CSTRING(cmove_string, blength(message.message_text))
+
+            HARDBUG(
+              my_sscanf(bdata(message.message_text), "%s", cmove_string) != 1)
+
+            HARDBUG(bassigncstr(bmove_string, cmove_string) == BSTR_ERR)
+
+            CDESTROY(cmove_string)
+          }
+        }
+
+        HARDBUG(compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
+
+        snprintf(line, MY_LINE_MAX, "done move=%s\n", bdata(bmove_string));
+
+        write_to_hub(line);
+
+        BDESTROY(bmove_string)
       }
-
-      HARDBUG(compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
-
-      snprintf(line, MY_LINE_MAX, "done move=%s\n", bdata(bmove_string));
-
-      write_to_hub(line);
-
-      BDESTROY(bmove_string)
     }
     else if (compat_strcasecmp(command.command, "ping") == 0)
     {
@@ -1038,7 +1143,7 @@ local int play_game(search_t *arg_with_search,
             else
               FATAL("message.message_id error", EXIT_FAILURE)
           }
-          compat_sleep(CENTI_SECOND);
+          HARDBUG(compat_sleep(CENTI_SECOND) != 0)
         }
       }
 
@@ -1077,7 +1182,7 @@ local int play_game(search_t *arg_with_search,
 
       // check for known endgame
 
-      int egtb_mate = read_endgame(arg_with_search, NULL);
+      int egtb_mate = read_endgame(arg_with_search);
 
       if (egtb_mate != ENDGAME_UNKNOWN)
       {
@@ -1199,7 +1304,7 @@ local int play_game(search_t *arg_with_search,
               else
                 FATAL("message.message_id error", EXIT_FAILURE)
             }
-            compat_sleep(CENTI_SECOND);
+            HARDBUG(compat_sleep(CENTI_SECOND) != 0)
           }
         }
       }
@@ -1281,7 +1386,7 @@ local int play_game(search_t *arg_with_search,
             else
               FATAL("message.message_id error", EXIT_FAILURE)
           }
-          compat_sleep(CENTI_SECOND);
+          HARDBUG(compat_sleep(CENTI_SECOND) != 0)
         }
 
         PRINTF("evaluate best_move=%s best_score=%d best_depth=%d\n",
@@ -1289,7 +1394,7 @@ local int play_game(search_t *arg_with_search,
                best_score,
                best_depth);
 
-        int fd = compat_lock_file("hub.fen");
+        int fd = compat_lock_file("hub.fen", TRUE);
 
         HARDBUG(fd == -1)
 
@@ -1297,12 +1402,12 @@ local int play_game(search_t *arg_with_search,
 
         board2fen(&(arg_with_search->S_board), bfen, FALSE);
 
-        compat_fdprintf(fd,
-                        "%s {%.5f}\n",
-                        bdata(bfen),
-                        return_sigmoid(best_score / 100.0));
+        HARDBUG(compat_fdprintf(fd,
+                                "%s {%.5f}\n",
+                                bdata(bfen),
+                                return_sigmoid(best_score / 100.0)) < 0)
 
-        compat_unlock_file(fd);
+        HARDBUG(compat_unlock_file(fd) != 0)
       }
 
       BDESTROY(bbest_string)

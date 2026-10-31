@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef BucketsH
 #define BucketsH
 
@@ -7,8 +7,6 @@
 
 typedef struct
 {
-  my_printf_t *bucket_my_printf;
-
   bstring bucket_name;
 
   double bucket_size;

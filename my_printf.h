@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef MyPrintfH
 #define MyPrintfH
 
@@ -16,7 +16,6 @@ typedef struct
   bstring MP_bbuffer;
 
   bstring MP_bline;
-  bstring MP_bstamp;
 
   my_mutex_t MP_mutex;
 
@@ -28,8 +27,7 @@ extern bstring my_printf_logs_dir;
 // my_printf.c
 
 void construct_my_printf(my_printf_t *, char *, int);
-void my_printf(my_printf_t *, char *, ...)
-  __attribute__((format(printf, 2, 3)));
+void my_printf(my_printf_t *, char *, ...) COMPAT_FORMAT(printf, 2, 3);
 void pause_my_printf(my_printf_t *);
 void resume_my_printf(my_printf_t *);
 void init_my_printf(void);

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef SearchH
 #define SearchH
 
@@ -6,6 +6,9 @@
 
 #define NPV_SLOTS 4
 #define NPV_ENTRIES 64
+
+_Static_assert(NPV_ENTRIES > 0 && (NPV_ENTRIES & (NPV_ENTRIES - 1)) == 0,
+               "PV entry count must be a power of two");
 
 #define MINIMAL_WINDOW_BIT BIT(0)
 #define PV_BIT BIT(1)
@@ -29,10 +32,8 @@
 #define IS_SR_LE_ALPHA(X) ((X) & SR_LE_ALPHA_BIT)
 #define IS_SR_GE_BETA(X) ((X) & SR_GE_BETA_BIT)
 #define IS_SR_TRUE_SCORE(X) ((X) & SR_TRUE_SCORE_BIT)
-#define IS_SR_EGTB_DRAW(X) ((X) & SR_EGTB_DRAW_BIT)
 #define IS_SR_WON(X) ((X) & SR_WON_BIT)
 #define IS_SR_LOST(X) ((X) & SR_LOST_BIT)
-#define IS_SR_SINGULAR_REDUCTION(X) ((X) & SR_SINGULAR_REDUCTION_BIT)
 
 #define PV_SLOT_WHITE_MOVE_MASK 0xFFULL
 #define PV_SLOT_BLACK_MOVE_MASK 0xFF00ULL
@@ -78,24 +79,15 @@ typedef struct
 
   my_random_t S_random;
 
-  cache_t S_endgame_entry_cache;
-  cache_t S_endgame_wdl_entry_cache;
-
   score_t S_root_simple_score;
   score_t S_root_score;
   score_t S_best_score;
   int S_best_score_kind;
   int S_best_move;
   int S_best_depth;
+  pv_entries_t S_best_pv;
 
   i64_t S_total_move_repetitions;
-
-  i64_t S_total_quiescence_nodes;
-  i64_t S_total_quiescence_1move;
-  i64_t S_total_quiescence_all_moves_captures_only;
-  i64_t S_total_quiescence_all_moves_le2_moves;
-  i64_t S_total_quiescence_all_moves_combination;
-  i64_t S_total_quiescence_all_moves_extended;
 
   i64_t S_total_nodes;
   i64_t S_total_alpha_beta_nodes;
@@ -103,8 +95,8 @@ typedef struct
   i64_t S_total_capture_nodes;
   i64_t S_total_minimal_window_nodes;
   i64_t S_total_pv_nodes;
-
-  i64_t S_total_quiescence_extension_searches_combination;
+  i64_t S_total_quiescence_nodes;
+  i64_t S_total_quiescence_1move;
 
   i64_t S_total_pv_extension_searches_combination;
 
@@ -118,7 +110,6 @@ typedef struct
   i64_t S_total_singular_extension_probes_le_alpha;
   i64_t S_total_singular_extension_probes_ge_beta;
   i64_t S_total_singular_extensions;
-  i64_t S_total_singular_reductions;
 
   i64_t S_total_evaluations;
   i64_t S_total_lazy_alpha_evaluations;
@@ -146,6 +137,8 @@ typedef struct
 
   i64_t S_total_score_cache_hits;
   i64_t S_total_score_cache_crc_errors;
+
+  GwdegtbWdlProbe *S_wdl_probe;
 } search_t;
 
 int draw_by_repetition(board_t *, int);

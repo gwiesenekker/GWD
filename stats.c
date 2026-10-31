@@ -1,24 +1,19 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
+#include <float.h>
 
 void clear_stats(stats_t *arg_with_stats)
 {
   arg_with_stats->S_n = 0;
 
-  arg_with_stats->S_min = 0.0;
-  arg_with_stats->S_max = 0.0;
-
-  arg_with_stats->S_mean_welford = 0.0;
-  arg_with_stats->S_sigma_welford = 0.0;
+  arg_with_stats->S_min = DBL_MAX;
+  arg_with_stats->S_max = -DBL_MAX;
 
   arg_with_stats->S_sum = 0.0;
   arg_with_stats->S_sum2 = 0.0;
 
   arg_with_stats->S_mean = 0.0;
   arg_with_stats->S_sigma = 0.0;
-
-  arg_with_stats->S_mean_sum = 0.0;
-  arg_with_stats->S_sigma_sum2 = 0.0;
 }
 
 void construct_stats(stats_t *arg_with_stats, char *arg_name)
@@ -33,14 +28,15 @@ void mean_sigma(stats_t *arg_with_stats)
   if (arg_with_stats->S_n == 0)
     return;
 
-  arg_with_stats->S_mean = arg_with_stats->S_mean_welford;
-  arg_with_stats->S_sigma =
-    sqrt(arg_with_stats->S_sigma_welford / arg_with_stats->S_n);
+  arg_with_stats->S_mean = arg_with_stats->S_sum / arg_with_stats->S_n;
 
-  arg_with_stats->S_mean_sum = arg_with_stats->S_sum / arg_with_stats->S_n;
-  arg_with_stats->S_sigma_sum2 =
-    sqrt(arg_with_stats->S_sum2 / arg_with_stats->S_n -
-         arg_with_stats->S_mean_sum * arg_with_stats->S_mean_sum);
+  double variance = sqrt(arg_with_stats->S_sum2 / arg_with_stats->S_n -
+                         arg_with_stats->S_mean * arg_with_stats->S_mean);
+
+  if (variance < 0.0)
+    variance = 0.0;
+
+  arg_with_stats->S_sigma = sqrt(variance);
 }
 
 void printf_stats(stats_t *arg_with_stats)
@@ -50,12 +46,8 @@ void printf_stats(stats_t *arg_with_stats)
   PRINTF("min=%.6f\n", arg_with_stats->S_min);
   PRINTF("max=%.6f\n", arg_with_stats->S_max);
 
-  PRINTF("mean=%.6f(%.6f)\n",
-         arg_with_stats->S_mean,
-         arg_with_stats->S_mean_sum);
-  PRINTF("sigma=%.6f(%.6f)\n",
-         arg_with_stats->S_sigma,
-         arg_with_stats->S_sigma_sum2);
+  PRINTF("mean=%.6f\n", arg_with_stats->S_mean);
+  PRINTF("sigma=%.6f\n", arg_with_stats->S_sigma);
 }
 
 void my_stats_aggregate(stats_t *arg_with_stats, MPI_Comm arg_comm)
@@ -74,25 +66,14 @@ void my_stats_aggregate(stats_t *arg_with_stats, MPI_Comm arg_comm)
                    &(arg_with_stats->S_min),
                    1,
                    MPI_DOUBLE,
-                   MPI_SUM,
+                   MPI_MIN,
                    arg_comm);
+
   my_mpi_allreduce(MPI_IN_PLACE,
                    &(arg_with_stats->S_max),
                    1,
                    MPI_DOUBLE,
-                   MPI_SUM,
-                   arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE,
-                   &(arg_with_stats->S_mean_welford),
-                   1,
-                   MPI_DOUBLE,
-                   MPI_SUM,
-                   arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE,
-                   &(arg_with_stats->S_sigma_welford),
-                   1,
-                   MPI_DOUBLE,
-                   MPI_SUM,
+                   MPI_MAX,
                    arg_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE,
@@ -103,18 +84,6 @@ void my_stats_aggregate(stats_t *arg_with_stats, MPI_Comm arg_comm)
                    arg_comm);
   my_mpi_allreduce(MPI_IN_PLACE,
                    &(arg_with_stats->S_sum2),
-                   1,
-                   MPI_DOUBLE,
-                   MPI_SUM,
-                   arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE,
-                   &(arg_with_stats->S_mean_sum),
-                   1,
-                   MPI_DOUBLE,
-                   MPI_SUM,
-                   arg_comm);
-  my_mpi_allreduce(MPI_IN_PLACE,
-                   &(arg_with_stats->S_sigma_sum2),
                    1,
                    MPI_DOUBLE,
                    MPI_SUM,

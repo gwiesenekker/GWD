@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
 
 #define NFBUFFER (4 * MBYTE)
@@ -7,7 +7,7 @@ void flush_fbuffer(fbuffer_t *arg_with_fbuffer, int arg_nfbuffer)
 {
   if (arg_with_fbuffer->FB_nfbuffer > arg_nfbuffer)
   {
-    int fd = compat_lock_file(bdata(arg_with_fbuffer->FB_bname));
+    int fd = compat_lock_file(bdata(arg_with_fbuffer->FB_bname), TRUE);
 
     HARDBUG(fd == -1)
 
@@ -16,7 +16,7 @@ void flush_fbuffer(fbuffer_t *arg_with_fbuffer, int arg_nfbuffer)
                          arg_with_fbuffer->FB_nfbuffer) !=
             arg_with_fbuffer->FB_nfbuffer)
 
-    compat_unlock_file(fd);
+    HARDBUG(compat_unlock_file(fd) != 0)
 
     arg_with_fbuffer->FB_nfbuffer = 0;
   }

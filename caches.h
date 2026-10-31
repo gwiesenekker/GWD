@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef CachesH
 #define CachesH
 
@@ -33,8 +33,6 @@ typedef struct
   i64_t C_nupdates;
 
   i64_t C_noverwrites;
-
-  my_mutex_t C_mutex;
 } cache_t;
 
 int check_entry_in_cache(cache_t *, void *, void *);

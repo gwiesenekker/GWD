@@ -1,25 +1,71 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
+#include <stdatomic.h>
 
 typedef struct
 {
   ui64_t SCS_key;
-  score_t SCS_score;
-  ui32_t SCS_crc32;
+  union
+  {
+    ui64_t SCS_data;
+    struct
+    {
+      score_t SCS_score;
+      ui32_t SCS_crc32;
+    };
+  };
 } score_cache_slot_t;
+
+_Static_assert(sizeof(score_cache_slot_t) == 16 &&
+                 offsetof(score_cache_slot_t, SCS_data) == 8 &&
+                 offsetof(score_cache_slot_t, SCS_score) == 8 &&
+                 offsetof(score_cache_slot_t, SCS_crc32) == 12,
+               "score-cache slot must retain its 16-byte layout");
+
+typedef struct
+{
+  _Atomic(uint64_t) SCS_key;
+  _Atomic(uint64_t) SCS_data;
+} score_cache_shared_slot_t;
+
+_Static_assert(sizeof(score_cache_shared_slot_t) == sizeof(score_cache_slot_t),
+               "atomic score-cache storage must preserve cache capacity");
+
+/* Each word is atomic, not the complete record. Keep checksum validation. */
+local inline void load_score_cache_slot(score_cache_slot_t *to,
+                                        const score_cache_shared_slot_t *from)
+{
+  to->SCS_key = atomic_load_explicit(&from->SCS_key, memory_order_relaxed);
+  to->SCS_data = atomic_load_explicit(&from->SCS_data, memory_order_relaxed);
+}
+
+local inline void store_score_cache_slot(score_cache_shared_slot_t *to,
+                                         const score_cache_slot_t *from)
+{
+  atomic_store_explicit(&to->SCS_key, from->SCS_key, memory_order_relaxed);
+  atomic_store_explicit(&to->SCS_data, from->SCS_data, memory_order_relaxed);
+}
+
+local inline void init_score_cache_slot(score_cache_shared_slot_t *to,
+                                        const score_cache_slot_t *from)
+{
+  atomic_init(&to->SCS_key, from->SCS_key);
+  atomic_init(&to->SCS_data, from->SCS_data);
+}
 
 local i64_t nscore_cache_entries;
 local score_cache_slot_t score_cache_slot_default;
-local score_cache_slot_t *score_cache[NCOLOUR_ENUM];
+local score_cache_shared_slot_t *score_cache[NCOLOUR_ENUM];
 
 local int probe_score_cache(search_t *arg_with_search,
-                            score_cache_slot_t *arg_score_cache,
+                            score_cache_shared_slot_t *arg_score_cache,
                             score_cache_slot_t *arg_score_cache_slot)
 {
   int result = FALSE;
 
-  *arg_score_cache_slot =
-    arg_score_cache[arg_with_search->S_board.B_key % nscore_cache_entries];
+  load_score_cache_slot(
+    arg_score_cache_slot,
+    &arg_score_cache[arg_with_search->S_board.B_key % nscore_cache_entries]);
 
   ui32_t crc32 = 0xFFFFFFFF;
   crc32 = HW_CRC32_U64(crc32, arg_score_cache_slot->SCS_key);
@@ -41,19 +87,66 @@ local int probe_score_cache(search_t *arg_with_search,
 }
 
 local void update_score_cache(search_t *arg_with_search,
-                              score_cache_slot_t *arg_score_cache,
+                              score_cache_shared_slot_t *arg_score_cache,
                               score_cache_slot_t *arg_score_cache_slot)
 {
-  arg_score_cache[arg_with_search->S_board.B_key % nscore_cache_entries] =
-    *arg_score_cache_slot;
+  store_score_cache_slot(
+    &arg_score_cache[arg_with_search->S_board.B_key % nscore_cache_entries],
+    arg_score_cache_slot);
 }
 
 #undef GEN_CSV
+
+static inline uint64_t mirror_bb(uint64_t bb)
+{
+  ui64_t result;
+
+  result = (bb >> 6);
+
+  result = BIT_REVERSE(result) >> (64 - 54);
+
+  result = (result << 6);
+
+#ifdef DEBUG
+  ui64_t debug = 0;
+
+  while (bb)
+  {
+    int ifield = BIT_CTZ(bb);
+
+    bb &= ~BITULL(ifield);
+
+    debug |= 1ULL << (65 - ifield);
+  }
+
+  HARDBUG(debug != result)
+#endif
+
+  return (result);
+}
 
 score_t return_score_from_board(board_t *arg_with_board,
                                 double_t *arg_network_score_scaled)
 {
   score_t result = SCORE(0);
+
+  int mirror = FALSE;
+
+  if (IS_BLACK(arg_with_board->B_colour2move))
+  {
+    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_man_bb);
+    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_man_bb);
+    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_king_bb);
+    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_king_bb);
+
+    arg_with_board->B_white_man_bb = white_man_bb;
+    arg_with_board->B_black_man_bb = black_man_bb;
+    arg_with_board->B_white_king_bb = white_king_bb;
+    arg_with_board->B_black_king_bb = black_king_bb;
+
+    arg_with_board->B_colour2move = WHITE_ENUM;
+    mirror = TRUE;
+  }
 
   network_t *with_network = networks + arg_with_board->B_network_id;
 
@@ -78,6 +171,22 @@ score_t return_score_from_board(board_t *arg_with_board,
   int nwhite_king = BIT_COUNT(arg_with_board->B_white_king_bb);
   int nblack_king = BIT_COUNT(arg_with_board->B_black_king_bb);
 
+#ifdef USE_AVX2_INTRINSICS
+  __m256 sum0;
+  __m256 sum1;
+  __m256 sum64[8];
+
+  if (with_network->N_pattern_dense_network_64x16_kernel)
+    for (int i = 0; i < 8; i++)
+      sum64[i] = _mm256_setzero_ps();
+
+  if (with_network->N_pattern_dense_network_16x8_kernel)
+  {
+    sum0 = _mm256_setzero_ps();
+    sum1 = _mm256_setzero_ps();
+  }
+#endif
+
   for (int ipattern = 0;
        ipattern < with_network->N_patterns_shared.PSS_npatterns;
        ipattern++)
@@ -89,77 +198,78 @@ score_t return_score_from_board(board_t *arg_with_board,
 
     if (with_pattern_shared->PS_id == PATTERN_BASE3_INDEX_ID)
     {
-      istate = base3_index_v2(arg_with_board, with_pattern_shared->PS_bb);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_MAN_ID)
-    {
-      istate = nwhite_man;
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_MAN_ID)
-    {
-      istate = nblack_man;
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_KING_ID)
-    {
-      istate = nwhite_king;
-
-      if (istate > PATTERN_NKING_MAX)
-        istate = PATTERN_NKING_MAX;
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_KING_ID)
-    {
-      istate = nblack_king;
-
-      if (istate > PATTERN_NKING_MAX)
-        istate = PATTERN_NKING_MAX;
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_WHITE_MOBILITY_ID)
-    {
-      istate = return_mobility(arg_with_board, WHITE_ENUM);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_BLACK_MOBILITY_ID)
-    {
-      istate = return_mobility(arg_with_board, BLACK_ENUM);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_WHITE_IMMOBILITY_ID)
-    {
-      istate = return_immobility(arg_with_board, WHITE_ENUM);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_BLACK_IMMOBILITY_ID)
-    {
-      istate = return_immobility(arg_with_board, BLACK_ENUM);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_KING_DIAGONAL_5_46_ID)
-    {
-      istate = BIT_COUNT(arg_with_board->B_white_king_bb & diagonal_5_46_bb);
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_KING_DIAGONAL_5_46_ID)
-    {
-      istate = BIT_COUNT(arg_with_board->B_black_king_bb & diagonal_5_46_bb);
+      istate = base3_index_v4(arg_with_board, with_pattern_shared->PS_bb);
     }
 
     HARDBUG(istate == INVALID)
 
-    if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
-    {
-      vadd_ab2a(with_pattern_shared->PS_nembed,
-                network_state->NS_pattern_dense_network_state.DNS_inputs +
-                  with_pattern_shared->PS_offset,
-                with_pattern_shared->PS_weights_nstatesxnembed[istate]);
-    }
-    else
-    {
-      if (arg_network_score_scaled != NULL)
-        vcopy_a2b(with_pattern_shared->PS_nembed,
-                  with_pattern_shared->PS_weights_nstatesxnembed[istate],
-                  network_state->NS_pattern_dense_network_state.DNS_inputs +
-                    with_pattern_shared->PS_offset);
+    HARDBUG(istate < 0)
 
-      vadd_ab2a(with_current->LS_noutputs,
-                with_current_thread->LT_dot,
-                with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
+    istate = with_pattern_shared->PS_state_map[istate];
+
+    if (istate != INVALID)
+    {
+      if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
+      {
+#ifdef USE_AVX2_INTRINSICS
+        if (with_network->N_pattern_dense_network_16x8_kernel)
+        {
+          const float *weights =
+            with_pattern_shared->PS_weights_nstatesxnembed[istate];
+
+          // MPI shared allocations need not be 32-byte aligned.
+          sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
+          sum1 = _mm256_add_ps(sum1, _mm256_loadu_ps(weights + 8));
+        }
+        else if (with_network->N_pattern_dense_network_64x16_kernel)
+        {
+          const float *weights =
+            with_pattern_shared->PS_weights_nstatesxnembed[istate];
+
+          // Preserve pattern order and allow unaligned shared-memory rows.
+          for (int i = 0; i < 8; i++)
+            sum64[i] =
+              _mm256_add_ps(sum64[i], _mm256_loadu_ps(weights + 8 * i));
+        }
+        else
+#endif
+          vadd_ab2a(with_pattern_shared->PS_nembed,
+                    network_state->NS_pattern_dense_network_state.DNS_inputs +
+                      with_pattern_shared->PS_offset,
+                    with_pattern_shared->PS_weights_nstatesxnembed[istate]);
+      }
+      else
+      {
+        if (arg_network_score_scaled != NULL)
+          vcopy_a2b(with_pattern_shared->PS_nembed,
+                    with_pattern_shared->PS_weights_nstatesxnembed[istate],
+                    network_state->NS_pattern_dense_network_state.DNS_inputs +
+                      with_pattern_shared->PS_offset);
+
+        vadd_ab2a(with_current->LS_noutputs,
+                  with_current_thread->LT_dot,
+                  with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
+      }
     }
   }
+
+#ifdef USE_AVX2_INTRINSICS
+  if (with_network->N_pattern_dense_network_16x8_kernel)
+  {
+    _mm256_store_ps(network_state->NS_pattern_dense_network_state.DNS_inputs,
+                    sum0);
+    _mm256_store_ps(network_state->NS_pattern_dense_network_state.DNS_inputs +
+                      8,
+                    sum1);
+  }
+  else if (with_network->N_pattern_dense_network_64x16_kernel)
+  {
+    for (int i = 0; i < 8; i++)
+      _mm256_store_ps(network_state->NS_pattern_dense_network_state.DNS_inputs +
+                        8 * i,
+                      sum64[i]);
+  }
+#endif
 
   double network_score_scaled = return_dense_network_score_scaled(
     &(with_network->N_pattern_dense_network_shared),
@@ -180,6 +290,17 @@ score_t return_score_from_board(board_t *arg_with_board,
     for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
       with_current_thread->LT_dot[ioutput] = 0;
 
+#ifdef USE_AVX2_INTRINSICS
+    if (with_network->N_material_dense_network_16x8_kernel)
+    {
+      sum0 = _mm256_setzero_ps();
+      sum1 = _mm256_setzero_ps();
+    }
+    if (with_network->N_material_dense_network_64x16_kernel)
+      for (int i = 0; i < 8; i++)
+        sum64[i] = _mm256_setzero_ps();
+#endif
+
     for (int imaterial = 0;
          imaterial < with_network->N_materials_shared.MSS_nmaterials;
          imaterial++)
@@ -197,14 +318,16 @@ score_t return_score_from_board(board_t *arg_with_board,
       {
         istate = nblack_man;
       }
-      else if (with_material_shared->MS_id == MATERIAL_NWHITE_KING_ID)
+      else if ((with_material_shared->MS_id == MATERIAL_NWHITE_KING_ID) or
+               (with_material_shared->MS_id == MATERIAL_NWHITE_KING20_ID))
       {
         istate = nwhite_king;
 
         if (istate >= with_material_shared->MS_nstates)
           istate = with_material_shared->MS_nstates - 1;
       }
-      else if (with_material_shared->MS_id == MATERIAL_NBLACK_KING_ID)
+      else if ((with_material_shared->MS_id == MATERIAL_NBLACK_KING_ID) or
+               (with_material_shared->MS_id == MATERIAL_NBLACK_KING20_ID))
       {
         istate = nblack_king;
 
@@ -225,39 +348,36 @@ score_t return_score_from_board(board_t *arg_with_board,
                    (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
                  nblack_man * (MATERIAL_KING_MAX + 1) + mblack_king;
       }
-      else if (with_material_shared->MS_id == MATERIAL_WHITE_MOBILITY_ID)
-      {
-        istate = return_mobility(arg_with_board, WHITE_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_BLACK_MOBILITY_ID)
-      {
-        istate = return_mobility(arg_with_board, BLACK_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_WHITE_IMMOBILITY_ID)
-      {
-        istate = return_immobility(arg_with_board, WHITE_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_BLACK_IMMOBILITY_ID)
-      {
-        istate = return_immobility(arg_with_board, BLACK_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_WHITE_UNSUPPORTED_ID)
-      {
-        istate = return_unsupported(arg_with_board, WHITE_ENUM);
-      }
-      else if (with_material_shared->MS_id == MATERIAL_BLACK_UNSUPPORTED_ID)
-      {
-        istate = return_unsupported(arg_with_board, BLACK_ENUM);
-      }
 
       HARDBUG(istate == INVALID)
 
       if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
       {
-        vadd_ab2a(with_material_shared->MS_nembed,
-                  network_state->NS_material_dense_network_state.DNS_inputs +
-                    with_material_shared->MS_offset,
-                  with_material_shared->MS_weights_nstatesxnembed[istate]);
+#ifdef USE_AVX2_INTRINSICS
+        if (with_network->N_material_dense_network_16x8_kernel)
+        {
+          const float *weights =
+            with_material_shared->MS_weights_nstatesxnembed[istate];
+
+          // MPI shared allocations need not be 32-byte aligned.
+          sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
+          sum1 = _mm256_add_ps(sum1, _mm256_loadu_ps(weights + 8));
+        }
+        else if (with_network->N_material_dense_network_64x16_kernel)
+        {
+          const float *weights =
+            with_material_shared->MS_weights_nstatesxnembed[istate];
+
+          for (int i = 0; i < 8; i++)
+            sum64[i] =
+              _mm256_add_ps(sum64[i], _mm256_loadu_ps(weights + 8 * i));
+        }
+        else
+#endif
+          vadd_ab2a(with_material_shared->MS_nembed,
+                    network_state->NS_material_dense_network_state.DNS_inputs +
+                      with_material_shared->MS_offset,
+                    with_material_shared->MS_weights_nstatesxnembed[istate]);
       }
       else if (with_network->N_architecture_material ==
                NETWORK_ARCHITECTURE_CONCAT)
@@ -275,6 +395,23 @@ score_t return_score_from_board(board_t *arg_with_board,
       else
         FATAL("unknown with_network->N_architecture_maerial", EXIT_FAILURE)
     }
+#ifdef USE_AVX2_INTRINSICS
+    if (with_network->N_material_dense_network_16x8_kernel)
+    {
+      _mm256_store_ps(network_state->NS_material_dense_network_state.DNS_inputs,
+                      sum0);
+      _mm256_store_ps(
+        network_state->NS_material_dense_network_state.DNS_inputs + 8,
+        sum1);
+    }
+    else if (with_network->N_material_dense_network_64x16_kernel)
+    {
+      for (int i = 0; i < 8; i++)
+        _mm256_store_ps(
+          network_state->NS_material_dense_network_state.DNS_inputs + 8 * i,
+          sum64[i]);
+    }
+#endif
 
     network_score_scaled = return_dense_network_score_scaled(
       &(with_network->N_material_dense_network_shared),
@@ -314,73 +451,6 @@ score_t return_score_from_board(board_t *arg_with_board,
           .LS_noutputs);
   }
 
-  for (int isignal = 0; isignal < with_network->N_signals_shared.SS_nsignals;
-       isignal++)
-  {
-    signal_shared_t *with_signal_shared =
-      with_network->N_signals_shared.SS_signals + isignal;
-
-    if (with_signal_shared->SS_id == SIGNAL_NULL_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = 0.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NWHITE_MAN_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = (float)nwhite_man / 20.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NBLACK_MAN_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = (float)nblack_man / 20.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NWHITE_KING_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = (float)nwhite_king / 20.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NBLACK_KING_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] = (float)nblack_king / 20.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NPIECES_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        (float)(nwhite_man + nblack_man + nwhite_king + nblack_king) / 40.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NWHITE_KING_DIAGONAL_5_46_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        (float)BIT_COUNT(arg_with_board->B_white_king_bb & diagonal_5_46_bb) /
-        10.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_NBLACK_KING_DIAGONAL_5_46_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        (float)BIT_COUNT(arg_with_board->B_black_king_bb & diagonal_5_46_bb) /
-        10.0f;
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_24_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        return_signal_24(arg_with_board);
-    }
-    else if (with_signal_shared->SS_id == SIGNAL_27_ID)
-    {
-      network_state->NS_dense_network_state
-        .DNS_inputs[with_signal_shared->SS_offset] =
-        return_signal_27(arg_with_board);
-    }
-    else
-      FATAL("unknown with_signal_shared->SS_id", EXIT_FAILURE)
-  }
-
   network_score_scaled = return_dense_network_score_scaled(
     &(with_network->N_dense_network_shared),
     &(arg_with_board->B_network_state.NS_dense_network_state));
@@ -411,10 +481,35 @@ score_t return_score_from_board(board_t *arg_with_board,
   }
 #endif
 
-  result = round(network_score_scaled * with_network->N_network2material_score);
+#if SCORE_T == SCORE_T_INT
+  result = round(network_score_scaled *
+                 (double)with_network->N_network2material_score);
+#elif SCORE_T == SCORE_T_FLOAT
+  result = round(network_score_scaled * SCORE(1)) *
+           with_network->N_network2material_score;
+#else
+#error unknown SCORE_T
+#endif
 
-  if (IS_BLACK(arg_with_board->B_colour2move))
-    result = -result;
+  if (mirror)
+  {
+    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_man_bb);
+    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_man_bb);
+    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_king_bb);
+    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_king_bb);
+
+    arg_with_board->B_white_man_bb = white_man_bb;
+    arg_with_board->B_black_man_bb = black_man_bb;
+    arg_with_board->B_white_king_bb = white_king_bb;
+    arg_with_board->B_black_king_bb = black_king_bb;
+
+    arg_with_board->B_colour2move = BLACK_ENUM;
+  }
+
+  /*
+    if (IS_BLACK(arg_with_board->B_colour2move))
+      result = -result;
+  */
 
 #ifdef GEN_CSV
   if ((BIT_COUNT(arg_with_board->B_black_king_bb) == 0) and
@@ -428,8 +523,8 @@ score_t return_score_from_board(board_t *arg_with_board,
   }
 #endif
 
-  HARDBUG(IS_SCORE_LOST(result))
-  HARDBUG(IS_SCORE_WON(result))
+  if (IS_SCORE_LOST(result) or IS_SCORE_WON(result))
+    result = return_material_score(arg_with_board);
 
   return (result);
 }
@@ -522,15 +617,23 @@ score_t return_material_score(board_t *arg_with_board)
     return (-material_score);
 }
 
-local void clear_score_caches(void)
+local void initialize_score_caches(void)
 {
   PRINTF("clear_score_caches..\n");
 
   for (i64_t ientry = 0; ientry < nscore_cache_entries; ientry++)
-    score_cache[WHITE_ENUM][ientry] = score_cache_slot_default;
+    init_score_cache_slot(&score_cache[WHITE_ENUM][ientry],
+                          &score_cache_slot_default);
 
   for (i64_t ientry = 0; ientry < nscore_cache_entries; ientry++)
-    score_cache[BLACK_ENUM][ientry] = score_cache_slot_default;
+    init_score_cache_slot(&score_cache[BLACK_ENUM][ientry],
+                          &score_cache_slot_default);
+
+  for (int colour = 0; colour < NCOLOUR_ENUM; colour++)
+  {
+    HARDBUG(!atomic_is_lock_free(&score_cache[colour][0].SCS_key))
+    HARDBUG(!atomic_is_lock_free(&score_cache[colour][0].SCS_data))
+  }
 
   PRINTF("..done\n");
 }
@@ -565,13 +668,13 @@ void init_score(void)
     score_cache_slot_default.SCS_crc32 = ~crc32;
 
     MY_MALLOC_BY_TYPE(score_cache[WHITE_ENUM],
-                      score_cache_slot_t,
+                      score_cache_shared_slot_t,
                       nscore_cache_entries)
 
     MY_MALLOC_BY_TYPE(score_cache[BLACK_ENUM],
-                      score_cache_slot_t,
+                      score_cache_shared_slot_t,
                       nscore_cache_entries)
 
-    clear_score_caches();
+    initialize_score_caches();
   }
 }

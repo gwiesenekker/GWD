@@ -1,6 +1,7 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef ThreadsH
 #define ThreadsH
+#include <stdatomic.h>
 
 #define NTHREADS_MAX 64
 
@@ -9,8 +10,6 @@ typedef struct
   int thread_role;
 
   my_printf_t T_my_printf;
-
-  my_random_t T_random;
 
   queue_t T_queue;
 
@@ -22,6 +21,10 @@ typedef struct
   search_t T_search;
 
   double T_idle;
+
+  /* Keep publication traffic away from the worker's hot private counters. */
+  _Alignas(64) _Atomic(i64_t) T_published_nodes;
+  _Atomic(int) T_nodes_ready;
 } thread_t;
 
 extern thread_t threads[NTHREADS_MAX];

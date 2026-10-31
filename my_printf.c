@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
 
 #define LOG_PREFIX_ID "LOG_prefix_id"
@@ -356,7 +356,6 @@ void construct_my_printf(my_printf_t *arg_with_my_printf,
   HARDBUG((arg_with_my_printf->MP_bbuffer = bfromcstr("")) == NULL)
 
   HARDBUG((arg_with_my_printf->MP_bline = bfromcstr("")) == NULL)
-  HARDBUG((arg_with_my_printf->MP_bstamp = bfromcstr("")) == NULL)
 
   object_id++;
 
@@ -400,11 +399,14 @@ void init_my_printf(void)
       bformata(my_printf_logs_dir, "%s_%s", getenv(WINEPREFIX), LOGS_DIR) ==
       BSTR_ERR)
 
-  if (opendir(bdata(my_printf_logs_dir)) == NULL)
+  CompatStat directory;
+  if (compat_stat(bdata(my_printf_logs_dir), &directory) != 0)
   {
+    HARDBUG(errno != ENOENT)
     HARDBUG(compat_mkdir(bdata(my_printf_logs_dir)) != 0)
-    HARDBUG(opendir(bdata(my_printf_logs_dir)) == NULL)
+    HARDBUG(compat_stat(bdata(my_printf_logs_dir), &directory) != 0)
   }
+  HARDBUG(!directory.is_directory)
 
   nlogs = 0;
 

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef MainH
 #define MainH
 
@@ -48,12 +48,9 @@ typedef struct
 
   int ponder;
 
-  int egtb_level;
-
   int material_only;
 
-  int quiescence_evaluation_policy;
-  int quiescence_combination_length;
+  int mobility_moves_threshold;
 
   int pv_combination_length;
 
@@ -61,8 +58,9 @@ typedef struct
   int aspiration_margin;
   int research_margin;
 
+  int use_quiescence;
   int use_reductions;
-
+  int reduction_moves_threshold;
   int reduction_depth_root;
   int reduction_depth_leaf;
   int reduction_combination_length;
@@ -71,9 +69,9 @@ typedef struct
   int reduction_margin;
 
   int singular_probe_depth;
-  int singular_probe_margin;
+  int singular_moves_threshold;
   int singular_probe_percentage;
-  int singular_extension_moves;
+  int singular_probe_margin;
 
   int sync_clock;
 
@@ -85,8 +83,6 @@ typedef struct
   int nthreads_alpha_beta;
 
   int lazy_smp_policy;
-
-  char ipc_dir[MY_LINE_MAX];
 
   char egtb_dir[MY_LINE_MAX];
   char egtb_dir_wdl[MY_LINE_MAX];

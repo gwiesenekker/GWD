@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
 
 // the game state is maintained in a cJSON object
@@ -179,31 +179,43 @@ local void save(game_state_t *arg_with_game_state, char *arg_name)
 
 local void save2pdn(game_state_t *arg_with_game_state, char *arg_pdn)
 {
-  int fd = compat_lock_file(arg_pdn);
+  int fd = compat_lock_file(arg_pdn, TRUE);
 
   HARDBUG(fd == -1)
 
-  compat_fdprintf(fd,
-                  "[Event \"%s\"]\n",
-                  arg_with_game_state->get_event(arg_with_game_state));
-  compat_fdprintf(fd,
-                  "[Date \"%s\"]\n",
-                  arg_with_game_state->get_date(arg_with_game_state));
-  compat_fdprintf(fd,
-                  "[White \"%s\"]\n",
-                  arg_with_game_state->get_white(arg_with_game_state));
-  compat_fdprintf(fd,
-                  "[Black \"%s\"]\n",
-                  arg_with_game_state->get_black(arg_with_game_state));
-  compat_fdprintf(fd,
-                  "[Result \"%s\"]\n",
-                  arg_with_game_state->get_result(arg_with_game_state));
-  compat_fdprintf(
-    fd,
-    "[FEN \"%s\"]\n\n",
-    arg_with_game_state->get_starting_position(arg_with_game_state));
+  HARDBUG(compat_fdprintf(fd,
+                          "[Event \"%s\"]\n",
+                          arg_with_game_state->get_event(arg_with_game_state)) <
+          0)
+  HARDBUG(compat_fdprintf(fd,
+                          "[Date \"%s\"]\n",
+                          arg_with_game_state->get_date(arg_with_game_state)) <
+          0)
+  HARDBUG(compat_fdprintf(fd,
+                          "[White \"%s\"]\n",
+                          arg_with_game_state->get_white(arg_with_game_state)) <
+          0)
+  HARDBUG(compat_fdprintf(fd,
+                          "[Black \"%s\"]\n",
+                          arg_with_game_state->get_black(arg_with_game_state)) <
+          0)
+  HARDBUG(
+    compat_fdprintf(fd,
+                    "[Result \"%s\"]\n",
+                    arg_with_game_state->get_result(arg_with_game_state)) < 0)
+  HARDBUG(compat_fdprintf(fd,
+                          "[FEN \"%s\"]\n\n",
+                          arg_with_game_state->get_starting_position(
+                            arg_with_game_state)) < 0)
+
+  char *fen = arg_with_game_state->get_starting_position(arg_with_game_state);
 
   int iply = 0;
+
+  // quick hack
+
+  if (*fen == 'B')
+    HARDBUG(compat_fdprintf(fd, "%d...", iply + 1) < 0)
 
   cJSON *game_move;
 
@@ -218,30 +230,31 @@ local void save2pdn(game_state_t *arg_with_game_state, char *arg_pdn)
       cJSON_GetObjectItem(game_move, CJSON_COMMENT_STRING_ID);
 
     if ((iply % 2) == 0)
-      compat_fdprintf(fd, " %d.", iply / 2 + 1);
+      HARDBUG(compat_fdprintf(fd, " %d.", iply / 2 + 1) < 0)
 
     if (comment_string == NULL)
     {
-      compat_fdprintf(fd, " %s", cJSON_GetStringValue(move_string));
+      HARDBUG(compat_fdprintf(fd, " %s", cJSON_GetStringValue(move_string)) < 0)
     }
     else
     {
-      compat_fdprintf(fd,
-                      " %s {%s}",
-                      cJSON_GetStringValue(move_string),
-                      cJSON_GetStringValue(comment_string));
+      HARDBUG(compat_fdprintf(fd,
+                              " %s {%s}",
+                              cJSON_GetStringValue(move_string),
+                              cJSON_GetStringValue(comment_string)) < 0)
     }
 
     iply++;
 
     if ((iply > 0) and ((iply % 10) == 0))
-      compat_fdprintf(fd, "\n");
+      HARDBUG(compat_fdprintf(fd, "\n") < 0)
   }
-  compat_fdprintf(fd,
-                  " %s\n\n",
-                  arg_with_game_state->get_result(arg_with_game_state));
+  HARDBUG(
+    compat_fdprintf(fd,
+                    " %s\n\n",
+                    arg_with_game_state->get_result(arg_with_game_state)) < 0)
 
-  compat_unlock_file(fd);
+  HARDBUG(compat_unlock_file(fd) != 0)
 }
 
 local char *get_game_state(game_state_t *arg_with_game_state)

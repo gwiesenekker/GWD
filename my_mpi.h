@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef MpiH
 #define MpiH
 
@@ -7,10 +7,6 @@
 #ifdef USE_OPENMPI
 
 #include <mpi.h>
-// #include <sys/ipc.h>
-#include <sys/sem.h>
-
-#define BARRIER_POLL CENTI_SECOND
 
 #else
 
@@ -18,7 +14,7 @@ typedef void *MPI_Comm;
 typedef void *MPI_Info;
 typedef void *MPI_Datatype;
 typedef void *MPI_Op;
-typedef int MPI_Aint;
+typedef ptrdiff_t MPI_Aint;
 typedef void *MPI_Win;
 
 #define MPI_SUCCESS 0
@@ -36,6 +32,7 @@ typedef void *MPI_Win;
 #define MPI_LONG_LONG_INT NULL
 #define MPI_SUM NULL
 #define MPI_MAX NULL
+#define MPI_MIN NULL
 
 #define MPI_WIN_NULL NULL
 
@@ -43,9 +40,6 @@ typedef void *MPI_Win;
 
 typedef struct
 {
-  const int MMG_NGLOBAL_MAX;
-  const int MMG_BARRIER_TAG;
-
   int MMG_init;
   int MMG_nglobal;
   int MMG_id_global;

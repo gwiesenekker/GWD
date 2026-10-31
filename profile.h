@@ -1,11 +1,10 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #ifndef ProfileH
 #define ProfileH
 
 #ifdef PROFILE
 
 #define PROFILE_LINUX 0
-#define PROFILE_WINDOWS 1
 
 #define PROFILE_PLATFORM PROFILE_LINUX
 

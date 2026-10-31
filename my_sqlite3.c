@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
 
 #define NRETRIES 1000000
@@ -150,23 +150,15 @@ void my_sqlite3_prepare_v2(sqlite3 *arg_db,
 int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
 {
 #ifdef USE_SQLITE3
-  static my_random_t retry_random;
-  static int retry_random_init = FALSE;
+  static _Thread_local my_random_t retry_random;
+  static _Thread_local int retry_random_init = FALSE;
 
   BSTRING(bsql)
-
-  int nsemicolons = 0;
 
   if (arg_step)
     HARDBUG(bassigncstr(bsql, sqlite3_sql((sqlite3_stmt *)arg_sql)) == BSTR_ERR)
   else
-  {
     HARDBUG(bassigncstr(bsql, (char *)arg_sql) == BSTR_ERR)
-
-    for (int ichar = 0; ichar < blength(bsql); ichar++)
-      if (bchar(bsql, ichar) == ';')
-        nsemicolons++;
-  }
 
   if (!retry_random_init)
   {
@@ -179,16 +171,18 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
     retry_random_init = TRUE;
   }
 
-  double delay = 0.0;
-
   int rc = SQLITE_OK;
 
   char *err_msg = NULL;
 
-  int iretry = 0;
+  progress_t progress;
 
-  while (iretry <= NRETRIES)
+  construct_progress(&progress, "execute_sql", 0, 10);
+
+  while (return_ndone(&progress) <= NRETRIES)
   {
+    (void)make_progress(&progress, 0);
+
     if (arg_step)
       rc = sqlite3_step((sqlite3_stmt *)arg_sql);
     else
@@ -199,12 +193,12 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
 
     if (arg_step)
     {
-      if ((iretry % 1000) == 0)
+      if ((return_ndone(&progress) % 1000) == 0)
       {
-        PRINTF("busy or locked step=%s iretry=%d delay=%.6f\n",
+        PRINTF("busy or locked step=%s"
+               " return_ndone(&progress)=%lld\n",
                bdata(bsql),
-               iretry,
-               delay);
+               return_ndone(&progress));
       }
     }
     else
@@ -213,65 +207,73 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
 
       err_msg = NULL;
 
-      if ((iretry % 1000) == 0)
+      if ((return_ndone(&progress) % 1000) == 0)
       {
         if (blength(bsql) <= (2 * SQL_PRINTF_WIDTH))
         {
-          PRINTF("busy or locked sql=%s iretry=%d delay=%.6f\n",
+          PRINTF("busy or locked sql=%s"
+                 " return_ndone(&progress)=%lld\n",
                  bdata(bsql),
-                 iretry,
-                 delay);
+                 return_ndone(&progress));
         }
         else
         {
-          PRINTF("busy or locked sql=%.*s...%.*s iretry=%d delay=%.6f\n",
+          PRINTF("busy or locked sql=%.*s...%.*s"
+                 " return_ndone(&progress)=%lld\n",
                  SQL_PRINTF_WIDTH,
                  bdata(bsql),
                  SQL_PRINTF_WIDTH,
                  bdata(bsql) + blength(bsql) - SQL_PRINTF_WIDTH,
-                 iretry,
-                 delay);
+                 return_ndone(&progress));
         }
       }
     }
 
-    if ((nsemicolons > 1) or (iretry >= 1000))
-      delay = (1.0 + return_my_random(&retry_random) % 1000) * MILLI_SECOND;
-    else
-      delay = (1.0 + return_my_random(&retry_random) % 1000) * MICRO_SECOND;
+    double delay = delay =
+      (1.0 + return_my_random(&retry_random) % 1000) * MICRO_SECOND;
 
-    if ((iretry % 1000) == 0)
-      PRINTF("delay=%.6f\n", delay);
+    if ((return_ndone(&progress) % 1000) == 0)
+      PRINTF("return_ndone(&progress)=%lld delay=%.6f\n",
+             return_ndone(&progress),
+             delay);
 
-    compat_sleep(delay);
-
-    ++iretry;
+    HARDBUG(compat_sleep(delay) != 0)
   }
 
   if ((rc == SQLITE_OK) or (rc == SQLITE_DONE) or (rc == SQLITE_ROW))
   {
-    if (iretry > 0)
+    // 1 step is expected
+
+    if (return_ndone(&progress) > 1)
     {
+      finalize_progress(&progress);
+
       if (arg_step)
       {
-        PRINTF("OK or DONE or ROW step=%s iretry=%d delay=%.6f\n",
+        PRINTF("OK or DONE or ROW step=%s"
+               " return_ndone(&progress)=%lld\n",
                bdata(bsql),
-               iretry,
-               delay);
+               return_ndone(&progress));
       }
       else
       {
-        PRINTF("OK or DONE or ROW sql=%s iretry=%d delay=%.2f\n",
+        PRINTF("OK or DONE or ROW sql=%s"
+               " return_ndone(&progress)=%lld\n",
                bdata(bsql),
-               iretry,
-               delay);
+               return_ndone(&progress));
       }
     }
+
+    destroy_progress(&progress);
 
     BDESTROY(bsql);
 
     return (rc);
   }
+
+  finalize_progress(&progress);
+
+  destroy_progress(&progress);
 
   if (arg_step)
   {
@@ -281,24 +283,28 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
   {
     if (blength(bsql) <= (2 * SQL_PRINTF_WIDTH))
     {
-      PRINTF("FAILED sql=%s rc=%d err_msg=%s iretry=%d delay=%.6f\n",
+      PRINTF("FAILED sql=%s"
+             " rc=%d"
+             " sqlite3_errmsg(arg_db)=%s"
+             " return_ndone(&progress)=%lld\n",
              bdata(bsql),
              rc,
              sqlite3_errmsg(arg_db),
-             iretry,
-             delay);
+             return_ndone(&progress));
     }
     else
     {
-      PRINTF("FAILED sql=%.*s...%.*s rc=%d err_msg=%s iretry=%d delay=%.6f\n",
+      PRINTF("FAILED sql=%.*s...%.*s"
+             " rc=%d"
+             " sqlite3_errmsg(arg_db)=%s"
+             " return_ndone(&progress)=%lld\n",
              SQL_PRINTF_WIDTH,
              bdata(bsql),
              SQL_PRINTF_WIDTH,
              bdata(bsql) + blength(bsql) - SQL_PRINTF_WIDTH,
              rc,
              sqlite3_errmsg(arg_db),
-             iretry,
-             delay);
+             return_ndone(&progress));
     }
   }
 

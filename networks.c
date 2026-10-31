@@ -1,20 +1,31 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
+#include <float.h>
+
+_Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24 &&
+                 FLT_MIN_EXP == -125 && FLT_MAX_EXP == 128,
+               "network files require binary32 float characteristics");
 
 // MPI shared memory does not guarantee 32-byte alignment
 
+#define USE_FMA
+#define USE_RSQRT
 #define MM256_LOAD_PS _mm256_loadu_ps
+
+#ifdef USE_FMA
+#define MM256_MADD_PS(a, b, c) _mm256_fmadd_ps((a), (b), (c))
+#else
+#define MM256_MADD_PS(a, b, c) _mm256_add_ps(_mm256_mul_ps((a), (b)), (c))
+#endif
 
 #define NPIECES_PERCENTILE (INVALID)
 
 #undef USE_RECIPROCAL
 #define USE_ERF
 
-#undef APPEND_SIGNALS
-
-#define TAG "w2m-embed-patterns-nm7immob"
-
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+
+local double wdl_score, mat_score;
 
 #define DOUBLE2SCALED(D) ((scaled_double_t)(D))
 #define SCALED2DOUBLE(S) ((double)(S))
@@ -41,10 +52,10 @@ network_t networks[NETWORKS_MAX];
 
 typedef i32_t bin_t;
 
-local int load_network = TRUE;
 local i8_t base64_table[256];
+local ui16_t base3_table[65536];
 
-void init_base64_table(void)
+local void init_base64_table(void)
 {
   const char *base64_chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -54,6 +65,57 @@ void init_base64_table(void)
 
   for (int i = 0; base64_chars[i]; i++)
     base64_table[(unsigned char)base64_chars[i]] = i;
+}
+
+local void init_base3_table(void)
+{
+  for (int wm = 0; wm < 256; wm++)
+  {
+    for (int bm = 0; bm < 256; bm++)
+    {
+      int index = 0;
+      int power = 1;
+
+      for (int k = 0; k < 8; k++)
+      {
+        int w = (wm >> k) & 1;
+        int b = (bm >> k) & 1;
+
+        int digit = w + 2 * b;
+
+        index += digit * power;
+        power *= 3;
+      }
+
+      base3_table[wm | (bm << 8)] = (uint16_t)index;
+    }
+  }
+}
+
+#define BASE3_PATTERN_BITS 16
+#define BASE3_MASK_TABLE_SIZE (1u << BASE3_PATTERN_BITS)
+
+local uint32_t base3_mask_table[BASE3_MASK_TABLE_SIZE];
+
+local void init_base3_mask_table(void)
+{
+  for (uint32_t mask = 0; mask < BASE3_MASK_TABLE_SIZE; mask++)
+  {
+    uint32_t index = 0;
+    uint32_t power = 1;
+
+    for (int k = 0; k < BASE3_PATTERN_BITS; k++)
+    {
+      if ((mask >> k) & 1u)
+      {
+        index += power;
+      }
+
+      power *= 3u;
+    }
+
+    base3_mask_table[mask] = index;
+  }
 }
 
 void decode_base64(size_t ns, unsigned char *s, size_t nt, unsigned char *t)
@@ -164,12 +226,50 @@ read_1d_csv_base64(cJSON *arg_csv, int *arg_nrows, scaled_double_t **arg_cells)
   *arg_cells = cells;
 }
 
+local void
+read_1d_csv_base64i32(cJSON *arg_csv, int *arg_nrows, i32_t **arg_cells)
+{
+  *arg_cells = NULL;
+
+  cJSON *cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_ROWS_ID);
+
+  HARDBUG(!cJSON_IsNumber(cjson_value))
+
+  int nrows = round(cJSON_GetNumberValue(cjson_value));
+
+  HARDBUG(nrows < 1)
+
+  cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_DATA_ID);
+
+  HARDBUG(!cJSON_IsString(cjson_value));
+
+  char *data = cJSON_GetStringValue(cjson_value);
+
+  i32_t *cells;
+
+  MY_MALLOC_BY_TYPE(cells, i32_t, nrows)
+
+  decode_base64(strlen(data),
+                (unsigned char *)data,
+                nrows * sizeof(i32_t),
+                (unsigned char *)cells);
+
+  if (*arg_nrows != INVALID)
+    HARDBUG(nrows != *arg_nrows)
+  else
+    *arg_nrows = nrows;
+
+  *arg_cells = cells;
+}
+
 local void read_2d_csv_base64(cJSON *arg_csv,
                               int *arg_nrows,
                               int *arg_ncols,
                               scaled_double_t ***arg_cells_nrowsxncols,
                               scaled_double_t ***arg_cells_ncolsxnrows)
 {
+  HARDBUG((arg_cells_nrowsxncols == NULL) and (arg_cells_ncolsxnrows == NULL))
+
   cJSON *cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_ROWS_ID);
 
   HARDBUG(!cJSON_IsNumber(cjson_value))
@@ -201,39 +301,46 @@ local void read_2d_csv_base64(cJSON *arg_csv,
                 nrows * ncols * sizeof(float),
                 (unsigned char *)cells_float);
 
-  void *void_cells_nrowsxncols;
+  if (arg_cells_nrowsxncols != NULL)
+  {
+    void *void_cells_nrowsxncols;
 
-  MPI_Win win_cells_nrowsxncols;
+    MPI_Win win_cells_nrowsxncols;
 
-  my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
-                         sizeof(float),
-                         nrows * ncols,
-                         &void_cells_nrowsxncols,
-                         &win_cells_nrowsxncols);
+    my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
+                           sizeof(scaled_double_t),
+                           nrows * ncols,
+                           &void_cells_nrowsxncols,
+                           &win_cells_nrowsxncols);
 
-  scaled_double_t *cells_nrowsxncols =
-    (scaled_double_t *)void_cells_nrowsxncols;
+    scaled_double_t *cells_nrowsxncols =
+      (scaled_double_t *)void_cells_nrowsxncols;
 
+    MY_MALLOC_BY_TYPE(*arg_cells_nrowsxncols, scaled_double_t *, nrows);
+
+    for (int irow = 0; irow < nrows; irow++)
+      (*arg_cells_nrowsxncols)[irow] = cells_nrowsxncols + irow * ncols;
+
+    for (int irow = 0; irow < nrows; irow++)
+    {
+      for (int icol = 0; icol < ncols; icol++)
+      {
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-  for (int ifloat = 0; ifloat < nrows * ncols; ifloat++)
-    cells_nrowsxncols[ifloat] = cells_float[ifloat];
+        cells_nrowsxncols[irow * ncols + icol] =
+          cells_float[irow * ncols + icol];
 #else
-  for (int ifloat = 0; ifloat < nrows * ncols; ifloat++)
-    cells_nrowsxncols[ifloat] = FLOAT2SCALED(cells_float[ifloat]);
+        cells_nrowsxncols[irow * ncols + icol] =
+          FLOAT2SCALED(cells_float[irow * ncols + icol]);
 #endif
+      }
+    }
 
-  my_free(cells_float);
+    my_mpi_sync_shared(my_mpi_globals.MMG_comm_global,
+                       win_cells_nrowsxncols,
+                       "win_cells_nrowsxncols");
 
-  MY_MALLOC_BY_TYPE(*arg_cells_nrowsxncols, scaled_double_t *, nrows);
-
-  for (int irow = 0; irow < nrows; irow++)
-    (*arg_cells_nrowsxncols)[irow] = cells_nrowsxncols + irow * ncols;
-
-  my_mpi_sync_shared(my_mpi_globals.MMG_comm_global,
-                     win_cells_nrowsxncols,
-                     "win_cells_nrowsxncols");
-
-  MARK_ARRAY_READ_ONLY(cells_nrowsxncols, nrows * ncols);
+    MARK_ARRAY_READ_ONLY(cells_nrowsxncols, nrows * ncols);
+  }
 
   if (arg_cells_ncolsxnrows != NULL)
   {
@@ -260,8 +367,13 @@ local void read_2d_csv_base64(cJSON *arg_csv,
     {
       for (int icol = 0; icol < ncols; icol++)
       {
+#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
         cells_ncolsxnrows[icol * nrows + irow] =
-          cells_nrowsxncols[irow * ncols + icol];
+          cells_float[irow * ncols + icol];
+#else
+        cells_ncolsxnrows[icol * nrows + irow] =
+          FLOAT2SCALED(cells_float[irow * ncols + icol]);
+#endif
       }
     }
 
@@ -271,6 +383,8 @@ local void read_2d_csv_base64(cJSON *arg_csv,
 
     MARK_ARRAY_READ_ONLY(cells_ncolsxnrows, ncols * nrows);
   }
+
+  my_free(cells_float);
 
   if (*arg_nrows != INVALID)
     HARDBUG(nrows != *arg_nrows)
@@ -312,8 +426,7 @@ local scaled_double_t dot_scaled(int n,
       __m256 va = MM256_LOAD_PS(a);
       __m256 vb = MM256_LOAD_PS(b);
 
-      vs = _mm256_add_ps(vs, _mm256_mul_ps(va, vb));
-      // vs = _mm256_fmadd_ps(va, vb, vs);
+      vs = MM256_MADD_PS(va, vb, vs);
     }
 
     ALIGN64(float t[8]);
@@ -360,6 +473,87 @@ local scaled_double_t dot_scaled(int n,
   return (s);
 }
 
+#if defined(USE_AVX2_INTRINSICS) && SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+local inline void dense_fixed_x8(const float *arg_inputs,
+                                 scaled_double_t *const *arg_weights,
+                                 float *arg_dot,
+                                 int arg_nchunks)
+{
+  // Callers supply 2 or 4 chunks. Preserve dot_scaled's accumulation order,
+  // including the initial FMA with zero and left-to-right scalar reduction.
+  __m256 inputs[4];
+  for (int ichunk = 0; ichunk < arg_nchunks; ichunk++)
+    inputs[ichunk] = _mm256_loadu_ps(arg_inputs + 8 * ichunk);
+
+  for (int ioutput = 0; ioutput < 8; ioutput += 4)
+  {
+    __m256 sums[4] = {_mm256_setzero_ps(),
+                      _mm256_setzero_ps(),
+                      _mm256_setzero_ps(),
+                      _mm256_setzero_ps()};
+
+    for (int ichunk = 0; ichunk < arg_nchunks; ichunk++)
+    {
+      for (int j = 0; j < 4; j++)
+      {
+        // Shared MPI allocations need not be 32-byte aligned.
+        __m256 weights = _mm256_loadu_ps(arg_weights[ioutput + j] + 8 * ichunk);
+        sums[j] = MM256_MADD_PS(inputs[ichunk], weights, sums[j]);
+      }
+    }
+
+    for (int j = 0; j < 4; j++)
+    {
+      ALIGN64(float t[8]);
+      _mm256_store_ps(t, sums[j]);
+      arg_dot[ioutput + j] =
+        t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7];
+    }
+  }
+}
+
+local void dense_16x8(const float *arg_inputs,
+                      scaled_double_t *const *arg_weights,
+                      float *arg_dot)
+{
+  dense_fixed_x8(arg_inputs, arg_weights, arg_dot, 2);
+}
+
+local void dense_32x8(const float *arg_inputs,
+                      scaled_double_t *const *arg_weights,
+                      float *arg_dot)
+{
+  dense_fixed_x8(arg_inputs, arg_weights, arg_dot, 4);
+}
+#endif
+
+local void dense_layer0_dot(dense_network_shared_t *arg_dense,
+                            scaled_double_t *arg_inputs,
+                            scaled_double_t *arg_dot)
+{
+  layer_shared_t *layer = arg_dense->DNS_layers;
+
+#if defined(USE_AVX2_INTRINSICS) && SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
+  if (arg_dense->DNS_16x8_kernel)
+  {
+    HARDBUG(layer->LS_ninputs != 16 || layer->LS_noutputs != 8)
+    dense_16x8(arg_inputs, layer->LS_weights_noutputsxninputs, arg_dot);
+    return;
+  }
+  if (arg_dense->DNS_32x8_kernel)
+  {
+    HARDBUG(layer->LS_ninputs != 32 || layer->LS_noutputs != 8)
+    dense_32x8(arg_inputs, layer->LS_weights_noutputsxninputs, arg_dot);
+    return;
+  }
+#endif
+
+  for (int i = 0; i < layer->LS_noutputs; i++)
+    arg_dot[i] = dot_scaled(layer->LS_ninputs,
+                            arg_inputs,
+                            layer->LS_weights_noutputsxninputs[i]);
+}
+
 local void construct_dense_network_shared(network_t *arg_network,
                                           cJSON *arg_directory,
                                           char *arg_prefix,
@@ -367,12 +561,14 @@ local void construct_dense_network_shared(network_t *arg_network,
 {
   dense_network_shared_t *with_dense_network_shared = NULL;
 
-  if (arg_prefix == NULL)
-    with_dense_network_shared = &(arg_network->N_dense_network_shared);
-  else if (compat_strcasecmp(arg_prefix, "pattern") == 0)
+  if (compat_strcasecmp(arg_prefix, "pattern") == 0)
     with_dense_network_shared = &(arg_network->N_pattern_dense_network_shared);
   else if (compat_strcasecmp(arg_prefix, "material") == 0)
     with_dense_network_shared = &(arg_network->N_material_dense_network_shared);
+  else if (compat_strcasecmp(arg_prefix, "final") == 0)
+    with_dense_network_shared = &(arg_network->N_dense_network_shared);
+  else
+    FATAL("unknown arg_prefix", EXIT_FAILURE)
 
   HARDBUG(with_dense_network_shared == NULL)
 
@@ -417,7 +613,7 @@ local void construct_dense_network_shared(network_t *arg_network,
       read_2d_csv_base64(file,
                          &(with_layer_shared->LS_ninputs),
                          &(with_layer_shared->LS_noutputs),
-                         &(with_layer_shared->LS_weights_ninputsxnoutputs),
+                         NULL,
                          &(with_layer_shared->LS_weights_noutputsxninputs));
 
       file = open_cjson_file(arg_directory, bdata(bbias));
@@ -439,6 +635,13 @@ local void construct_dense_network_shared(network_t *arg_network,
   }
 
   HARDBUG(with_dense_network_shared->DNS_nlayers < 1)
+
+  with_dense_network_shared->DNS_16x8_kernel =
+    (with_dense_network_shared->DNS_layers[0].LS_ninputs == 16) and
+    (with_dense_network_shared->DNS_layers[0].LS_noutputs == 8);
+  with_dense_network_shared->DNS_32x8_kernel =
+    (with_dense_network_shared->DNS_layers[0].LS_ninputs == 32) and
+    (with_dense_network_shared->DNS_layers[0].LS_noutputs == 8);
 
   if (arg_verbose)
   {
@@ -469,6 +672,44 @@ local void construct_dense_network_shared(network_t *arg_network,
 
     HARDBUG(with_current->LS_noutputs != with_next->LS_ninputs)
   }
+}
+
+local char *activation_last2string(int arg_activation_last, int arg_lc)
+{
+  char *result = NULL;
+
+  if (arg_activation_last == NETWORK_ACTIVATION_LINEAR)
+  {
+    if (arg_lc)
+      result = "linear";
+    else
+      result = "LINEAR";
+  }
+  else if (arg_activation_last == NETWORK_ACTIVATION_TANH)
+  {
+    if (arg_lc)
+      result = "tanh";
+    else
+      result = "TANH";
+  }
+  else if (arg_activation_last == NETWORK_ACTIVATION_LOGITS)
+  {
+    if (arg_lc)
+      result = "logits";
+    else
+      result = "LOGITS";
+  }
+  else if (arg_activation_last == NETWORK_ACTIVATION_2HEADS)
+  {
+    if (arg_lc)
+      result = "2heads";
+    else
+      result = "2HEADS";
+  }
+  else
+    FATAL("unknown arg_activation_last", EXIT_FAILURE)
+
+  return (result);
 }
 
 local void construct_network_shared(char *arg_network_name,
@@ -525,20 +766,22 @@ local void construct_network_shared(char *arg_network_name,
 
   HARDBUG(!cJSON_IsNumber(value_cjson))
 
-  with_network->N_network2material_score = cJSON_GetNumberValue(value_cjson);
+  with_network->N_network2material_score =
+    round(cJSON_GetNumberValue(value_cjson));
 
   if (arg_verbose)
-    PRINTF("with_network->N_network2material_score=%.2f\n",
+    PRINTF("with_network->N_network2material_score=%d\n",
            with_network->N_network2material_score);
 
-  // nmaterial
+  // nmaterials
 
   cJSON *cjson_materials = cJSON_GetObjectItem(directory, CJSON_MATERIALS_ID);
 
-  HARDBUG(!cJSON_IsArray(cjson_materials))
-
-  with_network->N_materials_shared.MSS_nmaterials =
-    cJSON_GetArraySize(cjson_materials);
+  if (!cJSON_IsArray(cjson_materials))
+    with_network->N_materials_shared.MSS_nmaterials = 0;
+  else
+    with_network->N_materials_shared.MSS_nmaterials =
+      cJSON_GetArraySize(cjson_materials);
 
   HARDBUG(with_network->N_materials_shared.MSS_nmaterials > NMATERIAL_MAX)
 
@@ -604,6 +847,24 @@ local void construct_network_shared(char *arg_network_name,
       with_material_shared->MS_nstates = (MATERIAL_KING_MAX + 1);
       // with_material_shared->MS_nstates = (NPIECES_MAX + 1);
     }
+    else if (biseqcstr(bmaterial_name, MATERIAL_NWHITE_KING20_CNAME) == 1)
+    {
+      HARDBUG((with_material_shared->MS_bname =
+                 bfromcstr(MATERIAL_NWHITE_KING20_CNAME)) == NULL)
+
+      with_material_shared->MS_id = MATERIAL_NWHITE_KING20_ID;
+
+      with_material_shared->MS_nstates = (NPIECES_MAX + 1);
+    }
+    else if (biseqcstr(bmaterial_name, MATERIAL_NBLACK_KING20_CNAME) == 1)
+    {
+      HARDBUG((with_material_shared->MS_bname =
+                 bfromcstr(MATERIAL_NBLACK_KING20_CNAME)) == NULL)
+
+      with_material_shared->MS_id = MATERIAL_NBLACK_KING20_ID;
+
+      with_material_shared->MS_nstates = (NPIECES_MAX + 1);
+    }
     else if (biseqcstr(bmaterial_name, MATERIAL_MAN_KING_CNAME) == 1)
     {
       with_material_shared->MS_id = MATERIAL_MAN_KING_ID;
@@ -611,42 +872,6 @@ local void construct_network_shared(char *arg_network_name,
       with_material_shared->MS_nstates =
         (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) * (NPIECES_MAX + 1) *
         (MATERIAL_KING_MAX + 1);
-    }
-    else if (biseqcstr(bmaterial_name, MATERIAL_WHITE_MOBILITY_CNAME) == 1)
-    {
-      with_material_shared->MS_id = MATERIAL_WHITE_MOBILITY_ID;
-
-      with_material_shared->MS_nstates = 2 * NPIECES_MAX + 1;
-    }
-    else if (biseqcstr(bmaterial_name, MATERIAL_BLACK_MOBILITY_CNAME) == 1)
-    {
-      with_material_shared->MS_id = MATERIAL_BLACK_MOBILITY_ID;
-
-      with_material_shared->MS_nstates = 2 * NPIECES_MAX + 1;
-    }
-    else if (biseqcstr(bmaterial_name, MATERIAL_WHITE_IMMOBILITY_CNAME) == 1)
-    {
-      with_material_shared->MS_id = MATERIAL_WHITE_IMMOBILITY_ID;
-
-      with_material_shared->MS_nstates = NPIECES_MAX + 1;
-    }
-    else if (biseqcstr(bmaterial_name, MATERIAL_BLACK_IMMOBILITY_CNAME) == 1)
-    {
-      with_material_shared->MS_id = MATERIAL_BLACK_IMMOBILITY_ID;
-
-      with_material_shared->MS_nstates = NPIECES_MAX + 1;
-    }
-    else if (biseqcstr(bmaterial_name, MATERIAL_WHITE_UNSUPPORTED_CNAME) == 1)
-    {
-      with_material_shared->MS_id = MATERIAL_WHITE_UNSUPPORTED_ID;
-
-      with_material_shared->MS_nstates = NPIECES_MAX + 1;
-    }
-    else if (biseqcstr(bmaterial_name, MATERIAL_BLACK_UNSUPPORTED_CNAME) == 1)
-    {
-      with_material_shared->MS_id = MATERIAL_BLACK_UNSUPPORTED_ID;
-
-      with_material_shared->MS_nstates = NPIECES_MAX + 1;
     }
     else
       FATAL("unknown material_name", EXIT_FAILURE)
@@ -741,8 +966,8 @@ local void construct_network_shared(char *arg_network_name,
 
   svalue = cJSON_GetStringValue(value_cjson);
 
-  if (compat_strcasecmp(svalue, "relu6") == 0)
-    with_network->N_activation_inputs = NETWORK_ACTIVATION_RELU6;
+  if (compat_strcasecmp(svalue, "relu") == 0)
+    with_network->N_activation_inputs = NETWORK_ACTIVATION_RELU;
   else if (compat_strcasecmp(svalue, "tanh") == 0)
     with_network->N_activation_inputs = NETWORK_ACTIVATION_TANH;
   else if (compat_strcasecmp(svalue, "rsqrt") == 0)
@@ -758,8 +983,8 @@ local void construct_network_shared(char *arg_network_name,
 
   if (arg_verbose)
   {
-    if (with_network->N_activation_inputs == NETWORK_ACTIVATION_RELU6)
-      PRINTF("activation_inputs=RELU6\n");
+    if (with_network->N_activation_inputs == NETWORK_ACTIVATION_RELU)
+      PRINTF("activation_inputs=RELU\n");
     else if (with_network->N_activation_inputs == NETWORK_ACTIVATION_TANH)
       PRINTF("activation_inputs=TANH\n");
     else if (with_network->N_activation_inputs == NETWORK_ACTIVATION_RSQRT)
@@ -782,8 +1007,8 @@ local void construct_network_shared(char *arg_network_name,
 
   svalue = cJSON_GetStringValue(value_cjson);
 
-  if (compat_strcasecmp(svalue, "relu6") == 0)
-    with_network->N_activation = NETWORK_ACTIVATION_RELU6;
+  if (compat_strcasecmp(svalue, "relu") == 0)
+    with_network->N_activation = NETWORK_ACTIVATION_RELU;
   else if (compat_strcasecmp(svalue, "tanh") == 0)
     with_network->N_activation = NETWORK_ACTIVATION_TANH;
   else if (compat_strcasecmp(svalue, "rsqrt") == 0)
@@ -797,8 +1022,8 @@ local void construct_network_shared(char *arg_network_name,
 
   if (arg_verbose)
   {
-    if (with_network->N_activation == NETWORK_ACTIVATION_RELU6)
-      PRINTF("activation=RELU6\n");
+    if (with_network->N_activation == NETWORK_ACTIVATION_RELU)
+      PRINTF("activation=RELU\n");
     else if (with_network->N_activation == NETWORK_ACTIVATION_TANH)
       PRINTF("activation=TANH\n");
     else if (with_network->N_activation == NETWORK_ACTIVATION_RSQRT)
@@ -821,19 +1046,19 @@ local void construct_network_shared(char *arg_network_name,
 
   if (compat_strcasecmp(svalue, "linear") == 0)
     with_network->N_activation_last = NETWORK_ACTIVATION_LINEAR;
+  else if (compat_strcasecmp(svalue, "tanh") == 0)
+    with_network->N_activation_last = NETWORK_ACTIVATION_TANH;
   else if (compat_strcasecmp(svalue, "logits") == 0)
     with_network->N_activation_last = NETWORK_ACTIVATION_LOGITS;
+  else if (compat_strcasecmp(svalue, "2heads") == 0)
+    with_network->N_activation_last = NETWORK_ACTIVATION_2HEADS;
   else
     FATAL("unknown activation_last option", EXIT_FAILURE)
 
   if (arg_verbose)
   {
-    if (with_network->N_activation_last == NETWORK_ACTIVATION_LINEAR)
-      PRINTF("activation_last=LINEAR\n");
-    else if (with_network->N_activation_last == NETWORK_ACTIVATION_LOGITS)
-      PRINTF("activation_last=LOGITS\n");
-    else
-      FATAL("unknown activation_last option", EXIT_FAILURE)
+    PRINTF("with_network->N_activation_last=%s\n",
+           activation_last2string(with_network->N_activation_last, TRUE));
   }
 
   // nman_min
@@ -878,10 +1103,17 @@ local void construct_network_shared(char *arg_network_name,
 
   HARDBUG(with_network->N_nman_min > with_network->N_nman_max)
 
-  PRINTF("load_network=%d\n", load_network);
+  value_cjson = cJSON_GetObjectItem(directory, CJSON_PRAGMA_ID);
 
-  if (!load_network)
-    return;
+  if (cJSON_IsString(value_cjson))
+  {
+    svalue = cJSON_GetStringValue(value_cjson);
+
+    PRINTF("pragma=%s\n", svalue);
+
+    if (compat_strcasecmp(svalue, "dummy") == 0)
+      return;
+  }
 
   with_network->N_pattern_dense_network_shared.DNS_ninputs = 0;
   with_network->N_pattern_dense_network_shared.DNS_nlayers = 0;
@@ -898,8 +1130,6 @@ local void construct_network_shared(char *arg_network_name,
   with_network->N_dense_network_shared.DNS_activate_layer0 = FALSE;
   with_network->N_dense_network_shared.DNS_compute_layer0 = TRUE;
 
-  with_network->N_loaded = TRUE;
-
   // load the embedding vectors for the patterns
 
   for (int ipattern = 0;
@@ -909,18 +1139,54 @@ local void construct_network_shared(char *arg_network_name,
     pattern_shared_t *with_pattern_shared =
       with_network->N_patterns_shared.PSS_patterns + ipattern;
 
+    BSTRING(bindex)
+
+    bformata(bindex, "pattern_embedding%d_index.csv", ipattern);
+
+    cJSON *file = open_cjson_file(directory, bdata(bindex));
+
+    BDESTROY(bindex)
+
+    MY_MALLOC_BY_TYPE(with_pattern_shared->PS_state_map,
+                      int,
+                      with_pattern_shared->PS_nstates);
+
+    int nstate_map = INVALID;
+
+    if (file == NULL)
+    {
+      // identity
+
+      nstate_map = with_pattern_shared->PS_nstates;
+
+      for (int istate = 0; istate < with_pattern_shared->PS_nstates; istate++)
+        with_pattern_shared->PS_state_map[istate] = istate;
+    }
+    else
+    {
+      i32_t *state_map;
+
+      read_1d_csv_base64i32(file, &nstate_map, &state_map);
+
+      for (int istate = 0; istate < with_pattern_shared->PS_nstates; istate++)
+        with_pattern_shared->PS_state_map[istate] = INVALID;
+
+      for (int imap = 0; imap < nstate_map; imap++)
+        with_pattern_shared->PS_state_map[state_map[imap]] = imap;
+    }
+
     BSTRING(bweights)
 
     bformata(bweights, "pattern_embedding%d_weights.csv", ipattern);
 
-    cJSON *file = open_cjson_file(directory, bdata(bweights));
+    file = open_cjson_file(directory, bdata(bweights));
 
     BDESTROY(bweights)
 
     HARDBUG(file == NULL)
 
     read_2d_csv_base64(file,
-                       &(with_pattern_shared->PS_nstates),
+                       &(nstate_map),
                        &(with_pattern_shared->PS_nembed),
                        &(with_pattern_shared->PS_weights_nstatesxnembed),
                        NULL);
@@ -986,7 +1252,7 @@ local void construct_network_shared(char *arg_network_name,
                          &(with_material_shared->MS_nstates),
                          &(with_material_shared->MS_nembed),
                          &(with_material_shared->MS_weights_nstatesxnembed),
-                         &(with_material_shared->MS_weights_nembedxnstates));
+                         NULL);
 
       if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
       {
@@ -1036,6 +1302,39 @@ local void construct_network_shared(char *arg_network_name,
   HARDBUG(with_network->N_pattern_dense_network_shared.DNS_ninputs !=
           with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_ninputs)
 
+  // The specialized path sums 16-element embeddings for a 16x8 first layer.
+  with_network->N_pattern_dense_network_16x8_kernel =
+    (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD) and
+    (with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_ninputs ==
+     16) and
+    (with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_noutputs ==
+     8);
+
+  with_network->N_pattern_dense_network_64x16_kernel =
+    (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD) and
+    (with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_ninputs ==
+     64) and
+    (with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_noutputs ==
+     16);
+
+  for (int ipattern = 0;
+       ipattern < with_network->N_patterns_shared.PSS_npatterns;
+       ipattern++)
+  {
+    pattern_shared_t *with_pattern_shared =
+      with_network->N_patterns_shared.PSS_patterns + ipattern;
+
+    if ((with_pattern_shared->PS_nembed != 16) or
+        (with_pattern_shared->PS_offset != 0))
+      with_network->N_pattern_dense_network_16x8_kernel = FALSE;
+    if ((with_pattern_shared->PS_nembed != 64) or
+        (with_pattern_shared->PS_offset != 0))
+      with_network->N_pattern_dense_network_64x16_kernel = FALSE;
+  }
+
+  with_network->N_material_dense_network_16x8_kernel = FALSE;
+  with_network->N_material_dense_network_64x16_kernel = FALSE;
+
   if (with_network->N_architecture_material != NETWORK_ARCHITECTURE_NULL)
   {
     construct_dense_network_shared(with_network, directory, "material", TRUE);
@@ -1045,7 +1344,45 @@ local void construct_network_shared(char *arg_network_name,
     HARDBUG(
       with_network->N_material_dense_network_shared.DNS_ninputs !=
       with_network->N_material_dense_network_shared.DNS_layers[0].LS_ninputs)
+
+    with_network->N_material_dense_network_16x8_kernel =
+      (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD) and
+      (with_network->N_material_dense_network_shared.DNS_layers[0].LS_ninputs ==
+       16) and
+      (with_network->N_material_dense_network_shared.DNS_layers[0]
+         .LS_noutputs == 8);
+
+    with_network->N_material_dense_network_64x16_kernel =
+      (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD) and
+      (with_network->N_material_dense_network_shared.DNS_layers[0].LS_ninputs ==
+       64) and
+      (with_network->N_material_dense_network_shared.DNS_layers[0]
+         .LS_noutputs == 16);
+
+    for (int imaterial = 0;
+         imaterial < with_network->N_materials_shared.MSS_nmaterials;
+         imaterial++)
+    {
+      material_shared_t *with_material_shared =
+        with_network->N_materials_shared.MSS_materials + imaterial;
+
+      if ((with_material_shared->MS_nembed != 16) or
+          (with_material_shared->MS_offset != 0))
+        with_network->N_material_dense_network_16x8_kernel = FALSE;
+      if ((with_material_shared->MS_nembed != 64) or
+          (with_material_shared->MS_offset != 0))
+        with_network->N_material_dense_network_64x16_kernel = FALSE;
+    }
   }
+
+  PRINTF("N_pattern_dense_network_16x8_kernel=%d\n",
+         with_network->N_pattern_dense_network_16x8_kernel);
+  PRINTF("N_material_dense_network_16x8_kernel=%d\n",
+         with_network->N_material_dense_network_16x8_kernel);
+  PRINTF("N_pattern_dense_network_64x16_kernel=%d\n",
+         with_network->N_pattern_dense_network_64x16_kernel);
+  PRINTF("N_material_dense_network_64x16_kernel=%d\n",
+         with_network->N_material_dense_network_64x16_kernel);
 
   // set expected inputs for dense network
 
@@ -1067,107 +1404,12 @@ local void construct_network_shared(char *arg_network_name,
         .LS_noutputs;
   }
 
-  // add the signals to the inputs of the dense network
-
-  cJSON *cjson_signals = cJSON_GetObjectItem(directory, CJSON_SIGNALS_ID);
-
-  if (!cJSON_IsArray(cjson_signals))
-    goto label_skip;
-
-  HARDBUG(!cJSON_IsArray(cjson_signals));
-
-  with_network->N_signals_shared.SS_nsignals =
-    cJSON_GetArraySize(cjson_signals);
-
-  PRINTF("with_network->N_signals_shared.SS_nsignals=%d\n",
-         with_network->N_signals_shared.SS_nsignals);
-
-  for (int isignal = 0; isignal < with_network->N_signals_shared.SS_nsignals;
-       isignal++)
-  {
-    signal_shared_t *with_signal_shared =
-      with_network->N_signals_shared.SS_signals + isignal;
-
-    cJSON *cjson_signal = cJSON_GetArrayItem(cjson_signals, isignal);
-
-    HARDBUG(!cJSON_IsObject(cjson_signal));
-
-    cJSON *cjson_signal_name =
-      cJSON_GetObjectItem(cjson_signal, CJSON_SIGNAL_NAME_ID);
-
-    HARDBUG(!cJSON_IsString(cjson_signal_name));
-
-    const char *signal_name = cJSON_GetStringValue(cjson_signal_name);
-
-    HARDBUG(signal_name == NULL)
-
-    HARDBUG((with_signal_shared->SS_bname = bfromcstr(signal_name)) == NULL)
-
-    if (biseqcstr(with_signal_shared->SS_bname, "NULL") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_NULL_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname, "nwhite_man") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_NWHITE_MAN_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname, "nblack_man") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_NBLACK_MAN_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname, "nwhite_king") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_NWHITE_KING_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname, "nblack_king") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_NBLACK_KING_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname, "npieces") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_NPIECES_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname,
-                       "nwhite_king_diagonal_5_46") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_NWHITE_KING_DIAGONAL_5_46_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname,
-                       "nblack_king_diagonal_5_46") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_NBLACK_KING_DIAGONAL_5_46_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname, "signal_24") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_24_ID;
-    }
-    else if (biseqcstr(with_signal_shared->SS_bname, "signal_27") == 1)
-    {
-      with_signal_shared->SS_id = SIGNAL_27_ID;
-    }
-    else
-      FATAL("unknown signal name", EXIT_FAILURE)
-
-    with_signal_shared->SS_offset =
-      with_network->N_dense_network_shared.DNS_ninputs++;
-
-    PRINTF("isignal=%d with_signal_shared->SS_bname=%s"
-           " with_signal_shared->SS_id=%d"
-           " with_signal_shared->SS_offset=%d\n",
-           isignal,
-           bdata(with_signal_shared->SS_bname),
-           with_signal_shared->SS_id,
-           with_signal_shared->SS_offset);
-  }
-
-label_skip:
-
   PRINTF("with_network->N_dense_network_shared.DNS_ninputs=%d\n",
          with_network->N_dense_network_shared.DNS_ninputs);
 
   HARDBUG(with_network->N_dense_network_shared.DNS_ninputs >= NINPUTS_MAX)
 
-  construct_dense_network_shared(with_network, directory, NULL, TRUE);
+  construct_dense_network_shared(with_network, directory, "final", TRUE);
 
   if (with_network->N_dense_network_shared.DNS_ninputs !=
       with_network->N_dense_network_shared.DNS_layers[0].LS_ninputs)
@@ -1658,101 +1900,6 @@ local void activation_relu_double(int n,
   }
 }
 
-#define CLIP_VALUE 6
-
-local void activation_clipped_relu_scaled(int n,
-                                          scaled_double_t *restrict a,
-                                          scaled_double_t *restrict b)
-{
-  // for (int i = 0; i < n; i++) HARDBUG(a[i] > CLIP_VALUE)
-
-#ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
-#endif
-  {
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    for (int i = 0; i < n; i++)
-    {
-      if (a[i] <= 0)
-        b[i] = 0;
-      else if (a[i] >= (scaled_double_t)CLIP_VALUE)
-        b[i] = (scaled_double_t)CLIP_VALUE;
-      else
-        b[i] = a[i];
-    }
-#else
-    for (int i = 0; i < n; i++)
-    {
-      if (a[i] <= 0)
-        b[i] = 0;
-      else if (a[i] >= (SCALED_DOUBLE_FACTOR * CLIP_VALUE))
-        b[i] = (SCALED_DOUBLE_FACTOR * CLIP_VALUE);
-      else
-        b[i] = a[i];
-    }
-#endif
-  }
-#ifdef USE_AVX2_INTRINSICS
-  else
-  {
-    SOFTBUG((n % 8) != 0)
-
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    const __m256 vz = _mm256_setzero_ps();
-
-    const __m256 vc = _mm256_set1_ps((scaled_double_t)CLIP_VALUE);
-
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
-    {
-      __m256 ta = MM256_LOAD_PS(a);
-
-      ta = _mm256_max_ps(ta, vz);
-      ta = _mm256_min_ps(ta, vc);
-
-      _mm256_store_ps(b, ta);
-    }
-#else
-    __m256i zero = _mm256_setzero_si256();
-    __m256i clip = _mm256_set1_epi32(SCALED_DOUBLE_FACTOR * CLIP_VALUE);
-
-    for (const int32_t *z = a + n; a < z; a += 8, b += 8)
-    {
-      __m256i va = _mm256_load_si256((__m256i *)a);
-
-      va = _mm256_max_epi32(va, zero);
-      va = _mm256_min_epi32(va, clip);
-
-      _mm256_store_si256((__m256i *)b, va);
-    }
-#endif
-  }
-#endif
-}
-
-local void activation_clipped_relu_double(int n,
-                                          scaled_double_t *restrict a,
-                                          scaled_double_t *restrict b)
-{
-  for (int i = 0; i < n; i++)
-  {
-#if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    if (a[i] <= 0.0)
-      b[i] = 0.0;
-    else if (a[i] >= CLIP_VALUE)
-      b[i] = (scaled_double_t)CLIP_VALUE;
-    else
-      b[i] = a[i];
-#else
-    if (a[i] <= 0.0)
-      b[i] = 0.0;
-    else if (a[i] >= (SCALED_DOUBLE_FACTOR * CLIP_VALUE))
-      b[i] = (scaled_double_t)(SCALED_DOUBLE_FACTOR * CLIP_VALUE);
-    else
-      b[i] = a[i];
-#endif
-  }
-}
-
 local void activation_tanh_scaled(int n,
                                   scaled_double_t *restrict a,
                                   scaled_double_t *restrict b)
@@ -1974,6 +2121,7 @@ local void activation_geluv2_scaled(int n,
           _mm256_store_ps(b, _mm256_mul_ps(_mm256_mul_ps(half, va), vp));
         }
     */
+#ifdef USE_RSQRT
     const __m256 qp = _mm256_set1_ps(0.25f * 0.544790f);
     const __m256 half = _mm256_set1_ps(0.5f);
     const __m256 three_halfs = _mm256_set1_ps(1.5f);
@@ -1986,7 +2134,7 @@ local void activation_geluv2_scaled(int n,
 
       __m256 vy2 = _mm256_mul_ps(vy, vy);
 
-      __m256 vy2qp = _mm256_fmadd_ps(vy, vy, qp);
+      __m256 vy2qp = MM256_MADD_PS(vy, vy, qp);
 
       __m256 rsqrt = _mm256_rsqrt_ps(vy2qp);
 
@@ -1994,14 +2142,41 @@ local void activation_geluv2_scaled(int n,
 
       __m256 rsqrt2 = _mm256_mul_ps(rsqrt, rsqrt);
 
+#ifdef USE_FMA
       rsqrt = _mm256_mul_ps(
         rsqrt,
         _mm256_fnmadd_ps(_mm256_mul_ps(half, vy2qp), rsqrt2, three_halfs));
+#else
+      rsqrt = _mm256_mul_ps(
+        rsqrt,
+        _mm256_sub_ps(three_halfs,
+                      _mm256_mul_ps(_mm256_mul_ps(half, vy2qp), rsqrt2)));
+#endif
 
-      __m256 vg = _mm256_fmadd_ps(vy2, rsqrt, vy);
+      __m256 vg = MM256_MADD_PS(vy2, rsqrt, vy);
 
       _mm256_store_ps(b, vg);
     }
+#else
+    const __m256 p = _mm256_set1_ps(0.544790f);
+    const __m256 half = _mm256_set1_ps(0.5f);
+    const __m256 one = _mm256_set1_ps(1.0f);
+
+    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    {
+      __m256 va = MM256_LOAD_PS(a);
+
+      __m256 va2 = _mm256_mul_ps(va, va);
+
+      __m256 vsqrt = _mm256_sqrt_ps(_mm256_add_ps(p, va2));
+
+      __m256 rsqrt = _mm256_add_ps(one, _mm256_div_ps(va, vsqrt));
+
+      __m256 vg = _mm256_mul_ps(_mm256_mul_ps(half, va), rsqrt);
+
+      _mm256_store_ps(b, vg);
+    }
+#endif
 #else
 #error not implemented
 #endif
@@ -2029,9 +2204,9 @@ local void activation_scaled(int arg_activation,
                              scaled_double_t *restrict a,
                              scaled_double_t *restrict b)
 {
-  if (arg_activation == NETWORK_ACTIVATION_RELU6)
+  if (arg_activation == NETWORK_ACTIVATION_RELU)
   {
-    activation_clipped_relu_scaled(n, a, b);
+    activation_relu_scaled(n, a, b);
   }
   else if (arg_activation == NETWORK_ACTIVATION_TANH)
   {
@@ -2062,9 +2237,9 @@ local void activation_double(int arg_activation,
                              scaled_double_t *restrict a,
                              scaled_double_t *restrict b)
 {
-  if (arg_activation == NETWORK_ACTIVATION_RELU6)
+  if (arg_activation == NETWORK_ACTIVATION_RELU)
   {
-    activation_clipped_relu_double(n, a, b);
+    activation_relu_double(n, a, b);
   }
   else if (arg_activation == NETWORK_ACTIVATION_TANH)
   {
@@ -2119,6 +2294,26 @@ int base3_index_v2(board_t *arg_board, ui64_t arg_pattern_bb)
   return (result);
 }
 
+int base3_index_v3(board_t *arg_board, ui64_t arg_pattern_bb)
+{
+  uint64_t wm = _pext_u64(arg_board->B_white_man_bb, arg_pattern_bb);
+  uint64_t bm = _pext_u64(arg_board->B_black_man_bb, arg_pattern_bb);
+
+  return base3_table[wm | (bm << 8)];
+}
+
+int base3_index_v4(board_t *arg_board, ui64_t arg_pattern_bb)
+{
+  // HARDBUG(BIT_COUNT(arg_pattern_bb) > BASE3_PATTERN_BITS)
+
+  uint32_t wm = (uint32_t)_pext_u64(arg_board->B_white_man_bb, arg_pattern_bb);
+  uint32_t bm = (uint32_t)_pext_u64(arg_board->B_black_man_bb, arg_pattern_bb);
+
+  HARDBUG((wm & bm) != 0)
+
+  return (int)(base3_mask_table[wm] + 2u * base3_mask_table[bm]);
+}
+
 // assumes inputs have been set
 
 double return_dense_network_score_scaled(
@@ -2143,25 +2338,17 @@ double return_dense_network_score_scaled(
 
     HARDBUG(arg_dense_network_shared->DNS_compute_layer0 == FALSE)
 
-    for (int i = 0; i < with_current->LS_noutputs; i++)
-    {
-      with_current_thread->LT_dot[i] =
-        dot_scaled(with_current->LS_ninputs,
-                   activated_inputs,
-                   with_current->LS_weights_noutputsxninputs[i]);
-    }
+    dense_layer0_dot(arg_dense_network_shared,
+                     activated_inputs,
+                     with_current_thread->LT_dot);
   }
   else
   {
     if (arg_dense_network_shared->DNS_compute_layer0)
     {
-      for (int i = 0; i < with_current->LS_noutputs; i++)
-      {
-        with_current_thread->LT_dot[i] =
-          dot_scaled(with_current->LS_ninputs,
-                     arg_dense_network_state->DNS_inputs,
-                     with_current->LS_weights_noutputsxninputs[i]);
-      }
+      dense_layer0_dot(arg_dense_network_shared,
+                       arg_dense_network_state->DNS_inputs,
+                       with_current_thread->LT_dot);
     }
   }
 
@@ -2208,7 +2395,7 @@ double return_dense_network_score_scaled(
               with_current->LS_bias,
               with_current_thread->LT_sum);
 
-    if (with_current->LS_noutputs > 1)
+    if (with_current->LS_noutputs > 3)
     {
       BEGIN_BLOCK("Ax+b-and-activation-other-layers-activation")
 
@@ -2226,12 +2413,34 @@ double return_dense_network_score_scaled(
       if (arg_dense_network_shared->DNS_activation_last ==
           NETWORK_ACTIVATION_LINEAR)
       {
+        HARDBUG(with_current->LS_noutputs != 1)
+
         with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
+      }
+      else if (arg_dense_network_shared->DNS_activation_last ==
+               NETWORK_ACTIVATION_TANH)
+      {
+        HARDBUG(with_current->LS_noutputs != 1)
+
+        with_current_thread->LT_outputs[0] =
+          tanhf(with_current_thread->LT_sum[0]);
       }
       else if (arg_dense_network_shared->DNS_activation_last ==
                NETWORK_ACTIVATION_LOGITS)
       {
+        HARDBUG(with_current->LS_noutputs != 3)
+
         with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
+        with_current_thread->LT_outputs[1] = with_current_thread->LT_sum[1];
+        with_current_thread->LT_outputs[2] = with_current_thread->LT_sum[2];
+      }
+      else if (arg_dense_network_shared->DNS_activation_last ==
+               NETWORK_ACTIVATION_2HEADS)
+      {
+        HARDBUG(with_current->LS_noutputs != 2)
+
+        with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
+        with_current_thread->LT_outputs[1] = with_current_thread->LT_sum[1];
       }
       else
         FATAL("unknown activation_last option", EXIT_FAILURE)
@@ -2247,7 +2456,65 @@ double return_dense_network_score_scaled(
   layer_thread_t *with_thread = arg_dense_network_state->DNS_layers +
                                 arg_dense_network_shared->DNS_nlayers - 1;
 
-  return (SCALED2DOUBLE(with_thread->LT_outputs[0]));
+  if (with_current->LS_noutputs == 1)
+  {
+    return (SCALED2DOUBLE(with_thread->LT_outputs[0]));
+  }
+  else if (with_current->LS_noutputs == 2)
+  {
+    wdl_score = SCALED2DOUBLE(with_thread->LT_outputs[0]);
+    mat_score = SCALED2DOUBLE(with_thread->LT_outputs[1]);
+
+    /*
+        PRINTF("wdl_score=%.6f mat_score=%.6f\n",
+               wdl_score, mat_score);
+    */
+
+    return (wdl_score + 50 * mat_score);
+    // return((wdl_score + mat_score) / 2.0);
+    // return(wdl_score);
+    // return(mat_score);
+  }
+  else if (with_current->LS_noutputs == 3)
+  {
+    double logits0 = SCALED2DOUBLE(with_thread->LT_outputs[0]);
+    double logits1 = SCALED2DOUBLE(with_thread->LT_outputs[1]);
+    double logits2 = SCALED2DOUBLE(with_thread->LT_outputs[2]);
+
+    return (logits2 - logits0);
+
+    // Mild drawish boost
+    double v = logits2 - logits0;
+    double g = logits1 - 0.5 * (logits2 + logits0);
+    // double g = logits1 - fmax(logits2, logits0);
+    double drawish = 1.0 / (1.0 + exp(-g));
+
+    return (v * (1.0 + 1.0 * drawish));
+
+    double logitsm = logits0;
+
+    if (logits1 > logitsm)
+      logitsm = logits1;
+    if (logits2 > logitsm)
+      logitsm = logits2;
+
+    double exp0 = exp(logits0 - logitsm);
+    double exp1 = exp(logits1 - logitsm);
+    double exp2 = exp(logits2 - logitsm);
+
+    double sum = exp0 + exp1 + exp2;
+
+    double ploss = exp0 / sum;
+    double pwin = exp2 / sum;
+
+    // return (pwin - ploss);
+
+    return (logits2 - logits0) * (pwin + ploss);
+  }
+  else
+  {
+    return (0.0);
+  }
 }
 
 double return_dense_network_score_double(
@@ -2333,7 +2600,18 @@ double return_dense_network_score_double(
         with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
       }
       else if (arg_dense_network_shared->DNS_activation_last ==
+               NETWORK_ACTIVATION_TANH)
+      {
+        with_current_thread->LT_outputs[0] =
+          tanh(with_current_thread->LT_sum[0]);
+      }
+      else if (arg_dense_network_shared->DNS_activation_last ==
                NETWORK_ACTIVATION_LOGITS)
+      {
+        with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
+      }
+      else if (arg_dense_network_shared->DNS_activation_last ==
+               NETWORK_ACTIVATION_2HEADS)
       {
         with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
       }
@@ -2415,6 +2693,32 @@ update_mean_sigma(long long n, double x, double *xmax, double *mn, double *sn)
   *sn = snm1 + (x - mnm1) * (x - *mn);
 }
 
+static inline uint64_t mirror_bb(uint64_t bb)
+{
+  ui64_t result;
+
+  result = (bb >> 6);
+
+  result = BIT_REVERSE(result) >> (64 - 54);
+
+  result = (result << 6);
+
+  ui64_t debug = 0;
+
+  while (bb)
+  {
+    int ifield = BIT_CTZ(bb);
+
+    bb &= ~BITULL(ifield);
+
+    debug |= 1ULL << (65 - ifield);
+  }
+
+  HARDBUG(debug != result)
+
+  return (result);
+}
+
 void fen2network(char *arg_name, i64_t arg_npositions)
 {
   board_t board;
@@ -2471,18 +2775,16 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
   double error_max_scaled_vs_double = 0.0;
 
-  i64_t nfactor = 0;
-  double factor = 0.0;
-
-  i64_t nnetwork2mat_score_gt_score_man = 0;
-
   construct_my_bstream(&my_bstream, arg_name);
 
   BSTRING(bfen)
 
   progress_t progress;
 
-  construct_progress(&progress, nfen, 10);
+  construct_progress(&progress, "fen2network:stats", nfen, 10);
+
+  FILE *fcsv;
+  fcsv = fopen("xyz.csv", "w");
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
   {
@@ -2492,6 +2794,9 @@ void fen2network(char *arg_name, i64_t arg_npositions)
       continue;
 
     bstring bline = my_bstream.BS_bline;
+
+    if (bchar(bline, 0) == '#')
+      continue;
 
     CSTRING(cfen, blength(bline))
 
@@ -2504,6 +2809,8 @@ void fen2network(char *arg_name, i64_t arg_npositions)
     CDESTROY(cfen)
 
     fen2board(with_board, bdata(bfen));
+
+    HARDBUG(IS_BLACK(with_board->B_colour2move))
 
     int nwhite_man = BIT_COUNT(with_board->B_white_man_bb);
     int nblack_man = BIT_COUNT(with_board->B_black_man_bb);
@@ -2532,9 +2839,12 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
     // check_moves(with, &moves_list);
 
-    int mat_score = return_material_score(with_board);
+    int material_score = return_material_score(with_board);
 
     return_score_from_board(with_board, score_scaled + ifen);
+
+    if (ifen < 100000)
+      fprintf(fcsv, "%.3f,%.3f,%.3f\n", wdl_score, mat_score, result);
 
     network_t *with_network = networks + with_board->B_network_id;
 
@@ -2542,14 +2852,11 @@ void fen2network(char *arg_name, i64_t arg_npositions)
       &(with_network->N_dense_network_shared),
       &(with_board->B_network_state.NS_dense_network_state));
 
-    if (IS_BLACK(with_board->B_colour2move))
-      mat_score = -mat_score;
-
     if (ifen <= 100)
       PRINTF("%s {%.6f} ms=%d ss=%.6f sd=%.6f r=%.6f\n",
              bdata(bfen),
              result,
-             mat_score,
+             material_score,
              score_scaled[ifen],
              score_double[ifen],
              result);
@@ -2574,43 +2881,18 @@ void fen2network(char *arg_name, i64_t arg_npositions)
       PRINTF("%s {%.6f} ms=%d nss=%.6f nsd=%.6f r=%.6f\n",
              bdata(bfen),
              result,
-             mat_score,
+             material_score,
              score_scaled[ifen],
              score_double[ifen],
              result);
 
       PRINTF("error_max_scaled_vs_double=%.6f\n", error_max_scaled_vs_double);
     }
-
-    if ((moves_list.ML_ncaptx == 0) and (with_board->B_white_king_bb == 0) and
-        (with_board->B_black_king_bb == 0) and (result > 0.0) and
-        (score_scaled[ifen] >= result) and
-        ((mat_score >= SCORE_MAN) and (mat_score <= (3 * SCORE_MAN))))
-    {
-      ++nfactor;
-
-      factor += mat_score / score_scaled[ifen];
-
-      if (nfactor <= 100)
-        PRINTF("nfactor=%lld factor=%.6f\n", nfactor, factor / nfactor);
-    }
-
-    if (nfactor > 10)
-    {
-      int network2mat_score = round(score_scaled[ifen] * factor / nfactor);
-
-      if (abs(network2mat_score - mat_score) > SCORE_MAN)
-      {
-        if (nnetwork2mat_score_gt_score_man <= 100)
-          PRINTF("network2mat_score=%d mat_score=%d\n",
-                 network2mat_score,
-                 mat_score);
-        nnetwork2mat_score_gt_score_man++;
-      }
-    }
   }
-
+  fclose(fcsv);
   finalize_progress(&progress);
+
+  destroy_progress(&progress);
 
   destroy_my_bstream(&my_bstream);
 
@@ -2675,30 +2957,10 @@ void fen2network(char *arg_name, i64_t arg_npositions)
                    my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_allreduce(MPI_IN_PLACE,
-                   &nnetwork2mat_score_gt_score_man,
-                   1,
-                   MPI_LONG_LONG_INT,
-                   MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
-
-  my_mpi_allreduce(MPI_IN_PLACE,
                    &error_max_scaled_vs_double,
                    1,
                    MPI_DOUBLE,
                    MPI_MAX,
-                   my_mpi_globals.MMG_comm_slaves);
-
-  my_mpi_allreduce(MPI_IN_PLACE,
-                   &nfactor,
-                   1,
-                   MPI_LONG_LONG_INT,
-                   MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
-  my_mpi_allreduce(MPI_IN_PLACE,
-                   &factor,
-                   1,
-                   MPI_DOUBLE,
-                   MPI_SUM,
                    my_mpi_globals.MMG_comm_slaves);
 
   PRINTF("delta npieces\n");
@@ -2793,11 +3055,6 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
   PRINTF("error_max_scaled_vs_double=%.6f\n", error_max_scaled_vs_double);
 
-  PRINTF("nfactor=%lld factor=%.6f\n", nfactor, factor / nfactor);
-
-  PRINTF("nnetwork2mat_score_gt_score_man=%lld\n",
-         nnetwork2mat_score_gt_score_man);
-
   i64_t ipercentile = round(90 / 100.0 * nfen);
   double percentile = delta_scaled[pdelta_scaled[ipercentile]];
 
@@ -2805,10 +3062,18 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
   construct_my_bstream(&my_bstream, arg_name);
 
-  construct_progress(&progress, nfen, 10);
+  construct_progress(&progress, "fen2network:factor", nfen, 10);
 
-  nfactor = 0;
-  factor = 0.0;
+  i64_t nfactor[NPIECES_MAX + 1];
+  double factor[NPIECES_MAX + 1];
+  double score[NPIECES_MAX + 1];
+
+  for (int ipiece = 0; ipiece <= NPIECES_MAX; ++ipiece)
+  {
+    nfactor[ipiece] = 0;
+    factor[ipiece] = 0;
+    score[ipiece] = 0;
+  }
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
   {
@@ -2818,6 +3083,9 @@ void fen2network(char *arg_name, i64_t arg_npositions)
       continue;
 
     bstring bline = my_bstream.BS_bline;
+
+    if (bchar(bline, 0) == '#')
+      continue;
 
     CSTRING(cfen, blength(bline))
 
@@ -2855,19 +3123,24 @@ void fen2network(char *arg_name, i64_t arg_npositions)
     int nwhite_man = BIT_COUNT(with_board->B_white_man_bb);
     int nblack_man = BIT_COUNT(with_board->B_black_man_bb);
 
-    int delta_man = abs(nwhite_man - nblack_man);
-
-    if (delta_man != 1)
+    if ((nwhite_man == 0) or (nblack_man == 0))
       continue;
 
-    if (fabs(score_scaled[ifen] - result) > percentile)
+    int delta_man = nwhite_man - nblack_man;
+    if (delta_man < 0)
       continue;
 
-    nfactor++;
-    factor += fabs(score_scaled[ifen]);
+    // if (fabs(score_scaled[ifen] - result) > percentile)
+    //   continue;
+
+    nfactor[delta_man]++;
+    factor[delta_man] += fabs(score_scaled[ifen]);
+    score[delta_man] += ABS_SCORE_T(return_score_from_board(with_board, NULL));
   }
 
   finalize_progress(&progress);
+
+  destroy_progress(&progress);
 
   destroy_my_bstream(&my_bstream);
 
@@ -2875,25 +3148,44 @@ void fen2network(char *arg_name, i64_t arg_npositions)
 
   my_mpi_allreduce(MPI_IN_PLACE,
                    &nfactor,
-                   1,
+                   NPIECES_MAX + 1,
                    MPI_LONG_LONG_INT,
                    MPI_SUM,
                    my_mpi_globals.MMG_comm_slaves);
   my_mpi_allreduce(MPI_IN_PLACE,
                    &factor,
-                   1,
+                   NPIECES_MAX + 1,
+                   MPI_DOUBLE,
+                   MPI_SUM,
+                   my_mpi_globals.MMG_comm_slaves);
+  my_mpi_allreduce(MPI_IN_PLACE,
+                   &score,
+                   NPIECES_MAX + 1,
                    MPI_DOUBLE,
                    MPI_SUM,
                    my_mpi_globals.MMG_comm_slaves);
 
-  factor /= nfactor;
+  for (int ipiece = 0; ipiece <= NPIECES_MAX; ++ipiece)
+  {
+    if (nfactor[ipiece] == 0)
+      continue;
 
-  double factor2man_score = SCORE_MAN / factor;
+    factor[ipiece] /= nfactor[ipiece];
+    score[ipiece] /= nfactor[ipiece];
 
-  PRINTF("nfactor=%lld factor=%.6f factor2man_score=%.6f\n",
-         nfactor,
-         factor,
-         factor2man_score);
+    double factor2man_score = (ipiece * SCORE_MAN) / factor[ipiece];
+
+    PRINTF("ipiece=%d"
+           " nfactor[ipiece]=%lld"
+           " factor[ipiece]=%.6f"
+           " score[ipiece]=%.6f"
+           " factor2man_score=%.6f\n",
+           ipiece,
+           nfactor[ipiece],
+           factor[ipiece],
+           score[ipiece],
+           factor2man_score);
+  }
 }
 
 local void append_fen(board_t *arg_with_board,
@@ -2917,6 +3209,10 @@ local void append_fen(board_t *arg_with_board,
     }
   */
 
+  // always WTM
+
+  HARDBUG(IS_BLACK(arg_with_board->B_colour2move))
+
   int nwhite_man = BIT_COUNT(arg_with_board->B_white_man_bb);
   int nblack_man = BIT_COUNT(arg_with_board->B_black_man_bb);
   int nwhite_king = BIT_COUNT(arg_with_board->B_white_king_bb);
@@ -2936,74 +3232,6 @@ local void append_fen(board_t *arg_with_board,
       int input = base3_index_v2(arg_with_board, with_pattern_shared->PS_bb);
 
       bin_t ibin = input;
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_MAN_ID)
-    {
-      bin_t ibin = nwhite_man;
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_MAN_ID)
-    {
-      bin_t ibin = nblack_man;
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_KING_ID)
-    {
-      bin_t ibin = nwhite_king;
-
-      if (ibin > PATTERN_NKING_MAX)
-        ibin = PATTERN_NKING_MAX;
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_KING_ID)
-    {
-      bin_t ibin = nblack_king;
-
-      if (ibin > PATTERN_NKING_MAX)
-        ibin = PATTERN_NKING_MAX;
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_WHITE_MOBILITY_ID)
-    {
-      bin_t ibin = return_mobility(arg_with_board, WHITE_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_BLACK_MOBILITY_ID)
-    {
-      bin_t ibin = return_mobility(arg_with_board, BLACK_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_WHITE_IMMOBILITY_ID)
-    {
-      bin_t ibin = return_immobility(arg_with_board, WHITE_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_BLACK_IMMOBILITY_ID)
-    {
-      bin_t ibin = return_immobility(arg_with_board, BLACK_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NWHITE_KING_DIAGONAL_5_46_ID)
-    {
-      bin_t ibin =
-        BIT_COUNT(arg_with_board->B_white_king_bb & diagonal_5_46_bb);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_pattern_shared->PS_id == PATTERN_NBLACK_KING_DIAGONAL_5_46_ID)
-    {
-      bin_t ibin =
-        BIT_COUNT(arg_with_board->B_black_king_bb & diagonal_5_46_bb);
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
@@ -3052,6 +3280,18 @@ local void append_fen(board_t *arg_with_board,
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
+    else if (with_material_shared->MS_id == MATERIAL_NWHITE_KING20_ID)
+    {
+      bin_t ibin = nwhite_king;
+
+      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+    }
+    else if (with_material_shared->MS_id == MATERIAL_NBLACK_KING20_ID)
+    {
+      bin_t ibin = nblack_king;
+
+      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
+    }
     else if (with_material_shared->MS_id == MATERIAL_MAN_KING_ID)
     {
       int mwhite_king = nwhite_king;
@@ -3070,75 +3310,9 @@ local void append_fen(board_t *arg_with_board,
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
-    else if (with_material_shared->MS_id == MATERIAL_WHITE_MOBILITY_ID)
-    {
-      bin_t ibin = return_mobility(arg_with_board, WHITE_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_material_shared->MS_id == MATERIAL_BLACK_MOBILITY_ID)
-    {
-      bin_t ibin = return_mobility(arg_with_board, BLACK_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_material_shared->MS_id == MATERIAL_WHITE_IMMOBILITY_ID)
-    {
-      bin_t ibin = return_immobility(arg_with_board, WHITE_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_material_shared->MS_id == MATERIAL_BLACK_IMMOBILITY_ID)
-    {
-      bin_t ibin = return_immobility(arg_with_board, BLACK_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_material_shared->MS_id == MATERIAL_WHITE_UNSUPPORTED_ID)
-    {
-      bin_t ibin = return_unsupported(arg_with_board, WHITE_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
-    else if (with_material_shared->MS_id == MATERIAL_BLACK_UNSUPPORTED_ID)
-    {
-      bin_t ibin = return_unsupported(arg_with_board, BLACK_ENUM);
-
-      append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
-    }
     else
       FATAL("unknown with_material_shared->MS_id", EXIT_FAILURE)
   }
-
-#ifdef APPEND_SIGNALS
-  float fbin = (float)nwhite_man / 20.0f;
-
-  append_fbuffer_bin(arg_fcsv, &fbin, sizeof(float));
-
-  fbin = (float)nblack_man / 20.0f;
-
-  append_fbuffer_bin(arg_fcsv, &fbin, sizeof(float));
-
-  fbin = (float)nwhite_king / 20.0f;
-
-  append_fbuffer_bin(arg_fcsv, &fbin, sizeof(float));
-
-  fbin = (float)nblack_king / 20.0f;
-
-  append_fbuffer_bin(arg_fcsv, &fbin, sizeof(float));
-
-  fbin = 0.0f;
-
-  append_fbuffer_bin(arg_fcsv, &fbin, sizeof(float));
-  append_fbuffer_bin(arg_fcsv, &fbin, sizeof(float));
-  append_fbuffer_bin(arg_fcsv, &fbin, sizeof(float));
-  append_fbuffer_bin(arg_fcsv, &fbin, sizeof(float));
-#endif
-
-  // always W2M
-
-  if (IS_BLACK(arg_with_board->B_colour2move))
-    arg_result = -arg_result;
 
   if (with_network->N_activation_last == NETWORK_ACTIVATION_LINEAR)
   {
@@ -3160,6 +3334,16 @@ local void append_fen(board_t *arg_with_board,
       FATAL("unknown arg_result", EXIT_FAILURE)
 
     append_fbuffer_bin(arg_fcsv, &result, sizeof(i32_t));
+  }
+  else if (with_network->N_activation_last == NETWORK_ACTIVATION_2HEADS)
+  {
+    float result = arg_result;
+
+    append_fbuffer_bin(arg_fcsv, &result, sizeof(float));
+
+    result = (float)return_material_score(arg_with_board) / 1000000.0f;
+
+    append_fbuffer_bin(arg_fcsv, &result, sizeof(float));
   }
   else
     FATAL("unknown with_network->N_activation_last", EXIT_FAILURE)
@@ -3201,12 +3385,14 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
   network_t *with_network = networks + with_board->B_network_id;
 
-  HARDBUG(bformata(btag,
-                   "%s-npiecesmin%d-npiecesmax%d-%s",
-                   TAG,
-                   arg_npieces_min,
-                   arg_npieces_max,
-                   bdata(with_network->N_bshape)) == BSTR_ERR)
+  HARDBUG(
+    bformata(btag,
+             "%s-nm%d-%s-np%d-%d-mirror",
+             bdata(with_network->N_bshape),
+             with_network->N_materials_shared.MSS_nmaterials,
+             activation_last2string(with_network->N_activation_last, TRUE),
+             arg_npieces_min,
+             arg_npieces_max) == BSTR_ERR)
 
   // training
 
@@ -3300,12 +3486,67 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
   i64_t nfen = 0;
 
+  int label_white2move = FALSE;
+
   while (my_bstream_readln(&my_bstream, TRUE) == BSTR_OK)
+  {
+    bstring bline = my_bstream.BS_bline;
+
+    if (bchar(bline, 0) == '#')
+    {
+      if (biseqcaselessStatic(bline, "#pragma label_white2move"))
+      {
+        PRINTF("WARNING: #PRAGMA label_white2move\n");
+
+        label_white2move = TRUE;
+      }
+    }
+
     nfen++;
+  }
 
   destroy_my_bstream(&my_bstream);
 
   PRINTF("nfen=%lld\n", nfen);
+
+  stats_t stats_original_labels;
+
+  stats_t stats_training_labels;
+
+  stats_t stats_validation_labels;
+
+  construct_stats(&stats_original_labels, "stats_original_labels");
+
+  construct_stats(&stats_training_labels, "stats_training_labels");
+
+  construct_stats(&stats_validation_labels, "stats_validation_labels");
+
+  bucket_t bucket_original_labels;
+
+  construct_bucket(&bucket_original_labels,
+                   "bucket_original_labels",
+                   0.1,
+                   -1.2,
+                   1.2,
+                   BUCKET_LINEAR);
+
+  bucket_t bucket_training_labels;
+
+  construct_bucket(&bucket_training_labels,
+                   "bucket_training_labels",
+                   0.1,
+                   -1.2,
+                   1.2,
+                   BUCKET_LINEAR);
+
+  bucket_t bucket_validation_labels;
+
+  construct_bucket(&bucket_validation_labels,
+                   "bucket_validation_labelS",
+                   0.1,
+                   -1.2,
+                   1.2,
+                   BUCKET_LINEAR);
 
   bucket_t bucket_material_score;
 
@@ -3384,7 +3625,7 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
   progress_t progress;
 
-  construct_progress(&progress, nfen, 10);
+  construct_progress(&progress, "fen2csv", nfen, 10);
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
   {
@@ -3395,24 +3636,44 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
     bstring bline = my_bstream.BS_bline;
 
+    if (bchar(bline, 0) == '#')
+      continue;
+
     double result;
 
     CSTRING(cfen, blength(bline))
 
-    // ARES convention
-
     HARDBUG(my_sscanf(bdata(bline), "%s {%lf}", cfen, &result) != 2)
+
+    update_stats(&stats_original_labels, result);
+
+    update_bucket(&bucket_original_labels, result);
 
     HARDBUG(bassigncstr(bfen, cfen) == BSTR_ERR)
 
     fen2board(with_board, bdata(bfen));
 
-    if (IS_BLACK(with_board->B_colour2move))
-      result = -result;
-
-    // END ARES CONVENTION
-
     CDESTROY(cfen)
+
+    if (IS_BLACK(with_board->B_colour2move))
+    {
+      if (label_white2move)
+        result = -result;
+
+      ui64_t white_man_bb = mirror_bb(with_board->B_black_man_bb);
+      ui64_t black_man_bb = mirror_bb(with_board->B_white_man_bb);
+      ui64_t white_king_bb = mirror_bb(with_board->B_black_king_bb);
+      ui64_t black_king_bb = mirror_bb(with_board->B_white_king_bb);
+
+      with_board->B_white_man_bb = white_man_bb;
+      with_board->B_black_man_bb = black_man_bb;
+      with_board->B_white_king_bb = white_king_bb;
+      with_board->B_black_king_bb = black_king_bb;
+
+      with_board->B_colour2move = WHITE_ENUM;
+
+      board2fen(with_board, bfen, FALSE);
+    }
 
     int nwhite_man = BIT_COUNT(with_board->B_white_man_bb);
 
@@ -3439,6 +3700,12 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
       continue;
 
     int material_score = return_material_score(with_board);
+
+    // if ((material_score != 0) and (fabs(result) < 1.0e-3)) continue;
+    // if ((material_score < 0) and (result > 1.0e-3))
+    //   continue;
+    // if ((material_score > 0) and (result < -1.0e-3))
+    //   continue;
 
     update_bucket(&bucket_material_score, material_score);
 
@@ -3476,14 +3743,24 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
     if (prob <= 79)
     {
       append_fen(with_board, bfen, result, &ftraining, NULL);
+
+      update_stats(&stats_training_labels, result);
+
+      update_bucket(&bucket_training_labels, result);
     }
     else
     {
       append_fen(with_board, bfen, result, &fvalidation, &ffen);
+
+      update_stats(&stats_validation_labels, result);
+
+      update_bucket(&bucket_validation_labels, result);
     }
   }
 
   finalize_progress(&progress);
+
+  destroy_progress(&progress);
 
   destroy_my_bstream(&my_bstream);
 
@@ -3494,6 +3771,21 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
   BDESTROY(bfen)
 
   BDESTROY(bdata_name)
+
+  my_stats_aggregate(&stats_original_labels, my_mpi_globals.MMG_comm_slaves);
+
+  my_stats_aggregate(&stats_training_labels, my_mpi_globals.MMG_comm_slaves);
+
+  my_stats_aggregate(&stats_validation_labels, my_mpi_globals.MMG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_original_labels,
+                          my_mpi_globals.MMG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_training_labels,
+                          my_mpi_globals.MMG_comm_slaves);
+
+  my_mpi_bucket_aggregate(&bucket_validation_labels,
+                          my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_material_score,
                           my_mpi_globals.MMG_comm_slaves);
@@ -3509,6 +3801,21 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
   my_mpi_bucket_aggregate(&bucket_nman, my_mpi_globals.MMG_comm_slaves);
 
   my_mpi_bucket_aggregate(&bucket_nkings, my_mpi_globals.MMG_comm_slaves);
+
+  mean_sigma(&stats_original_labels);
+  printf_stats(&stats_original_labels);
+
+  mean_sigma(&stats_validation_labels);
+  printf_stats(&stats_validation_labels);
+
+  mean_sigma(&stats_training_labels);
+  printf_stats(&stats_training_labels);
+
+  printf_bucket(&bucket_original_labels);
+
+  printf_bucket(&bucket_training_labels);
+
+  printf_bucket(&bucket_validation_labels);
 
   printf_bucket(&bucket_material_score);
 
@@ -3542,6 +3849,8 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
 void init_networks(void)
 {
   init_base64_table();
+  init_base3_table();
+  init_base3_mask_table();
 
   networks[NETWORK0_ID].N_network_id = INVALID;
   networks[NETWORK1_ID].N_network_id = INVALID;

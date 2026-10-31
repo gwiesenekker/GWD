@@ -1,7 +1,10 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
 
 #define NPAD (4 * 64)
+
+_Static_assert(NPAD % 64 == 0,
+               "allocation prefix must preserve 64-byte alignment");
 
 #define NMY_NAMES_MAX 1024
 
@@ -44,8 +47,18 @@ local int nmy_mallocs_max = 128;
 local int nmy_mallocs = 0;
 local my_malloc_t *my_mallocs = NULL;
 
-local int nmy_names = 0;
-local my_name_t *my_names = NULL;
+typedef struct my_name_stack
+{
+  my_name_t names[NMY_NAMES_MAX];
+  int count;
+  my_mutex_t mutex;
+  struct my_name_stack *next;
+} my_name_stack_t;
+
+/* Process-lifetime registry: never retain pointers to expired TLS storage.
+ * Entries also preserve unbalanced stacks from threads which have exited. */
+local my_name_stack_t *name_stacks = NULL;
+local _Thread_local my_name_stack_t *name_stack = NULL;
 
 local my_mutex_t my_malloc_mutex;
 
@@ -313,6 +326,8 @@ void *my_malloc(char *arg_name,
 {
   void *result;
 
+  HARDBUG(arg_size > SIZE_MAX - 2 * NPAD)
+
   COMPAT_MALLOC(result, NPAD + arg_size + NPAD)
 
   if (result == NULL)
@@ -348,21 +363,62 @@ void my_free(void *arg_pointer)
   FREE(heap)
 }
 
+local my_name_stack_t *return_name_stack(void)
+{
+  if (name_stack == NULL)
+  {
+    /* Do not use the tracked allocator or BSTRING in this diagnostic path. */
+    my_name_stack_t *stack = calloc(1, sizeof(*stack));
+    HARDBUG(stack == NULL)
+    HARDBUG(compat_mutex_init(&stack->mutex) != 0)
+    HARDBUG(compat_mutex_lock(&my_names_mutex) != 0)
+    stack->next = name_stacks;
+    name_stacks = stack;
+    HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
+    name_stack = stack;
+  }
+  return name_stack;
+}
+
+local int print_name_stack(my_name_stack_t *stack)
+{
+  my_name_t snapshot[NMY_NAMES_MAX];
+  HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
+  int count = stack->count;
+  memcpy(snapshot, stack->names, (size_t)count * sizeof(*snapshot));
+  HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
+
+  /* Never hold a stack lock while printing or invoking fatal diagnostics. */
+  for (int i = count - 1; i >= 0; --i)
+    PRINTF("iname=%d name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
+           i,
+           snapshot[i].MN_name,
+           snapshot[i].MN_file,
+           snapshot[i].MN_func,
+           snapshot[i].MN_line,
+           snapshot[i].MN_pthread_self);
+  return count;
+}
+
+local int print_all_name_stacks(void)
+{
+  HARDBUG(compat_mutex_lock(&my_names_mutex) != 0)
+  my_name_stack_t *stack = name_stacks;
+  HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
+
+  /* Links are immutable after publication and entries are never freed. */
+  int count = 0;
+  for (; stack != NULL; stack = stack->next)
+    count += print_name_stack(stack);
+  return count;
+}
+
 void print_my_names(int arg_all)
 {
-  for (int iname = nmy_names - 1; iname >= 0; --iname)
-  {
-    if (arg_all or (my_names[iname].MN_pthread_self == compat_pthread_self()))
-    {
-      PRINTF("iname=%d name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
-             iname,
-             my_names[iname].MN_name,
-             my_names[iname].MN_file,
-             my_names[iname].MN_func,
-             my_names[iname].MN_line,
-             my_names[iname].MN_pthread_self);
-    }
-  }
+  if (arg_all)
+    (void)print_all_name_stacks();
+  else if (name_stack != NULL)
+    (void)print_name_stack(name_stack);
 }
 
 void push_name(char *arg_name,
@@ -370,31 +426,18 @@ void push_name(char *arg_name,
                const char *arg_func,
                int arg_line)
 {
-  HARDBUG(compat_mutex_lock(&my_names_mutex) != 0)
-
-  if (nmy_names >= NMY_NAMES_MAX)
+  my_name_stack_t *stack = return_name_stack();
+  HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
+  if (stack->count >= NMY_NAMES_MAX)
   {
-    PRINTF("PUSH_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
-           arg_name,
-           arg_file,
-           arg_func,
-           arg_line,
-           compat_pthread_self());
-
+    HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
     print_my_names(FALSE);
-
     FATAL("TOO MANY PUSH_NAMES", EXIT_FAILURE)
   }
 
-  my_names[nmy_names].MN_name = arg_name;
-  my_names[nmy_names].MN_file = arg_file;
-  my_names[nmy_names].MN_func = arg_func;
-  my_names[nmy_names].MN_line = arg_line;
-  my_names[nmy_names].MN_pthread_self = compat_pthread_self();
-
-  nmy_names++;
-
-  HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
+  stack->names[stack->count++] =
+    (my_name_t){arg_name, arg_file, arg_func, arg_line, compat_pthread_self()};
+  HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 }
 
 void pop_name(char *arg_name,
@@ -402,9 +445,19 @@ void pop_name(char *arg_name,
               const char *arg_func,
               int arg_line)
 {
-  HARDBUG(compat_mutex_lock(&my_names_mutex) != 0)
+  my_name_stack_t *stack = name_stack;
+  if (stack == NULL)
+    FATAL("NO PUSHED NAMES", EXIT_FAILURE)
 
-  if (nmy_names == 0)
+  HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
+  int empty = stack->count == 0;
+  int mismatch =
+    !empty && strcmp(stack->names[stack->count - 1].MN_name, arg_name) != 0;
+  if (!empty && !mismatch)
+    --stack->count;
+  HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
+
+  if (empty || mismatch)
   {
     PRINTF("POP_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
            arg_name,
@@ -412,50 +465,9 @@ void pop_name(char *arg_name,
            arg_func,
            arg_line,
            compat_pthread_self());
-
-    FATAL("NO PUSHED LEAKS", EXIT_FAILURE)
-  }
-
-  int iname;
-
-  for (iname = nmy_names - 1; iname >= 0; --iname)
-    if (my_names[iname].MN_pthread_self == compat_pthread_self())
-      break;
-
-  if (iname < 0)
-  {
-    PRINTF("POP_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
-           arg_name,
-           arg_file,
-           arg_func,
-           arg_line,
-           compat_pthread_self());
-
     print_my_names(FALSE);
-
-    FATAL("POP_NAME DID NOT FIND ANY PUSH_NAME", EXIT_FAILURE)
-  }
-
-  if (strcmp(my_names[iname].MN_name, arg_name) != 0)
-  {
-    PRINTF("POP_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
-           arg_name,
-           arg_file,
-           arg_func,
-           arg_line,
-           compat_pthread_self());
-
-    print_my_names(FALSE);
-
     FATAL("POP_NAME DID NOT FIND CORRESPONDING PUSH_NAME", EXIT_FAILURE)
   }
-
-  for (int jname = iname; jname < nmy_names; jname++)
-    my_names[jname] = my_names[jname + 1];
-
-  nmy_names--;
-
-  HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
 }
 
 void init_my_malloc(void)
@@ -465,10 +477,6 @@ void init_my_malloc(void)
   my_mallocs = malloc(sizeof(my_malloc_t) * nmy_mallocs_max);
 
   HARDBUG(my_mallocs == NULL)
-
-  my_names = malloc(sizeof(my_name_t) * NMY_NAMES_MAX);
-
-  HARDBUG(my_names == NULL)
 
   HARDBUG(compat_mutex_init(&my_malloc_mutex) != 0)
 
@@ -703,10 +711,8 @@ void fin_my_malloc(int arg_verbose)
       break;
   }
 
-  if (nmy_names > 0)
+  if (print_all_name_stacks() > 0)
   {
-    print_my_names(TRUE);
-
     PRINTF("MEMORY LEAK DETECTED!\n");
   }
 }

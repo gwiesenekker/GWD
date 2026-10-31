@@ -1,0 +1,29 @@
+# Ignore everything in the development directory by default.
+/*
+
+# Version-controlled source and documentation.
+!/*.c
+!/*.h
+!/*.cpp
+!/*.py
+!/Makefile
+!/CMakeLists.txt
+!/build.bat
+!/README.md
+!/WINDOWS.md
+!/LICENSE
+
+/fen2pdn.py
+/network2json.py
+
+# Development configuration.
+!/.clang-format
+!/.clang-tidy
+!/.gitignore
+
+# Regression tests: retain sources and documentation, not generated output.
+!/tests/
+/tests/*
+!/tests/*.c
+!/tests/*.sh
+!/tests/*.md

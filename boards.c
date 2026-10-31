@@ -1,4 +1,4 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
 
 // clang-format off
@@ -147,9 +147,7 @@ void pop_board_state(board_t *arg_with_board)
 
 hash_key_t return_key_from_bb(board_t *arg_with_board)
 {
-  hash_key_t result;
-
-  CLR_HASH_KEY(result)
+  hash_key_t result = 0;
 
   ui64_t bb = arg_with_board->B_white_man_bb;
 
@@ -157,7 +155,7 @@ hash_key_t return_key_from_bb(board_t *arg_with_board)
   {
     int ifield = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, hash_keys[WHITE_ENUM][MAN_ENUM][ifield])
+    result ^= hash_keys[WHITE_ENUM][MAN_ENUM][ifield];
 
     bb &= ~BITULL(ifield);
   }
@@ -168,7 +166,7 @@ hash_key_t return_key_from_bb(board_t *arg_with_board)
   {
     int ifield = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, hash_keys[WHITE_ENUM][KING_ENUM][ifield])
+    result ^= hash_keys[WHITE_ENUM][KING_ENUM][ifield];
 
     bb &= ~BITULL(ifield);
   }
@@ -179,7 +177,7 @@ hash_key_t return_key_from_bb(board_t *arg_with_board)
   {
     int ifield = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, hash_keys[BLACK_ENUM][MAN_ENUM][ifield])
+    result ^= hash_keys[BLACK_ENUM][MAN_ENUM][ifield];
 
     bb &= ~BITULL(ifield);
   }
@@ -190,7 +188,7 @@ hash_key_t return_key_from_bb(board_t *arg_with_board)
   {
     int ifield = BIT_CTZ(bb);
 
-    XOR_HASH_KEY(result, hash_keys[BLACK_ENUM][KING_ENUM][ifield])
+    result ^= hash_keys[BLACK_ENUM][KING_ENUM][ifield];
 
     bb &= ~BITULL(ifield);
   }

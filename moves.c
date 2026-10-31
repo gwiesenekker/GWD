@@ -1,10 +1,10 @@
-// SCU REVISION 8.1236 vr  1 mei 2026  7:13:53 CEST
+// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
 #include "globals.h"
 
 local int white_dir[4] = {-6, -5, 5, 6};
 local int black_dir[4] = {5, 6, -6, -5};
 
-void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
+void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 {
   PUSH_NAME(__FUNC__)
 
@@ -34,8 +34,6 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
   arg_moves_list->ML_nmoves = 0;
   arg_moves_list->ML_ncaptx = 0;
-  arg_moves_list->ML_nblocked = 0;
-  arg_moves_list->ML_nsafe = 0;
 
   ui64_t my_bb = (arg_with_board->my_man_bb | arg_with_board->my_king_bb);
   ui64_t your_bb = (arg_with_board->your_man_bb | arg_with_board->your_king_bb);
@@ -66,15 +64,11 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
             move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
 
-            move->M_from = ifield1;
+            move->M_move_from = ifield1;
             move->M_move_to = jfield1;
             move->M_captures_bb = 0;
 
             arg_moves_list->ML_nmoves++;
-          }
-          else if (field2square[jfield1] != INVALID)
-          {
-            arg_moves_list->ML_nblocked++;
           }
         }
       }
@@ -88,7 +82,7 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
             move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
 
-            move->M_from = ifield1;
+            move->M_move_from = ifield1;
             move->M_move_to = jfield1;
             move->M_captures_bb = 0;
 
@@ -136,7 +130,6 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
             arg_moves_list->ML_ncaptx = ncapt;
 
             arg_moves_list->ML_nmoves = 0;
-            arg_moves_list->ML_nblocked = 0;
           }
           if (ncapt == arg_moves_list->ML_ncaptx)
           {
@@ -148,7 +141,7 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
             move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
 
-            move->M_from = ifield1;
+            move->M_move_from = ifield1;
             move->M_move_to = kfield1;
             move->M_captures_bb = captures_bb;
 
@@ -252,62 +245,19 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   {
     move_t *move = arg_moves_list->ML_moves + imove;
 
-    int ifield = move->M_from;
+    int ifield = move->M_move_from;
     int kfield = move->M_move_to;
 
-    int move_score_delta = 0;
-
-    ui64_t captures_bb = move->M_captures_bb;
-
-    while (captures_bb != 0)
-    {
-      int jfield = BIT_CTZ(captures_bb);
-
-      if (arg_with_board->your_man_bb & BITULL(jfield))
-      {
-        move_score_delta += SCORE_MAN;
-      }
-      else
-      {
-        move_score_delta += SCORE_KING;
-      }
-
-      captures_bb &= ~BITULL(jfield);
-    }
-
-    int move_weight = move_score_delta;
-
-    int move_flag = 0;
+    arg_moves_list->ML_move_flags[imove] = 0;
 
     if (arg_with_board->my_man_bb & BITULL(ifield))
     {
-      if (my_row[kfield] == 8)
+      if (my_row[kfield] >= 9)
       {
-        move_weight = move_score_delta + 10;
-      }
-      else if (my_row[kfield] == 9)
-      {
-        move_weight = move_score_delta + 20;
-
-        move_flag = MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT;
-      }
-      else if (my_row[kfield] == 10)
-      {
-        move_score_delta += SCORE_KING - SCORE_MAN;
-
-        move_weight = move_score_delta + 30;
-
-        move_flag = MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT;
+        arg_moves_list->ML_move_flags[imove] =
+          MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT;
       }
     }
-    else
-    {
-      move_flag = MOVE_KING_BIT;
-    }
-
-    arg_moves_list->ML_move_weights[imove] = move_weight;
-
-    arg_moves_list->ML_move_flags[imove] = move_flag;
   }
 
   arg_with_board->B_nodes[arg_with_board->B_inode].node_ncaptx =
@@ -320,140 +270,208 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   POP_NAME(__FUNC__)
 }
 
-int return_mobility(board_t *arg_with_board, colour_enum arg_colour2move)
+/* One-hot padded squares: shifting off the board is harmless. In particular,
+ * never form 1ULL << a possibly negative scalar square number. */
+local inline ui64_t move_shift(ui64_t bb, int dir)
 {
-  ui64_t man_bb = 0;
-  int dir0, dir1;
-
-  if (IS_WHITE(arg_colour2move))
-  {
-    man_bb = arg_with_board->B_white_man_bb;
-
-    dir0 = white_dir[0];
-    dir1 = white_dir[1];
-  }
-  else if (IS_BLACK(arg_colour2move))
-  {
-    man_bb = arg_with_board->B_black_man_bb;
-
-    dir0 = black_dir[0];
-    dir1 = black_dir[1];
-  }
-  else
-    FATAL("unknown colour", EXIT_FAILURE)
-
-  ui64_t empty_bb =
-    arg_with_board->B_valid_bb &
-    ~(arg_with_board->B_white_man_bb | arg_with_board->B_black_man_bb |
-      arg_with_board->B_white_king_bb | arg_with_board->B_black_king_bb);
-
-  int nmoves = 0;
-
-  while (man_bb != 0)
-  {
-    int ifield;
-
-    ifield = BIT_CTZ(man_bb);
-
-    man_bb &= ~BITULL(ifield);
-
-    if (empty_bb & BITULL(ifield + dir0))
-      nmoves++;
-    if (empty_bb & BITULL(ifield + dir1))
-      nmoves++;
-  }
-
-  return (nmoves);
+  return dir > 0 ? bb << dir : bb >> -dir;
 }
 
-int return_immobility(board_t *arg_with_board, colour_enum arg_colour2move)
+local inline void append_bb_move(moves_list_t *list,
+                                 int from,
+                                 ui64_t to,
+                                 ui64_t captures,
+                                 int count)
 {
-  ui64_t man_bb = 0;
-  int dir0, dir1;
-
-  if (IS_WHITE(arg_colour2move))
+  if (count < list->ML_ncaptx)
+    return;
+  if (count > list->ML_ncaptx)
   {
-    man_bb = arg_with_board->B_white_man_bb;
-
-    dir0 = white_dir[0];
-    dir1 = white_dir[1];
+    list->ML_ncaptx = count;
+    list->ML_nmoves = 0;
   }
-  else if (IS_BLACK(arg_colour2move))
-  {
-    man_bb = arg_with_board->B_black_man_bb;
-
-    dir0 = black_dir[0];
-    dir1 = black_dir[1];
-  }
-  else
-    FATAL("unknown colour", EXIT_FAILURE)
-
-  ui64_t empty_bb =
-    arg_with_board->B_valid_bb &
-    ~(arg_with_board->B_white_man_bb | arg_with_board->B_black_man_bb |
-      arg_with_board->B_white_king_bb | arg_with_board->B_black_king_bb);
-
-  int nimmobile = 0;
-
-  while (man_bb != 0)
-  {
-    int ifield;
-
-    ifield = BIT_CTZ(man_bb);
-
-    man_bb &= ~BITULL(ifield);
-
-    if (!(empty_bb & BITULL(ifield + dir0)) and
-        !(empty_bb & BITULL(ifield + dir1)))
-      nimmobile++;
-  }
-
-  return (nimmobile);
+  HARDBUG(list->ML_nmoves >= NMOVES_MAX)
+  move_t *move = &list->ML_moves[list->ML_nmoves++];
+  move->M_move_from = from;
+  move->M_move_to = BIT_CTZ(to);
+  move->M_captures_bb = captures;
 }
 
-int return_unsupported(board_t *arg_with_board, colour_enum arg_colour2move)
+/* Captured pieces remain blockers until the entire move is finished. The
+ * origin, however, is empty: a capture may return to it (rondslag).
+ * Keep legacy's traversal: positive perpendicular, negative perpendicular,
+ * then straight ahead. Do not deduplicate different capture routes. */
+local void capture_man_bb(moves_list_t *list,
+                          int from,
+                          ui64_t at,
+                          ui64_t empty,
+                          ui64_t opponents,
+                          ui64_t captures,
+                          int count,
+                          int incoming)
 {
-  ui64_t man_bb = 0;
-  int dir0, dir1;
-
-  if (IS_WHITE(arg_colour2move))
+  append_bb_move(list, from, at, captures, count);
+  int perpendicular = 11 - abs(incoming);
+  int dirs[3] = {perpendicular, -perpendicular, incoming};
+  ui64_t available = opponents & ~captures;
+  for (int i = 0; i < 3; ++i)
   {
-    man_bb = arg_with_board->B_white_man_bb;
-
-    dir0 = white_dir[0];
-    dir1 = white_dir[1];
+    ui64_t victim = move_shift(at, dirs[i]) & available;
+    ui64_t landing = move_shift(victim, dirs[i]) & empty;
+    if (landing)
+      capture_man_bb(list,
+                     from,
+                     landing,
+                     empty,
+                     opponents,
+                     captures | victim,
+                     count + 1,
+                     dirs[i]);
   }
-  else if (IS_BLACK(arg_colour2move))
+}
+
+local void capture_king_bb(moves_list_t *list,
+                           int from,
+                           ui64_t at,
+                           ui64_t empty,
+                           ui64_t opponents,
+                           ui64_t captures,
+                           int count,
+                           int incoming)
+{
+  int perpendicular = 11 - abs(incoming);
+  ui64_t available = opponents & ~captures;
+  do
   {
-    man_bb = arg_with_board->B_black_man_bb;
+    append_bb_move(list, from, at, captures, count);
+    for (int dir = perpendicular; dir != 0; dir = dir > 0 ? -dir : 0)
+    {
+      ui64_t victim = move_shift(at, dir);
+      while (victim & empty)
+        victim = move_shift(victim, dir);
+      victim &= available;
+      ui64_t landing = move_shift(victim, dir) & empty;
+      if (landing)
+        capture_king_bb(list,
+                        from,
+                        landing,
+                        empty,
+                        opponents,
+                        captures | victim,
+                        count + 1,
+                        dir);
+    }
+    at = move_shift(at, incoming);
+  } while (at & empty);
 
-    dir0 = black_dir[0];
-    dir1 = black_dir[1];
-  }
-  else
-    FATAL("unknown colour", EXIT_FAILURE)
+  ui64_t victim = at & available;
+  ui64_t landing = move_shift(victim, incoming) & empty;
+  if (landing)
+    capture_king_bb(list,
+                    from,
+                    landing,
+                    empty,
+                    opponents,
+                    captures | victim,
+                    count + 1,
+                    incoming);
+}
 
-  ui64_t empty_bb =
-    arg_with_board->B_valid_bb &
-    ~(arg_with_board->B_white_man_bb | arg_with_board->B_black_man_bb |
-      arg_with_board->B_white_king_bb | arg_with_board->B_black_king_bb);
+void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
+{
+  PUSH_NAME(__FUNC__)
+  BEGIN_BLOCK(__FUNC__)
 
-  int nunsupported = 0;
+  int white = IS_WHITE(arg_with_board->B_colour2move);
+  colour_enum my_colour = white ? WHITE_ENUM : BLACK_ENUM;
+  colour_enum your_colour = white ? BLACK_ENUM : WHITE_ENUM;
+  const int *dirs = white ? white_dir : black_dir;
+  const int *rows = white ? white_row : black_row;
+  ui64_t men = arg_with_board->my_man_bb;
+  ui64_t kings = arg_with_board->my_king_bb;
+  ui64_t opponents = arg_with_board->your_man_bb | arg_with_board->your_king_bb;
+  ui64_t empty = arg_with_board->B_valid_bb & ~(men | kings | opponents);
+  moves_list_t *list = arg_moves_list;
+  list->ML_nmoves = list->ML_ncaptx = 0;
 
-  while (man_bb != 0)
+  /* Test all men simultaneously, without visiting non-capturing pieces. */
+  ui64_t sources =
+    men &
+    (((opponents >> 5) & (empty >> 10)) | ((opponents >> 6) & (empty >> 12)) |
+     ((opponents << 5) & (empty << 10)) | ((opponents << 6) & (empty << 12)));
+  sources |= kings;
+  while (sources)
   {
-    int ifield;
-
-    ifield = BIT_CTZ(man_bb);
-
-    man_bb &= ~BITULL(ifield);
-
-    if ((empty_bb & BITULL(ifield - dir0)) and
-        (empty_bb & BITULL(ifield - dir1)))
-      nunsupported++;
+    int from = white ? BIT_CTZ(sources) : 63 - BIT_CLZ(sources);
+    ui64_t origin = BITULL(from);
+    sources &= ~origin;
+    for (int i = 0; i < 4; ++i)
+    {
+      int dir = dirs[i];
+      ui64_t victim = move_shift(origin, dir);
+      if (origin & kings)
+        while (victim & empty)
+          victim = move_shift(victim, dir);
+      victim &= opponents;
+      ui64_t landing = move_shift(victim, dir) & empty;
+      if (!landing)
+        continue;
+      if (origin & men)
+        capture_man_bb(list,
+                       from,
+                       landing,
+                       empty | origin,
+                       opponents,
+                       victim,
+                       1,
+                       dir);
+      else
+        capture_king_bb(list,
+                        from,
+                        landing,
+                        empty | origin,
+                        opponents,
+                        victim,
+                        1,
+                        dir);
+    }
   }
 
-  return (nunsupported);
+  if (list->ML_ncaptx == 0)
+  {
+    sources = kings | (men & (white ? (empty << 6) | (empty << 5)
+                                    : (empty >> 5) | (empty >> 6)));
+    while (sources)
+    {
+      int from = white ? BIT_CTZ(sources) : 63 - BIT_CLZ(sources);
+      ui64_t origin = BITULL(from);
+      sources &= ~origin;
+      int king = (origin & kings) != 0;
+      for (int i = 0; i < (king ? 4 : 2); ++i)
+      {
+        ui64_t landing = move_shift(origin, dirs[i]) & empty;
+        while (landing)
+        {
+          append_bb_move(list, from, landing, 0, 0);
+          if (!king)
+            break;
+          landing = move_shift(landing, dirs[i]) & empty;
+        }
+      }
+    }
+  }
+  for (int i = 0; i < list->ML_nmoves; ++i)
+  {
+    const move_t *move = &list->ML_moves[i];
+    list->ML_move_flags[i] =
+      (men & BITULL(move->M_move_from)) && rows[move->M_move_to] >= 9
+        ? MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT
+        : 0;
+  }
+  arg_with_board->B_nodes[arg_with_board->B_inode].node_ncaptx =
+    list->ML_ncaptx;
+  END_BLOCK
+  POP_NAME(__FUNC__)
 }
 
 int can_capture(board_t *arg_with_board, int arg_kings)
@@ -614,7 +632,7 @@ void do_move(board_t *arg_with_board,
 
   move_t *move = arg_moves_list->ML_moves + arg_imove;
 
-  int ifield = move->M_from;
+  int ifield = move->M_move_from;
   int kfield = move->M_move_to;
 
   if (ifield != kfield)
@@ -623,7 +641,7 @@ void do_move(board_t *arg_with_board,
     {
       move_key = my_man_key[ifield];
 
-      XOR_HASH_KEY(arg_with_board->B_key, my_man_key[ifield])
+      arg_with_board->B_key ^= my_man_key[ifield];
 
       arg_with_board->my_man_bb &= ~BITULL(ifield);
 
@@ -636,7 +654,7 @@ void do_move(board_t *arg_with_board,
     {
       move_key = my_king_key[ifield];
 
-      XOR_HASH_KEY(arg_with_board->B_key, my_king_key[ifield]);
+      arg_with_board->B_key ^= my_king_key[ifield];
 
       arg_with_board->my_king_bb &= ~BITULL(ifield);
 
@@ -647,13 +665,13 @@ void do_move(board_t *arg_with_board,
     {
       move_key ^= my_man_key[kfield];
 
-      XOR_HASH_KEY(arg_with_board->B_key, my_man_key[kfield])
+      arg_with_board->B_key ^= my_man_key[kfield];
     }
     else
     {
       move_key ^= my_king_key[kfield];
 
-      XOR_HASH_KEY(arg_with_board->B_key, my_king_key[kfield])
+      arg_with_board->B_key ^= my_king_key[kfield];
     }
   }
 
@@ -669,7 +687,7 @@ void do_move(board_t *arg_with_board,
     {
       move_key ^= your_man_key[jfield];
 
-      XOR_HASH_KEY(arg_with_board->B_key, your_man_key[jfield])
+      arg_with_board->B_key ^= your_man_key[jfield];
 
       arg_with_board->your_man_bb &= ~BITULL(jfield);
     }
@@ -677,7 +695,7 @@ void do_move(board_t *arg_with_board,
     {
       move_key ^= your_king_key[jfield];
 
-      XOR_HASH_KEY(arg_with_board->B_key, your_king_key[jfield])
+      arg_with_board->B_key ^= your_king_key[jfield];
 
       arg_with_board->your_king_bb &= ~BITULL(jfield);
     }
@@ -708,7 +726,7 @@ label_null:
 
   temp_key = return_key_from_bb(arg_with_board);
 
-  HARDBUG(!HASH_KEY_EQ(temp_key, arg_with_board->B_key))
+  HARDBUG(temp_key != arg_with_board->B_key)
 #endif
 
   END_BLOCK
@@ -762,7 +780,7 @@ void undo_move(board_t *arg_with_board,
 
   temp_key = return_key_from_bb(arg_with_board);
 
-  HARDBUG(!HASH_KEY_EQ(temp_key, arg_with_board->B_key))
+  HARDBUG(temp_key ^= arg_with_board->B_key)
 #endif
 
   END_BLOCK
@@ -780,12 +798,12 @@ void check_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
     hash_key_t temp_key;
 
     temp_key = return_key_from_bb(arg_with_board);
-    HARDBUG(!HASH_KEY_EQ(temp_key, arg_with_board->B_key))
+    HARDBUG(temp_key != arg_with_board->B_key)
 
     undo_move(arg_with_board, imove, arg_moves_list);
 
     temp_key = return_key_from_bb(arg_with_board);
-    HARDBUG(!HASH_KEY_EQ(temp_key, arg_with_board->B_key))
+    HARDBUG(temp_key != arg_with_board->B_key)
   }
 
   END_BLOCK
@@ -801,7 +819,7 @@ void move2bstring(moves_list_t *arg_with_moves_list,
 
   move_t *move = arg_with_moves_list->ML_moves + arg_imove;
 
-  int ifield = move->M_from;
+  int ifield = move->M_move_from;
   int kfield = move->M_move_to;
 
   btrunc(arg_bmove_string, 0);
