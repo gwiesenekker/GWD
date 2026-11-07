@@ -1,4 +1,4 @@
-// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
+// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
 
 #include "globals.h"
 
@@ -12,7 +12,7 @@ void init_endgame(void)
 
   HARDBUG(compat_mutex_init(&dtm_probe_mutex) != 0)
 
-  i64_t endgame_ram = 0;
+  size_t egtb_ram = 0;
 
   cJSON *egtbs = cJSON_GetObjectItem(gwd_json, options.egtb_ram_wdl);
 
@@ -28,15 +28,15 @@ void init_endgame(void)
 
     HARDBUG(endgame_name == NULL)
 
-    size_t bytes;
+    size_t egtb_size;
 
 #ifdef USE_COMPRESSED_WDL
     HARDBUG(!gwdegtb_wdl_compressed_info_threads(options.egtb_dir_wdl,
                                                  endgame_name,
-                                                 &bytes,
+                                                 &egtb_size,
                                                  4));
 
-    if (bytes == 0)
+    if (egtb_size == 0)
     {
       PRINTF("skipping unavaible EGTB %s\n", endgame_name);
 
@@ -45,15 +45,17 @@ void init_endgame(void)
 #else
     uint64_t maximum_index;
 
-    HARDBUG(!gwdegtb_wdl_info(endgame_name, &maximum_index, &bytes))
+    HARDBUG(!gwdegtb_wdl_info(endgame_name, &maximum_index, &egtb_size))
 #endif
+
+    PRINTF("loading EGTB %s..\n", endgame_name);
 
     void *pendgame;
     MPI_Win wendgame;
 
     my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
                            sizeof(ui8_t),
-                           bytes,
+                           egtb_size,
                            &pendgame,
                            &wendgame);
 
@@ -63,13 +65,13 @@ void init_endgame(void)
       HARDBUG(!gwdegtb_wdl_compressed_load_threads(options.egtb_dir_wdl,
                                                    endgame_name,
                                                    pendgame,
-                                                   bytes,
+                                                   egtb_size,
                                                    4));
 #else
       HARDBUG(!gwdegtb_wdl_decompress_threads(options.egtb_dir_wdl,
                                               endgame_name,
                                               pendgame,
-                                              bytes,
+                                              egtb_size,
                                               4))
 #endif
     }
@@ -84,31 +86,38 @@ void init_endgame(void)
     my_mpi_sync_shared(my_mpi_globals.MMG_comm_global, wendgame, "WDL EGTB");
 
 #ifdef USE_COMPRESSED_WDL
-    HARDBUG(!gwdegtb_wdl_compressed_attach(endgame_name, pendgame, bytes));
+    HARDBUG(!gwdegtb_wdl_compressed_attach(endgame_name, pendgame, egtb_size));
 
-    HARDBUG(
-      !gwdegtb_wdl_probe_create(256 * MBYTE, &wdl_probe_alpha_beta_master));
+
 #else
-    HARDBUG(!gwdegtb_wdl_attach(endgame_name, pendgame, bytes))
+    HARDBUG(!gwdegtb_wdl_attach(endgame_name, pendgame, egtb_size))
 #endif
+    PRINTF("..loaded %zu bytes\n", egtb_size);
+
   } // cJSON_ArrayForEach(egtb, egtbs)
 
-  PRINTF("endgame_ram=%lld MBYTE\n", endgame_ram / MBYTE + 1);
+#ifdef USE_COMPRESSED_WDL
+  size_t wdl_probe_cache = 256 * MBYTE;
+
+  HARDBUG(
+    !gwdegtb_wdl_probe_create(wdl_probe_cache, &wdl_probe_alpha_beta_master));
+
+  PRINTF("EGTB probe cache is %zu MBYTE\n", wdl_probe_cache / MBYTE + 1);
+
+  egtb_ram += wdl_probe_cache;
+#endif
+
+  PRINTF("total EGTB ram is %zu MBYTE\n", egtb_ram / MBYTE + 1);
 
   PRINTF("..done\n");
 }
 
-int read_endgame(search_t *arg_with_search)
+int read_endgame(search_t *arg_with_search, const char **arg_dtm_missing_name)
 {
+  if (arg_dtm_missing_name != NULL)
+    *arg_dtm_missing_name = NULL;
+
   board_t *with_board = &(arg_with_search->S_board);
-
-  int nwhite_man = BIT_COUNT(with_board->B_white_man_bb);
-  int nblack_man = BIT_COUNT(with_board->B_black_man_bb);
-  int nwhite_king = BIT_COUNT(with_board->B_white_king_bb);
-  int nblack_king = BIT_COUNT(with_board->B_black_king_bb);
-
-  if ((nwhite_man + nblack_man + nwhite_king + nblack_king) > 7)
-    return (ENDGAME_UNKNOWN);
 
   HARDBUG(compat_mutex_lock(&dtm_probe_mutex) != 0)
 
@@ -124,8 +133,13 @@ int read_endgame(search_t *arg_with_search)
 
   HARDBUG(compat_mutex_unlock(&dtm_probe_mutex) != 0)
 
-  if (result == GWDEGTB_WDL_UNAVAILABLE)
+  if (result == GWDEGTB_DTM_UNAVAILABLE)
+  {
+    if (arg_dtm_missing_name != NULL)
+      *arg_dtm_missing_name = gwdegtb_dtm_missing_name();
+
     result = ENDGAME_UNKNOWN;
+  }
 
   return (result);
 }
@@ -135,14 +149,6 @@ score_t return_endgame_score(search_t *arg_with_search)
   score_t result = SCORE_NOT_A_NUMBER;
 
   board_t *with_board = &(arg_with_search->S_board);
-
-  int nwhite_man = BIT_COUNT(with_board->B_white_man_bb);
-  int nblack_man = BIT_COUNT(with_board->B_black_man_bb);
-  int nwhite_king = BIT_COUNT(with_board->B_white_king_bb);
-  int nblack_king = BIT_COUNT(with_board->B_black_king_bb);
-
-  if ((nwhite_man + nblack_man + nwhite_king + nblack_king) > 7)
-    return (result);
 
   int temp_mate = ENDGAME_UNKNOWN;
 

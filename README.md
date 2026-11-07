@@ -2,15 +2,24 @@
 
 Windows CMake build instructions: [WINDOWS.md](WINDOWS.md).
 
-## Release 8.1255
+## Source version 8.1256
+
+Version 8.1256 updates WDL and DTM lookups for supported eight-piece endgames
+and falls back to normal search when a required child-position DTM file is
+missing at the root. See [CHANGELOG.md](CHANGELOG.md) for details.
+
+The engine source matches SCU/8.1256. Building requires the external `compat`
+and `endgame7` (GWDEGTB) source directories; they are not bundled in this repository.
+Use an updated GWDEGTB version providing `gwdegtb_dtm_missing_name()`.
+
+## Latest published release: 8.1255
 
 [Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1255).
 Download the archive for your platform and the shared network archive. Extract
 both into the same writable directory, then follow `RELEASE-README.txt`.
 SHA-1 and SHA-256 checksum lists accompany the release assets.
 
-The engine source matches SCU/8.1255. Building requires the external `compat`
-and `endgame7` (GWDEGTB) source directories; they are not bundled in this repository.
+These downloads contain version 8.1255, not the newer source version 8.1256.
 The binary packages do not include endgame databases or an opening book.
 
 The source code of my Draughts program GWD. I have been working on it on and off for the last 40 years. It has the following features:

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
+// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
 #include "globals.h"
 
 #define SA struct sockaddr
@@ -889,7 +889,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
 
       // check for known endgame
 
-      int egtb_mate = read_endgame(&(arg_with_dxp->DXP_search));
+      int egtb_mate = read_endgame(&(arg_with_dxp->DXP_search), NULL);
 
       if (egtb_mate != ENDGAME_UNKNOWN)
       {

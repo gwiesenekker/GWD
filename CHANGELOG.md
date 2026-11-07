@@ -1,4 +1,24 @@
-# GWD 8.1255 changes since 8.1236
+# GWD changelog
+
+## 8.1256
+
+7 November 2026. Source update; binaries have not been published for this version.
+
+- Removed GWD's hard-coded seven-piece limit on WDL and DTM probes, allowing
+  supported eight-piece positions to be handled by GWDEGTB.
+- When a root DTM lookup succeeds but a required child-position DTM file is
+  absent, report its filename, restore the board, and fall back to normal
+  search instead of aborting. Discard the partial root DTM result.
+  Other DTM failures are not treated as missing files.
+- Create the master WDL probe cache once after loading the databases, rather
+  than repeatedly inside the loading loop. Added per-database loading and
+  probe-cache size diagnostics.
+- Removed a duplicate DTM lookup while displaying the PV and updated DTM
+  callers to the new optional missing-filename interface.
+
+Building this version requires GWDEGTB with `gwdegtb_dtm_missing_name()` support.
+
+## 8.1255 changes since 8.1236
 
 Released 31 October 2026. Compared with 8.1236, released 1 May 2026.
 
@@ -9,7 +29,7 @@ Windows build. Shared search caches and node reporting now use C11 atomics.
 The release changes below describe the code in the
 [8.1236 to 8.1255 comparison](https://github.com/gwiesenekker/GWD/compare/v8.1236...v8.1255).
 
-## Move generation and search
+### Move generation and search
 
 - Replaced `gen_moves` with a generator using the existing padded bit-boards
   and diagonal shifts of 5 and 6. Retained `gen_moves_legacy` for comparison.
@@ -44,7 +64,7 @@ The release changes below describe the code in the
 
 Source areas: `moves.c`, `search.c`, `search.h`, `my_random.c`.
 
-## Neural evaluation and network loading
+### Neural evaluation and network loading
 
 - Reworked evaluation orientation to mirror the board for the network, with
   corresponding score-orientation handling.
@@ -84,7 +104,7 @@ guarantee of identical results for every compiler, network, or search setting.
 Source areas: `networks.c`, `networks.h`, `patterns.c`, `patterns.h`,
 `score.c`, `globals.h`.
 
-## Endgame databases
+### Endgame databases
 
 - Replaced the large in-tree legacy endgame implementation with calls into
   the external endgame7/GWDEGTB library.
@@ -97,7 +117,7 @@ Source areas: `networks.c`, `networks.h`, `patterns.c`, `patterns.h`,
 
 Source areas: `endgame.c`, `endgame.h`, `Makefile`, `CMakeLists.txt`.
 
-## Threading and portability
+### Threading and portability
 
 - Added C11 atomic load/store wrappers for individual 64-bit words in the
   transposition table and score cache, using relaxed memory ordering and
@@ -123,7 +143,7 @@ Source areas: `endgame.c`, `endgame.h`, `Makefile`, `CMakeLists.txt`.
 Source areas: `search.c`, `score.c`, `my_threads.c`, `my_threads.h`,
 `my_malloc.c`, `my_sqlite3.c`, `my_mpi.c`, `dxp.c`, `globals.h`.
 
-## Protocols and maintenance
+### Protocols and maintenance
 
 - Fixed Hub position handling so supplied moves are also applied to the
   search board. Added Hub MCTS shoot-outs with result and confidence-bound
@@ -138,7 +158,7 @@ Source areas: `search.c`, `score.c`, `my_threads.c`, `my_threads.h`,
 - Removed unused definitions and fields across the source. Many otherwise
   unchanged files also receive the updated SCU revision header.
 
-## Builds and release contents
+### Builds and release contents
 
 - Added a C11 CMake build, Windows instructions and `build.bat`, with external
   compat/endgame7 source paths and SQLite3/Zstd dependencies. Windows uses

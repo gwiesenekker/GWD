@@ -1,4 +1,4 @@
-// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
+// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
 #ifndef EndgameH
 #define EndgameH
 
@@ -9,7 +9,7 @@
 extern GwdegtbWdlProbe *wdl_probe_alpha_beta_master;
 
 void init_endgame(void);
-int read_endgame(search_t *);
+int read_endgame(search_t *, const char **);
 score_t return_endgame_score(search_t *);
 void fin_endgame(void);
 

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
+// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
 #include "globals.h"
 
 #define GAME_MOVES 40
@@ -1182,7 +1182,7 @@ local int play_game(search_t *arg_with_search,
 
       // check for known endgame
 
-      int egtb_mate = read_endgame(arg_with_search);
+      int egtb_mate = read_endgame(arg_with_search, NULL);
 
       if (egtb_mate != ENDGAME_UNKNOWN)
       {

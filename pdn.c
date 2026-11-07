@@ -1,4 +1,4 @@
-// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
+// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
 #include "globals.h"
 
 #define NAG '$'
@@ -562,7 +562,7 @@ void auto_play(char *arg_txt_name, i64_t arg_npositions)
       else
         FATAL("with_search error", EXIT_FAILURE)
 
-      egtb_mate = read_endgame(with_search);
+      egtb_mate = read_endgame(with_search, NULL);
 
       if (egtb_mate != ENDGAME_UNKNOWN)
         break;
@@ -861,7 +861,7 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
 
     resume_my_printf(with_search->S_my_printf);
 
-    int egtb_mate = read_endgame(with_search);
+    int egtb_mate = read_endgame(with_search, NULL);
 
     if (egtb_mate == ENDGAME_UNKNOWN)
     {

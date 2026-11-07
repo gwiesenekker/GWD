@@ -1,4 +1,4 @@
-// SCU REVISION 8.1255 za 31 okt 2026  9:15:42 CET
+// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -870,7 +870,7 @@ endgame_pv(search_t *arg_with_search, int arg_mate, bstring arg_bpv_string)
   {
     do_move(&(arg_with_search->S_board), imove, &moves_list);
 
-    int your_mate = read_endgame(arg_with_search);
+    int your_mate = read_endgame(arg_with_search, NULL);
 
     undo_move(&(arg_with_search->S_board), imove, &moves_list);
 
@@ -963,7 +963,7 @@ endgame_pv(search_t *arg_with_search, int arg_mate, bstring arg_bpv_string)
     {
       do_move(&(arg_with_search->S_board), imove, &moves_list);
 
-      int your_mate = read_endgame(arg_with_search);
+      int your_mate = read_endgame(arg_with_search, NULL);
 
       undo_move(&(arg_with_search->S_board), imove, &moves_list);
 
@@ -3368,12 +3368,10 @@ void do_pv(search_t *arg_with_search,
     return;
   }
 
-  int temp_mate = read_endgame(arg_with_search);
+  int temp_mate = read_endgame(arg_with_search, NULL);
 
   if (temp_mate != ENDGAME_UNKNOWN)
   {
-    temp_mate = read_endgame(arg_with_search);
-
     if (temp_mate == INVALID)
     {
       if (options.hub)
@@ -3674,7 +3672,7 @@ void do_search(search_t *arg_with_search,
 
   // check for known endgame
 
-  int egtb_mate = read_endgame(arg_with_search);
+  int egtb_mate = read_endgame(arg_with_search, NULL);
 
   if (egtb_mate != ENDGAME_UNKNOWN)
   {
@@ -3696,9 +3694,23 @@ void do_search(search_t *arg_with_search,
 
       ++(arg_with_search->S_total_nodes);
 
-      int temp_mate = read_endgame(arg_with_search);
+      const char *dtm_missing_name;
 
-      HARDBUG(temp_mate == ENDGAME_UNKNOWN)
+      int temp_mate = read_endgame(arg_with_search, &dtm_missing_name);
+
+      if (temp_mate == ENDGAME_UNKNOWN)
+      {
+        HARDBUG(dtm_missing_name == NULL)
+
+        PRINTF("WARNING: DTM EGTB %s MISSING!\n",
+               dtm_missing_name);
+
+        undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
+
+        arg_with_search->S_best_score = SCORE(SCORE_MINUS_INFINITY);
+
+        break;
+      }
 
       score_t temp_score;
 
@@ -3751,66 +3763,67 @@ void do_search(search_t *arg_with_search,
 #endif
     }
 
-    HARDBUG(arg_with_search->S_best_score == SCORE(SCORE_MINUS_INFINITY))
-
-    arg_with_search->S_best_score_kind = SEARCH_BEST_SCORE_EGTB;
-
-    arg_with_search->S_best_depth = 0;
-
-    arg_with_search->S_best_pv = pv_entries_default;
-
-    BSTRING(bmove_string)
-
-    move2bstring(arg_moves_list, sort[0], bmove_string);
-
-    BSTRING(bpv_string)
-
-    if (options.hub)
+    if (arg_with_search->S_best_score != SCORE(SCORE_MINUS_INFINITY))
     {
-      HARDBUG(bformata(bpv_string,
-                       "depth=127 score=" PRINTF_SCORE_T " nps=0.00 pv=\"%s",
-                       SCORE2PRINTF(arg_with_search->S_best_score),
-                       bdata(bmove_string)) == BSTR_ERR)
-    }
-    else
-    {
-      HARDBUG(bformata(bpv_string,
-                       "s=" PRINTF_SCORE_T " (%d) x=egtb pv=%s ",
-                       SCORE2PRINTF(arg_with_search->S_best_score),
-                       egtb_mate,
-                       bdata(bmove_string)) == BSTR_ERR)
-    }
+      arg_with_search->S_best_score_kind = SEARCH_BEST_SCORE_EGTB;
 
-    if (your_mate != INVALID)
-    {
-      do_move(&(arg_with_search->S_board), sort[0], arg_moves_list);
-
-      endgame_pv(arg_with_search, your_mate, bpv_string);
-
-      undo_move(&(arg_with_search->S_board), sort[0], arg_moves_list);
-    }
-    else
-    {
+      arg_with_search->S_best_depth = 0;
+  
+      arg_with_search->S_best_pv = pv_entries_default;
+  
+      BSTRING(bmove_string)
+  
+      move2bstring(arg_moves_list, sort[0], bmove_string);
+  
+      BSTRING(bpv_string)
+  
       if (options.hub)
       {
-        HARDBUG(bcatcstr(bpv_string, "\"") == BSTR_ERR)
+        HARDBUG(bformata(bpv_string,
+                         "depth=127 score=" PRINTF_SCORE_T " nps=0.00 pv=\"%s",
+                         SCORE2PRINTF(arg_with_search->S_best_score),
+                         bdata(bmove_string)) == BSTR_ERR)
       }
+      else
+      {
+        HARDBUG(bformata(bpv_string,
+                         "s=" PRINTF_SCORE_T " (%d) x=egtb pv=%s ",
+                         SCORE2PRINTF(arg_with_search->S_best_score),
+                         egtb_mate,
+                         bdata(bmove_string)) == BSTR_ERR)
+      }
+  
+      if (your_mate != INVALID)
+      {
+        do_move(&(arg_with_search->S_board), sort[0], arg_moves_list);
+  
+        endgame_pv(arg_with_search, your_mate, bpv_string);
+  
+        undo_move(&(arg_with_search->S_board), sort[0], arg_moves_list);
+      }
+      else
+      {
+        if (options.hub)
+        {
+          HARDBUG(bcatcstr(bpv_string, "\"") == BSTR_ERR)
+        }
+      }
+
+      my_printf(arg_with_search->S_my_printf, "%s\n", bdata(bpv_string));
+  
+      if (options.mode == GAME_MODE)
+      {
+        if ((arg_with_search->S_thread != NULL) and
+            (arg_with_search->S_thread == thread_alpha_beta_master))
+          enqueue(&main_queue, MESSAGE_INFO, bdata(bpv_string));
+      }
+
+      BDESTROY(bpv_string)
+
+      BDESTROY(bmove_string)
+
+      goto label_limit;
     }
-
-    my_printf(arg_with_search->S_my_printf, "%s\n", bdata(bpv_string));
-
-    if (options.mode == GAME_MODE)
-    {
-      if ((arg_with_search->S_thread != NULL) and
-          (arg_with_search->S_thread == thread_alpha_beta_master))
-        enqueue(&main_queue, MESSAGE_INFO, bdata(bpv_string));
-    }
-
-    BDESTROY(bpv_string)
-
-    BDESTROY(bmove_string)
-
-    goto label_limit;
   }
 
   ui32_t your_tweaks = 0;
