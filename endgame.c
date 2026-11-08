@@ -1,4 +1,4 @@
-// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
+// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
 
 #include "globals.h"
 
@@ -93,6 +93,8 @@ void init_endgame(void)
     HARDBUG(!gwdegtb_wdl_attach(endgame_name, pendgame, egtb_size))
 #endif
     PRINTF("..loaded %zu bytes\n", egtb_size);
+
+    egtb_ram += egtb_size;
 
   } // cJSON_ArrayForEach(egtb, egtbs)
 

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
+// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -15,6 +15,7 @@
 
 #define TWEAK_MOVE_REDUCED_BIT BIT(0)
 #define TWEAK_MOVE_EXTENDED_BIT BIT(1)
+#define TWEAK_PROB_CUT_BIT BIT(2)
 
 #define STAGE_SEARCH_MOVE_NULL 0
 #define STAGE_SEARCHED_MOVE_AT_FULL_DEPTH BIT(1)
@@ -531,6 +532,15 @@ void clear_totals(search_t *arg_with_search)
   arg_with_search->S_total_reductions_le_alpha = 0;
   arg_with_search->S_total_reductions_ge_beta = 0;
 
+  arg_with_search->S_total_prob_cut_probes = 0;
+  arg_with_search->S_total_prob_cut_probes_le_alpha = 0;
+  arg_with_search->S_total_prob_cut_probes_ge_beta = 0;
+  arg_with_search->S_total_prob_cut_nodes = 0;
+  arg_with_search->S_total_prob_cut_nodes_le_alpha = 0;
+  arg_with_search->S_total_prob_cut_nodes_ge_beta = 0;
+  arg_with_search->S_total_prob_cut_probes_aborted = 0;
+  arg_with_search->S_total_prob_cut_nodes_aborted = 0;
+
   arg_with_search->S_total_singular_extension_probes = 0;
   arg_with_search->S_total_singular_extension_probes_le_alpha = 0;
   arg_with_search->S_total_singular_extension_probes_ge_beta = 0;
@@ -588,6 +598,15 @@ void print_totals(search_t *arg_with_search){
   PRINTF_TOTAL(S_total_reductions_lost)
   PRINTF_TOTAL(S_total_reductions_le_alpha)
   PRINTF_TOTAL(S_total_reductions_ge_beta)
+
+  PRINTF_TOTAL(S_total_prob_cut_probes)
+  PRINTF_TOTAL(S_total_prob_cut_probes_le_alpha)
+  PRINTF_TOTAL(S_total_prob_cut_probes_ge_beta)
+  PRINTF_TOTAL(S_total_prob_cut_nodes)
+  PRINTF_TOTAL(S_total_prob_cut_nodes_le_alpha)
+  PRINTF_TOTAL(S_total_prob_cut_nodes_ge_beta)
+  PRINTF_TOTAL(S_total_prob_cut_probes_aborted)
+  PRINTF_TOTAL(S_total_prob_cut_nodes_aborted)
 
   PRINTF_TOTAL(S_total_singular_extension_probes)
   PRINTF_TOTAL(S_total_singular_extension_probes_le_alpha)
@@ -2365,7 +2384,8 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
   ui32_t your_tweaks = 0;
 
-  if (!(arg_my_tweaks & TWEAK_MOVE_EXTENDED_BIT) and
+  if (!(arg_my_tweaks & TWEAK_MOVE_REDUCED_BIT) and
+      !(arg_my_tweaks & TWEAK_MOVE_EXTENDED_BIT) and
       !IS_SCORE_LOST(arg_my_alpha))
   {
     if ((options.pv_combination_length > 0) and
@@ -2459,6 +2479,7 @@ local void alpha_beta_pv(search_t *arg_with_search,
                    node_type,
                    arg_reduction_depth_root,
                    your_tweaks |
+                     (reduced_depth < your_depth ? TWEAK_MOVE_REDUCED_BIT : 0U) |
                      (singular_extension > 0 ? TWEAK_MOVE_EXTENDED_BIT : 0U),
                    NULL,
                    NULL,
@@ -2855,6 +2876,8 @@ local void alpha_beta(search_t *arg_with_search,
     goto label_return;
   }
 
+  ui64_t history_before_move_generation = arg_history;
+
   arg_history = (arg_history << 4) | (arg_moves_list->ML_ncaptx & 0xF) |
                 0xF000000000000000ULL;
 
@@ -2908,7 +2931,7 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_my_depth / 2,
                  arg_node_type,
                  arg_reduction_depth_root,
-                 0,
+                 arg_my_tweaks | TWEAK_MOVE_REDUCED_BIT,
                  arg_moves_list,
                  NULL,
                  0,
@@ -3048,6 +3071,108 @@ local void alpha_beta(search_t *arg_with_search,
 
   int singular_extension = arg_singular_extension == INVALID ? INVALID : 0;
 
+  if ((options.prob_cut_depth > 0) and
+      (arg_my_depth >= options.prob_cut_depth) and
+      IS_MINIMAL_WINDOW(arg_node_type) and
+      (arg_singular_extension == 0) and
+      !(arg_my_tweaks & TWEAK_MOVE_REDUCED_BIT) and
+      !(arg_my_tweaks & TWEAK_MOVE_EXTENDED_BIT) and
+      !(arg_my_tweaks & TWEAK_PROB_CUT_BIT) and
+      (arg_moves_list->ML_ncaptx == 0) and
+      (arg_moves_list->ML_nmoves > options.mobility_moves_threshold) and
+      !IS_SCORE_LOST(arg_my_alpha) and !IS_SCORE_WON(arg_my_beta))
+  {
+    int prob_cut_depth = (arg_my_depth * options.prob_cut_percentage) / 100;
+
+    if (prob_cut_depth < 1) prob_cut_depth = 1;
+
+    score_t prob_cut_beta = arg_my_beta + SCORE(options.prob_cut_margin);
+
+    int alpha_beta_cache_probe_fails = 
+      alpha_beta_cache_hit and
+      (alpha_beta_cache_slot.ABCS_depth >= prob_cut_depth) and
+      !(alpha_beta_cache_slot.ABCS_flags & ABCS_SCORE_GE_BETA_BIT) and
+      (alpha_beta_cache_slot.ABCS_score < prob_cut_beta);
+
+    if ((prob_cut_depth < arg_my_depth) and !alpha_beta_cache_probe_fails)
+    {
+      ++(arg_with_search->S_total_prob_cut_probes);
+
+      HARDBUG(prob_cut_depth < 0)
+
+      int prob_cut_sort[NMOVES_MAX];
+
+      for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
+        prob_cut_sort[imove] = sort[imove];
+
+      search_result_t prob_cut_result;
+
+      prob_cut_result.SR_pv = arg_search_result->SR_pv;
+
+      i64_t total_nodes = arg_with_search->S_total_nodes;
+      i64_t total_prob_cut_nodes = arg_with_search->S_total_prob_cut_nodes;
+
+      // Same-position probe: do not append the capture history twice.
+      // Descendant move searches construct fresh tweaks, as for LMR.
+      alpha_beta(arg_with_search,
+                 prob_cut_beta - 1,
+                 prob_cut_beta,
+                 prob_cut_depth,
+                 MINIMAL_WINDOW_BIT,
+                 arg_reduction_depth_root,
+                 arg_my_tweaks | TWEAK_PROB_CUT_BIT,
+                 arg_moves_list,
+                 prob_cut_sort,
+                 0,
+                 history_before_move_generation,
+                 &prob_cut_result);
+
+      HARDBUG(arg_with_search->S_total_nodes < total_nodes)
+      HARDBUG(arg_with_search->S_total_prob_cut_nodes < total_prob_cut_nodes)
+
+      // Attribute each node to its innermost probe, even on interruption.
+      i64_t prob_cut_nodes =
+        (arg_with_search->S_total_nodes - total_nodes) -
+        (arg_with_search->S_total_prob_cut_nodes - total_prob_cut_nodes);
+ 
+      HARDBUG(prob_cut_nodes < 0)
+
+      arg_with_search->S_total_prob_cut_nodes += prob_cut_nodes;
+
+      if (IS_SCORE_NAN(prob_cut_result.SR_score))
+      {
+        ++(arg_with_search->S_total_prob_cut_probes_aborted);
+
+        arg_with_search->S_total_prob_cut_nodes_aborted += prob_cut_nodes;
+
+        goto label_return;
+      }
+
+      if (prob_cut_result.SR_score >= prob_cut_beta)
+      {
+        ++(arg_with_search->S_total_prob_cut_probes_ge_beta);
+
+        arg_with_search->S_total_prob_cut_nodes_ge_beta += prob_cut_nodes;
+
+        construct_search_result(arg_search_result,
+                                arg_my_beta,
+                                arg_my_beta,
+                                SR_NULL);
+
+        arg_search_result->SR_depth = arg_my_depth;
+
+        arg_search_result->SR_pv = prob_cut_result.SR_pv;
+
+        // Do not store the inferred cutoff as a full-depth TT bound.
+        goto label_return;
+      }
+
+      ++(arg_with_search->S_total_prob_cut_probes_le_alpha);
+
+      arg_with_search->S_total_prob_cut_nodes_le_alpha += prob_cut_nodes;
+    }
+  }
+
   if ((options.singular_probe_depth > 0) and
       (arg_my_depth >= options.singular_probe_depth) and
       (arg_moves_list->ML_nmoves > options.singular_moves_threshold) and
@@ -3091,7 +3216,7 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_moves_list,
                  singular_sort,
                  INVALID,
-                 arg_history,
+                 history_before_move_generation,
                  &singular_probe_result);
 
       if (IS_SCORE_NAN(singular_probe_result.SR_score))

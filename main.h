@@ -1,4 +1,4 @@
-// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
+// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
 #ifndef MainH
 #define MainH
 
@@ -67,6 +67,10 @@ typedef struct
   int reduction_full_min;
   int reduction_percentage;
   int reduction_margin;
+
+  int prob_cut_depth;
+  int prob_cut_percentage;
+  int prob_cut_margin;
 
   int singular_probe_depth;
   int singular_moves_threshold;

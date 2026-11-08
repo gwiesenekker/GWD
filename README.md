@@ -2,25 +2,28 @@
 
 Windows CMake build instructions: [WINDOWS.md](WINDOWS.md).
 
-## Source version 8.1256
+## Version 8.1260
 
-Version 8.1256 updates WDL and DTM lookups for supported eight-piece endgames
-and falls back to normal search when a required child-position DTM file is
-missing at the root. See [CHANGELOG.md](CHANGELOG.md) for details.
+Version 8.1260 adds configurable ProbCut searches and probe-cost statistics,
+corrects search-tweak and capture-history handling, and fixes reported EGTB
+memory usage. It also includes the eight-piece endgame support and missing-DTM
+fallback introduced in 8.1256. See [CHANGELOG.md](CHANGELOG.md) for details.
 
-The engine source matches SCU/8.1256. Building requires the external `compat`
+The engine source matches SCU/8.1260. Building requires the external `compat`
 and `endgame7` (GWDEGTB) source directories; they are not bundled in this repository.
 Use an updated GWDEGTB version providing `gwdegtb_dtm_missing_name()`.
 
-## Latest published release: 8.1255
+## Latest published release: 8.1260
 
-[Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1255).
+[Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1260).
 Download the archive for your platform and the shared network archive. Extract
 both into the same writable directory, then follow `RELEASE-README.txt`.
 SHA-1 and SHA-256 checksum lists accompany the release assets.
 
-These downloads contain version 8.1255, not the newer source version 8.1256.
 The binary packages do not include endgame databases or an opening book.
+The packaged configuration enables ProbCut from depth 4, with a probe depth
+of 50% and a margin of 20 centipawns. Use `--prob_cut_depth=0` to disable it.
+Both platforms use AVX2 evaluation and the shared 16x8 network with FP32 weights.
 
 The source code of my Draughts program GWD. I have been working on it on and off for the last 40 years. It has the following features:
 

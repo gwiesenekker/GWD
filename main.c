@@ -1,4 +1,4 @@
-// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
+// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
 #include "globals.h"
 
 #define GWD_JSON "gwd.json"
@@ -1895,6 +1895,10 @@ local void load_gwd_json(void)
   options.reduction_percentage = 50;
   options.reduction_margin = 100;
 
+  options.prob_cut_depth = 0;
+  options.prob_cut_percentage = 50;
+  options.prob_cut_margin = 100;
+
   options.singular_probe_depth = 2;
   options.singular_moves_threshold = 2;
   options.singular_probe_percentage = 50;
@@ -2058,6 +2062,16 @@ local void parse_parameters(void)
 
       else if (compat_strcasecmp(parameter_name, "reduction_margin") == 0)
         options.reduction_margin = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "prob_cut_depth") == 0)
+        options.prob_cut_depth = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "prob_cut_percentage") ==
+               0)
+        options.prob_cut_percentage = ivalue;
+
+      else if (compat_strcasecmp(parameter_name, "prob_cut_margin") == 0)
+        options.prob_cut_margin = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "singular_probe_depth") == 0)
         options.singular_probe_depth = ivalue;
@@ -3001,6 +3015,10 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(reduction_percentage);
   PRINTF_CFG_I(reduction_margin);
 
+  PRINTF_CFG_I(prob_cut_depth);
+  PRINTF_CFG_I(prob_cut_percentage);
+  PRINTF_CFG_I(prob_cut_margin);
+
   PRINTF_CFG_I(singular_probe_depth);
   PRINTF_CFG_I(singular_moves_threshold);
   PRINTF_CFG_I(singular_probe_percentage);
@@ -3091,6 +3109,11 @@ int main(int argc, char **argv)
   HARDBUG(options.reduction_percentage < 1)
   HARDBUG(options.reduction_percentage > 99)
   HARDBUG(options.reduction_margin < 0)
+
+  HARDBUG(options.prob_cut_depth < 0)
+  HARDBUG(options.prob_cut_percentage < 1)
+  HARDBUG(options.prob_cut_percentage > 99)
+  HARDBUG(options.prob_cut_margin < 0)
 
   HARDBUG(options.singular_probe_depth < 0)
   HARDBUG(options.singular_moves_threshold < 1)

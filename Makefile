@@ -60,6 +60,7 @@ ifneq ($(ARCH),arm64)
 ARCH=native
 endif
 
+MAKE_AVX2=make_avx2
 MAKE_VALGRIND=make_valgrind
 MAKE_SQLITE3=make_sqlite3
 MAKE_OPENMPI=make_openmpi

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
+// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
 /*
  * xxHash - Extremely Fast Hash algorithm
  * Copyright (C) 2012-2023 Yann Collet

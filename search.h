@@ -1,4 +1,4 @@
-// SCU REVISION 8.1256 za  7 nov 2026 11:28:24 CET
+// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
 #ifndef SearchH
 #define SearchH
 
@@ -105,6 +105,15 @@ typedef struct
   i64_t S_total_reductions_lost;
   i64_t S_total_reductions_le_alpha;
   i64_t S_total_reductions_ge_beta;
+
+  i64_t S_total_prob_cut_probes;
+  i64_t S_total_prob_cut_probes_le_alpha;
+  i64_t S_total_prob_cut_probes_ge_beta;
+  i64_t S_total_prob_cut_nodes;
+  i64_t S_total_prob_cut_nodes_le_alpha;
+  i64_t S_total_prob_cut_nodes_ge_beta;
+  i64_t S_total_prob_cut_probes_aborted;
+  i64_t S_total_prob_cut_nodes_aborted;
 
   i64_t S_total_singular_extension_probes;
   i64_t S_total_singular_extension_probes_le_alpha;

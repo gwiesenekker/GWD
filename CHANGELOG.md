@@ -1,5 +1,35 @@
 # GWD changelog
 
+## 8.1260
+
+Released 8 November 2026, with Linux and Windows x86-64 binaries and the
+shared 16x8 evaluation network. Changes below are relative to source version
+8.1256; the binary release also includes the 8.1256 changes listed below.
+
+- Added configurable ProbCut at eligible quiet, minimal-window search nodes.
+  `prob_cut_depth` is the minimum depth for a probe; zero disables ProbCut.
+  `prob_cut_percentage` selects the probe depth as a percentage of the current
+  depth, and `prob_cut_margin` raises the probe threshold above beta.
+  The packaged configuration uses 4, 50 and 20 respectively.
+- Prevent immediate recursive ProbCut probes while allowing probes deeper in
+  the move tree. Skip probes after reduced or extended moves, and when a
+  sufficiently deep TT result already rules out the raised threshold.
+  Successful probes return a fail-hard cutoff without storing the inferred
+  result as a full-depth TT bound.
+- Added probe and node counters for successful, failed and interrupted
+  ProbCut searches. Attribute nested-probe nodes only once, to the innermost
+  probe, so the counters show where probe work is spent.
+- Corrected reduced-move tweak propagation in PV searches and internal
+  iterative deepening. Avoid adding capture history twice when probing the
+  same position for singularity or ProbCut.
+- Fixed the total reported RAM usage for loaded WDL databases.
+- Enable AVX2 evaluation intrinsics by default in the Linux Makefile, matching
+  the Windows release build. Neural weights and arithmetic remain FP32.
+
+The C/header/Makefile sources match SCU/8.1260. Release packages include
+SHA-1 and SHA-256 checksums; endgame databases and opening books remain
+separate downloads.
+
 ## 8.1256
 
 7 November 2026. Source update; binaries have not been published for this version.
