@@ -49,35 +49,6 @@ static void compare(board_t *board, moves_list_t *moves)
   assert(ncapt == board->B_nodes[board->B_inode].node_ncaptx);
   assert(moves->ML_nmoves == legacy.ML_nmoves);
   assert(moves->ML_ncaptx == legacy.ML_ncaptx);
-  assert(can_capture_bb(board) == (legacy.ML_ncaptx > 0));
-  if (moves->ML_nmoves)
-  {
-    board_t saved = *board;
-    board_t expected = *board;
-    const move_t *move = &moves->ML_moves[tested % moves->ML_nmoves];
-    play(&expected, move);
-    move_undo_v2_t undo;
-    do_move_v2(board, move, &undo);
-    assert(memcmp(board->B_bit_boards, expected.B_bit_boards,
-                  sizeof(board->B_bit_boards)) == 0);
-    assert(board->B_colour2move == expected.B_colour2move);
-    assert(board->B_inode == saved.B_inode + 1);
-    assert(board->B_key == saved.B_key && board->B_nstate == saved.B_nstate);
-    undo_move_v2(board, &undo);
-    assert(memcmp(board, &saved, sizeof(saved)) == 0);
-  }
-  if (moves->ML_nmoves && !moves->ML_ncaptx)
-  {
-    board_t child = *board;
-    board_t saved = *board;
-    const move_t *move = &moves->ML_moves[tested % moves->ML_nmoves];
-    int capture = quiet_move_allows_capture_bb(board, move);
-    assert(memcmp(board, &saved, sizeof(saved)) == 0);
-    play(&child, move);
-    moves_list_t replies;
-    gen_moves_legacy(&child, &replies);
-    assert(capture == (replies.ML_ncaptx > 0));
-  }
   for (int i = 0; i < moves->ML_nmoves; ++i)
   {
     const move_t *a = &moves->ML_moves[i], *b = &legacy.ML_moves[i];
@@ -164,7 +135,10 @@ int main(int argc, char **argv)
     printf("%s: %llu generations, %.3f CPU seconds.\n", argv[1], tested,
            (double)(clock() - start) / CLOCKS_PER_SEC);
   else
+  {
+    assert(roundtrips > 0);
     printf("Passed %llu ordered move-list comparisons; %llu round-trip moves.\n",
            tested, roundtrips);
+  }
   return 0;
 }

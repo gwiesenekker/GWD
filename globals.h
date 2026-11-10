@@ -1,8 +1,8 @@
-// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
+// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
 #ifndef GlobalsH
 #define GlobalsH
 
-#define REVISION "8.1260"
+#define REVISION "8.1262"
 
 // generic includes
 
@@ -261,6 +261,7 @@ extern void *STDOUT;
 #include "networks.h"
 #include "boards.h"
 #include "moves.h"
+#include "sort.h"
 #include "search.h"
 #include "my_threads.h"
 #include "book.h"

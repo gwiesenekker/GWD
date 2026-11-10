@@ -1,6 +1,7 @@
-// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
+// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
 
 #include "globals.h"
+#include "material.h" // GWDEGTB's EGTB_MAX_PIECES
 
 GwdegtbWdlProbe *wdl_probe_alpha_beta_master;
 
@@ -151,6 +152,11 @@ score_t return_endgame_score(search_t *arg_with_search)
   score_t result = SCORE_NOT_A_NUMBER;
 
   board_t *with_board = &(arg_with_search->S_board);
+
+  if (BIT_COUNT(with_board->B_white_king_bb | with_board->B_white_man_bb |
+                with_board->B_black_king_bb | with_board->B_black_man_bb) >
+      EGTB_MAX_PIECES)
+    return (result);
 
   int temp_mate = ENDGAME_UNKNOWN;
 

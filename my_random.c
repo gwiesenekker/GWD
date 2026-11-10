@@ -1,5 +1,10 @@
-// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
+// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
 #include "globals.h"
+
+void copy_my_random(my_random_t *arg_to, const my_random_t *arg_from)
+{
+  *arg_to = *arg_from;
+}
 
 /*
 uint64_t splitmix64_next(uint64_t* state) {
@@ -254,12 +259,45 @@ void test_my_random(void)
          sigma_min,
          sigma_max);
 
-  int s[TEST_NBUCKETS];
-
   my_random_t test_random;
 
   construct_my_random(&test_random, NULL);
 
-  shuffle(s, TEST_NBUCKETS, NULL, INVALID);
-  shuffle(s, TEST_NBUCKETS, &test_random, INVALID);
+  for (int narray = 0; narray <= NMOVES_MAX; narray++)
+  {
+    for (int isort0 = 0; isort0 <= narray; isort0++)
+    {
+      int sort0 = isort0 - 1;
+
+      for (int irandom = 0; irandom < 2; irandom++)
+      {
+        sort_t sort;
+        construct_sort(&sort, narray, irandom ? &test_random : NULL, sort0);
+
+        int found[NMOVES_MAX] = {0};
+        int array[NMOVES_MAX];
+
+        for (int isort = 0; isort < narray; isort++)
+        {
+          int value = return_next_sort(&sort);
+
+          HARDBUG((value < 0) or (value >= narray))
+          HARDBUG(found[value] != 0)
+          HARDBUG((isort == 0) and (sort0 != INVALID) and (value != sort0))
+          HARDBUG(!irandom and (sort0 == INVALID) and (value != isort))
+
+          found[value] = 1;
+          array[isort] = value;
+        }
+
+        HARDBUG(return_next_sort(&sort) != INVALID)
+
+        reset_sort(&sort, 0);
+        for (int isort = 0; isort < narray; isort++)
+          HARDBUG(return_next_sort(&sort) != array[isort])
+
+        HARDBUG(return_next_sort(&sort) != INVALID)
+      }
+    }
+  }
 }

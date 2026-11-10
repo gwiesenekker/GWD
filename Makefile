@@ -143,8 +143,11 @@ $(TARGET): $(OBJS) $(COMPATOBJS) $(ENDGAME7OBJS)
 	REVISION=$$(./$(TARGET) --revision); echo $$REVISION;\
         mkdir -p /tmp8/gwies/dxp1/$$REVISION;\
         cp $(TARGET) gwd.json overrides.json network0.json ballot2.fen /tmp8/gwies/dxp1/$$REVISION;\
+        mkdir -p /tmp8/gwies/dxp2/$$REVISION;\
+        cp $(TARGET) gwd.json overrides.json network0.json ballot2.fen /tmp8/gwies/dxp1/$$REVISION;\
 
 HEADERS=boards.h\
+  sort.h\
   bstrlib.h\
   cJSON.h\
   xxhash.h\
@@ -226,6 +229,10 @@ clean:
 	rm *.o logs/*
 
 .PHONY: test-movegen test-movegen-sanitize
+.PHONY: test-sort
+test-sort:
+	bash tests/run-sort.sh
+
 test-movegen:
 	bash tests/run-movegen.sh
 

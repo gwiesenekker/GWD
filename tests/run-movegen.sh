@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 build_dir=$(mktemp -d /tmp/gwd8-movegen-test-XXXXXX)
 compiler=${CC:-clang}
 common=(-g -D_GNU_SOURCE -ffunction-sections -fdata-sections
-        -I. -I"${EGTB_INCLUDE:-../endgame7}")
+        -I. -I"${COMPAT_DIR:-../compat}" -I"${EGTB_INCLUDE:-../endgame7}")
 echo "Test artifacts: $build_dir"
 
 if [[ ${1:-} == sanitize ]]; then

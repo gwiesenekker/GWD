@@ -1,4 +1,4 @@
-// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
+// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
 #include "globals.h"
 
 void construct_my_bstream(my_bstream_t *arg_with_my_bstream, char *arg_name)

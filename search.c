@@ -1,4 +1,4 @@
-// SCU REVISION 8.1260 zo  8 nov 2026 17:20:46 CET
+// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -1681,9 +1681,8 @@ local void quiescence(search_t *arg_with_search,
       goto label_return;
   }
 
-  int sort[NMOVES_MAX];
-
-  shuffle(sort,
+  sort_t sort;
+  construct_sort(&sort,
           arg_moves_list->ML_nmoves,
           &(arg_with_search->S_random),
           INVALID);
@@ -1692,7 +1691,9 @@ local void quiescence(search_t *arg_with_search,
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
-    int jmove = sort[imove];
+    int jmove = return_next_sort(&sort);
+
+    HARDBUG(jmove == INVALID)
 
     if (nmoves < arg_moves_list->ML_nmoves)
     {
@@ -1793,7 +1794,7 @@ local void alpha_beta(search_t *,
                       int,
                       ui32_t,
                       moves_list_t *,
-                      int[NMOVES_MAX],
+                      sort_t *,
                       int,
                       ui64_t,
                       search_result_t *);
@@ -1806,7 +1807,7 @@ local void alpha_beta_captures(search_t *arg_with_search,
                                int arg_reduction_depth_root,
                                ui32_t arg_my_tweaks,
                                moves_list_t *arg_moves_list,
-                               int arg_sort[NMOVES_MAX],
+                               sort_t *arg_sort,
                                int arg_singular_extension,
                                ui64_t arg_history,
                                search_result_t *arg_search_result)
@@ -1851,11 +1852,15 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
   temp_result.SR_pv = arg_search_result->SR_pv;
 
+  reset_sort(arg_sort, arg_singular_extension == INVALID ? 1 : 0);
+
   for (int imove = (arg_singular_extension == INVALID ? 1 : 0);
        imove < arg_moves_list->ML_nmoves;
        imove++)
   {
-    int jmove = arg_sort[imove];
+    int jmove = return_next_sort(arg_sort);
+
+    HARDBUG(jmove == INVALID)
 
     int singular_extension = 0;
 
@@ -1970,9 +1975,9 @@ local void alpha_beta_captures(search_t *arg_with_search,
       arg_search_result->SR_depth = arg_my_depth + singular_extension;
 
       for (int kmove = imove; kmove > 0; kmove--)
-        arg_sort[kmove] = arg_sort[kmove - 1];
+        arg_sort->S_array[kmove] = arg_sort->S_array[kmove - 1];
 
-      arg_sort[0] = jmove;
+      arg_sort->S_array[0] = jmove;
 
       TRACE_AB_RESULT(trace_key,
                       "result best move",
@@ -2022,7 +2027,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
                               int arg_reduction_depth_root,
                               ui32_t arg_my_tweaks,
                               moves_list_t *arg_moves_list,
-                              int arg_sort[NMOVES_MAX],
+                              sort_t *arg_sort,
                               int arg_singular_extension,
                               ui64_t arg_history,
                               search_result_t *arg_search_result)
@@ -2099,11 +2104,15 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
   for (int jpass = 1; jpass <= NPASS_REDUCED_SEARCH; ++jpass)
   {
+    reset_sort(arg_sort, arg_singular_extension == INVALID ? 1 : 0);
+
     for (int imove = (arg_singular_extension == INVALID ? 1 : 0);
          imove < arg_moves_list->ML_nmoves;
          imove++)
     {
-      int jmove = arg_sort[imove];
+      int jmove = return_next_sort(arg_sort);
+
+      HARDBUG(jmove == INVALID)
 
       if (stage[jmove] == STAGE_SEARCHED_MOVE_AT_FULL_DEPTH)
         continue;
@@ -2287,9 +2296,9 @@ local void alpha_beta_minimal(search_t *arg_with_search,
         arg_search_result->SR_depth = arg_my_depth + singular_extension;
 
         for (int kmove = imove; kmove > 0; kmove--)
-          arg_sort[kmove] = arg_sort[kmove - 1];
+          arg_sort->S_array[kmove] = arg_sort->S_array[kmove - 1];
 
-        arg_sort[0] = jmove;
+        arg_sort->S_array[0] = jmove;
 
         TRACE_AB_RESULT(trace_key,
                         "result best move",
@@ -2344,7 +2353,7 @@ local void alpha_beta_pv(search_t *arg_with_search,
                          int arg_reduction_depth_root,
                          ui32_t arg_my_tweaks,
                          moves_list_t *arg_moves_list,
-                         int arg_sort[NMOVES_MAX],
+                         sort_t *arg_sort,
                          int arg_singular_extension,
                          ui64_t arg_history,
                          search_result_t *arg_search_result)
@@ -2411,11 +2420,15 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
   for (int jpass = 1; jpass <= NPASS_PV_SEARCH; ++jpass)
   {
+    reset_sort(arg_sort, arg_singular_extension == INVALID ? 1 : 0);
+
     for (int imove = (arg_singular_extension == INVALID ? 1 : 0);
          imove < arg_moves_list->ML_nmoves;
          imove++)
     {
-      int jmove = arg_sort[imove];
+      int jmove = return_next_sort(arg_sort);
+
+      HARDBUG(jmove == INVALID)
 
       if (stage[jmove] == STAGE_SEARCHED_MOVE_AT_FULL_DEPTH)
         continue;
@@ -2573,9 +2586,9 @@ local void alpha_beta_pv(search_t *arg_with_search,
         arg_search_result->SR_depth = arg_my_depth + singular_extension;
 
         for (int kmove = imove; kmove > 0; kmove--)
-          arg_sort[kmove] = arg_sort[kmove - 1];
+          arg_sort->S_array[kmove] = arg_sort->S_array[kmove - 1];
 
-        arg_sort[0] = jmove;
+        arg_sort->S_array[0] = jmove;
 
         TRACE_AB_RESULT(trace_key,
                         "result best move",
@@ -2628,7 +2641,7 @@ local void alpha_beta(search_t *arg_with_search,
                       int arg_reduction_depth_root,
                       ui32_t arg_my_tweaks,
                       moves_list_t *arg_moves_list,
-                      int arg_sort[NMOVES_MAX],
+                      sort_t *arg_sort,
                       int arg_singular_extension,
                       ui64_t arg_history,
                       search_result_t *arg_search_result)
@@ -2659,11 +2672,13 @@ local void alpha_beta(search_t *arg_with_search,
   {
     HARDBUG(arg_moves_list == NULL)
 
+    initialize_sort(arg_sort);
+
     int frequency[NMOVES_MAX] = {0};
 
     for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
     {
-      int key = arg_sort[imove];
+      int key = arg_sort->S_array[imove];
 
       HARDBUG((key < 0) or (key >= arg_moves_list->ML_nmoves))
 
@@ -2671,7 +2686,7 @@ local void alpha_beta(search_t *arg_with_search,
     }
 
     for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
-      HARDBUG(frequency[arg_sort[imove]] != 1)
+      HARDBUG(frequency[arg_sort->S_array[imove]] != 1)
   }
 #endif
 
@@ -3041,13 +3056,14 @@ local void alpha_beta(search_t *arg_with_search,
     }
   }
 
-  int sort_local[NMOVES_MAX];
+  sort_t sort_local;
+  construct_sort(&sort_local, 0, NULL, INVALID);
 
-  int *sort = arg_sort;
+  sort_t *sort = arg_sort;
 
   if (sort == NULL)
   {
-    sort = sort_local;
+    sort = &sort_local;
 
     int kmove = INVALID;
 
@@ -3063,10 +3079,10 @@ local void alpha_beta(search_t *arg_with_search,
       }
     }
 
-    shuffle(sort,
-            arg_moves_list->ML_nmoves,
-            &(arg_with_search->S_random),
-            kmove);
+    construct_sort(sort,
+                   arg_moves_list->ML_nmoves,
+                   &(arg_with_search->S_random),
+                   kmove);
   }
 
   int singular_extension = arg_singular_extension == INVALID ? INVALID : 0;
@@ -3100,10 +3116,9 @@ local void alpha_beta(search_t *arg_with_search,
 
       HARDBUG(prob_cut_depth < 0)
 
-      int prob_cut_sort[NMOVES_MAX];
-
-      for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
-        prob_cut_sort[imove] = sort[imove];
+      sort_t prob_cut_sort;
+      construct_sort(&prob_cut_sort, 0, NULL, INVALID);
+      copy_sort(&prob_cut_sort, sort);
 
       search_result_t prob_cut_result;
 
@@ -3122,7 +3137,7 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_reduction_depth_root,
                  arg_my_tweaks | TWEAK_PROB_CUT_BIT,
                  arg_moves_list,
-                 prob_cut_sort,
+                 &prob_cut_sort,
                  0,
                  history_before_move_generation,
                  &prob_cut_result);
@@ -3197,10 +3212,9 @@ local void alpha_beta(search_t *arg_with_search,
 
       HARDBUG(singular_probe_depth < 1)
 
-      int singular_sort[NMOVES_MAX];
-
-      for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
-        singular_sort[imove] = sort[imove];
+      sort_t singular_sort;
+      construct_sort(&singular_sort, 0, NULL, INVALID);
+      copy_sort(&singular_sort, sort);
 
       search_result_t singular_probe_result;
 
@@ -3214,7 +3228,7 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_reduction_depth_root,
                  arg_my_tweaks,
                  arg_moves_list,
-                 singular_sort,
+                 &singular_sort,
                  INVALID,
                  history_before_move_generation,
                  &singular_probe_result);
@@ -3344,6 +3358,8 @@ local void alpha_beta(search_t *arg_with_search,
 
 label_store:
 
+  HARDBUG(sort->S_ninitialized == INVALID)
+
   // we always searched move 0
 
   HARDBUG(arg_search_result->SR_score == SCORE(SCORE_MINUS_INFINITY))
@@ -3355,7 +3371,7 @@ label_store:
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
-    int key = sort[imove];
+    int key = sort->S_array[imove];
 
     HARDBUG((key < 0) or (key >= arg_moves_list->ML_nmoves))
 
@@ -3363,7 +3379,7 @@ label_store:
   }
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
-    HARDBUG(frequency[sort[imove]] != 1)
+    HARDBUG(frequency[sort->S_array[imove]] != 1)
 
   // #endif
 
@@ -3397,7 +3413,7 @@ label_store:
       nmoves = arg_moves_list->ML_nmoves;
 
     for (int imove = 0; imove < nmoves; imove++)
-      alpha_beta_cache_slot.ABCS_moves[imove] = sort[imove];
+      alpha_beta_cache_slot.ABCS_moves[imove] = sort->S_array[imove];
 
     if (arg_search_result->SR_score <= arg_my_alpha)
     {
@@ -3791,9 +3807,8 @@ void do_search(search_t *arg_with_search,
 
   reset_my_timer(&(arg_with_search->S_timer));
 
-  int sort[NMOVES_MAX];
-
-  shuffle(sort, arg_moves_list->ML_nmoves, arg_shuffle, INVALID);
+  sort_t sort;
+  construct_sort(&sort, arg_moves_list->ML_nmoves, arg_shuffle, INVALID);
 
   // check for known endgame
 
@@ -3811,9 +3826,13 @@ void do_search(search_t *arg_with_search,
 
     int your_mate = INVALID;
 
+    reset_sort(&sort, 0);
+
     for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
     {
-      int jmove = sort[imove];
+      int jmove = return_next_sort(&sort);
+
+      HARDBUG(jmove == INVALID)
 
       do_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
@@ -3866,9 +3885,9 @@ void do_search(search_t *arg_with_search,
       if (move_score > arg_with_search->S_best_score)
       {
         for (int kmove = imove; kmove > 0; kmove--)
-          sort[kmove] = sort[kmove - 1];
+          sort.S_array[kmove] = sort.S_array[kmove - 1];
 
-        sort[0] = jmove;
+        sort.S_array[0] = jmove;
 
         arg_with_search->S_best_score = move_score;
 
@@ -3881,7 +3900,7 @@ void do_search(search_t *arg_with_search,
       {
         int ndebug = 0;
         for (int jdebug = 0; jdebug < arg_moves_list->ML_nmoves; jdebug++)
-          if (sort[jdebug] == idebug)
+          if (sort.S_array[jdebug] == idebug)
             ++ndebug;
         HARDBUG(ndebug != 1)
       }
@@ -3898,7 +3917,7 @@ void do_search(search_t *arg_with_search,
   
       BSTRING(bmove_string)
   
-      move2bstring(arg_moves_list, sort[0], bmove_string);
+      move2bstring(arg_moves_list, sort.S_array[0], bmove_string);
   
       BSTRING(bpv_string)
   
@@ -3920,11 +3939,11 @@ void do_search(search_t *arg_with_search,
   
       if (your_mate != INVALID)
       {
-        do_move(&(arg_with_search->S_board), sort[0], arg_moves_list);
+        do_move(&(arg_with_search->S_board), sort.S_array[0], arg_moves_list);
   
         endgame_pv(arg_with_search, your_mate, bpv_string);
   
-        undo_move(&(arg_with_search->S_board), sort[0], arg_moves_list);
+        undo_move(&(arg_with_search->S_board), sort.S_array[0], arg_moves_list);
       }
       else
       {
@@ -4113,9 +4132,13 @@ void do_search(search_t *arg_with_search,
 
     while (TRUE)
     {
+      reset_sort(&sort, 0);
+
       for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
       {
-        int jmove = sort[imove];
+        int jmove = return_next_sort(&sort);
+
+        HARDBUG(jmove == INVALID)
 
         score_t margin_alpha = SCORE(options.aspiration_margin);
         score_t margin_beta = SCORE(options.aspiration_margin);
@@ -4313,12 +4336,12 @@ void do_search(search_t *arg_with_search,
 
         if ((nbest_moves == 0) or (move_score > arg_with_search->S_best_score))
         {
-          if (sort[0] != jmove)
+          if (sort.S_array[0] != jmove)
           {
             for (int kmove = imove; kmove > 0; kmove--)
-              sort[kmove] = sort[kmove - 1];
+              sort.S_array[kmove] = sort.S_array[kmove - 1];
 
-            sort[0] = jmove;
+            sort.S_array[0] = jmove;
 
             if ((arg_with_search->S_thread != NULL) and
                 (arg_with_search->S_thread == thread_alpha_beta_master) and
@@ -4390,7 +4413,7 @@ void do_search(search_t *arg_with_search,
         {
           int ndebug = 0;
           for (int jdebug = 0; jdebug < arg_moves_list->ML_nmoves; jdebug++)
-            if (sort[jdebug] == idebug)
+            if (sort.S_array[jdebug] == idebug)
               ++ndebug;
           HARDBUG(ndebug != 1)
         }
@@ -4417,10 +4440,10 @@ void do_search(search_t *arg_with_search,
     /*
         if ((arg_with_search->S_best_score == previous_best_score) and
     */
-    if ((previous_best_move == sort[0]) and
+    if ((previous_best_move == sort.S_array[0]) and
         pv_equal(arg_with_search,
                  arg_moves_list,
-                 sort[0],
+                 sort.S_array[0],
                  &(arg_with_search->S_best_pv),
                  &previous_best_pv,
                  FALSE))
@@ -4431,7 +4454,7 @@ void do_search(search_t *arg_with_search,
 
       (void)pv_equal(arg_with_search,
                      arg_moves_list,
-                     sort[0],
+                     sort.S_array[0],
                      &(arg_with_search->S_best_pv),
                      &previous_best_pv,
                      TRUE);
@@ -4444,7 +4467,7 @@ void do_search(search_t *arg_with_search,
     }
     else
     {
-      previous_best_move = sort[0];
+      previous_best_move = sort.S_array[0];
 
       previous_best_pv = arg_with_search->S_best_pv;
 
