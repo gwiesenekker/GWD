@@ -1,4 +1,4 @@
-// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
+// SCU REVISION 8.1263 di 10 nov 2026 16:08:19 CET
 /*
  * This source file is part of the bstring string library.  This code was
  * written by Paul Hsieh in 2002-2015, and is covered by the BSD open source

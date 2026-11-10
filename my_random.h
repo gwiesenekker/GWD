@@ -1,4 +1,4 @@
-// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
+// SCU REVISION 8.1263 di 10 nov 2026 16:08:19 CET
 #ifndef RandomH
 #define RandomH
 
@@ -9,6 +9,7 @@ typedef struct
 
 void shuffle(int *, int n, my_random_t *, int);
 void construct_my_random(my_random_t *, ui64_t *);
+void seed_my_random(my_random_t *, ui64_t);
 void copy_my_random(my_random_t *, const my_random_t *);
 ui64_t return_my_random(my_random_t *);
 

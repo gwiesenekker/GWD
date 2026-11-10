@@ -1,4 +1,4 @@
-// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
+// SCU REVISION 8.1263 di 10 nov 2026 16:08:19 CET
 #include "globals.h"
 
 local int white_dir[4] = {-6, -5, 5, 6};

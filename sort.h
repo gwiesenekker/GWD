@@ -1,4 +1,4 @@
-// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
+// SCU REVISION 8.1263 di 10 nov 2026 16:08:19 CET
 #ifndef SortH
 #define SortH
 
@@ -27,9 +27,7 @@ static inline void construct_sort(sort_t *arg_sort, int arg_narray,
   arg_sort->S_randomize = arg_my_random != NULL;
   if (arg_my_random != NULL)
   {
-    copy_my_random(&arg_sort->S_random, arg_my_random);
-    // Give subsequent sorts a different starting state.
-    (void)return_my_random(arg_my_random);
+    seed_my_random(&arg_sort->S_random, return_my_random(arg_my_random));
   }
 }
 

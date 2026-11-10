@@ -1,4 +1,4 @@
-// SCU REVISION 8.1262 di 10 nov 2026 15:00:45 CET
+// SCU REVISION 8.1263 di 10 nov 2026 16:08:19 CET
 #include "globals.h"
 
 void copy_my_random(my_random_t *arg_to, const my_random_t *arg_from)
@@ -117,6 +117,12 @@ void shuffle(int *s, int n, my_random_t *r, int k)
 #endif
 }
 
+void seed_my_random(my_random_t *arg_with_my_random, ui64_t arg_seed)
+{
+  for (int istate = 0; istate < 4; istate++)
+    arg_with_my_random->MR_state[istate] = splitmix64(&arg_seed);
+}
+
 void construct_my_random(my_random_t *arg_with_my_random, ui64_t *arg_seed)
 {
   ui64_t seed;
@@ -136,8 +142,7 @@ void construct_my_random(my_random_t *arg_with_my_random, ui64_t *arg_seed)
     seed = *arg_seed;
   }
 
-  for (int i = 0; i < 4; i++)
-    arg_with_my_random->MR_state[i] = splitmix64(&seed);
+  seed_my_random(arg_with_my_random, seed);
 }
 
 /*

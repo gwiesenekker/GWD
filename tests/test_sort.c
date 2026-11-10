@@ -15,6 +15,24 @@ int main(int argc, char **argv)
   my_random_t random;
   construct_my_random(&random, NULL);
 
+  my_random_t seeded;
+  seed_my_random(&seeded, 0);
+  assert(memcmp(&random, &seeded, sizeof(random)) == 0);
+
+  // Seeding a sort consumes exactly one parent draw, including empty sorts.
+  for (int narray = 0; narray <= NMOVES_MAX; narray++)
+  {
+    my_random_t expected_parent;
+    copy_my_random(&expected_parent, &random);
+    seed_my_random(&seeded, return_my_random(&expected_parent));
+
+    sort_t sort;
+    construct_sort(&sort, narray, &random, INVALID);
+    assert(memcmp(&random, &expected_parent, sizeof(random)) == 0);
+    for (int idraw = 0; idraw < 8; idraw++)
+      assert(return_my_random(&sort.S_random) == return_my_random(&seeded));
+  }
+
   for (int nmoves = 0; nmoves <= NMOVES_MAX; nmoves++)
   {
     for (int isort0 = 0; isort0 <= nmoves; isort0++)
