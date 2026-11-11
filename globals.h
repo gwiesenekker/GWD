@@ -1,8 +1,8 @@
-// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
+// SCU REVISION 8.1267 wo 11 nov 2026  3:10:47 CET
 #ifndef GlobalsH
 #define GlobalsH
 
-#define REVISION "8.1266"
+#define REVISION "8.1267"
 
 // generic includes
 
