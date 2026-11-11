@@ -1,4 +1,4 @@
-// SCU REVISION 8.1270 wo 11 nov 2026  9:25:12 CET
+// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
 #include "globals.h"
 
 #define GWD_JSON "gwd.json"
@@ -1879,8 +1879,6 @@ local void load_gwd_json(void)
 
   options.mobility_moves_threshold = 2;
 
-  options.pv_combination_length = 2;
-
   options.best_score_margin = 0;
   options.aspiration_margin = 25;
   options.research_margin = 1;
@@ -1890,7 +1888,6 @@ local void load_gwd_json(void)
   options.reduction_moves_threshold = 2;
   options.reduction_depth_root = 2;
   options.reduction_depth_leaf = 2;
-  options.reduction_combination_length = 2;
   options.reduction_full_min = 1;
   options.reduction_percentage = 50;
   options.reduction_margin = 100;
@@ -2028,9 +2025,6 @@ local void parse_parameters(void)
                0)
         options.mobility_moves_threshold = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "pv_combination_length") == 0)
-        options.pv_combination_length = ivalue;
-
       else if (compat_strcasecmp(parameter_name, "best_score_margin") == 0)
         options.best_score_margin = ivalue;
 
@@ -2052,10 +2046,6 @@ local void parse_parameters(void)
 
       else if (compat_strcasecmp(parameter_name, "reduction_full_min") == 0)
         options.reduction_full_min = ivalue;
-
-      else if (compat_strcasecmp(parameter_name,
-                                 "reduction_combination_length") == 0)
-        options.reduction_combination_length = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "reduction_percentage") == 0)
         options.reduction_percentage = ivalue;
@@ -2998,8 +2988,6 @@ int main(int argc, char **argv)
 
   PRINTF_CFG_I(mobility_moves_threshold);
 
-  PRINTF_CFG_I(pv_combination_length);
-
   PRINTF_CFG_I(best_score_margin);
   PRINTF_CFG_I(aspiration_margin);
   PRINTF_CFG_I(research_margin);
@@ -3009,7 +2997,6 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(reduction_moves_threshold);
   PRINTF_CFG_I(reduction_depth_root);
   PRINTF_CFG_I(reduction_depth_leaf);
-  PRINTF_CFG_I(reduction_combination_length);
   PRINTF_CFG_I(reduction_full_min);
   PRINTF_CFG_I(reduction_percentage);
   PRINTF_CFG_I(reduction_margin);
@@ -3095,8 +3082,6 @@ int main(int argc, char **argv)
 
   HARDBUG(options.mobility_moves_threshold < 1)
 
-  HARDBUG(options.pv_combination_length < 0)
-
   HARDBUG(options.best_score_margin < 0)
   HARDBUG(options.aspiration_margin < 1)
   HARDBUG(options.research_margin < 1)
@@ -3104,7 +3089,6 @@ int main(int argc, char **argv)
   HARDBUG(options.reduction_moves_threshold < 1)
   HARDBUG(options.reduction_depth_root < 0)
   HARDBUG(options.reduction_depth_leaf < 0)
-  HARDBUG(options.reduction_combination_length < 0)
   HARDBUG(options.reduction_percentage < 1)
   HARDBUG(options.reduction_percentage > 99)
   HARDBUG(options.reduction_margin < 0)

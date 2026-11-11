@@ -1,4 +1,4 @@
-// SCU REVISION 8.1270 wo 11 nov 2026  9:25:12 CET
+// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
 #ifndef SearchH
 #define SearchH
 
@@ -79,6 +79,9 @@ typedef struct
 
   my_random_t S_random;
 
+  // history heuristic: [colour][from][to], cleared at the start of a search
+  int S_history[2][HISTORY_NFIELDS][HISTORY_NFIELDS];
+
   score_t S_root_simple_score;
   score_t S_root_score;
   score_t S_best_score;
@@ -98,9 +101,6 @@ typedef struct
   i64_t S_total_quiescence_nodes;
   i64_t S_total_quiescence_1move;
 
-  i64_t S_total_pv_extension_searches_combination;
-
-  i64_t S_total_reductions_combinations;
   i64_t S_total_reductions;
   i64_t S_total_reductions_lost;
   i64_t S_total_reductions_le_alpha;

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1270 wo 11 nov 2026  9:25:12 CET
+// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
 #ifndef MainH
 #define MainH
 
@@ -52,8 +52,6 @@ typedef struct
 
   int mobility_moves_threshold;
 
-  int pv_combination_length;
-
   int best_score_margin;
   int aspiration_margin;
   int research_margin;
@@ -63,7 +61,6 @@ typedef struct
   int reduction_moves_threshold;
   int reduction_depth_root;
   int reduction_depth_leaf;
-  int reduction_combination_length;
   int reduction_full_min;
   int reduction_percentage;
   int reduction_margin;

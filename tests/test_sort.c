@@ -110,6 +110,46 @@ int main(int argc, char **argv)
   assert(return_next_sort(&parent) == 17);
   for (int imove = 1; imove < NMOVES_MAX; imove++)
     assert(return_next_sort(&singular) == return_next_sort(&parent));
+  // A lazy history snapshot must survive copies made before any move is read.
+  moves_list_t moves = {0};
+  moves.ML_nmoves = 6;
+  int history[HISTORY_NFIELDS][HISTORY_NFIELDS] = {0};
+  for (int imove = 0; imove < moves.ML_nmoves; imove++)
+  {
+    moves.ML_moves[imove].M_move_from = 6;
+    moves.ML_moves[imove].M_move_to = 11 + imove;
+    history[6][11 + imove] = imove * 100;
+  }
+  construct_sort(&parent, moves.ML_nmoves, &random, 2);
+  parent.S_moves_list = &moves;
+  parent.S_history = (const int (*)[HISTORY_NFIELDS])history;
+  construct_sort(&singular, 0, NULL, INVALID);
+  copy_sort(&singular, &parent);
+  assert(parent.S_scored && singular.S_scored);
+  for (int imove = 0; imove < moves.ML_nmoves; imove++)
+    history[6][11 + imove] = -imove * 100;
+  reset_sort(&singular, 1);
+  assert(return_next_sort(&parent) == 2);
+  int expected[] = {5, 4, 3, 1, 0};
+  for (int isort = 0; isort < 5; isort++)
+  {
+    assert(return_next_sort(&parent) == expected[isort]);
+    assert(return_next_sort(&singular) == expected[isort]);
+  }
+  assert(return_next_sort(&parent) == INVALID);
+  assert(return_next_sort(&singular) == INVALID);
+
+  // Zero history preserves the original randomized permutation.
+  memset(history, 0, sizeof(history));
+  my_random_t same_random;
+  copy_my_random(&same_random, &random);
+  construct_sort(&parent, moves.ML_nmoves, &random, INVALID);
+  construct_sort(&singular, moves.ML_nmoves, &same_random, INVALID);
+  parent.S_moves_list = &moves;
+  parent.S_history = (const int (*)[HISTORY_NFIELDS])history;
+  for (int isort = 0; isort < moves.ML_nmoves; isort++)
+    assert(return_next_sort(&parent) == return_next_sort(&singular));
+
   puts("Sort tests passed: preferred move, permutations, exhaustion, replay and independent probes.");
   return 0;
 }

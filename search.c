@@ -1,4 +1,4 @@
-// SCU REVISION 8.1270 wo 11 nov 2026  9:25:12 CET
+// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -428,91 +428,6 @@ local inline ui64_t abcs2crc64(ui64_t abcs_key, ui64_t abcs_data)
   return (crc64);
 }
 
-local int return_combination_length(ui64_t arg_history)
-{
-  ui64_t history = arg_history;
-
-  // a combination should end with a regular move by me
-
-  if ((arg_history & 0xF) != 0)
-    return (0);
-
-  arg_history >>= 4;
-
-  // and the combination should end with a capture by you
-
-  int ncaptx_you = arg_history & 0xF;
-
-  if ((ncaptx_you == 0) or (ncaptx_you == 0xF))
-    return (0);
-
-  arg_history >>= 4;
-
-  int balance = ncaptx_you;
-
-  int result = 1;
-
-  while (TRUE)
-  {
-    int ncaptx = arg_history & 0xF;
-
-    if (ncaptx == 0xF)
-      break;
-
-    int ncaptx_me = ncaptx;
-
-    arg_history >>= 4;
-
-    ncaptx = arg_history & 0xF;
-
-    if (ncaptx == 0xF)
-      break;
-
-    ncaptx_you = ncaptx;
-
-    // you should not have captured during the combination?
-
-    if (ncaptx_you > 0)
-      return (0);
-
-    arg_history >>= 4;
-
-    balance -= ncaptx_me;
-
-    // if the balance becomes <= 0 you got nowhere
-
-    if (balance <= 0)
-      return (0);
-
-    if ((ncaptx_me > 0) and (ncaptx_you == 0))
-      ++result;
-
-    HARDBUG(result > 7)
-  }
-
-  // a combination should start with a regular move by you
-
-  if (ncaptx_you != 0)
-    return (0);
-
-  HARDBUG(balance <= 0)
-
-  if (FALSE and (result >= 3))
-  {
-    for (int i = 15; i >= 0; i--)
-    {
-      int j = (history >> (4 * i)) & 0xF;
-      if ((j != 15) and ((i % 2) == 0))
-        j = -j;
-      PRINTF(" (%d)", j);
-    }
-    PRINTF(" balance=%d result=%d\n", balance, result);
-    // FATAL("eh?", 1)
-  }
-
-  return (result);
-}
-
 void clear_totals(search_t *arg_with_search)
 {
   arg_with_search->S_total_move_repetitions = 0;
@@ -526,9 +441,6 @@ void clear_totals(search_t *arg_with_search)
   arg_with_search->S_total_quiescence_nodes = 0;
   arg_with_search->S_total_quiescence_1move = 0;
 
-  arg_with_search->S_total_pv_extension_searches_combination = 0;
-
-  arg_with_search->S_total_reductions_combinations = 0;
   arg_with_search->S_total_reductions = 0;
   arg_with_search->S_total_reductions_lost = 0;
   arg_with_search->S_total_reductions_le_alpha = 0;
@@ -574,6 +486,54 @@ void clear_totals(search_t *arg_with_search)
 
   arg_with_search->S_total_score_cache_hits = 0;
   arg_with_search->S_total_score_cache_crc_errors = 0;
+
+  memset(arg_with_search->S_history, 0, sizeof(arg_with_search->S_history));
+}
+
+// History heuristic: a non-capture move that causes a beta cutoff gets a
+// bonus, the moves tried before it at that node get the same malus.
+// Scores saturate at +/- HISTORY_MAX.
+
+local inline void update_history_score(int *arg_score, int arg_bonus)
+{
+  int abs_bonus = arg_bonus < 0 ? -arg_bonus : arg_bonus;
+
+  *arg_score += arg_bonus - (*arg_score * abs_bonus) / HISTORY_MAX;
+}
+
+local void update_history(search_t *arg_with_search,
+                          moves_list_t *arg_moves_list,
+                          const ui8_t *arg_found,
+                          int arg_jmove,
+                          int arg_my_depth)
+{
+  if (arg_moves_list->ML_ncaptx > 0)
+    return;
+
+  int(*history)[HISTORY_NFIELDS] =
+    arg_with_search
+      ->S_history[IS_WHITE(arg_with_search->S_board.B_colour2move) ? 0 : 1];
+
+  int bonus = arg_my_depth * arg_my_depth + arg_my_depth;
+
+  if (bonus > HISTORY_BONUS_MAX)
+    bonus = HISTORY_BONUS_MAX;
+
+  move_t *move = arg_moves_list->ML_moves + arg_jmove;
+
+  update_history_score(&history[move->M_move_from][move->M_move_to], bonus);
+
+  // Only penalize moves actually searched at this node. In particular,
+  // the excluded move in a singular probe has not failed this window.
+  for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
+  {
+    if ((imove == arg_jmove) or !arg_found[imove])
+      continue;
+
+    move = arg_moves_list->ML_moves + imove;
+
+    update_history_score(&history[move->M_move_from][move->M_move_to], -bonus);
+  }
 }
 
 #define PRINTF_TOTAL(X) \
@@ -593,9 +553,6 @@ void print_totals(search_t *arg_with_search){
   PRINTF_TOTAL(S_total_quiescence_nodes)
   PRINTF_TOTAL(S_total_quiescence_1move)
 
-  PRINTF_TOTAL(S_total_pv_extension_searches_combination)
-
-  PRINTF_TOTAL(S_total_reductions_combinations)
   PRINTF_TOTAL(S_total_reductions)
   PRINTF_TOTAL(S_total_reductions_lost)
   PRINTF_TOTAL(S_total_reductions_le_alpha)
@@ -1486,7 +1443,6 @@ local void quiescence(search_t *arg_with_search,
                       score_t arg_my_beta,
                       ui32_t arg_node_type,
                       moves_list_t *arg_moves_list,
-                      ui64_t arg_history,
                       score_t *arg_best_score,
                       pv_entries_t *arg_best_pv)
 {
@@ -1633,9 +1589,6 @@ local void quiescence(search_t *arg_with_search,
     goto label_return;
   }
 
-  arg_history = (arg_history << 4) | (arg_moves_list->ML_ncaptx & 0xF) |
-                0xF000000000000000ULL;
-
   if ((arg_moves_list->ML_nmoves == 1) and
       !move_repetition(&(arg_with_search->S_board)))
   {
@@ -1648,7 +1601,6 @@ local void quiescence(search_t *arg_with_search,
                -arg_my_alpha,
                arg_node_type,
                NULL,
-               arg_history,
                arg_best_score,
                arg_best_pv);
 
@@ -1732,7 +1684,6 @@ local void quiescence(search_t *arg_with_search,
                  -temp_alpha,
                  node_type,
                  NULL,
-                 arg_history,
                  &temp_score,
                  &temp_pv);
 
@@ -1798,7 +1749,6 @@ local void alpha_beta(search_t *,
                       moves_list_t *,
                       sort_t *,
                       int,
-                      ui64_t,
                       search_result_t *);
 
 local void alpha_beta_captures(search_t *arg_with_search,
@@ -1811,7 +1761,6 @@ local void alpha_beta_captures(search_t *arg_with_search,
                                moves_list_t *arg_moves_list,
                                sort_t *arg_sort,
                                int arg_singular_extension,
-                               ui64_t arg_history,
                                search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
@@ -1834,8 +1783,6 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
   HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
           ((arg_my_beta - arg_my_alpha) != 1))
-
-  HARDBUG(arg_history == 0)
 
   ++(arg_with_search->S_total_nodes);
 
@@ -1922,7 +1869,6 @@ local void alpha_beta_captures(search_t *arg_with_search,
                  NULL,
                  NULL,
                  0,
-                 arg_history,
                  &temp_result);
 
       TRACE_DEDENT
@@ -2031,7 +1977,6 @@ local void alpha_beta_minimal(search_t *arg_with_search,
                               moves_list_t *arg_moves_list,
                               sort_t *arg_sort,
                               int arg_singular_extension,
-                              ui64_t arg_history,
                               search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
@@ -2058,8 +2003,6 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
   HARDBUG(arg_moves_list->ML_ncaptx > 0)
 
-  HARDBUG(arg_history == 0)
-
   construct_search_result(arg_search_result,
                           SCORE(SCORE_MINUS_INFINITY),
                           SCORE(SCORE_MINUS_INFINITY),
@@ -2082,21 +2025,13 @@ local void alpha_beta_minimal(search_t *arg_with_search,
     (arg_reduction_depth_root == 0) and !IS_SCORE_LOST(arg_my_alpha) and
     !IS_SCORE_WON(arg_my_beta);
 
-  if (allow_reductions and (options.reduction_combination_length > 0) and
-      (return_combination_length(arg_history) >=
-       options.reduction_combination_length))
-  {
-    arg_with_search->S_total_reductions_combinations++;
-
-    allow_reductions = FALSE;
-  }
-
   ui32_t your_tweaks = 0;
 
   search_result_t temp_result;
 
   temp_result.SR_pv = arg_search_result->SR_pv;
 
+  ui8_t found[NMOVES_MAX] = {0};
   int stage[NMOVES_MAX];
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
@@ -2118,6 +2053,8 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
       if (stage[jmove] == STAGE_SEARCHED_MOVE_AT_FULL_DEPTH)
         continue;
+
+      found[jmove] = TRUE;
 
       int singular_extension = 0;
 
@@ -2204,7 +2141,6 @@ local void alpha_beta_minimal(search_t *arg_with_search,
           NULL,
           NULL,
           0,
-          arg_history,
           &temp_result);
 
         TRACE_DEDENT
@@ -2311,7 +2247,15 @@ local void alpha_beta_minimal(search_t *arg_with_search,
                         arg_search_result);
 
         if (arg_search_result->SR_score >= arg_my_beta)
+        {
+          update_history(arg_with_search,
+                         arg_moves_list,
+                         found,
+                         jmove,
+                         arg_my_depth);
+
           goto label_break;
+        }
       }
     } // for (int imove
   }   // for (int jpass
@@ -2357,7 +2301,6 @@ local void alpha_beta_pv(search_t *arg_with_search,
                          moves_list_t *arg_moves_list,
                          sort_t *arg_sort,
                          int arg_singular_extension,
-                         ui64_t arg_history,
                          search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
@@ -2378,8 +2321,6 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
   HARDBUG(!IS_PV(arg_node_type))
 
-  HARDBUG(arg_history == 0)
-
   ++(arg_with_search->S_total_nodes);
 
   ++(arg_with_search->S_total_pv_nodes);
@@ -2395,26 +2336,11 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
   ui32_t your_tweaks = 0;
 
-  if (!(arg_my_tweaks & TWEAK_MOVE_REDUCED_BIT) and
-      !(arg_my_tweaks & TWEAK_MOVE_EXTENDED_BIT) and
-      !IS_SCORE_LOST(arg_my_alpha))
-  {
-    if ((options.pv_combination_length > 0) and
-        (return_combination_length(arg_history) >=
-         options.pv_combination_length))
-    {
-      arg_with_search->S_total_pv_extension_searches_combination++;
-
-      your_depth++;
-
-      your_tweaks |= TWEAK_MOVE_EXTENDED_BIT;
-    }
-  }
-
   search_result_t temp_result;
 
   temp_result.SR_pv = arg_search_result->SR_pv;
 
+  ui8_t found[NMOVES_MAX] = {0};
   int stage[NMOVES_MAX];
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
@@ -2434,6 +2360,8 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
       if (stage[jmove] == STAGE_SEARCHED_MOVE_AT_FULL_DEPTH)
         continue;
+
+      found[jmove] = TRUE;
 
       int singular_extension = 0;
 
@@ -2500,7 +2428,6 @@ local void alpha_beta_pv(search_t *arg_with_search,
           NULL,
           NULL,
           0,
-          arg_history,
           &temp_result);
 
         TRACE_DEDENT
@@ -2602,7 +2529,15 @@ local void alpha_beta_pv(search_t *arg_with_search,
                         arg_search_result);
 
         if (arg_search_result->SR_score >= arg_my_beta)
+        {
+          update_history(arg_with_search,
+                         arg_moves_list,
+                         found,
+                         jmove,
+                         arg_my_depth);
+
           goto label_break;
+        }
       }
     } // for (int imove
   }   // for (int jpass
@@ -2646,7 +2581,6 @@ local void alpha_beta(search_t *arg_with_search,
                       moves_list_t *arg_moves_list,
                       sort_t *arg_sort,
                       int arg_singular_extension,
-                      ui64_t arg_history,
                       search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
@@ -2692,8 +2626,6 @@ local void alpha_beta(search_t *arg_with_search,
       HARDBUG(frequency[arg_sort->S_array[imove]] != 1)
   }
 #endif
-
-  HARDBUG(arg_history == 0)
 
   if (RUNNING_ON_VALGRIND)
   {
@@ -2894,11 +2826,6 @@ local void alpha_beta(search_t *arg_with_search,
     goto label_return;
   }
 
-  ui64_t history_before_move_generation = arg_history;
-
-  arg_history = (arg_history << 4) | (arg_moves_list->ML_ncaptx & 0xF) |
-                0xF000000000000000ULL;
-
   if ((arg_moves_list->ML_nmoves == 1) and
       !move_repetition(&(arg_with_search->S_board)))
   {
@@ -2916,7 +2843,6 @@ local void alpha_beta(search_t *arg_with_search,
                NULL,
                NULL,
                0,
-               arg_history,
                arg_search_result);
 
     flip_search_result(arg_search_result);
@@ -2953,7 +2879,6 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_moves_list,
                  NULL,
                  0,
-                 arg_history,
                  &temp_result);
 
       if (IS_SCORE_NAN(temp_result.SR_score))
@@ -3086,6 +3011,15 @@ local void alpha_beta(search_t *arg_with_search,
                    arg_moves_list->ML_nmoves,
                    &(arg_with_search->S_random),
                    kmove);
+
+    if (arg_moves_list->ML_ncaptx == 0)
+    {
+      sort->S_moves_list = arg_moves_list;
+
+      sort->S_history =
+        (const int(*)[HISTORY_NFIELDS])arg_with_search
+          ->S_history[IS_WHITE(arg_with_search->S_board.B_colour2move) ? 0 : 1];
+    }
   }
 
   int singular_extension = arg_singular_extension == INVALID ? INVALID : 0;
@@ -3142,7 +3076,6 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_moves_list,
                  &prob_cut_sort,
                  0,
-                 history_before_move_generation,
                  &prob_cut_result);
 
       HARDBUG(arg_with_search->S_total_nodes < total_nodes)
@@ -3233,7 +3166,6 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_moves_list,
                  &singular_sort,
                  INVALID,
-                 history_before_move_generation,
                  &singular_probe_result);
 
       if (IS_SCORE_NAN(singular_probe_result.SR_score))
@@ -3273,7 +3205,6 @@ local void alpha_beta(search_t *arg_with_search,
                         arg_moves_list,
                         sort,
                         singular_extension,
-                        arg_history,
                         arg_search_result);
 
     if (IS_SCORE_NAN(arg_search_result->SR_score))
@@ -3296,7 +3227,6 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_my_beta,
                  arg_node_type,
                  arg_moves_list,
-                 arg_history,
                  &quiescence_score,
                  &(arg_search_result->SR_pv));
     }
@@ -3334,7 +3264,6 @@ local void alpha_beta(search_t *arg_with_search,
                        arg_moves_list,
                        sort,
                        singular_extension,
-                       arg_history,
                        arg_search_result);
 
     if (IS_SCORE_NAN(arg_search_result->SR_score))
@@ -3352,7 +3281,6 @@ local void alpha_beta(search_t *arg_with_search,
                   arg_moves_list,
                   sort,
                   singular_extension,
-                  arg_history,
                   arg_search_result);
 
     if (IS_SCORE_NAN(arg_search_result->SR_score))
@@ -3990,7 +3918,6 @@ void do_search(search_t *arg_with_search,
              NULL,
              NULL,
              0,
-             0xFULL,
              &temp_result);
 
   if (IS_SCORE_NAN(temp_result.SR_score))
@@ -4202,7 +4129,6 @@ void do_search(search_t *arg_with_search,
                      NULL,
                      NULL,
                      0,
-                     0xFULL,
                      &temp_result);
 
           TRACE_DEDENT
