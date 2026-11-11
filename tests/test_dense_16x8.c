@@ -32,18 +32,16 @@ static void test_shape(int ninputs, int noutputs)
   dense_network_shared_t dense = {0};
   network_state_t state = {0};
   dense_network_state_t *thread = &state.NS_pattern_dense_network_state;
-  ALIGN64(float weights_storage[16][72]);
+  ALIGN64(float weights_storage[16 * 72 + 8]);
   ALIGN64(float input_storage[72]);
   ALIGN64(float dot[16]);
   ALIGN64(float sum[16]);
   ALIGN64(float output[16]);
   ALIGN64(float bias[16]);
-  float *weights[16];
   float reference[16];
   size_t output_bytes = noutputs * sizeof(float);
   dense.DNS_layers[0].LS_ninputs = ninputs;
   dense.DNS_layers[0].LS_noutputs = noutputs;
-  dense.DNS_layers[0].LS_weights_noutputsxninputs = weights;
   dense.DNS_layers[0].LS_bias = bias;
   dense.DNS_nlayers = 1;
   dense.DNS_activation = NETWORK_ACTIVATION_LINEAR;
@@ -53,13 +51,14 @@ static void test_shape(int ninputs, int noutputs)
 
   for (int iteration = 0; iteration < 10000; iteration++)
   {
-    /* Vary alignment of both inputs and every weight row. */
+    /* Vary alignment of the inputs and contiguous weight matrix. */
     float *inputs = input_storage + iteration % 8;
+    float *weights = weights_storage + iteration % 8;
+    dense.DNS_layers[0].LS_weights_noutputsxninputs = weights;
     for (int i = 0; i < ninputs; i++) inputs[i] = sample();
     for (int o = 0; o < noutputs; o++)
     {
-      weights[o] = weights_storage[o] + (iteration + o) % 8;
-      for (int i = 0; i < ninputs; i++) weights[o][i] = sample();
+      for (int i = 0; i < ninputs; i++) weights[o * ninputs + i] = sample();
       bias[o] = sample();
     }
     select_kernel(&dense, FALSE);

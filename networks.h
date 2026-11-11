@@ -29,7 +29,7 @@ typedef struct
   int LS_ninputs;
   int LS_noutputs;
 
-  scaled_double_t **LS_weights_noutputsxninputs;
+  scaled_double_t *LS_weights_noutputsxninputs;
 
   scaled_double_t *LS_bias;
 } layer_shared_t;

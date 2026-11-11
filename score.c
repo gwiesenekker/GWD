@@ -205,51 +205,50 @@ score_t return_score_from_board(board_t *arg_with_board,
 
     HARDBUG(istate < 0)
 
-    istate = with_pattern_shared->PS_state_map[istate];
-
-    if (istate != INVALID)
+    if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
     {
-      if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
-      {
 #ifdef USE_AVX2_INTRINSICS
-        if (with_network->N_pattern_dense_network_16x8_kernel)
-        {
-          const float *weights =
-            with_pattern_shared->PS_weights_nstatesxnembed[istate];
+      if (with_network->N_pattern_dense_network_16x8_kernel)
+      {
+        const float *weights =
+          with_pattern_shared->PS_weights_nstatesxnembed +
+            (size_t)istate * with_pattern_shared->PS_nembed;
 
-          // MPI shared allocations need not be 32-byte aligned.
-          sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
-          sum1 = _mm256_add_ps(sum1, _mm256_loadu_ps(weights + 8));
-        }
-        else if (with_network->N_pattern_dense_network_64x16_kernel)
-        {
-          const float *weights =
-            with_pattern_shared->PS_weights_nstatesxnembed[istate];
+        // MPI shared allocations need not be 32-byte aligned.
+        sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
+        sum1 = _mm256_add_ps(sum1, _mm256_loadu_ps(weights + 8));
+      }
+      else if (with_network->N_pattern_dense_network_64x16_kernel)
+      {
+        const float *weights =
+          with_pattern_shared->PS_weights_nstatesxnembed +
+            (size_t)istate * with_pattern_shared->PS_nembed;
 
-          // Preserve pattern order and allow unaligned shared-memory rows.
-          for (int i = 0; i < 8; i++)
-            sum64[i] =
-              _mm256_add_ps(sum64[i], _mm256_loadu_ps(weights + 8 * i));
-        }
-        else
-#endif
-          vadd_ab2a(with_pattern_shared->PS_nembed,
-                    network_state->NS_pattern_dense_network_state.DNS_inputs +
-                      with_pattern_shared->PS_offset,
-                    with_pattern_shared->PS_weights_nstatesxnembed[istate]);
+        // Preserve pattern order and allow unaligned shared-memory rows.
+        for (int i = 0; i < 8; i++)
+          sum64[i] =
+            _mm256_add_ps(sum64[i], _mm256_loadu_ps(weights + 8 * i));
       }
       else
-      {
-        if (arg_network_score_scaled != NULL)
-          vcopy_a2b(with_pattern_shared->PS_nembed,
-                    with_pattern_shared->PS_weights_nstatesxnembed[istate],
-                    network_state->NS_pattern_dense_network_state.DNS_inputs +
-                      with_pattern_shared->PS_offset);
+#endif
+        vadd_ab2a(with_pattern_shared->PS_nembed,
+                  network_state->NS_pattern_dense_network_state.DNS_inputs +
+                    with_pattern_shared->PS_offset,
+                  with_pattern_shared->PS_weights_nstatesxnembed +
+                    (size_t)istate * with_pattern_shared->PS_nembed);
+    }
+    else
+    {
+      if (arg_network_score_scaled != NULL)
+        vcopy_a2b(with_pattern_shared->PS_nembed,
+                  with_pattern_shared->PS_weights_nstatesxnembed +
+                    (size_t)istate * with_pattern_shared->PS_nembed,
+                  network_state->NS_pattern_dense_network_state.DNS_inputs +
+                    with_pattern_shared->PS_offset);
 
-        vadd_ab2a(with_current->LS_noutputs,
-                  with_current_thread->LT_dot,
-                  with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
-      }
+      vadd_ab2a(with_current->LS_noutputs,
+                with_current_thread->LT_dot,
+                with_pattern_shared->PS_sum_nstatesxnoutputs[istate]);
     }
   }
 
@@ -357,7 +356,8 @@ score_t return_score_from_board(board_t *arg_with_board,
         if (with_network->N_material_dense_network_16x8_kernel)
         {
           const float *weights =
-            with_material_shared->MS_weights_nstatesxnembed[istate];
+            with_material_shared->MS_weights_nstatesxnembed +
+              (size_t)istate * with_material_shared->MS_nembed;
 
           // MPI shared allocations need not be 32-byte aligned.
           sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
@@ -366,7 +366,8 @@ score_t return_score_from_board(board_t *arg_with_board,
         else if (with_network->N_material_dense_network_64x16_kernel)
         {
           const float *weights =
-            with_material_shared->MS_weights_nstatesxnembed[istate];
+            with_material_shared->MS_weights_nstatesxnembed +
+              (size_t)istate * with_material_shared->MS_nembed;
 
           for (int i = 0; i < 8; i++)
             sum64[i] =
@@ -377,14 +378,16 @@ score_t return_score_from_board(board_t *arg_with_board,
           vadd_ab2a(with_material_shared->MS_nembed,
                     network_state->NS_material_dense_network_state.DNS_inputs +
                       with_material_shared->MS_offset,
-                    with_material_shared->MS_weights_nstatesxnembed[istate]);
+                    with_material_shared->MS_weights_nstatesxnembed +
+                      (size_t)istate * with_material_shared->MS_nembed);
       }
       else if (with_network->N_architecture_material ==
                NETWORK_ARCHITECTURE_CONCAT)
       {
         if (arg_network_score_scaled != NULL)
           vcopy_a2b(with_material_shared->MS_nembed,
-                    with_material_shared->MS_weights_nstatesxnembed[istate],
+                    with_material_shared->MS_weights_nstatesxnembed +
+                      (size_t)istate * with_material_shared->MS_nembed,
                     network_state->NS_material_dense_network_state.DNS_inputs +
                       with_material_shared->MS_offset);
 

@@ -226,47 +226,11 @@ read_1d_csv_base64(cJSON *arg_csv, int *arg_nrows, scaled_double_t **arg_cells)
   *arg_cells = cells;
 }
 
-local void
-read_1d_csv_base64i32(cJSON *arg_csv, int *arg_nrows, i32_t **arg_cells)
-{
-  *arg_cells = NULL;
-
-  cJSON *cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_ROWS_ID);
-
-  HARDBUG(!cJSON_IsNumber(cjson_value))
-
-  int nrows = round(cJSON_GetNumberValue(cjson_value));
-
-  HARDBUG(nrows < 1)
-
-  cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_DATA_ID);
-
-  HARDBUG(!cJSON_IsString(cjson_value));
-
-  char *data = cJSON_GetStringValue(cjson_value);
-
-  i32_t *cells;
-
-  MY_MALLOC_BY_TYPE(cells, i32_t, nrows)
-
-  decode_base64(strlen(data),
-                (unsigned char *)data,
-                nrows * sizeof(i32_t),
-                (unsigned char *)cells);
-
-  if (*arg_nrows != INVALID)
-    HARDBUG(nrows != *arg_nrows)
-  else
-    *arg_nrows = nrows;
-
-  *arg_cells = cells;
-}
-
 local void read_2d_csv_base64(cJSON *arg_csv,
                               int *arg_nrows,
                               int *arg_ncols,
-                              scaled_double_t ***arg_cells_nrowsxncols,
-                              scaled_double_t ***arg_cells_ncolsxnrows)
+                              scaled_double_t **arg_cells_nrowsxncols,
+                              scaled_double_t **arg_cells_ncolsxnrows)
 {
   HARDBUG((arg_cells_nrowsxncols == NULL) and (arg_cells_ncolsxnrows == NULL))
 
@@ -316,10 +280,7 @@ local void read_2d_csv_base64(cJSON *arg_csv,
     scaled_double_t *cells_nrowsxncols =
       (scaled_double_t *)void_cells_nrowsxncols;
 
-    MY_MALLOC_BY_TYPE(*arg_cells_nrowsxncols, scaled_double_t *, nrows);
-
-    for (int irow = 0; irow < nrows; irow++)
-      (*arg_cells_nrowsxncols)[irow] = cells_nrowsxncols + irow * ncols;
+    *arg_cells_nrowsxncols = cells_nrowsxncols;
 
     for (int irow = 0; irow < nrows; irow++)
     {
@@ -358,10 +319,7 @@ local void read_2d_csv_base64(cJSON *arg_csv,
 
     cells_ncolsxnrows = (scaled_double_t *)void_cells_ncolsxnrows;
 
-    MY_MALLOC_BY_TYPE(*arg_cells_ncolsxnrows, scaled_double_t *, ncols);
-
-    for (int icol = 0; icol < ncols; icol++)
-      (*arg_cells_ncolsxnrows)[icol] = cells_ncolsxnrows + icol * nrows;
+    *arg_cells_ncolsxnrows = cells_ncolsxnrows;
 
     for (int irow = 0; irow < nrows; irow++)
     {
@@ -475,7 +433,7 @@ local scaled_double_t dot_scaled(int n,
 
 #if defined(USE_AVX2_INTRINSICS) && SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
 local inline void dense_fixed_x8(const float *arg_inputs,
-                                 scaled_double_t *const *arg_weights,
+                                 const scaled_double_t *arg_weights,
                                  float *arg_dot,
                                  int arg_nchunks)
 {
@@ -497,7 +455,8 @@ local inline void dense_fixed_x8(const float *arg_inputs,
       for (int j = 0; j < 4; j++)
       {
         // Shared MPI allocations need not be 32-byte aligned.
-        __m256 weights = _mm256_loadu_ps(arg_weights[ioutput + j] + 8 * ichunk);
+        __m256 weights = _mm256_loadu_ps(
+          arg_weights + (size_t)(ioutput + j) * (8 * arg_nchunks) + 8 * ichunk);
         sums[j] = MM256_MADD_PS(inputs[ichunk], weights, sums[j]);
       }
     }
@@ -513,14 +472,14 @@ local inline void dense_fixed_x8(const float *arg_inputs,
 }
 
 local void dense_16x8(const float *arg_inputs,
-                      scaled_double_t *const *arg_weights,
+                      const scaled_double_t *arg_weights,
                       float *arg_dot)
 {
   dense_fixed_x8(arg_inputs, arg_weights, arg_dot, 2);
 }
 
 local void dense_32x8(const float *arg_inputs,
-                      scaled_double_t *const *arg_weights,
+                      const scaled_double_t *arg_weights,
                       float *arg_dot)
 {
   dense_fixed_x8(arg_inputs, arg_weights, arg_dot, 4);
@@ -551,7 +510,8 @@ local void dense_layer0_dot(dense_network_shared_t *arg_dense,
   for (int i = 0; i < layer->LS_noutputs; i++)
     arg_dot[i] = dot_scaled(layer->LS_ninputs,
                             arg_inputs,
-                            layer->LS_weights_noutputsxninputs[i]);
+                            layer->LS_weights_noutputsxninputs +
+                              (size_t)i * layer->LS_ninputs);
 }
 
 local void construct_dense_network_shared(network_t *arg_network,
@@ -1147,33 +1107,8 @@ local void construct_network_shared(char *arg_network_name,
 
     BDESTROY(bindex)
 
-    MY_MALLOC_BY_TYPE(with_pattern_shared->PS_state_map,
-                      int,
-                      with_pattern_shared->PS_nstates);
-
-    int nstate_map = INVALID;
-
-    if (file == NULL)
-    {
-      // identity
-
-      nstate_map = with_pattern_shared->PS_nstates;
-
-      for (int istate = 0; istate < with_pattern_shared->PS_nstates; istate++)
-        with_pattern_shared->PS_state_map[istate] = istate;
-    }
-    else
-    {
-      i32_t *state_map;
-
-      read_1d_csv_base64i32(file, &nstate_map, &state_map);
-
-      for (int istate = 0; istate < with_pattern_shared->PS_nstates; istate++)
-        with_pattern_shared->PS_state_map[istate] = INVALID;
-
-      for (int imap = 0; imap < nstate_map; imap++)
-        with_pattern_shared->PS_state_map[state_map[imap]] = imap;
-    }
+    if (file != NULL)
+      FATAL("compact embedding index files are not supported", EXIT_FAILURE)
 
     BSTRING(bweights)
 
@@ -1186,7 +1121,7 @@ local void construct_network_shared(char *arg_network_name,
     HARDBUG(file == NULL)
 
     read_2d_csv_base64(file,
-                       &(nstate_map),
+                       &(with_pattern_shared->PS_nstates),
                        &(with_pattern_shared->PS_nembed),
                        &(with_pattern_shared->PS_weights_nstatesxnembed),
                        NULL);
@@ -1482,8 +1417,10 @@ local void construct_network_shared(char *arg_network_name,
           {
             with_pattern_shared->PS_sum_nstatesxnoutputs[istate][ioutput] =
               dot_scaled(with_pattern_shared->PS_nembed,
-                         with_pattern_shared->PS_weights_nstatesxnembed[istate],
-                         with_current->LS_weights_noutputsxninputs[ioutput] +
+                         with_pattern_shared->PS_weights_nstatesxnembed +
+                           (size_t)istate * with_pattern_shared->PS_nembed,
+                         with_current->LS_weights_noutputsxninputs +
+                           (size_t)ioutput * with_current->LS_ninputs +
                            with_pattern_shared->PS_offset);
           }
         }
@@ -1553,8 +1490,10 @@ local void construct_network_shared(char *arg_network_name,
         {
           with_material_shared->MS_sum_nstatesxnoutputs[istate][ioutput] =
             dot_scaled(with_material_shared->MS_nembed,
-                       with_material_shared->MS_weights_nstatesxnembed[istate],
-                       with_current->LS_weights_noutputsxninputs[ioutput] +
+                       with_material_shared->MS_weights_nstatesxnembed +
+                           (size_t)istate * with_material_shared->MS_nembed,
+                       with_current->LS_weights_noutputsxninputs +
+                           (size_t)ioutput * with_current->LS_ninputs +
                          with_material_shared->MS_offset);
         }
       }
@@ -2387,7 +2326,8 @@ double return_dense_network_score_scaled(
       with_current_thread->LT_dot[i] =
         dot_scaled(with_current->LS_ninputs,
                    with_previous_thread->LT_outputs,
-                   with_current->LS_weights_noutputsxninputs[i]);
+                   with_current->LS_weights_noutputsxninputs +
+                     (size_t)i * with_current->LS_ninputs);
     }
 
     vadd_ab2c(with_current->LS_noutputs,
@@ -2542,7 +2482,8 @@ double return_dense_network_score_double(
       with_current_thread->LT_dot[i] =
         dot_double(with_current->LS_ninputs,
                    activated_inputs,
-                   with_current->LS_weights_noutputsxninputs[i]);
+                   with_current->LS_weights_noutputsxninputs +
+                     (size_t)i * with_current->LS_ninputs);
     }
   }
   else
@@ -2552,7 +2493,8 @@ double return_dense_network_score_double(
       with_current_thread->LT_dot[i] =
         dot_double(with_current->LS_ninputs,
                    arg_dense_network_state->DNS_inputs,
-                   with_current->LS_weights_noutputsxninputs[i]);
+                   with_current->LS_weights_noutputsxninputs +
+                     (size_t)i * with_current->LS_ninputs);
     }
   }
 
@@ -2581,7 +2523,8 @@ double return_dense_network_score_double(
       with_current_thread->LT_sum[i] =
         dot_double(with_current->LS_ninputs,
                    with_previous_thread->LT_outputs,
-                   with_current->LS_weights_noutputsxninputs[i]) +
+                   with_current->LS_weights_noutputsxninputs +
+                     (size_t)i * with_current->LS_ninputs) +
         with_current->LS_bias[i];
     }
 

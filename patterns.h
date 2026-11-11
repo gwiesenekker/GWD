@@ -37,8 +37,7 @@ typedef struct
   int PS_nstates;
   int PS_nembed;
   int PS_offset;
-  int *PS_state_map;
-  scaled_double_t **PS_weights_nstatesxnembed;
+  scaled_double_t *PS_weights_nstatesxnembed;
   scaled_double_t **PS_sum_nstatesxnoutputs;
 } pattern_shared_t;
 
@@ -49,7 +48,7 @@ typedef struct
   int MS_nstates;
   int MS_nembed;
   int MS_offset;
-  scaled_double_t **MS_weights_nstatesxnembed;
+  scaled_double_t *MS_weights_nstatesxnembed;
   scaled_double_t **MS_sum_nstatesxnoutputs;
 } material_shared_t;
 
