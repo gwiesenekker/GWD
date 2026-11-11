@@ -1,4 +1,4 @@
-// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
+// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
 #ifndef SortH
 #define SortH
 
@@ -13,8 +13,10 @@ typedef struct
   my_random_t S_random;
 } sort_t;
 
-static inline void construct_sort(sort_t *arg_sort, int arg_narray,
-                                  my_random_t *arg_my_random, int arg_isort0)
+static inline void construct_sort(sort_t *arg_sort,
+                                  int arg_narray,
+                                  my_random_t *arg_my_random,
+                                  int arg_isort0)
 {
   HARDBUG((arg_narray < 0) or (arg_narray > NMOVES_MAX))
   HARDBUG((arg_isort0 != INVALID) and
@@ -61,9 +63,9 @@ static inline void update_sort(sort_t *arg_sort)
 
   if (arg_sort->S_randomize and (isort + 1 < arg_sort->S_narray))
   {
-    int jsort = isort + (int)compat_mulhi_u64(
-      return_my_random(&arg_sort->S_random),
-      (ui64_t)(arg_sort->S_narray - isort));
+    int jsort =
+      isort + (int)compat_mulhi_u64(return_my_random(&arg_sort->S_random),
+                                    (ui64_t)(arg_sort->S_narray - isort));
     int value = arg_sort->S_array[jsort];
 
     arg_sort->S_array[jsort] = arg_sort->S_array[isort];
@@ -106,7 +108,8 @@ static inline void copy_sort(sort_t *arg_to, const sort_t *arg_from)
   if (arg_from->S_randomize)
     copy_my_random(&arg_to->S_random, &arg_from->S_random);
   if (arg_from->S_ninitialized != INVALID)
-    memcpy(arg_to->S_array, arg_from->S_array,
+    memcpy(arg_to->S_array,
+           arg_from->S_array,
            arg_from->S_narray * sizeof(arg_from->S_array[0]));
 }
 

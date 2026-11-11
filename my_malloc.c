@@ -1,4 +1,4 @@
-// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
+// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
 #include "globals.h"
 
 #define NPAD (4 * 64)
@@ -363,25 +363,31 @@ void *my_large_malloc(char *arg_name,
 {
   HARDBUG(arg_size > SIZE_MAX - 2 * NPAD)
 
-  void *heap = compat_large_alloc(NPAD + arg_size + NPAD, TRUE,
-                                   arg_allocation);
+  void *heap = compat_large_alloc(NPAD + arg_size + NPAD, TRUE, arg_allocation);
 
   HARDBUG(heap == NULL)
 
-  register_heap(arg_name, arg_file, arg_func, arg_line, heap, arg_size,
-                TRUE, FALSE);
+  register_heap(arg_name,
+                arg_file,
+                arg_func,
+                arg_line,
+                heap,
+                arg_size,
+                TRUE,
+                FALSE);
 
   PRINTF("large allocation %s: bytes=%zu base=%p pages=%s\n",
-         arg_name, arg_allocation->size, heap,
-         arg_allocation->page_mode == COMPAT_PAGES_LARGE ? "large" :
-         arg_allocation->page_mode == COMPAT_PAGES_ADVISED ? "advised" :
-                                                          "regular");
+         arg_name,
+         arg_allocation->size,
+         heap,
+         arg_allocation->page_mode == COMPAT_PAGES_LARGE     ? "large"
+         : arg_allocation->page_mode == COMPAT_PAGES_ADVISED ? "advised"
+                                                             : "regular");
 
   return (char *)heap + NPAD;
 }
 
-void my_large_free(void *arg_pointer,
-                    compat_large_allocation_t *arg_allocation)
+void my_large_free(void *arg_pointer, compat_large_allocation_t *arg_allocation)
 {
   HARDBUG(deregister_heap(arg_pointer) != arg_allocation->pointer)
 

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
+// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -210,9 +210,8 @@ score_t return_score_from_board(board_t *arg_with_board,
 #ifdef USE_AVX2_INTRINSICS
       if (with_network->N_pattern_dense_network_16x8_kernel)
       {
-        const float *weights =
-          with_pattern_shared->PS_weights_nstatesxnembed +
-            (size_t)istate * with_pattern_shared->PS_nembed;
+        const float *weights = with_pattern_shared->PS_weights_nstatesxnembed +
+                               (size_t)istate * with_pattern_shared->PS_nembed;
 
         // MPI shared allocations need not be 32-byte aligned.
         sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
@@ -220,14 +219,12 @@ score_t return_score_from_board(board_t *arg_with_board,
       }
       else if (with_network->N_pattern_dense_network_64x16_kernel)
       {
-        const float *weights =
-          with_pattern_shared->PS_weights_nstatesxnembed +
-            (size_t)istate * with_pattern_shared->PS_nembed;
+        const float *weights = with_pattern_shared->PS_weights_nstatesxnembed +
+                               (size_t)istate * with_pattern_shared->PS_nembed;
 
         // Preserve pattern order and allow unaligned shared-memory rows.
         for (int i = 0; i < 8; i++)
-          sum64[i] =
-            _mm256_add_ps(sum64[i], _mm256_loadu_ps(weights + 8 * i));
+          sum64[i] = _mm256_add_ps(sum64[i], _mm256_loadu_ps(weights + 8 * i));
       }
       else
 #endif
@@ -275,151 +272,13 @@ score_t return_score_from_board(board_t *arg_with_board,
     &(arg_with_board->B_network_state.NS_pattern_dense_network_state));
 
   if (with_network->N_architecture_material != NETWORK_ARCHITECTURE_NULL)
-  {
-    for (int input = 0;
-         input < with_network->N_material_dense_network_shared.DNS_ninputs;
-         input++)
-      network_state->NS_material_dense_network_state.DNS_inputs[input] = 0;
-
-    with_current = with_network->N_material_dense_network_shared.DNS_layers;
-
-    with_current_thread =
-      network_state->NS_material_dense_network_state.DNS_layers;
-
-    for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
-      with_current_thread->LT_dot[ioutput] = 0;
-
-#ifdef USE_AVX2_INTRINSICS
-    if (with_network->N_material_dense_network_16x8_kernel)
-    {
-      sum0 = _mm256_setzero_ps();
-      sum1 = _mm256_setzero_ps();
-    }
-    if (with_network->N_material_dense_network_64x16_kernel)
-      for (int i = 0; i < 8; i++)
-        sum64[i] = _mm256_setzero_ps();
-#endif
-
-    for (int imaterial = 0;
-         imaterial < with_network->N_materials_shared.MSS_nmaterials;
-         imaterial++)
-    {
-      material_shared_t *with_material_shared =
-        with_network->N_materials_shared.MSS_materials + imaterial;
-
-      int istate = INVALID;
-
-      if (with_material_shared->MS_id == MATERIAL_NWHITE_MAN_ID)
-      {
-        istate = nwhite_man;
-      }
-      else if (with_material_shared->MS_id == MATERIAL_NBLACK_MAN_ID)
-      {
-        istate = nblack_man;
-      }
-      else if ((with_material_shared->MS_id == MATERIAL_NWHITE_KING_ID) or
-               (with_material_shared->MS_id == MATERIAL_NWHITE_KING20_ID))
-      {
-        istate = nwhite_king;
-
-        if (istate >= with_material_shared->MS_nstates)
-          istate = with_material_shared->MS_nstates - 1;
-      }
-      else if ((with_material_shared->MS_id == MATERIAL_NBLACK_KING_ID) or
-               (with_material_shared->MS_id == MATERIAL_NBLACK_KING20_ID))
-      {
-        istate = nblack_king;
-
-        if (istate >= with_material_shared->MS_nstates)
-          istate = with_material_shared->MS_nstates - 1;
-      }
-      else if (with_material_shared->MS_id == MATERIAL_MAN_KING_ID)
-      {
-        int mwhite_king = nwhite_king;
-        int mblack_king = nblack_king;
-
-        if (mwhite_king > MATERIAL_KING_MAX)
-          mwhite_king = MATERIAL_KING_MAX;
-        if (mblack_king > MATERIAL_KING_MAX)
-          mblack_king = MATERIAL_KING_MAX;
-
-        istate = (nwhite_man * (MATERIAL_KING_MAX + 1) + mwhite_king) *
-                   (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
-                 nblack_man * (MATERIAL_KING_MAX + 1) + mblack_king;
-      }
-
-      HARDBUG(istate == INVALID)
-
-      if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
-      {
-#ifdef USE_AVX2_INTRINSICS
-        if (with_network->N_material_dense_network_16x8_kernel)
-        {
-          const float *weights =
-            with_material_shared->MS_weights_nstatesxnembed +
-              (size_t)istate * with_material_shared->MS_nembed;
-
-          // MPI shared allocations need not be 32-byte aligned.
-          sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
-          sum1 = _mm256_add_ps(sum1, _mm256_loadu_ps(weights + 8));
-        }
-        else if (with_network->N_material_dense_network_64x16_kernel)
-        {
-          const float *weights =
-            with_material_shared->MS_weights_nstatesxnembed +
-              (size_t)istate * with_material_shared->MS_nembed;
-
-          for (int i = 0; i < 8; i++)
-            sum64[i] =
-              _mm256_add_ps(sum64[i], _mm256_loadu_ps(weights + 8 * i));
-        }
-        else
-#endif
-          vadd_ab2a(with_material_shared->MS_nembed,
-                    network_state->NS_material_dense_network_state.DNS_inputs +
-                      with_material_shared->MS_offset,
-                    with_material_shared->MS_weights_nstatesxnembed +
-                      (size_t)istate * with_material_shared->MS_nembed);
-      }
-      else if (with_network->N_architecture_material ==
-               NETWORK_ARCHITECTURE_CONCAT)
-      {
-        if (arg_network_score_scaled != NULL)
-          vcopy_a2b(with_material_shared->MS_nembed,
-                    with_material_shared->MS_weights_nstatesxnembed +
-                      (size_t)istate * with_material_shared->MS_nembed,
-                    network_state->NS_material_dense_network_state.DNS_inputs +
-                      with_material_shared->MS_offset);
-
-        vadd_ab2a(with_current->LS_noutputs,
-                  with_current_thread->LT_dot,
-                  with_material_shared->MS_sum_nstatesxnoutputs[istate]);
-      }
-      else
-        FATAL("unknown with_network->N_architecture_maerial", EXIT_FAILURE)
-    }
-#ifdef USE_AVX2_INTRINSICS
-    if (with_network->N_material_dense_network_16x8_kernel)
-    {
-      _mm256_store_ps(network_state->NS_material_dense_network_state.DNS_inputs,
-                      sum0);
-      _mm256_store_ps(
-        network_state->NS_material_dense_network_state.DNS_inputs + 8,
-        sum1);
-    }
-    else if (with_network->N_material_dense_network_64x16_kernel)
-    {
-      for (int i = 0; i < 8; i++)
-        _mm256_store_ps(
-          network_state->NS_material_dense_network_state.DNS_inputs + 8 * i,
-          sum64[i]);
-    }
-#endif
-
-    network_score_scaled = return_dense_network_score_scaled(
-      &(with_network->N_material_dense_network_shared),
-      &(arg_with_board->B_network_state.NS_material_dense_network_state));
-  }
+    evaluate_material_network(with_network,
+                              &network_state->NS_material_dense_network_state,
+                              nwhite_man,
+                              nblack_man,
+                              nwhite_king,
+                              nblack_king,
+                              arg_network_score_scaled != NULL);
 
   // prepare inputs
 

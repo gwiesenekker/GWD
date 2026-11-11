@@ -1,4 +1,4 @@
-// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
+// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
 #include "globals.h"
 #include <float.h>
 
@@ -1491,9 +1491,9 @@ local void construct_network_shared(char *arg_network_name,
           with_material_shared->MS_sum_nstatesxnoutputs[istate][ioutput] =
             dot_scaled(with_material_shared->MS_nembed,
                        with_material_shared->MS_weights_nstatesxnembed +
-                           (size_t)istate * with_material_shared->MS_nembed,
+                         (size_t)istate * with_material_shared->MS_nembed,
                        with_current->LS_weights_noutputsxninputs +
-                           (size_t)ioutput * with_current->LS_ninputs +
+                         (size_t)ioutput * with_current->LS_ninputs +
                          with_material_shared->MS_offset);
         }
       }
@@ -3789,6 +3789,244 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
   BDESTROY(barg_name)
 }
 
+void evaluate_material_network(network_t *with_network,
+                               dense_network_state_t *arg_state,
+                               int nwhite_man,
+                               int nblack_man,
+                               int nwhite_king,
+                               int nblack_king,
+                               int arg_inputs)
+{
+  dense_network_shared_t *dense =
+    &with_network->N_material_dense_network_shared;
+  int ilast = dense->DNS_nlayers - 1;
+  HARDBUG(ilast < 0)
+  int noutputs = dense->DNS_layers[ilast].LS_noutputs;
+
+  HARDBUG((nwhite_man < 0) or (nblack_man < 0) or (nwhite_king < 0) or
+          (nblack_king < 0))
+
+  // Diagnostics need the intermediate inputs as well as the final outputs.
+  if (!arg_inputs and (with_network->N_material_cache != NULL) and
+      (nwhite_man <= NPIECES_MAX) and (nblack_man <= NPIECES_MAX) and
+      (nwhite_king <= NPIECES_MAX) and (nblack_king <= NPIECES_MAX))
+  {
+    size_t index =
+      ((nwhite_man * (NPIECES_MAX + 1) + nblack_man) * (NPIECES_MAX + 1) +
+       nwhite_king) *
+        (NPIECES_MAX + 1) +
+      nblack_king;
+    memcpy(arg_state->DNS_layers[ilast].LT_outputs,
+           with_network->N_material_cache + index * noutputs,
+           noutputs * sizeof(scaled_double_t));
+    return;
+  }
+
+#ifdef USE_AVX2_INTRINSICS
+  __m256 sum0, sum1, sum64[8];
+#endif
+
+  for (int iinput = 0;
+       iinput < with_network->N_material_dense_network_shared.DNS_ninputs;
+       iinput++)
+    arg_state->DNS_inputs[iinput] = 0;
+
+  layer_shared_t *with_current =
+    with_network->N_material_dense_network_shared.DNS_layers;
+
+  layer_thread_t *with_current_thread = arg_state->DNS_layers;
+
+  for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
+    with_current_thread->LT_dot[ioutput] = 0;
+
+#ifdef USE_AVX2_INTRINSICS
+  if (with_network->N_material_dense_network_16x8_kernel)
+  {
+    sum0 = _mm256_setzero_ps();
+    sum1 = _mm256_setzero_ps();
+  }
+  if (with_network->N_material_dense_network_64x16_kernel)
+    for (int ichunk = 0; ichunk < 8; ichunk++)
+      sum64[ichunk] = _mm256_setzero_ps();
+#endif
+
+  for (int imaterial = 0;
+       imaterial < with_network->N_materials_shared.MSS_nmaterials;
+       imaterial++)
+  {
+    material_shared_t *with_material_shared =
+      with_network->N_materials_shared.MSS_materials + imaterial;
+
+    int istate = INVALID;
+
+    if (with_material_shared->MS_id == MATERIAL_NWHITE_MAN_ID)
+    {
+      istate = nwhite_man;
+    }
+    else if (with_material_shared->MS_id == MATERIAL_NBLACK_MAN_ID)
+    {
+      istate = nblack_man;
+    }
+    else if ((with_material_shared->MS_id == MATERIAL_NWHITE_KING_ID) or
+             (with_material_shared->MS_id == MATERIAL_NWHITE_KING20_ID))
+    {
+      istate = nwhite_king;
+
+      if (istate >= with_material_shared->MS_nstates)
+        istate = with_material_shared->MS_nstates - 1;
+    }
+    else if ((with_material_shared->MS_id == MATERIAL_NBLACK_KING_ID) or
+             (with_material_shared->MS_id == MATERIAL_NBLACK_KING20_ID))
+    {
+      istate = nblack_king;
+
+      if (istate >= with_material_shared->MS_nstates)
+        istate = with_material_shared->MS_nstates - 1;
+    }
+    else if (with_material_shared->MS_id == MATERIAL_MAN_KING_ID)
+    {
+      int mwhite_king = nwhite_king;
+      int mblack_king = nblack_king;
+
+      if (mwhite_king > MATERIAL_KING_MAX)
+        mwhite_king = MATERIAL_KING_MAX;
+      if (mblack_king > MATERIAL_KING_MAX)
+        mblack_king = MATERIAL_KING_MAX;
+
+      istate = (nwhite_man * (MATERIAL_KING_MAX + 1) + mwhite_king) *
+                 (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
+               nblack_man * (MATERIAL_KING_MAX + 1) + mblack_king;
+    }
+
+    HARDBUG((istate < 0) or (istate >= with_material_shared->MS_nstates))
+
+    if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
+    {
+#ifdef USE_AVX2_INTRINSICS
+      if (with_network->N_material_dense_network_16x8_kernel)
+      {
+        const float *weights = with_material_shared->MS_weights_nstatesxnembed +
+                               (size_t)istate * with_material_shared->MS_nembed;
+
+        // MPI shared allocations need not be 32-byte aligned.
+        sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
+        sum1 = _mm256_add_ps(sum1, _mm256_loadu_ps(weights + 8));
+      }
+      else if (with_network->N_material_dense_network_64x16_kernel)
+      {
+        const float *weights = with_material_shared->MS_weights_nstatesxnembed +
+                               (size_t)istate * with_material_shared->MS_nembed;
+
+        for (int ichunk = 0; ichunk < 8; ichunk++)
+          sum64[ichunk] =
+            _mm256_add_ps(sum64[ichunk], _mm256_loadu_ps(weights + 8 * ichunk));
+      }
+      else
+#endif
+        vadd_ab2a(with_material_shared->MS_nembed,
+                  arg_state->DNS_inputs + with_material_shared->MS_offset,
+                  with_material_shared->MS_weights_nstatesxnembed +
+                    (size_t)istate * with_material_shared->MS_nembed);
+    }
+    else if (with_network->N_architecture_material ==
+             NETWORK_ARCHITECTURE_CONCAT)
+    {
+      if (arg_inputs)
+        vcopy_a2b(with_material_shared->MS_nembed,
+                  with_material_shared->MS_weights_nstatesxnembed +
+                    (size_t)istate * with_material_shared->MS_nembed,
+                  arg_state->DNS_inputs + with_material_shared->MS_offset);
+
+      vadd_ab2a(with_current->LS_noutputs,
+                with_current_thread->LT_dot,
+                with_material_shared->MS_sum_nstatesxnoutputs[istate]);
+    }
+    else
+      FATAL("unknown with_network->N_architecture_maerial", EXIT_FAILURE)
+  }
+#ifdef USE_AVX2_INTRINSICS
+  if (with_network->N_material_dense_network_16x8_kernel)
+  {
+    _mm256_store_ps(arg_state->DNS_inputs, sum0);
+    _mm256_store_ps(arg_state->DNS_inputs + 8, sum1);
+  }
+  else if (with_network->N_material_dense_network_64x16_kernel)
+  {
+    for (int ichunk = 0; ichunk < 8; ichunk++)
+      _mm256_store_ps(arg_state->DNS_inputs + 8 * ichunk, sum64[ichunk]);
+  }
+#endif
+
+  (void)return_dense_network_score_scaled(
+    &(with_network->N_material_dense_network_shared),
+    arg_state);
+}
+
+local void construct_material_cache(network_t *arg_network)
+{
+  arg_network->N_material_cache = NULL;
+  if ((arg_network->N_network_id == INVALID) or
+      (arg_network->N_architecture_material == NETWORK_ARCHITECTURE_NULL))
+    return;
+
+  dense_network_shared_t *dense = &arg_network->N_material_dense_network_shared;
+  if (dense->DNS_nlayers == 0)
+    return; // A dummy network has no loaded weights.
+  int ilast = dense->DNS_nlayers - 1;
+  int noutputs = dense->DNS_layers[ilast].LS_noutputs;
+  size_t ncounts = NPIECES_MAX + 1;
+  size_t nentries = ncounts * ncounts * ncounts * ncounts;
+  void *memory;
+  MPI_Win win;
+  my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
+                         sizeof(scaled_double_t),
+                         nentries * noutputs,
+                         &memory,
+                         &win);
+  scaled_double_t *cache = memory;
+
+  if (my_mpi_globals.MMG_is_master)
+  {
+    dense_network_state_t state = {0};
+    construct_dense_network_state(dense, &state);
+    size_t ientry = 0;
+    // Fill every count tuple, including unreachable ones: no uninitialized
+    // rows.
+    for (int iwhite_man = 0; iwhite_man <= NPIECES_MAX; iwhite_man++)
+      for (int iblack_man = 0; iblack_man <= NPIECES_MAX; iblack_man++)
+        for (int iwhite_king = 0; iwhite_king <= NPIECES_MAX; iwhite_king++)
+          for (int iblack_king = 0; iblack_king <= NPIECES_MAX; iblack_king++)
+          {
+            evaluate_material_network(arg_network,
+                                      &state,
+                                      iwhite_man,
+                                      iblack_man,
+                                      iwhite_king,
+                                      iblack_king,
+                                      TRUE);
+            memcpy(cache + ientry * noutputs,
+                   state.DNS_layers[ilast].LT_outputs,
+                   noutputs * sizeof(scaled_double_t));
+            ientry++;
+          }
+    for (int ilayer = 0; ilayer < dense->DNS_nlayers; ilayer++)
+    {
+      my_free(state.DNS_layers[ilayer].LT_dot);
+      my_free(state.DNS_layers[ilayer].LT_sum);
+      my_free(state.DNS_layers[ilayer].LT_outputs);
+    }
+  }
+  my_mpi_sync_shared(my_mpi_globals.MMG_comm_global, win, "material_cache");
+  MARK_ARRAY_READ_ONLY(cache, nentries * noutputs * sizeof(scaled_double_t));
+  // Published only after initialization; search threads never write this table.
+  arg_network->N_material_cache = cache;
+  PRINTF("material cache network=%d entries=%zu outputs=%d bytes=%zu\n",
+         arg_network->N_network_id,
+         nentries,
+         noutputs,
+         nentries * noutputs * sizeof(scaled_double_t));
+}
+
 void init_networks(void)
 {
   init_base64_table();
@@ -3802,6 +4040,9 @@ void init_networks(void)
 
   if (compat_strcasecmp(options.network1, "NULL") != 0)
     construct_network_shared(options.network1, NETWORK1_ID, TRUE);
+
+  for (int inetwork = 0; inetwork < NETWORKS_MAX; inetwork++)
+    construct_material_cache(networks + inetwork);
 }
 
 local double gelu(double x) { return (0.5 * x * (1.0 + erf(x / sqrt(2.0)))); }

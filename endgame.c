@@ -1,4 +1,4 @@
-// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
+// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
 
 #include "globals.h"
 #include "material.h" // GWDEGTB's EGTB_MAX_PIECES
@@ -88,7 +88,6 @@ void init_endgame(void)
 
 #ifdef USE_COMPRESSED_WDL
     HARDBUG(!gwdegtb_wdl_compressed_attach(endgame_name, pendgame, egtb_size));
-
 
 #else
     HARDBUG(!gwdegtb_wdl_attach(endgame_name, pendgame, egtb_size))

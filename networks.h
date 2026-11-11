@@ -1,4 +1,4 @@
-// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
+// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
 #ifndef NetworksH
 #define NetworksH
 
@@ -90,6 +90,7 @@ typedef struct
   dense_network_shared_t N_material_dense_network_shared;
   int N_material_dense_network_16x8_kernel;
   int N_material_dense_network_64x16_kernel; // embedding summation only
+  scaled_double_t *N_material_cache; // immutable final material output vectors
   dense_network_shared_t N_dense_network_shared;
 } network_t;
 
@@ -123,6 +124,13 @@ double return_dense_network_score_scaled(dense_network_shared_t *,
                                          dense_network_state_t *);
 double return_dense_network_score_double(dense_network_shared_t *,
                                          dense_network_state_t *);
+void evaluate_material_network(network_t *,
+                               dense_network_state_t *,
+                               int,
+                               int,
+                               int,
+                               int,
+                               int);
 void fen2network(char *, i64_t);
 void fen2csv(char *, int, int);
 void init_networks(void);

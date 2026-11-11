@@ -1,4 +1,4 @@
-// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
+// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -1685,9 +1685,9 @@ local void quiescence(search_t *arg_with_search,
 
   sort_t sort;
   construct_sort(&sort,
-          arg_moves_list->ML_nmoves,
-          &(arg_with_search->S_random),
-          INVALID);
+                 arg_moves_list->ML_nmoves,
+                 &(arg_with_search->S_random),
+                 INVALID);
 
   pv_entries_t temp_pv = *arg_best_pv;
 
@@ -2487,20 +2487,21 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
         TRACE_INDENT(arg_moves_list, jmove)
 
-        alpha_beta(arg_with_search,
-                   -temp_beta,
-                   -temp_alpha,
-                   reduced_depth + singular_extension,
-                   node_type,
-                   arg_reduction_depth_root,
-                   your_tweaks |
-                     (reduced_depth < your_depth ? TWEAK_MOVE_REDUCED_BIT : 0U) |
-                     (singular_extension > 0 ? TWEAK_MOVE_EXTENDED_BIT : 0U),
-                   NULL,
-                   NULL,
-                   0,
-                   arg_history,
-                   &temp_result);
+        alpha_beta(
+          arg_with_search,
+          -temp_beta,
+          -temp_alpha,
+          reduced_depth + singular_extension,
+          node_type,
+          arg_reduction_depth_root,
+          your_tweaks |
+            (reduced_depth < your_depth ? TWEAK_MOVE_REDUCED_BIT : 0U) |
+            (singular_extension > 0 ? TWEAK_MOVE_EXTENDED_BIT : 0U),
+          NULL,
+          NULL,
+          0,
+          arg_history,
+          &temp_result);
 
         TRACE_DEDENT
 
@@ -3091,8 +3092,7 @@ local void alpha_beta(search_t *arg_with_search,
 
   if ((options.prob_cut_depth > 0) and
       (arg_my_depth >= options.prob_cut_depth) and
-      IS_MINIMAL_WINDOW(arg_node_type) and
-      (arg_singular_extension == 0) and
+      IS_MINIMAL_WINDOW(arg_node_type) and (arg_singular_extension == 0) and
       !(arg_my_tweaks & TWEAK_MOVE_REDUCED_BIT) and
       !(arg_my_tweaks & TWEAK_MOVE_EXTENDED_BIT) and
       !(arg_my_tweaks & TWEAK_PROB_CUT_BIT) and
@@ -3102,11 +3102,12 @@ local void alpha_beta(search_t *arg_with_search,
   {
     int prob_cut_depth = (arg_my_depth * options.prob_cut_percentage) / 100;
 
-    if (prob_cut_depth < 1) prob_cut_depth = 1;
+    if (prob_cut_depth < 1)
+      prob_cut_depth = 1;
 
     score_t prob_cut_beta = arg_my_beta + SCORE(options.prob_cut_margin);
 
-    int alpha_beta_cache_probe_fails = 
+    int alpha_beta_cache_probe_fails =
       alpha_beta_cache_hit and
       (alpha_beta_cache_slot.ABCS_depth >= prob_cut_depth) and
       !(alpha_beta_cache_slot.ABCS_flags & ABCS_SCORE_GE_BETA_BIT) and
@@ -3151,7 +3152,7 @@ local void alpha_beta(search_t *arg_with_search,
       i64_t prob_cut_nodes =
         (arg_with_search->S_total_nodes - total_nodes) -
         (arg_with_search->S_total_prob_cut_nodes - total_prob_cut_nodes);
- 
+
       HARDBUG(prob_cut_nodes < 0)
 
       arg_with_search->S_total_prob_cut_nodes += prob_cut_nodes;
@@ -3848,8 +3849,7 @@ void do_search(search_t *arg_with_search,
       {
         HARDBUG(dtm_missing_name == NULL)
 
-        PRINTF("WARNING: DTM EGTB %s MISSING!\n",
-               dtm_missing_name);
+        PRINTF("WARNING: DTM EGTB %s MISSING!\n", dtm_missing_name);
 
         undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
@@ -3914,15 +3914,15 @@ void do_search(search_t *arg_with_search,
       arg_with_search->S_best_score_kind = SEARCH_BEST_SCORE_EGTB;
 
       arg_with_search->S_best_depth = 0;
-  
+
       arg_with_search->S_best_pv = pv_entries_default;
-  
+
       BSTRING(bmove_string)
-  
+
       move2bstring(arg_moves_list, sort.S_array[0], bmove_string);
-  
+
       BSTRING(bpv_string)
-  
+
       if (options.hub)
       {
         HARDBUG(bformata(bpv_string,
@@ -3938,13 +3938,13 @@ void do_search(search_t *arg_with_search,
                          egtb_mate,
                          bdata(bmove_string)) == BSTR_ERR)
       }
-  
+
       if (your_mate != INVALID)
       {
         do_move(&(arg_with_search->S_board), sort.S_array[0], arg_moves_list);
-  
+
         endgame_pv(arg_with_search, your_mate, bpv_string);
-  
+
         undo_move(&(arg_with_search->S_board), sort.S_array[0], arg_moves_list);
       }
       else
@@ -3956,7 +3956,7 @@ void do_search(search_t *arg_with_search,
       }
 
       my_printf(arg_with_search->S_my_printf, "%s\n", bdata(bpv_string));
-  
+
       if (options.mode == GAME_MODE)
       {
         if ((arg_with_search->S_thread != NULL) and
@@ -4696,14 +4696,20 @@ void init_search(void)
     HARDBUG(networks[NETWORK0_ID].N_network_id == INVALID)
 
     alpha_beta_cache[NETWORK0_ID][WHITE_ENUM] = my_large_malloc(
-      "alpha_beta_cache[NETWORK0_ID][WHITE_ENUM]", __FILE__, __FUNC__, __LINE__,
+      "alpha_beta_cache[NETWORK0_ID][WHITE_ENUM]",
+      __FILE__,
+      __FUNC__,
+      __LINE__,
       (size_t)nalpha_beta_cache_entries * sizeof(alpha_beta_cache_entry_t),
       &alpha_beta_cache_allocation[NETWORK0_ID][WHITE_ENUM]);
 
     initialize_alpha_beta_cache(alpha_beta_cache[NETWORK0_ID][WHITE_ENUM]);
 
     alpha_beta_cache[NETWORK0_ID][BLACK_ENUM] = my_large_malloc(
-      "alpha_beta_cache[NETWORK0_ID][BLACK_ENUM]", __FILE__, __FUNC__, __LINE__,
+      "alpha_beta_cache[NETWORK0_ID][BLACK_ENUM]",
+      __FILE__,
+      __FUNC__,
+      __LINE__,
       (size_t)nalpha_beta_cache_entries * sizeof(alpha_beta_cache_entry_t),
       &alpha_beta_cache_allocation[NETWORK0_ID][BLACK_ENUM]);
 
@@ -4712,14 +4718,20 @@ void init_search(void)
     if (networks[NETWORK1_ID].N_network_id != INVALID)
     {
       alpha_beta_cache[NETWORK1_ID][WHITE_ENUM] = my_large_malloc(
-        "alpha_beta_cache[NETWORK1_ID][WHITE_ENUM]", __FILE__, __FUNC__, __LINE__,
+        "alpha_beta_cache[NETWORK1_ID][WHITE_ENUM]",
+        __FILE__,
+        __FUNC__,
+        __LINE__,
         (size_t)nalpha_beta_cache_entries * sizeof(alpha_beta_cache_entry_t),
         &alpha_beta_cache_allocation[NETWORK1_ID][WHITE_ENUM]);
 
       initialize_alpha_beta_cache(alpha_beta_cache[NETWORK1_ID][WHITE_ENUM]);
 
       alpha_beta_cache[NETWORK1_ID][BLACK_ENUM] = my_large_malloc(
-        "alpha_beta_cache[NETWORK1_ID][BLACK_ENUM]", __FILE__, __FUNC__, __LINE__,
+        "alpha_beta_cache[NETWORK1_ID][BLACK_ENUM]",
+        __FILE__,
+        __FUNC__,
+        __LINE__,
         (size_t)nalpha_beta_cache_entries * sizeof(alpha_beta_cache_entry_t),
         &alpha_beta_cache_allocation[NETWORK1_ID][BLACK_ENUM]);
 

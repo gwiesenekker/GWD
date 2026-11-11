@@ -1,4 +1,4 @@
-// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
+// SCU REVISION 8.1266 wo 11 nov 2026  2:49:21 CET
 #include "globals.h"
 
 #define GWD_JSON "gwd.json"
@@ -2066,8 +2066,7 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "prob_cut_depth") == 0)
         options.prob_cut_depth = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "prob_cut_percentage") ==
-               0)
+      else if (compat_strcasecmp(parameter_name, "prob_cut_percentage") == 0)
         options.prob_cut_percentage = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "prob_cut_margin") == 0)
