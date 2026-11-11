@@ -1,4 +1,4 @@
-// SCU REVISION 8.1267 wo 11 nov 2026  3:10:47 CET
+// SCU REVISION 8.1270 wo 11 nov 2026  9:25:12 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -3369,7 +3369,7 @@ label_store:
 
   HARDBUG(arg_search_result->SR_depth == INVALID)
 
-  // #ifdef DEBUG
+#ifdef DEBUG
   int frequency[NMOVES_MAX] = {0};
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
@@ -3384,7 +3384,7 @@ label_store:
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
     HARDBUG(frequency[sort->S_array[imove]] != 1)
 
-  // #endif
+#endif
 
   if (FALSE and (options.alpha_beta_cache_size > 0) and
       IS_SR_DRAW_BY_REP(arg_search_result->SR_flags))
@@ -4151,13 +4151,18 @@ void do_search(search_t *arg_with_search,
         if (IS_PV(node_type))
         {
           my_alpha = arg_with_search->S_best_score - margin_alpha;
+
           my_beta = arg_with_search->S_best_score + margin_beta;
         }
         else
         {
-          my_alpha = arg_with_search->S_best_score - margin_alpha;
+          my_alpha = arg_with_search->S_best_score;
+
           my_beta = my_alpha + 1;
         }
+
+        HARDBUG(my_alpha < SCORE(SCORE_MINUS_INFINITY))
+        HARDBUG(my_beta > SCORE(SCORE_PLUS_INFINITY))
 
         score_t move_score = arg_with_search->S_best_score;
 
