@@ -1,5 +1,38 @@
 # GWD changelog
 
+## 8.1273
+
+Released 11 November 2026, with Linux and Windows x86-64 binaries and the
+shared 16x8 evaluation network. Changes below are relative to 8.1260.
+
+- Added quiet-move history ordering after the transposition-table move, with
+  bounded rewards for beta cutoffs and penalties for previously searched
+  alternatives. Each search worker has its own table, reset at the start of
+  a search. Singular probes do not penalize the excluded move, and copied
+  sorters preserve a snapshot of history scores across probes and re-searches.
+- Generate randomized move order incrementally, preserving the preferred
+  move and replaying the same order across search passes. Each sorter has
+  a separately seeded RNG rather than overlapping copies of the parent stream.
+- Root minimal-window searches now use the current best score as alpha,
+  instead of subtracting the aspiration margin. Added window-bound checks
+  and restored the DEBUG guard around the permutation validation.
+- Removed combination-length extensions/reduction exceptions, their capture
+  history bookkeeping, the `pv_combination_length` and
+  `reduction_combination_length` options, and obsolete statistics.
+- Skip endgame probes when the position exceeds GWDEGTB's supported piece count.
+- Store network weights in contiguous arrays and address embedding rows
+  directly. Compact embedding index files are no longer supported; use a
+  network with full embedding tables, such as the supplied network0.json.
+- Precompute material-network outputs at load time for supported piece-count
+  combinations, avoiding repeated material-network evaluation during search.
+- Use large-page-aware allocation for transposition tables, with ordinary-page
+  fallback when large pages are unavailable. Building requires updated compat
+  sources providing `compat_large_alloc()` and `compat_large_free()`.
+
+The C/header/Makefile sources match SCU/8.1273. Release packages include
+SHA-1 and SHA-256 checksums. Books and endgame databases are separate downloads;
+the packaged configuration starts without either.
+
 ## 8.1260
 
 Released 8 November 2026, with Linux and Windows x86-64 binaries and the

@@ -2,20 +2,23 @@
 
 Windows CMake build instructions: [WINDOWS.md](WINDOWS.md).
 
-## Version 8.1260
+## Version 8.1273
 
-Version 8.1260 adds configurable ProbCut searches and probe-cost statistics,
-corrects search-tweak and capture-history handling, and fixes reported EGTB
-memory usage. It also includes the eight-piece endgame support and missing-DTM
-fallback introduced in 8.1256. See [CHANGELOG.md](CHANGELOG.md) for details.
+Version 8.1273 adds quiet-move history ordering, incremental randomized move
+ordering, a precomputed material-network cache and large-page-aware
+transposition tables. It revises root scout windows and removes the old
+combination-length search options. See [CHANGELOG.md](CHANGELOG.md) for details.
 
-The engine source matches SCU/8.1260. Building requires the external `compat`
+The engine source matches SCU/8.1273. Building requires the external `compat`
 and `endgame7` (GWDEGTB) source directories; they are not bundled in this repository.
-Use an updated GWDEGTB version providing `gwdegtb_dtm_missing_name()`.
+Use updated compat sources providing `compat_large_alloc()` and
+`compat_large_free()`, and GWDEGTB providing `gwdegtb_dtm_missing_name()`.
+Compact embedding index files are no longer supported; use full embedding
+tables, as provided by the shared release network.
 
-## Latest published release: 8.1260
+## Latest published release: 8.1273
 
-[Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1260).
+[Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1273).
 Download the archive for your platform and the shared network archive. Extract
 both into the same writable directory, then follow `RELEASE-README.txt`.
 SHA-1 and SHA-256 checksum lists accompany the release assets.
