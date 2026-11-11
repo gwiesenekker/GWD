@@ -1,4 +1,4 @@
-// SCU REVISION 8.1263 di 10 nov 2026 16:08:19 CET
+// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
 #include "globals.h"
 
 #define MY_TIMER_STOPPED 0

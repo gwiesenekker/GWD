@@ -1,4 +1,4 @@
-// SCU REVISION 8.1263 di 10 nov 2026 16:08:19 CET
+// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -244,6 +244,8 @@ typedef struct
 local i64_t nalpha_beta_cache_entries;
 local alpha_beta_cache_slot_t alpha_beta_cache_slot_default;
 local alpha_beta_cache_entry_t *alpha_beta_cache[NETWORKS_MAX][NCOLOUR_ENUM];
+local compat_large_allocation_t
+  alpha_beta_cache_allocation[NETWORKS_MAX][NCOLOUR_ENUM];
 
 local pv_entry_t pv_entry_default;
 local pv_entries_t pv_entries_default;
@@ -4693,29 +4695,33 @@ void init_search(void)
 
     HARDBUG(networks[NETWORK0_ID].N_network_id == INVALID)
 
-    MY_MALLOC_BY_TYPE(alpha_beta_cache[NETWORK0_ID][WHITE_ENUM],
-                      alpha_beta_cache_entry_t,
-                      nalpha_beta_cache_entries)
+    alpha_beta_cache[NETWORK0_ID][WHITE_ENUM] = my_large_malloc(
+      "alpha_beta_cache[NETWORK0_ID][WHITE_ENUM]", __FILE__, __FUNC__, __LINE__,
+      (size_t)nalpha_beta_cache_entries * sizeof(alpha_beta_cache_entry_t),
+      &alpha_beta_cache_allocation[NETWORK0_ID][WHITE_ENUM]);
 
     initialize_alpha_beta_cache(alpha_beta_cache[NETWORK0_ID][WHITE_ENUM]);
 
-    MY_MALLOC_BY_TYPE(alpha_beta_cache[NETWORK0_ID][BLACK_ENUM],
-                      alpha_beta_cache_entry_t,
-                      nalpha_beta_cache_entries)
+    alpha_beta_cache[NETWORK0_ID][BLACK_ENUM] = my_large_malloc(
+      "alpha_beta_cache[NETWORK0_ID][BLACK_ENUM]", __FILE__, __FUNC__, __LINE__,
+      (size_t)nalpha_beta_cache_entries * sizeof(alpha_beta_cache_entry_t),
+      &alpha_beta_cache_allocation[NETWORK0_ID][BLACK_ENUM]);
 
     initialize_alpha_beta_cache(alpha_beta_cache[NETWORK0_ID][BLACK_ENUM]);
 
     if (networks[NETWORK1_ID].N_network_id != INVALID)
     {
-      MY_MALLOC_BY_TYPE(alpha_beta_cache[NETWORK1_ID][WHITE_ENUM],
-                        alpha_beta_cache_entry_t,
-                        nalpha_beta_cache_entries)
+      alpha_beta_cache[NETWORK1_ID][WHITE_ENUM] = my_large_malloc(
+        "alpha_beta_cache[NETWORK1_ID][WHITE_ENUM]", __FILE__, __FUNC__, __LINE__,
+        (size_t)nalpha_beta_cache_entries * sizeof(alpha_beta_cache_entry_t),
+        &alpha_beta_cache_allocation[NETWORK1_ID][WHITE_ENUM]);
 
       initialize_alpha_beta_cache(alpha_beta_cache[NETWORK1_ID][WHITE_ENUM]);
 
-      MY_MALLOC_BY_TYPE(alpha_beta_cache[NETWORK1_ID][BLACK_ENUM],
-                        alpha_beta_cache_entry_t,
-                        nalpha_beta_cache_entries)
+      alpha_beta_cache[NETWORK1_ID][BLACK_ENUM] = my_large_malloc(
+        "alpha_beta_cache[NETWORK1_ID][BLACK_ENUM]", __FILE__, __FUNC__, __LINE__,
+        (size_t)nalpha_beta_cache_entries * sizeof(alpha_beta_cache_entry_t),
+        &alpha_beta_cache_allocation[NETWORK1_ID][BLACK_ENUM]);
 
       initialize_alpha_beta_cache(alpha_beta_cache[NETWORK1_ID][BLACK_ENUM]);
     }
@@ -4741,4 +4747,18 @@ void init_search(void)
 #endif
 }
 
-void fin_search(void) {}
+void fin_search(void)
+{
+  for (int inetwork = 0; inetwork < NETWORKS_MAX; inetwork++)
+  {
+    for (int icolour = 0; icolour < NCOLOUR_ENUM; icolour++)
+    {
+      if (alpha_beta_cache[inetwork][icolour] != NULL)
+      {
+        my_large_free(alpha_beta_cache[inetwork][icolour],
+                      &alpha_beta_cache_allocation[inetwork][icolour]);
+        alpha_beta_cache[inetwork][icolour] = NULL;
+      }
+    }
+  }
+}

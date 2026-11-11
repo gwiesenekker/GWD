@@ -1,4 +1,4 @@
-// SCU REVISION 8.1263 di 10 nov 2026 16:08:19 CET
+// SCU REVISION 8.1265 wo 11 nov 2026  2:19:30 CET
 #ifndef MyMallocH
 #define MyMallocH
 
@@ -59,6 +59,11 @@ void *deregister_heap(void *);
 
 void *my_malloc(char *, char *, const char *, int, size_t);
 void my_free(void *);
+
+void *my_large_malloc(char *, char *, const char *, int, size_t,
+                       compat_large_allocation_t *);
+void my_large_free(void *, compat_large_allocation_t *);
+
 
 void print_my_names(int);
 void push_name(char *, char *, const char *, int);
