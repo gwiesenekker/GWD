@@ -2,6 +2,18 @@
 
 Windows CMake build instructions: [WINDOWS.md](WINDOWS.md).
 
+## Match play in the development version
+
+For standard DXP, leave `dxp_game_increment` at its default of zero. A positive
+value selects the Fischer `F` game request when GWD initiates a game. For
+example, `--dxp_game_time=5 --dxp_game_increment=2` gives each player five
+minutes plus two seconds per move for the whole game. Both engines must support
+the `F` extension. The increment is expressed in seconds, and a positive value
+must remain positive when rounded to the six-character protocol field.
+
+The built-in Hub match server has been removed. GWD still runs as a Hub engine.
+Use a GUI such as ZGUI to start the engines and run a match or ballot.
+
 ## Version 8.1273
 
 Version 8.1273 adds quiet-move history ordering, incremental randomized move
@@ -9,7 +21,7 @@ ordering, a precomputed material-network cache and large-page-aware
 transposition tables. It revises root scout windows and removes the old
 combination-length search options. See [CHANGELOG.md](CHANGELOG.md) for details.
 
-The engine source matches SCU/8.1273. Building requires the external `compat`
+The 8.1273 release source matches SCU/8.1273. Building requires the external `compat`
 and `endgame7` (GWDEGTB) source directories; they are not bundled in this repository.
 Use updated compat sources providing `compat_large_alloc()` and
 `compat_large_free()`, and GWDEGTB providing `gwdegtb_dtm_missing_name()`.
@@ -36,7 +48,7 @@ The source code of my Draughts program GWD. I have been working on it on and off
 - Supports patterns like 'kingsrow2' and 'zigzag2' as inputs for the neural network
 - Uses embedding vectors and AVX2 for evaluation of the neural networks
 - Supports both the DXP and the HUB protocol, so Turbo Dambase can be used as the GUI
-- Uses OpenMPI for 'bulk parallelization', so on a 16 CPU machine you can play 4 HUB matches in parallel, each match using 4 threads or 16 matches in parallel, each match using 1 thread
+- Uses OpenMPI for 'bulk parallelization', so independent engine tasks can run in parallel
 - Uses an embedded SQLite database for the opening book
 - An opening book can be generated in parallel using drop-out expansion
 - Compiles on both 64-bit Linux and Windows

@@ -33,6 +33,21 @@ local char event[MY_LINE_MAX];
 local char my_name[MY_LINE_MAX];
 local char your_name[MY_LINE_MAX];
 
+// The Fischer request carries six characters, with up to three decimal places.
+double format_dxp_increment(double arg_increment, char arg_field[7])
+{
+  int precision = 3;
+  while (snprintf(arg_field, 7, "%06.*f", precision, arg_increment) != 6)
+  {
+    HARDBUG(precision == 0)
+    --precision;
+  }
+
+  double increment;
+  HARDBUG(my_sscanf(arg_field, "%lf", &increment) != 1)
+  return increment;
+}
+
 local void encode(char arg_type,
                   dxp_t *arg_with_dxp,
                   char arg_buffer[MY_LINE_MAX],
@@ -76,14 +91,7 @@ local void encode(char arg_type,
       i += 6;
 
       // Configure our clock with the same precision as the wire field.
-      int precision = 3;
-      while (snprintf(arg_buffer + i, 7, "%06.*f", precision,
-                      options.dxp_game_increment) != 6)
-      {
-        HARDBUG(precision == 0)
-        --precision;
-      }
-      HARDBUG(my_sscanf(arg_buffer + i, "%lf", &increment) != 1)
+      increment = format_dxp_increment(options.dxp_game_increment, arg_buffer + i);
       HARDBUG(increment == 0.0)
       i += 6;
       moves = INVALID;

@@ -1,5 +1,14 @@
 # GWD changelog
 
+## Unreleased
+
+- Added the DXP Fischer `F` game request for whole-game clocks with an
+  increment in seconds per move. Both peers must support the extension.
+  `dxp_game_increment=0` keeps the standard `R` request. GWD rejects
+  positive increments that round to zero during option parsing.
+- Removed the built-in Hub match server and its `hub_server_*` options.
+  GWD continues to support the Hub engine role for games managed by a GUI.
+
 ## 8.1273
 
 Released 11 November 2026, with Linux and Windows x86-64 binaries and the

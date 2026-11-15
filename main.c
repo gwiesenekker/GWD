@@ -2117,6 +2117,9 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "dxp_game_increment") == 0)
       {
         HARDBUG((!isfinite(dvalue)) or (dvalue < 0.0) or (dvalue > 999999.0))
+        char field[7];
+        if ((dvalue > 0.0) and (format_dxp_increment(dvalue, field) == 0.0))
+          FATAL("dxp_game_increment rounds to zero in the DXP Fischer request", EXIT_FAILURE)
         options.dxp_game_increment = dvalue;
       }
 
