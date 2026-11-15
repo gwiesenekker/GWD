@@ -2,7 +2,7 @@
 
 Windows CMake build instructions: [WINDOWS.md](WINDOWS.md).
 
-## Match play in the development version
+## Match play in 8.1279
 
 For standard DXP, leave `dxp_game_increment` at its default of zero. A positive
 value selects the Fischer `F` game request when GWD initiates a game. For
@@ -14,23 +14,20 @@ must remain positive when rounded to the six-character protocol field.
 The built-in Hub match server has been removed. GWD still runs as a Hub engine.
 Use a GUI such as ZGUI to start the engines and run a match or ballot.
 
-## Version 8.1273
+Hub supports clock reports with optional move counts and Fischer increments.
+On a ponder hit, GWD continues the existing search and starts its move clock.
+Hub and DXP both reserve 50 ms for returning the move.
 
-Version 8.1273 adds quiet-move history ordering, incremental randomized move
-ordering, a precomputed material-network cache and large-page-aware
-transposition tables. It revises root scout windows and removes the old
-combination-length search options. See [CHANGELOG.md](CHANGELOG.md) for details.
-
-The 8.1273 release source matches SCU/8.1273. Building requires the external `compat`
+The release source matches SCU/8.1279. Building requires the external `compat`
 and `endgame7` (GWDEGTB) source directories; they are not bundled in this repository.
 Use updated compat sources providing `compat_large_alloc()` and
 `compat_large_free()`, and GWDEGTB providing `gwdegtb_dtm_missing_name()`.
 Compact embedding index files are no longer supported; use full embedding
 tables, as provided by the shared release network.
 
-## Latest published release: 8.1273
+## Latest published release: 8.1279
 
-[Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1273).
+[Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1279).
 Download the archive for your platform and the shared network archive. Extract
 both into the same writable directory, then follow `RELEASE-README.txt`.
 SHA-1 and SHA-256 checksum lists accompany the release assets.

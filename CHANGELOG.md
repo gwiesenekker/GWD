@@ -1,6 +1,8 @@
 # GWD changelog
 
-## Unreleased
+## 8.1279
+
+Released 15 November 2026 for Linux and Windows x86-64.
 
 - Added the DXP Fischer `F` game request for whole-game clocks with an
   increment in seconds per move. Both peers must support the extension.
@@ -8,6 +10,14 @@
   positive increments that round to zero during option parsing.
 - Removed the built-in Hub match server and its `hub_server_*` options.
   GWD continues to support the Hub engine role for games managed by a GUI.
+- Hub and DXP share the time allocator. Hub schedules the reported moves
+  remaining, or uses a rolling 40-move horizon when the GUI omits the count.
+  Both protocols reserve 50 ms for returning a move. Time-trouble extensions
+  borrow from subsequent moves and the base move receives the increment once.
+- Hub honors requested search depth, accepts fractional move times, and ignores
+  unknown level arguments. A ponder hit continues the running search and starts
+  the clock for the engine's move.
+- The random-generator startup test now runs only in DEBUG builds.
 
 ## 8.1273
 

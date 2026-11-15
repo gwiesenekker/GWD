@@ -1,4 +1,4 @@
-// SCU REVISION 8.1278 zo 15 nov 2026 14:53:59 CET
+// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
 #include "globals.h"
 
 void copy_my_random(my_random_t *arg_to, const my_random_t *arg_from)
