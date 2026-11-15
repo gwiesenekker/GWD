@@ -1,8 +1,8 @@
-// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
+// SCU REVISION 8.1278 zo 15 nov 2026 14:53:59 CET
 #ifndef GlobalsH
 #define GlobalsH
 
-#define REVISION "8.1273"
+#define REVISION "8.1278"
 
 // generic includes
 
@@ -102,10 +102,6 @@ _Static_assert(sizeof(i64_t) == 8 && sizeof(ui64_t) == 8,
 #define CJSON_MOVES_ID "moves"
 #define CJSON_MOVE_STRING_ID "move_string"
 #define CJSON_COMMENT_STRING_ID "comment_string"
-
-#define CJSON_HUB_CLIENT_DIR "dir"
-#define CJSON_HUB_CLIENT_EXE "exe"
-#define CJSON_HUB_CLIENT_ARG "arg"
 
 #define CJSON_HUB_PV_ID "hub_pv"
 

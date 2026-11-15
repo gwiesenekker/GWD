@@ -1,7 +1,5 @@
-// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
+// SCU REVISION 8.1278 zo 15 nov 2026 14:53:59 CET
 #include "globals.h"
-
-#define GAME_MOVES 40
 
 #define NARGS_MAX 256
 
@@ -133,7 +131,7 @@ local void write_to_hub(char *arg_line)
   HARDBUG(compat_write(1, arg_line, nline) != nline)
 }
 
-local char *pgets(char *arg_s, int arg_size, pipe_t arg_pfd)
+local char *pgets(char *arg_s, int arg_size)
 {
   // read pipe until '\n'
 
@@ -146,16 +144,8 @@ local char *pgets(char *arg_s, int arg_size, pipe_t arg_pfd)
 
     // error
 
-    if (arg_pfd == 0)
-    {
-      if ((n = compat_read(0, &c, 1)) == INVALID)
-        return (NULL);
-    }
-    else
-    {
-      if ((n = compat_pipe_read(arg_pfd, &c, 1)) == INVALID)
-        return (NULL);
-    }
+    if ((n = compat_read(0, &c, 1)) == INVALID)
+      return (NULL);
 
     // eof
 
@@ -177,7 +167,7 @@ local int read_from_hub(char arg_line[MY_LINE_MAX])
 {
   PRINTF("waiting for input..\n");
 
-  if (pgets(arg_line, MY_LINE_MAX, 0) == NULL)
+  if (pgets(arg_line, MY_LINE_MAX) == NULL)
     return (INVALID);
 
   PRINTF("read_from_hub: %s", arg_line);
@@ -186,6 +176,45 @@ local int read_from_hub(char arg_line[MY_LINE_MAX])
 }
 
 local int hub_input(void) { return (compat_poll()); }
+
+// A level can arrive before pos. Keep the GUI report until go think identifies
+// the position, so a repeated search or a ponder does not consume a move.
+typedef struct
+{
+  double time_left;
+  double increment;
+  int moves_left;
+} hub_level_t;
+
+local void read_clock_level(command_t *arg_command, hub_level_t *arg_level)
+{
+  arg_level->time_left = -1.0;
+  arg_level->moves_left = INVALID;
+  arg_level->increment = 0.0;
+
+  for (int iarg = 0; iarg < arg_command->command_nargs; ++iarg)
+  {
+    arg_t *arg = &arg_command->command_args[iarg];
+    HARDBUG(arg->arg_value == NULL)
+    if (compat_strcasecmp(arg->arg_name, "moves") == 0)
+    {
+      HARDBUG(my_sscanf(arg->arg_value, "%d", &arg_level->moves_left) != 1)
+      HARDBUG(arg_level->moves_left < 1)
+    }
+    else if (compat_strcasecmp(arg->arg_name, "time") == 0)
+    {
+      HARDBUG(my_sscanf(arg->arg_value, "%lf", &arg_level->time_left) != 1)
+    }
+    else if (compat_strcasecmp(arg->arg_name, "inc") == 0)
+    {
+      HARDBUG(my_sscanf(arg->arg_value, "%lf", &arg_level->increment) != 1)
+    }
+    else
+      FATAL("unknown clock parameter", EXIT_FAILURE)
+  }
+  HARDBUG((!isfinite(arg_level->time_left)) or (arg_level->time_left < 0.0))
+  HARDBUG((!isfinite(arg_level->increment)) or (arg_level->increment < 0.0))
+}
 
 void hub(void)
 {
@@ -200,6 +229,15 @@ void hub(void)
   game_state_t game_state;
 
   construct_game_state(&game_state);
+
+  time_control_t time_control;
+  construct_time_control(&time_control);
+  hub_level_t level;
+  int clock_active = FALSE;
+  int level_pending = FALSE;
+  int move_played = FALSE;
+  hash_key_t last_key = 0;
+  double default_time_limit = options.time_limit;
 
   while (TRUE)
   {
@@ -218,6 +256,15 @@ void hub(void)
     if (compat_strcasecmp(command.command, "quit") == 0)
     {
       break;
+    }
+    else if (compat_strcasecmp(command.command, "new-game") == 0)
+    {
+      construct_time_control(&time_control);
+      clock_active = FALSE;
+      level_pending = FALSE;
+      move_played = FALSE;
+      options.time_limit = default_time_limit;
+      options.time_ntrouble = 0;
     }
     else if (compat_strcasecmp(command.command, "pos") == 0)
     {
@@ -314,6 +361,7 @@ void hub(void)
 
       if (compat_strcasecmp(name, "depth") == 0)
       {
+        clock_active = FALSE;
         HARDBUG(value == NULL)
 
         int d;
@@ -329,6 +377,7 @@ void hub(void)
       }
       else if (compat_strcasecmp(name, "move-time") == 0)
       {
+        clock_active = FALSE;
         HARDBUG(value == NULL)
 
         int t;
@@ -345,81 +394,20 @@ void hub(void)
         options.time_trouble[1] = options.time_limit / 4.0;
         options.time_ntrouble = 2;
       }
-      else if (compat_strcasecmp(name, "moves") == 0)
+      else if ((compat_strcasecmp(name, "moves") == 0) or
+               (compat_strcasecmp(name, "time") == 0) or
+               (compat_strcasecmp(name, "inc") == 0))
       {
-        HARDBUG(value == NULL)
-
-        int moves_left;
-
-        HARDBUG(my_sscanf(value, "%d", &moves_left) != 1)
-
-        HARDBUG(command.command_nargs < 2)
-
-        name = command.command_args[1].arg_name;
-
-        value = command.command_args[1].arg_value;
-
-        HARDBUG(compat_strcasecmp(name, "time") != 0)
-
-        HARDBUG(value == NULL)
-
-        int time_left;
-
-        HARDBUG(my_sscanf(value, "%d", &time_left) != 1)
-
-        PRINTF("got moves %d time_left %d\n", moves_left, time_left);
-
-        options.time_limit = time_left / moves_left;
-
-        if (options.time_limit <= 0.1)
-          options.time_limit = 0.1;
-
-        options.time_trouble[0] = (time_left - options.time_limit) / moves_left;
-
-        if (options.time_trouble[0] <= 0.1)
-          options.time_trouble[0] = 0.1;
-
-        options.time_trouble[1] =
-          (time_left - options.time_limit - options.time_trouble[0]) /
-          moves_left;
-
-        if (options.time_trouble[1] <= 0.1)
-          options.time_trouble[1] = 0.1;
-
-        options.time_ntrouble = 2;
-      }
-      else if (compat_strcasecmp(name, "time") == 0)
-      {
-        HARDBUG(value == NULL)
-
-        double t;
-
-        HARDBUG(my_sscanf(value, "%lf", &t) != 1)
-
-        HARDBUG(t < 0.0)
-
-        PRINTF("found time %.2f\n", t);
-
-        options.time_limit = t / GAME_MOVES;
-
-        if (options.time_limit <= 0.1)
-          options.time_limit = 0.1;
-
-        options.time_trouble[0] = (t - options.time_limit) / GAME_MOVES;
-
-        if (options.time_trouble[0] <= 0.1)
-          options.time_trouble[0] = 0.1;
-
-        options.time_trouble[1] =
-          (t - options.time_limit - options.time_trouble[0]) / GAME_MOVES;
-
-        if (options.time_trouble[1] <= 0.1)
-          options.time_trouble[1] = 0.1;
-
-        options.time_ntrouble = 2;
+        read_clock_level(&command, &level);
+        clock_active = TRUE;
+        level_pending = is_configured_time_control(&time_control);
+        if (!level_pending)
+          configure_time_control(level.time_left, level.moves_left, level.increment,
+                                 &time_control);
       }
       else if (compat_strcasecmp(name, "infinite") == 0)
       {
+        clock_active = FALSE;
         PRINTF("found infinite\n");
 
         options.time_limit = 10000.0;
@@ -438,7 +426,22 @@ void hub(void)
 
       HARDBUG(name == NULL)
 
-      if (compat_strcasecmp(name, "ponder") == 0)
+      int clock_think = (compat_strcasecmp(name, "think") == 0) and clock_active;
+      if (clock_think)
+      {
+        if (level_pending)
+        {
+          int played = move_played and (last_key != with_search->S_board.B_key);
+          sync_time_control(level.time_left, level.moves_left, level.increment,
+                            played, &time_control);
+          level_pending = FALSE;
+        }
+        set_time_limit(&time_control);
+        PRINTF("hub clock imove=%d moves_left=%d time=%.3f limit=%.6f\n",
+               return_moves_done(&time_control), return_moves_left(&time_control),
+               return_time_left(&time_control), options.time_limit);
+      }
+      else if (compat_strcasecmp(name, "ponder") == 0)
       {
         options.time_limit = 10000.0;
         options.time_ntrouble = 0;
@@ -642,6 +645,12 @@ void hub(void)
         snprintf(line, MY_LINE_MAX, "done move=%s\n", bdata(bmove_string));
 
         write_to_hub(line);
+
+        if (clock_think)
+        {
+          move_played = TRUE;
+          last_key = with_search->S_board.B_key;
+        }
 
         BDESTROY(bmove_string)
       }
@@ -900,827 +909,5 @@ void init_hub(void)
       else
         FATAL("unknown parameter_type", EXIT_FAILURE)
     }
-  }
-}
-
-local void write_to_hub_client(char *arg_line, pipe_t arg_pfd)
-{
-  int nline = strlen(arg_line);
-
-  PRINTF("write_to_hub_client: %d:%s", nline, arg_line);
-
-  HARDBUG(arg_line[nline - 1] != '\n')
-
-  HARDBUG(compat_pipe_write(arg_pfd, arg_line, nline) != nline)
-}
-
-local int read_from_hub_client(char arg_line[MY_LINE_MAX], pipe_t arg_pfd)
-{
-  PRINTF("waiting for input..\n");
-
-  if (pgets(arg_line, MY_LINE_MAX, arg_pfd) == NULL)
-    return (INVALID);
-
-  PRINTF("read_from_hub_client: %s", arg_line);
-
-  return (TRUE);
-}
-
-local char event[MY_LINE_MAX];
-local char my_name[MY_LINE_MAX];
-local char your_name[MY_LINE_MAX];
-
-local double return_sigmoid(double x) { return (2.0 / (1.0 + exp(-x)) - 1.0); }
-
-local int play_game(search_t *arg_with_search,
-                    int arg_my_colour,
-                    pipe_t arg_parent2child,
-                    pipe_t arg_child2parent)
-{
-  int result = INVALID;
-
-  game_state_t game_state;
-
-  construct_game_state(&game_state);
-
-  game_state.set_event(&game_state, event);
-
-  if (IS_WHITE(arg_my_colour))
-  {
-    game_state.set_white(&game_state, my_name);
-    game_state.set_black(&game_state, your_name);
-  }
-  else
-  {
-    game_state.set_white(&game_state, your_name);
-    game_state.set_black(&game_state, my_name);
-  }
-
-  BSTRING(bfen)
-
-  board2fen(&(arg_with_search->S_board), bfen, FALSE);
-
-  game_state.set_starting_position(&game_state, bdata(bfen));
-
-  char pos[MY_LINE_MAX];
-
-  strcpy(pos, board2string(&(arg_with_search->S_board), TRUE));
-
-  PRINTF("pos=%s\n", pos);
-
-  // setup time allocation
-
-  time_control_t time_control;
-
-  configure_time_control(options.hub_server_game_time * 60,
-                         options.hub_server_game_moves,
-                         &time_control);
-
-  int nmy_game_moves_done = 0;
-  int nyour_game_moves_done = 0;
-
-  double my_game_time_left = options.hub_server_game_time * 60.0;
-  double your_game_time_left = options.hub_server_game_time * 60.0;
-
-  while (TRUE)
-  {
-    print_board(&(arg_with_search->S_board));
-
-    moves_list_t moves_list;
-
-    construct_moves_list(&moves_list);
-
-    gen_moves(&(arg_with_search->S_board), &moves_list);
-
-    PRINTF("nmy_game_moves_done=%d nyour_game_moves_done=%d\n",
-           nmy_game_moves_done,
-           nyour_game_moves_done);
-
-    if (arg_with_search->S_board.B_colour2move != arg_my_colour)
-    {
-      if (moves_list.ML_nmoves == 0)
-      {
-        if (IS_WHITE(arg_with_search->S_board.B_colour2move))
-          result = 0;
-        else
-          result = 2;
-
-        break;
-      }
-
-      if ((nmy_game_moves_done >= options.hub_server_game_moves) and
-          (nyour_game_moves_done >= options.hub_server_game_moves))
-      {
-        result = INVALID;
-        break;
-      }
-
-      if (options.ponder)
-      {
-        // configure thread for pondering
-
-        options.time_limit = 10000.0;
-        options.time_ntrouble = 0;
-
-        PRINTF("\nPondering..\n");
-
-        enqueue(return_thread_queue(thread_alpha_beta_master),
-                MESSAGE_STATE,
-                game_state.get_game_state(&game_state));
-
-        enqueue(return_thread_queue(thread_alpha_beta_master),
-                MESSAGE_GO,
-                "hub/play_game");
-      }
-
-      // prepare pos message
-
-      char moves_string[MY_LINE_MAX];
-
-      strcpy(moves_string, "");
-
-      cJSON *game_move;
-
-      cJSON_ArrayForEach(game_move, game_state.get_moves(&game_state))
-      {
-        cJSON *move_string =
-          cJSON_GetObjectItem(game_move, CJSON_MOVE_STRING_ID);
-
-        HARDBUG(!cJSON_IsString(move_string))
-
-        if (compat_strcasecmp(moves_string, "") == 0)
-          strcpy(moves_string, cJSON_GetStringValue(move_string));
-        else
-        {
-          strcat(moves_string, " ");
-          strcat(moves_string, cJSON_GetStringValue(move_string));
-        }
-      }
-
-      PRINTF("moves_string=%s\n", moves_string);
-
-      char line[MY_LINE_MAX];
-
-      snprintf(line,
-               MY_LINE_MAX,
-               "pos pos=%s moves=\"%s\"\n",
-               pos,
-               moves_string);
-
-      write_to_hub_client(line, arg_parent2child);
-
-      int nyour_game_moves_left =
-        options.hub_server_game_moves - nyour_game_moves_done;
-
-      PRINTF("you have %.2f seconds left for %d moves\n",
-             your_game_time_left,
-             nyour_game_moves_left);
-
-      snprintf(line,
-               MY_LINE_MAX,
-               "level moves=%d time=%d\n",
-               nyour_game_moves_left,
-               (int)round(your_game_time_left));
-
-      write_to_hub_client(line, arg_parent2child);
-
-      write_to_hub_client("go think\n", arg_parent2child);
-
-      PRINTF("waiting for 'info' or 'done'..\n");
-
-      double t1 = compat_time();
-
-      command_t command;
-
-      while (TRUE)
-      {
-        if (read_from_hub_client(line, arg_child2parent) == INVALID)
-          break;
-
-        line2command(line, &command);
-
-        HARDBUG(command.command == NULL)
-
-        if (compat_strcasecmp(command.command, "done") == 0)
-          break;
-      }
-
-      double t2 = compat_time();
-
-      double move_time_used = t2 - t1;
-
-      your_game_time_left -= move_time_used;
-
-      ++nyour_game_moves_done;
-
-      PRINTF("you used %.2f seconds, you have %.2f seconds remaining\n",
-             move_time_used,
-             your_game_time_left);
-
-      if (options.ponder)
-      {
-        // cancel pondering and dequeue messages
-
-        enqueue(return_thread_queue(thread_alpha_beta_master),
-                MESSAGE_ABORT_SEARCH,
-                "main/play_game");
-
-        message_t message;
-
-        while (TRUE)
-        {
-          if (dequeue(&main_queue, &message) != INVALID)
-          {
-            if (message.message_id == MESSAGE_INFO)
-            {
-              // PRINTF("got info %s\n", bdata(message.message_text));
-            }
-            else if (message.message_id == MESSAGE_RESULT)
-            {
-              PRINTF("got hint %s\n", bdata(message.message_text));
-              break;
-            }
-            else
-              FATAL("message.message_id error", EXIT_FAILURE)
-          }
-          HARDBUG(compat_sleep(CENTI_SECOND) != 0)
-        }
-      }
-
-      HARDBUG(command.command_nargs < 1)
-
-      HARDBUG(compat_strcasecmp(command.command_args[0].arg_name, "move") != 0)
-
-      BSTRING(bmove_string)
-
-      HARDBUG(bassigncstr(bmove_string, command.command_args[0].arg_value) ==
-              BSTR_ERR)
-
-      int imove;
-
-      HARDBUG((imove = search_move(&moves_list, bmove_string)) == INVALID)
-
-      game_state.push_move(&game_state, bdata(bmove_string), NULL);
-
-      do_move(&(arg_with_search->S_board), imove, &moves_list);
-
-      BDESTROY(bmove_string)
-    }
-    else
-    {
-      // my turn
-
-      if (moves_list.ML_nmoves == 0)
-      {
-        if (IS_WHITE(arg_with_search->S_board.B_colour2move))
-          result = 0;
-        else
-          result = 2;
-
-        break;
-      }
-
-      // check for known endgame
-
-      int egtb_mate = read_endgame(arg_with_search, NULL);
-
-      if (egtb_mate != ENDGAME_UNKNOWN)
-      {
-        PRINTF("known endgame egtb_mate=%d\n", egtb_mate);
-
-        if (egtb_mate == INVALID)
-        {
-          result = 1;
-        }
-        else if (egtb_mate > 0)
-        {
-          if (IS_WHITE(arg_with_search->S_board.B_colour2move))
-            result = 2;
-          else
-            result = 0;
-        }
-        else
-        {
-          if (IS_WHITE(arg_with_search->S_board.B_colour2move))
-            result = 0;
-          else
-            result = 2;
-        }
-
-        break;
-      }
-
-      if ((nmy_game_moves_done >= options.hub_server_game_moves) and
-          (nyour_game_moves_done >= options.hub_server_game_moves))
-      {
-        result = INVALID;
-        break;
-      }
-
-      BSTRING(bbest_move)
-
-      int best_score;
-      int best_depth;
-
-      HARDBUG(bassigncstr(bbest_move, "NULL") == BSTR_ERR)
-
-      BSTRING(bbest_string)
-
-      HARDBUG(bassigncstr(bbest_string, "NULL") == BSTR_ERR)
-
-      PRINTF("\nthinking..\n");
-
-      double t1 = compat_time();
-
-      if (moves_list.ML_nmoves == 1)
-      {
-        move2bstring(&moves_list, 0, bbest_move);
-
-        HARDBUG(bassigncstr(bbest_string, "only move") == BSTR_ERR)
-
-        best_score = 0;
-
-        best_depth = 0;
-      }
-      else
-      {
-        if (options.use_book)
-          return_book_move(&(arg_with_search->S_board),
-                           &moves_list,
-                           bbest_move);
-
-        if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
-        {
-          HARDBUG(bassigncstr(bbest_string, "book move") == BSTR_ERR)
-
-          best_score = 0;
-
-          best_depth = 0;
-        }
-        else
-        {
-          // configure thread for search
-
-          set_time_limit(nmy_game_moves_done, &time_control);
-
-          enqueue(return_thread_queue(thread_alpha_beta_master),
-                  MESSAGE_STATE,
-                  game_state.get_game_state(&game_state));
-
-          enqueue(return_thread_queue(thread_alpha_beta_master),
-                  MESSAGE_GO,
-                  "hub/play_game");
-
-          while (TRUE)
-          {
-            message_t message;
-
-            if (dequeue(&main_queue, &message) != INVALID)
-            {
-              if (message.message_id == MESSAGE_INFO)
-              {
-                PRINTF("got info %s\n", bdata(message.message_text));
-              }
-              else if (message.message_id == MESSAGE_RESULT)
-              {
-                HARDBUG(bassign(bbest_string, message.message_text) == BSTR_ERR)
-
-                PRINTF("got result %s\n", bdata(bbest_string));
-
-                CSTRING(cbest_move, blength(bbest_string))
-
-                HARDBUG(my_sscanf(bdata(bbest_string),
-                                  "%s%d%d",
-                                  cbest_move,
-                                  &best_score,
-                                  &best_depth) != 3)
-
-                HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
-
-                CDESTROY(cbest_move)
-
-                break;
-              }
-              else
-                FATAL("message.message_id error", EXIT_FAILURE)
-            }
-            HARDBUG(compat_sleep(CENTI_SECOND) != 0)
-          }
-        }
-      }
-
-      double t2 = compat_time();
-
-      double move_time_used = t2 - t1;
-
-      my_game_time_left -= move_time_used;
-
-      PRINTF("I used %.2f seconds, I have %.2f seconds remaining\n",
-             move_time_used,
-             my_game_time_left);
-
-      update_time_control(nmy_game_moves_done, move_time_used, &time_control);
-
-      nmy_game_moves_done++;
-
-      PRINTF("\n* * * * * * * * * * %s %d %d\n\n",
-             bdata(bbest_move),
-             best_score,
-             best_depth);
-
-      if (options.hub_annotate_level == 0)
-        game_state.push_move(&game_state, bdata(bbest_move), NULL);
-      else
-        game_state.push_move(&game_state,
-                             bdata(bbest_move),
-                             bdata(bbest_string));
-
-      int imove;
-
-      HARDBUG((imove = search_move(&moves_list, bbest_move)) == INVALID)
-
-      // evaluate if needed
-
-      if ((moves_list.ML_nmoves > 1) and
-          (options.network_evaluation_time > 0) and
-          (best_score >= options.network_evaluation_min) and
-          (best_score <= options.network_evaluation_max))
-      {
-        PRINTF("evaluating..\n");
-
-        options.time_limit = options.network_evaluation_time;
-        options.time_ntrouble = 0;
-
-        enqueue(return_thread_queue(thread_alpha_beta_master),
-                MESSAGE_GO,
-                "hub/evaluate");
-
-        while (TRUE)
-        {
-          message_t message;
-
-          if (dequeue(&main_queue, &message) != INVALID)
-          {
-            if (message.message_id == MESSAGE_INFO)
-            {
-              PRINTF("got info %s\n", bdata(message.message_text));
-            }
-            else if (message.message_id == MESSAGE_RESULT)
-            {
-              PRINTF("got result %s\n", bdata(message.message_text));
-
-              CSTRING(cbest_move, blength(message.message_text))
-
-              HARDBUG(my_sscanf(bdata(message.message_text),
-                                "%s%d%d",
-                                cbest_move,
-                                &best_score,
-                                &best_depth) != 3)
-
-              HARDBUG(bassigncstr(bbest_move, cbest_move) == BSTR_ERR)
-
-              CDESTROY(cbest_move)
-
-              break;
-            }
-            else
-              FATAL("message.message_id error", EXIT_FAILURE)
-          }
-          HARDBUG(compat_sleep(CENTI_SECOND) != 0)
-        }
-
-        PRINTF("evaluate best_move=%s best_score=%d best_depth=%d\n",
-               bdata(bbest_move),
-               best_score,
-               best_depth);
-
-        int fd = compat_lock_file("hub.fen", TRUE);
-
-        HARDBUG(fd == -1)
-
-        btrunc(bfen, 0);
-
-        board2fen(&(arg_with_search->S_board), bfen, FALSE);
-
-        HARDBUG(compat_fdprintf(fd,
-                                "%s {%.5f}\n",
-                                bdata(bfen),
-                                return_sigmoid(best_score / 100.0)) < 0)
-
-        HARDBUG(compat_unlock_file(fd) != 0)
-      }
-
-      BDESTROY(bbest_string)
-
-      BDESTROY(bbest_move)
-
-      do_move(&(arg_with_search->S_board), imove, &moves_list);
-    }
-  }
-
-  char game_result[MY_LINE_MAX];
-
-  strcpy(game_result, "*");
-
-  if (result == 2)
-  {
-    strcpy(game_result, "2-0");
-  }
-  else if (result == 1)
-  {
-    strcpy(game_result, "1-1");
-  }
-  else if (result == 0)
-  {
-    strcpy(game_result, "0-2");
-  }
-
-  PRINTF("game_result=%s\n", game_result);
-
-  game_state.set_result(&game_state, game_result);
-
-  game_state.save2pdn(&game_state, "hub.pdn");
-
-  destroy_game_state(&game_state);
-
-  BDESTROY(bfen)
-
-  return (result);
-}
-
-local void hub_server_game_initiator(pipe_t arg_parent2child,
-                                     pipe_t arg_child2parent)
-{
-  snprintf(my_name, MY_LINE_MAX, "GWD %s %s", REVISION, options.network0);
-  snprintf(your_name, MY_LINE_MAX, "%s", options.hub_server_client);
-
-  search_t search;
-
-  construct_search(&search, STDOUT, NULL, NETWORK0_ID);
-
-  search_t *with_search = &search;
-
-  int nwon = 0;
-  int ndraw = 0;
-  int nlost = 0;
-  int nunknown = 0;
-
-  FILE *fballot;
-
-  HARDBUG((fballot = fopen(options.hub_server_ballot, "r")) == NULL)
-
-  int nfen = 0;
-
-  while (TRUE)
-  {
-    char line[MY_LINE_MAX];
-
-    if (fgets(line, MY_LINE_MAX, fballot) == NULL)
-      break;
-
-    char fen[MY_LINE_MAX];
-
-    if (my_sscanf(line, "%[^\n]", fen) == 0)
-      continue;
-
-    if (strncmp(fen, "//", 2) == 0)
-      continue;
-
-    ++nfen;
-  }
-
-  FCLOSE(fballot)
-
-  HARDBUG((fballot = fopen(options.hub_server_ballot, "r")) == NULL)
-
-  PRINTF("nfen=%d\n", nfen);
-
-  int igame = 0;
-
-  int ifen = 0;
-
-  int nfen_mpi = 0;
-
-  while (TRUE)
-  {
-    char fen[MY_LINE_MAX];
-    char opening[MY_LINE_MAX];
-
-    strcpy(fen, "NULL");
-    strcpy(opening, "");
-
-    while (TRUE)
-    {
-      char line[MY_LINE_MAX];
-
-      if (fgets(line, MY_LINE_MAX, fballot) == NULL)
-        goto label_break;
-
-      if (my_sscanf(line, "%[^\n]", fen) == 0)
-        continue;
-
-      if (strncmp(fen, "//", 2) == 0)
-      {
-        HARDBUG(my_sscanf(fen, "//%[^\n]", opening) != 1)
-
-        continue;
-      }
-
-      break;
-    }
-
-    PRINTF("opening=%s fen=%s\n", opening, fen);
-
-    ++ifen;
-
-    if (ifen > options.hub_server_games)
-      break;
-
-    if ((my_mpi_globals.MMG_is_slave) and
-        (((ifen - 1) % my_mpi_globals.MMG_nslaves) !=
-         my_mpi_globals.MMG_id_slave))
-      continue;
-
-    ++nfen_mpi;
-
-    PRINTF("ifen=%d nfen=%d nfen_mpi=%d\n", ifen, nfen, nfen_mpi);
-
-    for (int icolour = 0; icolour < 2; icolour++)
-    {
-      ++igame;
-
-      // if (igame > options.hub_server_games) goto label_break;
-
-      snprintf(event,
-               MY_LINE_MAX,
-               "Game %d, Opening %s, MPI %d;%d",
-               igame,
-               opening,
-               my_mpi_globals.MMG_nglobal,
-               my_mpi_globals.MMG_id_global);
-
-      PRINTF("event=%s\n", event);
-
-      colour_enum my_colour;
-
-      if (icolour == 0)
-        my_colour = WHITE_ENUM;
-      else
-        my_colour = BLACK_ENUM;
-
-      PRINTF("game=%d opening=%s\n", igame, opening);
-
-      fen2board(&(with_search->S_board), fen);
-
-      print_board(&(with_search->S_board));
-
-      int result =
-        play_game(with_search, my_colour, arg_parent2child, arg_child2parent);
-
-      if (result == 2)
-      {
-        if (IS_WHITE(my_colour))
-          ++nwon;
-        else
-          ++nlost;
-      }
-      else if (result == 1)
-      {
-        ++ndraw;
-      }
-      else if (result == 0)
-      {
-        if (IS_WHITE(my_colour))
-          ++nlost;
-        else
-          ++nwon;
-      }
-      else
-        ++nunknown;
-
-      PRINTF("HUB nwon=%d ndraw=%d nlost=%d nunknown=%d\n",
-             nwon,
-             ndraw,
-             nlost,
-             nunknown);
-    }
-  }
-
-label_break:
-
-  if (my_mpi_globals.MMG_is_slave)
-  {
-    my_mpi_allreduce(MPI_IN_PLACE,
-                     &nfen_mpi,
-                     1,
-                     MPI_INT,
-                     MPI_SUM,
-                     my_mpi_globals.MMG_comm_slaves);
-
-    PRINTF("nfen=%d nfen_mpi=%d\n", nfen, nfen_mpi);
-
-    // if options.hub_server_games is hit this is not true
-    // HARDBUG(nfen_mpi != nfen)
-
-    my_mpi_allreduce(MPI_IN_PLACE,
-                     &nwon,
-                     1,
-                     MPI_INT,
-                     MPI_SUM,
-                     my_mpi_globals.MMG_comm_slaves);
-    my_mpi_allreduce(MPI_IN_PLACE,
-                     &ndraw,
-                     1,
-                     MPI_INT,
-                     MPI_SUM,
-                     my_mpi_globals.MMG_comm_slaves);
-    my_mpi_allreduce(MPI_IN_PLACE,
-                     &nlost,
-                     1,
-                     MPI_INT,
-                     MPI_SUM,
-                     my_mpi_globals.MMG_comm_slaves);
-    my_mpi_allreduce(MPI_IN_PLACE,
-                     &nunknown,
-                     1,
-                     MPI_INT,
-                     MPI_SUM,
-                     my_mpi_globals.MMG_comm_slaves);
-  }
-
-  PRINTF("HUB nwon=%d ndraw=%d nlost=%d nunknown=%d\n",
-         nwon,
-         ndraw,
-         nlost,
-         nunknown);
-
-  if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_lead_slave)
-    results2csv(nwon, ndraw, nlost, nunknown);
-}
-
-void hub_server(pipe_t arg_parent2child, pipe_t arg_child2parent)
-{
-  write_to_hub_client("hub\n", arg_parent2child);
-
-  PRINTF("waiting for 'wait'..\n");
-
-  while (TRUE)
-  {
-    char line[MY_LINE_MAX];
-
-    if (read_from_hub_client(line, arg_child2parent) == INVALID)
-      return;
-
-    command_t command;
-
-    line2command(line, &command);
-
-    HARDBUG(command.command == NULL)
-
-    if (compat_strcasecmp(command.command, "wait") == 0)
-      break;
-  }
-
-  write_to_hub_client("init\n", arg_parent2child);
-
-  PRINTF("waiting for 'ready'..\n");
-
-  while (TRUE)
-  {
-    char line[MY_LINE_MAX];
-
-    if (read_from_hub_client(line, arg_child2parent) == INVALID)
-      return;
-
-    command_t command;
-
-    line2command(line, &command);
-
-    HARDBUG(command.command == NULL)
-
-    if (compat_strcasecmp(command.command, "ready") == 0)
-      break;
-  }
-
-  hub_server_game_initiator(arg_parent2child, arg_child2parent);
-
-  write_to_hub_client("quit\n", arg_parent2child);
-
-  // wait for close
-
-  PRINTF("waiting for 'close'..\n");
-  return;
-  while (TRUE)
-  {
-    char line[MY_LINE_MAX];
-
-    if (read_from_hub_client(line, arg_child2parent) == INVALID)
-      return;
-
-    command_t command;
-
-    line2command(line, &command);
-
-    HARDBUG(command.command == NULL)
   }
 }

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
+// SCU REVISION 8.1278 zo 15 nov 2026 14:53:59 CET
 #ifndef MainH
 #define MainH
 
@@ -96,19 +96,13 @@ typedef struct
   int dxp_port;
   int dxp_initiator;
   int dxp_game_time;
+  double dxp_game_increment;
   int dxp_game_moves;
   int dxp_games;
   char dxp_ballot[MY_LINE_MAX];
   int dxp_annotate_level;
   int dxp_strict_gameend;
   char dxp_tag[MY_LINE_MAX];
-
-  int hub_server_game_moves;
-  int hub_server_game_time;
-  int hub_server_games;
-  char hub_server_ballot[MY_LINE_MAX];
-  char hub_server_client[MY_LINE_MAX];
-  int hub_annotate_level;
 
   int nthreads;
   int mode;

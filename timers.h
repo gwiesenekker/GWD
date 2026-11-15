@@ -1,4 +1,4 @@
-// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
+// SCU REVISION 8.1278 zo 15 nov 2026 14:53:59 CET
 #ifndef TimersH
 #define TimersH
 
@@ -35,7 +35,13 @@ typedef struct
 
 typedef struct
 {
+  double TC_game_time;
+  double TC_increment;
+  int TC_rolling;
   int TC_ngame_moves;
+  int TC_ntrouble;
+  int TC_nmoves_done;
+  double TC_time_used;
   double TC_game_time_per_move[NODE_MAX];
 } time_control_t;
 
@@ -53,9 +59,17 @@ i64_t return_ndone(progress_t *);
 i64_t return_ntodo(progress_t *);
 void destroy_progress(progress_t *);
 
-void configure_time_control(int, int, time_control_t *);
-void update_time_control(int, double, time_control_t *);
-void set_time_limit(int, time_control_t *);
+void construct_time_control(time_control_t *);
+void configure_time_control(double, int, double, time_control_t *);
+void sync_time_control(double, int, double, int, time_control_t *);
+void update_time_control(double, time_control_t *);
+void set_time_limit(const time_control_t *);
+double return_time_used(const time_control_t *);
+double return_time_left(const time_control_t *);
+int is_configured_time_control(const time_control_t *);
+int is_rolling_time_control(const time_control_t *);
+int return_moves_done(const time_control_t *);
+int return_moves_left(const time_control_t *);
 
 void test_my_timers(void);
 

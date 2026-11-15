@@ -1,9 +1,10 @@
-// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
+// SCU REVISION 8.1278 zo 15 nov 2026 14:53:59 CET
 #include "globals.h"
 
 #define SA struct sockaddr
 
 #define DXP_GAMEREQ 'R'
+#define DXP_FISCHER 'F'
 #define DXP_GAMEACC 'A'
 #define DXP_MOVE 'M'
 #define DXP_GAMEEND 'E'
@@ -23,11 +24,8 @@ typedef struct
   search_t DXP_search;
 
   colour_enum DXP_game_colour;
-  int DXP_game_time;
-  int DXP_game_moves;
+  time_control_t DXP_time_control;
   char DXP_move_string[MY_LINE_MAX];
-  double DXP_game_time_used;
-  int DXP_move_number;
   char DXP_game_code;
 } dxp_t;
 
@@ -42,11 +40,11 @@ local void encode(char arg_type,
 {
   *arg_nbuffer = 0;
 
-  if (arg_type == DXP_GAMEREQ)
+  if ((arg_type == DXP_GAMEREQ) or (arg_type == DXP_FISCHER))
   {
     int i = 0;
 
-    arg_buffer[i] = DXP_GAMEREQ;
+    arg_buffer[i] = arg_type;
     i++;
 
     strcpy(arg_buffer + i, "01");
@@ -68,23 +66,36 @@ local void encode(char arg_type,
     }
     i++;
 
-    char string[MY_LINE_MAX];
+    double game_time = options.dxp_game_time * 60.0;
+    double increment = 0.0;
+    int moves = options.dxp_game_moves;
+    if (arg_type == DXP_FISCHER)
+    {
+      HARDBUG((game_time < 0.0) or (game_time > 999999.0))
+      snprintf(arg_buffer + i, 7, "%06d", (int)game_time);
+      i += 6;
 
-    snprintf(string, MY_LINE_MAX, "%03d", options.dxp_game_time);
-
-    strcpy(arg_buffer + i, string);
-    i += 3;
-
-    // dependency
-
-    arg_with_dxp->DXP_game_time = options.dxp_game_time * 60;
-
-    snprintf(string, MY_LINE_MAX, "%03d", options.dxp_game_moves);
-
-    arg_with_dxp->DXP_game_moves = options.dxp_game_moves;
-
-    strcpy(arg_buffer + i, string);
-    i += 3;
+      // Configure our clock with the same precision as the wire field.
+      int precision = 3;
+      while (snprintf(arg_buffer + i, 7, "%06.*f", precision,
+                      options.dxp_game_increment) != 6)
+      {
+        HARDBUG(precision == 0)
+        --precision;
+      }
+      HARDBUG(my_sscanf(arg_buffer + i, "%lf", &increment) != 1)
+      HARDBUG(increment == 0.0)
+      i += 6;
+      moves = INVALID;
+    }
+    else
+    {
+      HARDBUG((options.dxp_game_time < 0) or (options.dxp_game_time > 999))
+      HARDBUG((moves < 0) or (moves > 999))
+      snprintf(arg_buffer + i, 7, "%03d%03d", options.dxp_game_time, moves);
+      i += 6;
+    }
+    configure_time_control(game_time, moves, increment, &arg_with_dxp->DXP_time_control);
 
     strcpy(arg_buffer + i, "B");
     i++;
@@ -173,7 +184,7 @@ local void encode(char arg_type,
     snprintf(string,
              MY_LINE_MAX,
              "%04d",
-             (int)round(arg_with_dxp->DXP_game_time_used));
+             (int)fmin(9999.0, round(return_time_used(&arg_with_dxp->DXP_time_control))));
 
     strcpy(arg_buffer + i, string);
     i += 4;
@@ -263,7 +274,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *arg_with_dxp)
   // buffer[nbuffer] = '\0';
   PRINTF("decode nbuffer=%d buffer=%s\n", arg_nhuffer, arg_buffer);
 
-  if (arg_buffer[0] == DXP_GAMEREQ)
+  if ((arg_buffer[0] == DXP_GAMEREQ) or (arg_buffer[0] == DXP_FISCHER))
   {
     // ignore version
 
@@ -293,25 +304,31 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *arg_with_dxp)
     else
       arg_with_dxp->DXP_game_colour = BLACK_ENUM;
 
-    int game_time;
-
-    HARDBUG((i + 2) >= arg_nhuffer)
-    HARDBUG(my_sscanf(arg_buffer + i, "%3d", &game_time) != 1)
-    i += 3;
-
-    PRINTF("game_time=%d\n", game_time);
-
-    arg_with_dxp->DXP_game_time = game_time * 60;
-
-    int game_moves;
-
-    HARDBUG((i + 2) >= arg_nhuffer)
-    HARDBUG(my_sscanf(arg_buffer + i, "%3d", &game_moves) != 1)
-    i += 3;
-
-    PRINTF("game_moves=%d\n", game_moves);
-
-    arg_with_dxp->DXP_game_moves = game_moves;
+    double game_time, increment;
+    int moves;
+    if (arg_buffer[0] == DXP_FISCHER)
+    {
+      HARDBUG((i + 12) >= arg_nhuffer)
+      HARDBUG(my_sscanf(arg_buffer + i, "%6lf", &game_time) != 1)
+      i += 6;
+      HARDBUG(my_sscanf(arg_buffer + i, "%6lf", &increment) != 1)
+      i += 6;
+      moves = INVALID;
+    }
+    else
+    {
+      int minutes;
+      HARDBUG((i + 6) >= arg_nhuffer)
+      HARDBUG(my_sscanf(arg_buffer + i, "%3d", &minutes) != 1)
+      i += 3;
+      HARDBUG(my_sscanf(arg_buffer + i, "%3d", &moves) != 1)
+      HARDBUG(moves < 0)
+      i += 3;
+      game_time = minutes * 60.0;
+      increment = 0.0;
+    }
+    PRINTF("game_time=%.3f increment=%.3f moves=%d\n", game_time, increment, moves);
+    configure_time_control(game_time, moves, increment, &arg_with_dxp->DXP_time_control);
 
     HARDBUG(i >= arg_nhuffer)
     if (arg_buffer[i] == 'A')
@@ -364,7 +381,7 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *arg_with_dxp)
     else
       FATAL("error in DXP", EXIT_FAILURE)
 
-    return (DXP_GAMEREQ);
+    return arg_buffer[0];
   }
   else if (arg_buffer[0] == DXP_GAMEACC)
   {
@@ -595,7 +612,7 @@ local char *secs2string(double arg_secs)
   int seconds;
   int centiseconds;
 
-  int secs = (int)round(arg_secs * 100.0);
+  i64_t secs = (i64_t)round(arg_secs * 100.0);
 
   centiseconds = secs % 100;
 
@@ -666,14 +683,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
   int nbuffer;
   char buffer[MY_LINE_MAX];
 
-  arg_with_dxp->DXP_game_time_used = 0.0;
-  arg_with_dxp->DXP_move_number = 0;
-
-  time_control_t time_control;
-
-  configure_time_control(arg_with_dxp->DXP_game_time,
-                         arg_with_dxp->DXP_game_moves,
-                         &time_control);
+  time_control_t *with_time_control = &arg_with_dxp->DXP_time_control;
 
   score_t score_min = SCORE(SCORE_PLUS_INFINITY);
   score_t score_max = SCORE(SCORE_MINUS_INFINITY);
@@ -958,8 +968,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
         break;
       }
 
-      if (arg_with_dxp->DXP_move_number >=
-          (arg_with_dxp->DXP_game_moves + MARGIN))
+      if (return_moves_left(with_time_control) <= -MARGIN)
       {
         PRINTF("moves exceeded\n");
 
@@ -1000,6 +1009,8 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
 
       BSTRING(bcomment)
 
+      double book_start = compat_time();
+
       // check for book
 
       if (options.use_book)
@@ -1010,6 +1021,9 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
       if (compat_strcasecmp(bdata(bbest_move), "NULL") != 0)
       {
         HARDBUG(bassigncstr(bcomment, "book") == BSTR_ERR)
+
+        if (is_rolling_time_control(with_time_control))
+          update_time_control(compat_time() - book_start, with_time_control);
 
         PRINTF("\nbook_move=%s\n", bdata(bbest_move));
       }
@@ -1037,7 +1051,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
         {
           // configure thread for search
 
-          set_time_limit(arg_with_dxp->DXP_move_number, &time_control);
+          set_time_limit(with_time_control);
 
           enqueue(return_thread_queue(thread_alpha_beta_master),
                   MESSAGE_STATE,
@@ -1088,21 +1102,14 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
 
         double move_time = t2 - t1;
 
-        update_time_control(arg_with_dxp->DXP_move_number,
-                            move_time,
-                            &time_control);
-
-        arg_with_dxp->DXP_game_time_used += move_time;
-
-        arg_with_dxp->DXP_move_number++;
+        update_time_control(move_time, with_time_control);
 
         PRINTF("used   %s\n", secs2string(move_time));
 
-        PRINTF("total  %s\n", secs2string(arg_with_dxp->DXP_game_time_used));
+        PRINTF("total  %s\n", secs2string(return_time_used(with_time_control)));
 
         PRINTF("remain %s\n",
-               secs2string(arg_with_dxp->DXP_game_time -
-                           arg_with_dxp->DXP_game_time_used));
+               secs2string(return_time_left(with_time_control)));
 
         PRINTF("\n* * * * * * * * * * %s " PRINTF_SCORE_T " %d\n\n",
                bdata(bbest_move),
@@ -1204,6 +1211,8 @@ local void dxp_game_initiator(compat_socket_t arg_fd)
 
   dxp_t *with_dxp = &dxp;
 
+  construct_time_control(&with_dxp->DXP_time_control);
+
   construct_search(&(with_dxp->DXP_search), STDOUT, NULL, NETWORK0_ID);
 
   int nwon = 0;
@@ -1299,7 +1308,8 @@ local void dxp_game_initiator(compat_socket_t arg_fd)
       int nbuffer;
       char buffer[MY_LINE_MAX];
 
-      encode(DXP_GAMEREQ, with_dxp, buffer, &nbuffer);
+      encode((options.dxp_game_increment > 0.0) ? DXP_FISCHER : DXP_GAMEREQ,
+             with_dxp, buffer, &nbuffer);
 
       int nwrite;
 
@@ -1377,6 +1387,8 @@ local void dxp_game_follower(compat_socket_t arg_fd)
 
   dxp_t *with_dxp = &dxp;
 
+  construct_time_control(&with_dxp->DXP_time_control);
+
   construct_search(&(with_dxp->DXP_search), STDOUT, NULL, NETWORK0_ID);
 
   int nwon = 0;
@@ -1398,7 +1410,7 @@ local void dxp_game_follower(compat_socket_t arg_fd)
 
     char type = decode(nbuffer, buffer, with_dxp);
 
-    HARDBUG(type != DXP_GAMEREQ)
+    HARDBUG((type != DXP_GAMEREQ) and (type != DXP_FISCHER))
 
     PRINTF("received DXP_GAMEREQ\n");
 

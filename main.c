@@ -1,4 +1,4 @@
-// SCU REVISION 8.1273 wo 11 nov 2026 19:28:10 CET
+// SCU REVISION 8.1278 zo 15 nov 2026 14:53:59 CET
 #include "globals.h"
 
 #define GWD_JSON "gwd.json"
@@ -1923,19 +1923,13 @@ local void load_gwd_json(void)
   options.dxp_port = 27531;
   options.dxp_initiator = TRUE;
   options.dxp_game_time = 10;
+  options.dxp_game_increment = 0.0;
   options.dxp_game_moves = 75;
   options.dxp_games = 1000;
   strcpy(options.dxp_ballot, "NULL");
   options.dxp_annotate_level = 1;
   options.dxp_strict_gameend = FALSE;
   strcpy(options.dxp_tag, "NULL");
-
-  options.hub_server_game_time = 10;
-  options.hub_server_game_moves = 75;
-  options.hub_server_games = 1000;
-  strcpy(options.hub_server_ballot, "ballot2.fen");
-  strcpy(options.hub_server_client, "NULL");
-  options.hub_annotate_level = 1;
 
   options.nthreads = INVALID;
   options.mode = INVALID;
@@ -2106,18 +2100,6 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "dxp_annotate_level") == 0)
         options.dxp_annotate_level = ivalue;
 
-      else if (compat_strcasecmp(parameter_name, "hub_server_game_time") == 0)
-        options.hub_server_game_time = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "hub_server_game_moves") == 0)
-        options.hub_server_game_moves = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "hub_server_games") == 0)
-        options.hub_server_games = ivalue;
-
-      else if (compat_strcasecmp(parameter_name, "hub_annotate_level") == 0)
-        options.hub_annotate_level = ivalue;
-
       else
         PRINTF("ignoring int parameter %s\n", parameter_name);
     }
@@ -2131,6 +2113,12 @@ local void parse_parameters(void)
 
       if (compat_strcasecmp(parameter_name, "time_limit") == 0)
         options.time_limit = dvalue;
+
+      else if (compat_strcasecmp(parameter_name, "dxp_game_increment") == 0)
+      {
+        HARDBUG((!isfinite(dvalue)) or (dvalue < 0.0) or (dvalue > 999999.0))
+        options.dxp_game_increment = dvalue;
+      }
 
       else
         PRINTF("ignoring double parameter %s with value %.2f\n",
@@ -2182,12 +2170,6 @@ local void parse_parameters(void)
 
       else if (compat_strcasecmp(parameter_name, "dxp_tag") == 0)
         strncpy(options.dxp_tag, svalue, MY_LINE_MAX);
-
-      else if (compat_strcasecmp(parameter_name, "hub_server_ballot") == 0)
-        strncpy(options.hub_server_ballot, svalue, MY_LINE_MAX);
-
-      else if (compat_strcasecmp(parameter_name, "hub_server_client") == 0)
-        strncpy(options.hub_server_client, svalue, MY_LINE_MAX);
 
       else
         PRINTF("ignoring string parameter %s\n", parameter_name);
@@ -3031,19 +3013,13 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(dxp_port);
   PRINTF_CFG_B(dxp_initiator);
   PRINTF_CFG_I(dxp_game_time);
+  PRINTF_CFG_D(dxp_game_increment);
   PRINTF_CFG_I(dxp_game_moves);
   PRINTF_CFG_I(dxp_games);
   PRINTF_CFG_S(dxp_ballot);
   PRINTF_CFG_I(dxp_annotate_level);
   PRINTF_CFG_B(dxp_strict_gameend);
   PRINTF_CFG_S(dxp_tag);
-
-  PRINTF_CFG_I(hub_server_game_time);
-  PRINTF_CFG_I(hub_server_game_moves);
-  PRINTF_CFG_I(hub_server_games);
-  PRINTF_CFG_S(hub_server_ballot);
-  PRINTF_CFG_S(hub_server_client);
-  PRINTF_CFG_I(hub_annotate_level);
 
   PRINTF_CFG_I(nthreads);
 
@@ -3302,158 +3278,6 @@ int main(int argc, char **argv)
             "main/solve");
 
     join_threads();
-  }
-  else if (compat_strcasecmp(argv[iarg], "hub_server") == 0)
-  {
-    int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
-
-    HARDBUG(memory_slaves >= (physical_memory / 2))
-
-    int nthreads_slaves =
-      options.nthreads_alpha_beta * my_mpi_globals.MMG_nslaves;
-
-    if (options.ponder)
-      HARDBUG(nthreads_slaves > (physical_cpus / 2))
-    else
-      HARDBUG(nthreads_slaves > physical_cpus)
-
-    if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
-    {
-      cJSON *hub_server_client =
-        cJSON_GetObjectItem(overrides_json, options.hub_server_client);
-
-      HARDBUG(hub_server_client == NULL)
-
-      cJSON *cjson_dir =
-        cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_DIR);
-
-      char *dir = cJSON_GetStringValue(cjson_dir);
-
-      HARDBUG(dir == NULL)
-
-      cJSON *cjson_exe =
-        cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_EXE);
-
-      char *exe = cJSON_GetStringValue(cjson_exe);
-
-      HARDBUG(exe == NULL)
-
-      cJSON *cjson_arg =
-        cJSON_GetObjectItem(hub_server_client, CJSON_HUB_CLIENT_ARG);
-
-      char *arg = cJSON_GetStringValue(cjson_arg);
-
-      HARDBUG(arg == NULL)
-
-      PRINTF("dir=%s\n", dir);
-      PRINTF("exe=%s\n", exe);
-      PRINTF("arg=%s\n", arg);
-
-#if COMPAT_OS == COMPAT_OS_LINUX
-      pipe_t parent2child[2];
-      pipe_t child2parent[2];
-
-      HARDBUG(compat_pipe(parent2child) == -1)
-
-      HARDBUG(compat_pipe(child2parent) == -1)
-
-      pid_t pid;
-
-      HARDBUG((pid = compat_fork()) == -1)
-
-      if (pid == 0)
-      {
-        HARDBUG(compat_pipe_close(parent2child[1]) == -1)
-
-        HARDBUG(compat_pipe_close(child2parent[0]) == -1)
-
-        HARDBUG(compat_dup2(parent2child[0], 0) == -1)
-
-        HARDBUG(compat_dup2(child2parent[1], 1) == -1)
-
-        HARDBUG(compat_chdir(dir) == -1)
-
-        if (compat_strcasecmp(arg, "NULL") == 0)
-        {
-          HARDBUG(execlp(exe, exe, NULL) == -1)
-        }
-        else
-        {
-          HARDBUG(execlp(exe, exe, arg, NULL) == -1)
-        }
-
-        FATAL("should not get here!", EXIT_FAILURE)
-      }
-
-      HARDBUG(compat_pipe_close(parent2child[0]) == -1)
-
-      HARDBUG(compat_pipe_close(child2parent[1]) == -1)
-
-      start_threads();
-
-      hub_server(parent2child[1], child2parent[0]);
-#else
-      pipe_t parent2child[2];
-
-      // pipe for stdin
-
-      HARDBUG(compat_pipe(parent2child) == -1)
-
-      HARDBUG(!SetHandleInformation(parent2child[1], HANDLE_FLAG_INHERIT, 0))
-
-      // pipe for stdout
-
-      pipe_t child2parent[2];
-
-      HARDBUG(compat_pipe(child2parent) == -1)
-
-      HARDBUG(!SetHandleInformation(child2parent[0], HANDLE_FLAG_INHERIT, 0))
-
-      PROCESS_INFORMATION piProcInfo;
-      STARTUPINFO siStartInfo;
-
-      ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
-      ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
-      siStartInfo.cb = sizeof(STARTUPINFO);
-      siStartInfo.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-      siStartInfo.hStdInput = parent2child[0];
-      siStartInfo.hStdOutput = child2parent[1];
-      siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
-
-      BOOL bSuccess =
-        CreateProcess(NULL,         // No module name (use command line)
-                      (LPSTR)exe,   // Command line
-                      NULL,         // Process handle not inheritable
-                      NULL,         // Thread handle not inheritable
-                      TRUE,         // Set handle inheritance to TRUE
-                      0,            // No creation flags
-                      NULL,         // Use parent's environment block
-                      (LPSTR)dir,   // Set working directory
-                      &siStartInfo, // Pointer to STARTUPINFO structure
-                      &piProcInfo); // Pointer to PROCESS_INFORMATION
-
-      HARDBUG(!bSuccess)
-
-      start_threads();
-
-      hub_server(parent2child[1], child2parent[0]);
-#endif
-
-      if (options.nthreads > 1)
-      {
-        for (int ithread = 1; ithread < options.nthreads; ithread++)
-          enqueue(return_thread_queue(threads + ithread),
-                  MESSAGE_EXIT_THREAD,
-                  "main/hub_server");
-      }
-
-      enqueue(return_thread_queue(thread_alpha_beta_master),
-              MESSAGE_EXIT_THREAD,
-              "main/hub_server");
-
-      PRINTF("before join\n");
-      join_threads();
-    }
   }
   else if (compat_strcasecmp(argv[iarg], "gen_random") == 0)
   {
