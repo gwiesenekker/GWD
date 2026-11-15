@@ -2,6 +2,7 @@
 #include "globals.h"
 
 #define NARGS_MAX 256
+#define HUB_TIME_RESERVE 0.050 // seconds for getting the move back to the GUI
 
 typedef struct
 {
@@ -436,7 +437,7 @@ void hub(void)
                             played, &time_control);
           level_pending = FALSE;
         }
-        set_time_limit(&time_control);
+        set_time_limit(&time_control, HUB_TIME_RESERVE);
         PRINTF("hub clock imove=%d moves_left=%d time=%.3f limit=%.6f\n",
                return_moves_done(&time_control), return_moves_left(&time_control),
                return_time_left(&time_control), options.time_limit);

@@ -1051,7 +1051,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
         {
           // configure thread for search
 
-          set_time_limit(with_time_control);
+          set_time_limit(with_time_control, 0.0);
 
           enqueue(return_thread_queue(thread_alpha_beta_master),
                   MESSAGE_STATE,

@@ -580,7 +580,7 @@ void sync_time_control(double arg_time_left,
   }
 }
 
-void set_time_limit(const time_control_t *arg_with_time_control)
+void set_time_limit(const time_control_t *arg_with_time_control, double arg_reserve)
 {
   HARDBUG(arg_with_time_control->TC_ngame_moves == INVALID)
   int jmove = arg_with_time_control->TC_rolling ? 0 : arg_with_time_control->TC_nmoves_done;
@@ -588,18 +588,24 @@ void set_time_limit(const time_control_t *arg_with_time_control)
              (arg_with_time_control->TC_ngame_moves + arg_with_time_control->TC_ntrouble);
   HARDBUG(jmove > last)
 
-  double remaining = fmax(0.0, return_time_left(arg_with_time_control));
+  HARDBUG(arg_reserve < 0.0)
+  double remaining = fmax(0.0, return_time_left(arg_with_time_control) - arg_reserve);
   for (int itrouble = 0; itrouble <= arg_with_time_control->TC_ntrouble; ++itrouble)
   {
     int islot = jmove + itrouble;
     double limit = 0.1;
     if (islot <= last)
-      limit = fmax(limit, arg_with_time_control->TC_game_time_per_move[islot] +
-                          arg_with_time_control->TC_increment);
+    {
+      limit = arg_with_time_control->TC_game_time_per_move[islot];
+      if (itrouble == 0)
+        limit += arg_with_time_control->TC_increment;
+      limit = fmax(0.1, limit);
+    }
     else if (arg_with_time_control->TC_rolling)
       limit = 0.0;
 
-    if ((arg_with_time_control->TC_increment > 0.0) or arg_with_time_control->TC_rolling)
+    if ((arg_reserve > 0.0) or (arg_with_time_control->TC_increment > 0.0) or
+        arg_with_time_control->TC_rolling)
     {
       limit = fmin(limit, remaining);
       remaining -= limit;

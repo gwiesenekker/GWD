@@ -63,7 +63,7 @@ void construct_time_control(time_control_t *);
 void configure_time_control(double, int, double, time_control_t *);
 void sync_time_control(double, int, double, int, time_control_t *);
 void update_time_control(double, time_control_t *);
-void set_time_limit(const time_control_t *);
+void set_time_limit(const time_control_t *, double);
 double return_time_used(const time_control_t *);
 double return_time_left(const time_control_t *);
 int is_configured_time_control(const time_control_t *);
