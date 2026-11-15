@@ -154,6 +154,7 @@ int draw_by_repetition(board_t *, int);
 int move_repetition(board_t *);
 void clear_totals(search_t *);
 void print_totals(search_t *);
+int probe_pv(pv_entries_t *, search_t *);
 void do_search(search_t *, moves_list_t *, int, int, score_t, my_random_t *);
 void clear_caches(void);
 void construct_search(search_t *, my_printf_t *, void *, int);

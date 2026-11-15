@@ -298,6 +298,22 @@ local void thread_func_alpha_beta_master(void *self)
                          arg_with_thread->T_search.S_best_score,
                          arg_with_thread->T_search.S_best_depth) == BSTR_ERR)
 
+        if (options.hub and options.ponder)
+        {
+          search_t *with_search = &arg_with_thread->T_search;
+          do_move(with_board, with_search->S_best_move, &moves_list);
+          moves_list_t replies;
+          construct_moves_list(&replies);
+          gen_moves(with_board, &replies);
+          int ireply = (replies.ML_nmoves == 1) ? 0 : probe_pv(&with_search->S_best_pv, with_search);
+          if ((ireply >= 0) and (ireply < replies.ML_nmoves))
+          {
+            move2bstring(&replies, ireply, bmove_string);
+            HARDBUG(bformata(btext, " ponder=%s", bdata(bmove_string)) == BSTR_ERR)
+          }
+          undo_move(with_board, with_search->S_best_move, &moves_list);
+        }
+
         enqueue(&main_queue, MESSAGE_RESULT, bdata(btext));
 
         BDESTROY(bmove_string)

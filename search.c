@@ -737,7 +737,7 @@ local inline ui64_t return_fmix64(ui64_t arg_key)
   return (arg_key);
 }
 
-local int probe_pv(pv_entries_t *arg_pv, search_t *arg_with_search)
+int probe_pv(pv_entries_t *arg_pv, search_t *arg_with_search)
 {
   int result = INVALID;
 
@@ -1505,7 +1505,7 @@ local void quiescence(search_t *arg_with_search,
         goto label_return;
       }
 
-      if (return_my_timer(&(arg_with_search->S_timer), FALSE) >=
+      if (search_clock_used(&(arg_with_search->S_timer)) >=
           options.time_limit)
       {
         if ((arg_with_search->S_best_score < 0) and
@@ -1531,7 +1531,7 @@ local void quiescence(search_t *arg_with_search,
         }
       }
       // check time_limit again
-      if (return_my_timer(&(arg_with_search->S_timer), FALSE) >=
+      if (search_clock_used(&(arg_with_search->S_timer)) >=
           options.time_limit)
       {
         *arg_best_score = SCORE_NOT_A_NUMBER;
@@ -2694,7 +2694,7 @@ local void alpha_beta(search_t *arg_with_search,
         goto label_return;
       }
 
-      if (return_my_timer(&(arg_with_search->S_timer), FALSE) >=
+      if (search_clock_used(&(arg_with_search->S_timer)) >=
           options.time_limit)
       {
         if ((arg_with_search->S_best_score < 0) and
@@ -2720,7 +2720,7 @@ local void alpha_beta(search_t *arg_with_search,
         }
       }
       // check time_limit again
-      if (return_my_timer(&(arg_with_search->S_timer), FALSE) >=
+      if (search_clock_used(&(arg_with_search->S_timer)) >=
           options.time_limit)
       {
         construct_search_result(arg_search_result,

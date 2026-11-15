@@ -4,6 +4,29 @@
 #define NARGS_MAX 256
 #define HUB_TIME_RESERVE 0.050 // seconds for getting the move back to the GUI
 
+// Negative means an ordinary search, zero waits for a hit, positive starts the move clock.
+local _Atomic double ponder_start = -1.0;
+
+local double monotonic_seconds(void)
+{
+  struct timespec now;
+  HARDBUG(compat_monotonic(&now) != 0)
+  return (double)now.tv_sec + now.tv_nsec * 1e-9;
+}
+
+double search_clock_used(my_timer_t *arg_timer)
+{
+  if (options.hub)
+  {
+    double start = atomic_load_explicit(&ponder_start, memory_order_relaxed);
+    if (start == 0.0)
+      return -1.0;
+    if (start > 0.0)
+      return monotonic_seconds() - start;
+  }
+  return return_my_timer(arg_timer, FALSE);
+}
+
 typedef struct
 {
   char *arg_name;
@@ -132,48 +155,37 @@ local void write_to_hub(char *arg_line)
   HARDBUG(compat_write(1, arg_line, nline) != nline)
 }
 
-local char *pgets(char *arg_s, int arg_size)
+// Keep a partial command across polls so a short read cannot stall a search.
+local int read_hub_line(char arg_line[MY_LINE_MAX], int arg_wait)
 {
-  // read pipe until '\n'
+  local char input[MY_LINE_MAX];
+  local int ninput = 0;
 
-  int i = 0;
-
-  while (TRUE)
+  while (arg_wait or compat_poll())
   {
-    int n;
     char c;
-
-    // error
-
-    if ((n = compat_read(0, &c, 1)) == INVALID)
-      return (NULL);
-
-    // eof
-
-    if (n == 0)
-      return (NULL);
-
-    HARDBUG(i >= (arg_size - 1))
-
-    if ((arg_s[i++] = c) == '\n')
-      break;
+    if (compat_read(0, &c, 1) <= 0)
+    {
+      ninput = 0;
+      return INVALID;
+    }
+    HARDBUG(ninput >= (MY_LINE_MAX - 1))
+    input[ninput++] = c;
+    if (c == '\n')
+    {
+      input[ninput] = '\0';
+      memcpy(arg_line, input, ninput + 1);
+      ninput = 0;
+      PRINTF("read_from_hub: %s", arg_line);
+      return TRUE;
+    }
   }
-
-  arg_s[i++] = '\0';
-
-  return (arg_s);
+  return FALSE;
 }
 
 local int read_from_hub(char arg_line[MY_LINE_MAX])
 {
-  PRINTF("waiting for input..\n");
-
-  if (pgets(arg_line, MY_LINE_MAX) == NULL)
-    return (INVALID);
-
-  PRINTF("read_from_hub: %s", arg_line);
-
-  return (TRUE);
+  return read_hub_line(arg_line, TRUE);
 }
 
 local int hub_input(void) { return (compat_poll()); }
@@ -242,11 +254,16 @@ void hub(void)
   int level_depth = INVALID;
   double default_time_limit = options.time_limit;
 
+  char line[MY_LINE_MAX];
+  char pending_line[MY_LINE_MAX] = "";
   while (TRUE)
   {
-    char line[MY_LINE_MAX];
-
-    if (read_from_hub(line) == INVALID)
+    if (pending_line[0] != '\0')
+    {
+      strcpy(line, pending_line);
+      pending_line[0] = '\0';
+    }
+    else if (read_from_hub(line) == INVALID)
       return;
 
     command_t command;
@@ -443,24 +460,29 @@ void hub(void)
       HARDBUG(name == NULL)
 
       int clock_think = (compat_strcasecmp(name, "think") == 0) and clock_active;
-      if (clock_think)
+      int pondering = (compat_strcasecmp(name, "ponder") == 0);
+      time_control_t ponder_control;
+      if (clock_think or (pondering and clock_active))
       {
+        time_control_t *control = &time_control;
+        if (pondering)
+        {
+          // Commit the predicted position's clock report only on a hit.
+          ponder_control = time_control;
+          control = &ponder_control;
+        }
         if (level_pending)
         {
           int played = move_played and (last_key != with_search->S_board.B_key);
           sync_time_control(level.time_left, level.moves_left, level.increment,
-                            played, &time_control);
-          level_pending = FALSE;
+                            played, control);
+          if (!pondering)
+            level_pending = FALSE;
         }
-        set_time_limit(&time_control, HUB_TIME_RESERVE);
+        set_time_limit(control, HUB_TIME_RESERVE);
         PRINTF("hub clock imove=%d moves_left=%d time=%.3f limit=%.6f\n",
-               return_moves_done(&time_control), return_moves_left(&time_control),
-               return_time_left(&time_control), options.time_limit);
-      }
-      else if (compat_strcasecmp(name, "ponder") == 0)
-      {
-        options.time_limit = 10000.0;
-        options.time_ntrouble = 0;
+               return_moves_done(control), return_moves_left(control),
+               return_time_left(control), options.time_limit);
       }
       else if (compat_strcasecmp(name, "analyze") == 0)
       {
@@ -571,6 +593,7 @@ void hub(void)
         // think, ponder or analyze
 
         BSTRING(bmove_string)
+        BSTRING(bponder_string)
 
         if (options.use_book)
           return_book_move(&(with_search->S_board), &moves_list, bmove_string);
@@ -591,6 +614,9 @@ void hub(void)
 
           if (compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
           {
+            if (pondering)
+              atomic_store_explicit(&ponder_start, 0.0, memory_order_relaxed);
+
             enqueue(return_thread_queue(thread_alpha_beta_master),
                     MESSAGE_STATE,
                     game_state.get_game_state(&game_state));
@@ -600,19 +626,60 @@ void hub(void)
                     "hub/hub");
 
             int abort = FALSE;
+            int result_ready = FALSE;
             message_t message;
 
             while (TRUE)
             {
-              if (!abort and hub_input())
+              char input[MY_LINE_MAX];
+              int received = abort ? FALSE : read_hub_line(input, result_ready);
+              if (received != FALSE)
               {
-                PRINTF("got input!\n");
+                command_t incoming;
+                incoming.command = NULL;
+                if (received != INVALID)
+                {
+                  strcpy(pending_line, input);
+                  line2command(input, &incoming);
+                }
 
-                enqueue(return_thread_queue(thread_alpha_beta_master),
-                        MESSAGE_ABORT_SEARCH,
-                        "hub/hub");
+                if ((incoming.command != NULL) and
+                    (compat_strcasecmp(incoming.command, "ponder-hit") == 0))
+                {
+                  pending_line[0] = '\0';
+                  if (pondering)
+                  {
+                    atomic_store_explicit(&ponder_start, monotonic_seconds(), memory_order_relaxed);
+                    pondering = FALSE;
+                    clock_think = clock_active;
+                    if (clock_active)
+                    {
+                      time_control = ponder_control;
+                      level_pending = FALSE;
+                    }
+                    PRINTF("ponder-hit\n");
+                  }
+                }
+                else if ((incoming.command != NULL) and
+                         (compat_strcasecmp(incoming.command, "ping") == 0))
+                {
+                  pending_line[0] = '\0';
+                  write_to_hub("pong\n");
+                }
+                else
+                {
+                  if (!result_ready)
+                    enqueue(return_thread_queue(thread_alpha_beta_master),
+                            MESSAGE_ABORT_SEARCH, "hub/hub");
+                  abort = TRUE;
+                }
+              }
 
-                abort = TRUE;
+              if (result_ready)
+              {
+                if (pondering and !abort)
+                  continue;
+                break;
               }
 
               if (dequeue(&main_queue, &message) == INVALID)
@@ -638,12 +705,18 @@ void hub(void)
               else if (message.message_id == MESSAGE_RESULT)
               {
                 PRINTF("got result %s\n", bdata(message.message_text));
-
-                break;
+                result_ready = TRUE;
+                if ((!pondering) or abort)
+                  break;
               }
               else
                 FATAL("message.message_id error", EXIT_FAILURE)
             } // while(TRUE)
+
+            atomic_store_explicit(&ponder_start, -1.0, memory_order_relaxed);
+            char *reply = strstr(bdata(message.message_text), " ponder=");
+            if (reply != NULL)
+              HARDBUG(bassigncstr(bponder_string, reply) == BSTR_ERR)
 
             CSTRING(cmove_string, blength(message.message_text))
 
@@ -658,7 +731,7 @@ void hub(void)
 
         HARDBUG(compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
 
-        snprintf(line, MY_LINE_MAX, "done move=%s\n", bdata(bmove_string));
+        snprintf(line, MY_LINE_MAX, "done move=%s%s\n", bdata(bmove_string), bdata(bponder_string));
 
         write_to_hub(line);
 
@@ -668,6 +741,7 @@ void hub(void)
           last_key = with_search->S_board.B_key;
         }
 
+        BDESTROY(bponder_string)
         BDESTROY(bmove_string)
       }
       if (!clock_think)
