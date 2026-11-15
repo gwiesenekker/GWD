@@ -421,9 +421,8 @@ local double geometric_weights(int arg_first_move, int arg_nweights, double *arg
 local void allocate_game_time(time_control_t *arg_with_time_control)
 {
   int first = arg_with_time_control->TC_nmoves_done;
-  int moves = arg_with_time_control->TC_ngame_moves;
-  int nweights = arg_with_time_control->TC_rolling ? moves :
-             (moves + arg_with_time_control->TC_ntrouble + 1);
+  int nweights = arg_with_time_control->TC_nslots;
+  int padded = (nweights > arg_with_time_control->TC_ngame_moves);
   double game_time = fmax(0.0, return_time_left(arg_with_time_control));
   double *per_move = arg_with_time_control->TC_game_time_per_move;
   double weight_left;
@@ -432,15 +431,14 @@ local void allocate_game_time(time_control_t *arg_with_time_control)
   else
     weight_left = geometric_weights(first, nweights, per_move);
 
-  // The rolling window contains exactly 'moves' slots; the fixed schedule
-  // retains its original inclusive reserve slot and tail divisor.
-  if (arg_with_time_control->TC_rolling)
+  // For an exact horizon, redistribute only the weight outside its slots.
+  if (!padded)
   {
     weight_left = 1.0;
     for (int islot = 0; islot < nweights; ++islot)
       weight_left -= per_move[islot];
   }
-  double tail_weight = weight_left / (arg_with_time_control->TC_rolling ? nweights : (nweights - 1));
+  double tail_weight = weight_left / (padded ? (nweights - 1) : nweights);
   for (int islot = 0; islot < nweights; ++islot)
     per_move[islot] = game_time * (per_move[islot] + tail_weight);
 }
@@ -448,6 +446,7 @@ local void allocate_game_time(time_control_t *arg_with_time_control)
 void configure_time_control(double arg_game_time,
                             int arg_ngame_moves,
                             double arg_increment,
+                            time_horizon_t arg_horizon,
                             time_control_t *arg_with_time_control)
 {
   int rolling = (arg_ngame_moves == INVALID);
@@ -456,9 +455,18 @@ void configure_time_control(double arg_game_time,
 
   HARDBUG((!isfinite(arg_game_time)) or (arg_game_time < 0.0) or (arg_ngame_moves < 0))
   HARDBUG((!isfinite(arg_increment)) or (arg_increment < 0.0))
+  HARDBUG((arg_horizon != TIME_HORIZON_EXACT) and (arg_horizon != TIME_HORIZON_PADDED))
   HARDBUG((options.time_control_ntrouble < 0) or
-          (arg_ngame_moves >= (NODE_MAX - options.time_control_ntrouble)))
-  HARDBUG((arg_ngame_moves + options.time_control_ntrouble) == 0)
+          (options.time_control_ntrouble > NTROUBLE_MAX))
+  int nslots = arg_ngame_moves;
+  if ((!rolling) and (arg_horizon == TIME_HORIZON_PADDED))
+  {
+    // Standard DXP allows play beyond the agreed move count.
+    HARDBUG(arg_ngame_moves >= (NODE_MAX - options.time_control_ntrouble))
+    nslots += options.time_control_ntrouble + 1;
+    HARDBUG(nslots < 2)
+  }
+  HARDBUG((nslots < 1) or (nslots > NODE_MAX))
   HARDBUG(options.time_control_sigma < 1)
   if (options.time_control_method != 0)
     HARDBUG((options.time_control_mean < 0) or (options.time_control_mean >= NODE_MAX))
@@ -467,6 +475,7 @@ void configure_time_control(double arg_game_time,
   arg_with_time_control->TC_increment = arg_increment;
   arg_with_time_control->TC_game_time = arg_game_time;
   arg_with_time_control->TC_ngame_moves = arg_ngame_moves;
+  arg_with_time_control->TC_nslots = nslots;
   arg_with_time_control->TC_ntrouble = options.time_control_ntrouble;
   arg_with_time_control->TC_nmoves_done = 0;
   arg_with_time_control->TC_time_used = 0.0;
@@ -479,7 +488,7 @@ void update_time_control(double arg_move_time,
 {
   HARDBUG(arg_with_time_control->TC_ngame_moves == INVALID)
   int jmove = arg_with_time_control->TC_nmoves_done;
-  int last_move = arg_with_time_control->TC_ngame_moves + arg_with_time_control->TC_ntrouble;
+  int last_move = arg_with_time_control->TC_nslots - 1;
   HARDBUG((!isfinite(arg_move_time)) or (arg_move_time < 0.0))
   ++arg_with_time_control->TC_nmoves_done;
   arg_with_time_control->TC_time_used += arg_move_time;
@@ -497,7 +506,10 @@ void update_time_control(double arg_move_time,
 
   PRINTF("jmove=%d delta=%.2f\n", jmove, delta);
 
-  int moves2go = last_move - (jmove + 1);
+  int moves2go = last_move - jmove;
+  // Preserve the original redistribution divisor for the padded DXP schedule.
+  if (arg_with_time_control->TC_nslots > arg_with_time_control->TC_ngame_moves)
+    --moves2go;
 
   PRINTF("moves2go=%d\n", moves2go);
 
@@ -530,7 +542,7 @@ void sync_time_control(double arg_time_left,
   if ((!is_configured_time_control(arg_with_time_control)) or
       (rolling != arg_with_time_control->TC_rolling))
   {
-    configure_time_control(arg_time_left, arg_moves_left, arg_increment,
+    configure_time_control(arg_time_left, arg_moves_left, arg_increment, TIME_HORIZON_EXACT,
                            arg_with_time_control);
     return;
   }
@@ -545,7 +557,7 @@ void sync_time_control(double arg_time_left,
     else
     {
       // A new control period, or the GUI jumped to another move.
-      configure_time_control(arg_time_left, arg_moves_left, arg_increment,
+      configure_time_control(arg_time_left, arg_moves_left, arg_increment, TIME_HORIZON_EXACT,
                              arg_with_time_control);
       return;
     }
@@ -572,7 +584,7 @@ void sync_time_control(double arg_time_left,
     else
     {
       int first = arg_with_time_control->TC_nmoves_done;
-      int last = arg_with_time_control->TC_ngame_moves + arg_with_time_control->TC_ntrouble;
+      int last = arg_with_time_control->TC_nslots - 1;
       for (int islot = first; islot <= last; ++islot)
         arg_with_time_control->TC_game_time_per_move[islot] +=
           correction / (last - first + 1);
@@ -584,13 +596,16 @@ void set_time_limit(const time_control_t *arg_with_time_control, double arg_rese
 {
   HARDBUG(arg_with_time_control->TC_ngame_moves == INVALID)
   int jmove = arg_with_time_control->TC_rolling ? 0 : arg_with_time_control->TC_nmoves_done;
-  int last = arg_with_time_control->TC_rolling ? (arg_with_time_control->TC_ngame_moves - 1) :
-             (arg_with_time_control->TC_ngame_moves + arg_with_time_control->TC_ntrouble);
+  int last = arg_with_time_control->TC_nslots - 1;
   HARDBUG(jmove > last)
 
   HARDBUG(arg_reserve < 0.0)
   double remaining = fmax(0.0, return_time_left(arg_with_time_control) - arg_reserve);
-  for (int itrouble = 0; itrouble <= arg_with_time_control->TC_ntrouble; ++itrouble)
+  int ntrouble = arg_with_time_control->TC_ntrouble;
+  if ((arg_with_time_control->TC_nslots == arg_with_time_control->TC_ngame_moves) and
+      (ntrouble > (last - jmove)))
+    ntrouble = last - jmove;
+  for (int itrouble = 0; itrouble <= ntrouble; ++itrouble)
   {
     int islot = jmove + itrouble;
     double limit = 0.1;
@@ -601,8 +616,6 @@ void set_time_limit(const time_control_t *arg_with_time_control, double arg_rese
         limit += arg_with_time_control->TC_increment;
       limit = fmax(0.1, limit);
     }
-    else if (arg_with_time_control->TC_rolling)
-      limit = 0.0;
 
     if ((arg_reserve > 0.0) or (arg_with_time_control->TC_increment > 0.0) or
         arg_with_time_control->TC_rolling)
@@ -616,7 +629,7 @@ void set_time_limit(const time_control_t *arg_with_time_control, double arg_rese
     else
       options.time_trouble[itrouble - 1] = limit;
   }
-  options.time_ntrouble = arg_with_time_control->TC_ntrouble;
+  options.time_ntrouble = ntrouble;
 }
 
 local double burn_cpu(double t)

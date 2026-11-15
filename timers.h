@@ -33,12 +33,19 @@ typedef struct
   i64_t P_ndelta;
 } progress_t;
 
+typedef enum
+{
+  TIME_HORIZON_EXACT,
+  TIME_HORIZON_PADDED
+} time_horizon_t;
+
 typedef struct
 {
   double TC_game_time;
   double TC_increment;
   int TC_rolling;
   int TC_ngame_moves;
+  int TC_nslots;
   int TC_ntrouble;
   int TC_nmoves_done;
   double TC_time_used;
@@ -60,7 +67,7 @@ i64_t return_ntodo(progress_t *);
 void destroy_progress(progress_t *);
 
 void construct_time_control(time_control_t *);
-void configure_time_control(double, int, double, time_control_t *);
+void configure_time_control(double, int, double, time_horizon_t, time_control_t *);
 void sync_time_control(double, int, double, int, time_control_t *);
 void update_time_control(double, time_control_t *);
 void set_time_limit(const time_control_t *, double);

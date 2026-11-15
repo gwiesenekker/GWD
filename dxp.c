@@ -95,7 +95,8 @@ local void encode(char arg_type,
       snprintf(arg_buffer + i, 7, "%03d%03d", options.dxp_game_time, moves);
       i += 6;
     }
-    configure_time_control(game_time, moves, increment, &arg_with_dxp->DXP_time_control);
+    configure_time_control(game_time, moves, increment, TIME_HORIZON_PADDED,
+                           &arg_with_dxp->DXP_time_control);
 
     strcpy(arg_buffer + i, "B");
     i++;
@@ -328,7 +329,8 @@ char decode(int arg_nhuffer, char *arg_buffer, dxp_t *arg_with_dxp)
       increment = 0.0;
     }
     PRINTF("game_time=%.3f increment=%.3f moves=%d\n", game_time, increment, moves);
-    configure_time_control(game_time, moves, increment, &arg_with_dxp->DXP_time_control);
+    configure_time_control(game_time, moves, increment, TIME_HORIZON_PADDED,
+                           &arg_with_dxp->DXP_time_control);
 
     HARDBUG(i >= arg_nhuffer)
     if (arg_buffer[i] == 'A')

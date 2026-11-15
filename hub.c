@@ -413,7 +413,7 @@ void hub(void)
           level_pending = is_configured_time_control(&time_control);
           if (!level_pending)
             configure_time_control(level.time_left, level.moves_left, level.increment,
-                                   &time_control);
+                                   TIME_HORIZON_EXACT, &time_control);
         }
         else if (compat_strcasecmp(name, "infinite") == 0)
         {
