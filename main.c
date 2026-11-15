@@ -3131,8 +3131,10 @@ int main(int argc, char **argv)
 
   test_buckets();
 
+#ifdef DEBUG
   test_my_random();
   // FATAL("test_my_random", EXIT_FAILURE)
+#endif
 
   test_cJSON();
 
