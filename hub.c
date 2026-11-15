@@ -196,22 +196,22 @@ local void read_clock_level(command_t *arg_command, hub_level_t *arg_level)
   for (int iarg = 0; iarg < arg_command->command_nargs; ++iarg)
   {
     arg_t *arg = &arg_command->command_args[iarg];
-    HARDBUG(arg->arg_value == NULL)
     if (compat_strcasecmp(arg->arg_name, "moves") == 0)
     {
+      HARDBUG(arg->arg_value == NULL)
       HARDBUG(my_sscanf(arg->arg_value, "%d", &arg_level->moves_left) != 1)
       HARDBUG(arg_level->moves_left < 1)
     }
     else if (compat_strcasecmp(arg->arg_name, "time") == 0)
     {
+      HARDBUG(arg->arg_value == NULL)
       HARDBUG(my_sscanf(arg->arg_value, "%lf", &arg_level->time_left) != 1)
     }
     else if (compat_strcasecmp(arg->arg_name, "inc") == 0)
     {
+      HARDBUG(arg->arg_value == NULL)
       HARDBUG(my_sscanf(arg->arg_value, "%lf", &arg_level->increment) != 1)
     }
-    else
-      FATAL("unknown clock parameter", EXIT_FAILURE)
   }
   HARDBUG((!isfinite(arg_level->time_left)) or (arg_level->time_left < 0.0))
   HARDBUG((!isfinite(arg_level->increment)) or (arg_level->increment < 0.0))
@@ -238,6 +238,8 @@ void hub(void)
   int level_pending = FALSE;
   int move_played = FALSE;
   hash_key_t last_key = 0;
+  int default_depth_limit = options.depth_limit;
+  int level_depth = INVALID;
   double default_time_limit = options.time_limit;
 
   while (TRUE)
@@ -264,6 +266,7 @@ void hub(void)
       clock_active = FALSE;
       level_pending = FALSE;
       move_played = FALSE;
+      level_depth = INVALID;
       options.time_limit = default_time_limit;
       options.time_ntrouble = 0;
     }
@@ -356,70 +359,82 @@ void hub(void)
     {
       HARDBUG(command.command_nargs < 1)
 
-      char *name = command.command_args[0].arg_name;
-
-      char *value = command.command_args[0].arg_value;
-
-      if (compat_strcasecmp(name, "depth") == 0)
+      for (int iarg = 0; iarg < command.command_nargs; ++iarg)
       {
-        clock_active = FALSE;
-        HARDBUG(value == NULL)
+        char *name = command.command_args[iarg].arg_name;
 
-        int d;
+        char *value = command.command_args[iarg].arg_value;
 
-        HARDBUG(my_sscanf(value, "%d", &d) != 1)
+        if (compat_strcasecmp(name, "depth") == 0)
+        {
+          clock_active = FALSE;
+          HARDBUG(value == NULL)
 
-        HARDBUG(d < 1)
-        HARDBUG(d >= DEPTH_MAX)
+          int d;
 
-        PRINTF("got depth %d\n", d);
+          HARDBUG(my_sscanf(value, "%d", &d) != 1)
 
-        options.depth_limit = d;
+          HARDBUG(d < 1)
+          HARDBUG(d >= DEPTH_MAX)
+
+          PRINTF("got depth %d\n", d);
+
+          level_depth = d;
+          options.time_limit = 10000.0;
+          options.time_ntrouble = 0;
+        }
+        else if (compat_strcasecmp(name, "move-time") == 0)
+        {
+          clock_active = FALSE;
+          HARDBUG(value == NULL)
+
+          double t;
+
+          HARDBUG(my_sscanf(value, "%lf", &t) != 1)
+
+          HARDBUG((!isfinite(t)) or (t <= 0.0))
+
+          PRINTF("got move-time %g\n", t);
+
+          level_depth = INVALID;
+          options.time_limit = t;
+
+          options.time_trouble[0] = options.time_limit / 2.0;
+          options.time_trouble[1] = options.time_limit / 4.0;
+          options.time_ntrouble = 2;
+        }
+        else if ((compat_strcasecmp(name, "moves") == 0) or
+                 (compat_strcasecmp(name, "time") == 0) or
+                 (compat_strcasecmp(name, "inc") == 0))
+        {
+          level_depth = INVALID;
+          read_clock_level(&command, &level);
+          clock_active = TRUE;
+          level_pending = is_configured_time_control(&time_control);
+          if (!level_pending)
+            configure_time_control(level.time_left, level.moves_left, level.increment,
+                                   &time_control);
+        }
+        else if (compat_strcasecmp(name, "infinite") == 0)
+        {
+          clock_active = FALSE;
+          level_depth = INVALID;
+          PRINTF("found infinite\n");
+
+          options.time_limit = 10000.0;
+          options.time_ntrouble = 0;
+        }
+        else
+          continue;
+
+        break;
       }
-      else if (compat_strcasecmp(name, "move-time") == 0)
-      {
-        clock_active = FALSE;
-        HARDBUG(value == NULL)
-
-        int t;
-
-        HARDBUG(my_sscanf(value, "%d", &t) != 1)
-
-        HARDBUG(t < 1)
-
-        PRINTF("got move-time %d\n", t);
-
-        options.time_limit = t;
-
-        options.time_trouble[0] = options.time_limit / 2.0;
-        options.time_trouble[1] = options.time_limit / 4.0;
-        options.time_ntrouble = 2;
-      }
-      else if ((compat_strcasecmp(name, "moves") == 0) or
-               (compat_strcasecmp(name, "time") == 0) or
-               (compat_strcasecmp(name, "inc") == 0))
-      {
-        read_clock_level(&command, &level);
-        clock_active = TRUE;
-        level_pending = is_configured_time_control(&time_control);
-        if (!level_pending)
-          configure_time_control(level.time_left, level.moves_left, level.increment,
-                                 &time_control);
-      }
-      else if (compat_strcasecmp(name, "infinite") == 0)
-      {
-        clock_active = FALSE;
-        PRINTF("found infinite\n");
-
-        options.time_limit = 10000.0;
-        options.time_ntrouble = 0;
-      }
-      else
-        PRINTF("ignoring %s\n", name);
     }
     else if (compat_strcasecmp(command.command, "go") == 0)
     {
-      options.depth_limit = 64;
+      options.depth_limit = (level_depth == INVALID) ? default_depth_limit : level_depth;
+      double saved_time_limit = options.time_limit;
+      int saved_time_ntrouble = options.time_ntrouble;
 
       HARDBUG(command.command_nargs < 1)
 
@@ -449,12 +464,12 @@ void hub(void)
       }
       else if (compat_strcasecmp(name, "analyze") == 0)
       {
-        if (options.ponder)
+        if (options.ponder or (level_depth != INVALID))
           options.time_limit = 10000.0;
         else
         {
           options.time_limit = 1.0;
-          options.depth_limit = 1.0;
+          options.depth_limit = 1;
         }
 
         options.time_ntrouble = 0;
@@ -654,6 +669,11 @@ void hub(void)
         }
 
         BDESTROY(bmove_string)
+      }
+      if (!clock_think)
+      {
+        options.time_limit = saved_time_limit;
+        options.time_ntrouble = saved_time_ntrouble;
       }
     }
     else if (compat_strcasecmp(command.command, "ping") == 0)
