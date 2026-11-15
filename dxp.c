@@ -18,6 +18,7 @@
 #define DXP_IWIN '3'
 
 #define MARGIN 5
+#define DXP_TIME_RESERVE 0.050 // seconds for returning the move to the opponent
 
 typedef struct
 {
@@ -1061,7 +1062,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
         {
           // configure thread for search
 
-          set_time_limit(with_time_control, 0.0);
+          set_time_limit(with_time_control, DXP_TIME_RESERVE);
 
           enqueue(return_thread_queue(thread_alpha_beta_master),
                   MESSAGE_STATE,
