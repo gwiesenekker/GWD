@@ -256,6 +256,8 @@ void hub(void)
 
   char line[MY_LINE_MAX];
   char pending_line[MY_LINE_MAX] = "";
+  write_to_hub("ready\n");
+
   while (TRUE)
   {
     if (pending_line[0] != '\0')
@@ -899,10 +901,7 @@ void init_hub(void)
       continue;
 
     if (compat_strcasecmp(command.command, "init") == 0)
-    {
-      write_to_hub("ready\n");
       break;
-    }
 
     HARDBUG(compat_strcasecmp(command.command, "set-param") != 0)
 
