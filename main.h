@@ -73,6 +73,7 @@ typedef struct
   int singular_moves_threshold;
   int singular_probe_percentage;
   int singular_probe_margin;
+  int singular_reduction;
 
   int sync_clock;
 

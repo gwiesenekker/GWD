@@ -464,6 +464,7 @@ void clear_totals(search_t *arg_with_search)
   arg_with_search->S_total_singular_extension_probes_le_alpha = 0;
   arg_with_search->S_total_singular_extension_probes_ge_beta = 0;
   arg_with_search->S_total_singular_extensions = 0;
+  arg_with_search->S_total_singular_reductions = 0;
 
   arg_with_search->S_total_evaluations = 0;
   arg_with_search->S_total_lazy_alpha_evaluations = 0;
@@ -576,6 +577,7 @@ void print_totals(search_t *arg_with_search){
   PRINTF_TOTAL(S_total_singular_extension_probes_le_alpha)
   PRINTF_TOTAL(S_total_singular_extension_probes_ge_beta)
   PRINTF_TOTAL(S_total_singular_extensions)
+  PRINTF_TOTAL(S_total_singular_reductions)
 
   PRINTF_TOTAL(S_total_evaluations)
   PRINTF_TOTAL(S_total_lazy_alpha_evaluations)
@@ -1770,7 +1772,7 @@ local void alpha_beta_captures(search_t *arg_with_search,
                                ui32_t arg_my_tweaks,
                                moves_list_t *arg_moves_list,
                                sort_t *arg_sort,
-                               int arg_singular_extension,
+                               int arg_singular_adjustment,
                                search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
@@ -1811,9 +1813,9 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
   temp_result.SR_pv = arg_search_result->SR_pv;
 
-  reset_sort(arg_sort, arg_singular_extension == INVALID ? 1 : 0);
+  reset_sort(arg_sort, arg_singular_adjustment == DEPTH_MAX ? 1 : 0);
 
-  for (int imove = (arg_singular_extension == INVALID ? 1 : 0);
+  for (int imove = (arg_singular_adjustment == DEPTH_MAX ? 1 : 0);
        imove < arg_moves_list->ML_nmoves;
        imove++)
   {
@@ -1821,13 +1823,16 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
     HARDBUG(jmove == INVALID)
 
-    int singular_extension = 0;
+    int singular_adjustment = 0;
 
-    if ((arg_singular_extension > 0) and (imove < 1))
+    if ((arg_singular_adjustment != 0) and (imove < 1))
     {
-      singular_extension = arg_singular_extension;
+      singular_adjustment = arg_singular_adjustment;
 
-      ++(arg_with_search->S_total_singular_extensions);
+      if (singular_adjustment > 0)
+        ++(arg_with_search->S_total_singular_extensions);
+      else
+        ++(arg_with_search->S_total_singular_reductions);
     }
 
     score_t temp_alpha;
@@ -1871,11 +1876,12 @@ local void alpha_beta_captures(search_t *arg_with_search,
       alpha_beta(arg_with_search,
                  -temp_beta,
                  -temp_alpha,
-                 arg_my_depth + singular_extension,
+                 arg_my_depth + singular_adjustment,
                  node_type,
                  arg_reduction_depth_root,
                  your_tweaks |
-                   (singular_extension > 0 ? TWEAK_MOVE_EXTENDED_BIT : 0U),
+                   (singular_adjustment > 0 ? TWEAK_MOVE_EXTENDED_BIT : 0U) |
+                   (singular_adjustment < 0 ? TWEAK_MOVE_REDUCED_BIT : 0U),
                  NULL,
                  NULL,
                  0,
@@ -1930,7 +1936,8 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
       arg_search_result->SR_pv = temp_result.SR_pv;
 
-      arg_search_result->SR_depth = arg_my_depth + singular_extension;
+      arg_search_result->SR_depth =
+        arg_my_depth + (singular_adjustment > 0 ? singular_adjustment : 0);
 
       for (int kmove = imove; kmove > 0; kmove--)
         arg_sort->S_array[kmove] = arg_sort->S_array[kmove - 1];
@@ -1986,7 +1993,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
                               ui32_t arg_my_tweaks,
                               moves_list_t *arg_moves_list,
                               sort_t *arg_sort,
-                              int arg_singular_extension,
+                              int arg_singular_adjustment,
                               search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
@@ -2029,7 +2036,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
   int allow_reductions =
     options.use_reductions and !(arg_my_tweaks & TWEAK_MOVE_REDUCED_BIT) and
     !(arg_my_tweaks & TWEAK_MOVE_EXTENDED_BIT) and
-    (arg_singular_extension == 0) and (arg_moves_list->ML_ncaptx == 0) and
+    (arg_singular_adjustment <= 0) and (arg_moves_list->ML_ncaptx == 0) and
     (arg_moves_list->ML_nmoves > options.reduction_moves_threshold) and
     (your_depth >= options.reduction_depth_leaf) and
     (arg_reduction_depth_root == 0) and !IS_SCORE_LOST(arg_my_alpha) and
@@ -2051,9 +2058,9 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
   for (int jpass = 1; jpass <= NPASS_REDUCED_SEARCH; ++jpass)
   {
-    reset_sort(arg_sort, arg_singular_extension == INVALID ? 1 : 0);
+    reset_sort(arg_sort, arg_singular_adjustment == DEPTH_MAX ? 1 : 0);
 
-    for (int imove = (arg_singular_extension == INVALID ? 1 : 0);
+    for (int imove = (arg_singular_adjustment == DEPTH_MAX ? 1 : 0);
          imove < arg_moves_list->ML_nmoves;
          imove++)
     {
@@ -2066,13 +2073,16 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
       found[jmove] = TRUE;
 
-      int singular_extension = 0;
+      int singular_adjustment = 0;
 
-      if ((arg_singular_extension > 0) and (imove < 1))
+      if ((arg_singular_adjustment != 0) and (imove < 1))
       {
-        singular_extension = arg_singular_extension;
+        singular_adjustment = arg_singular_adjustment;
 
-        ++(arg_with_search->S_total_singular_extensions);
+        if (singular_adjustment > 0)
+          ++(arg_with_search->S_total_singular_extensions);
+        else
+          ++(arg_with_search->S_total_singular_reductions);
       }
 
       construct_search_result(&temp_result,
@@ -2110,7 +2120,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
         //   (nmoves_searched_at_full_depth >= options.reduction_full_min))
         // would also search move 0 with a reduced window
 
-        if ((ipass == 1) and allow_reductions and
+        if ((ipass == 1) and allow_reductions and (singular_adjustment == 0) and
             (nmoves_searched_at_full_depth >= options.reduction_full_min) and
             !MOVE_DO_NOT_REDUCE(arg_moves_list->ML_move_flags[jmove]))
         {
@@ -2142,12 +2152,13 @@ local void alpha_beta_minimal(search_t *arg_with_search,
           arg_with_search,
           -temp_beta,
           -temp_alpha,
-          reduced_depth + singular_extension,
+          reduced_depth + singular_adjustment,
           arg_node_type,
           arg_reduction_depth_root,
           your_tweaks |
             (reduced_depth < your_depth ? TWEAK_MOVE_REDUCED_BIT : 0U) |
-            (singular_extension ? TWEAK_MOVE_EXTENDED_BIT : 0U),
+            (singular_adjustment > 0 ? TWEAK_MOVE_EXTENDED_BIT : 0U) |
+            (singular_adjustment < 0 ? TWEAK_MOVE_REDUCED_BIT : 0U),
           NULL,
           NULL,
           0,
@@ -2241,7 +2252,8 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
         arg_search_result->SR_pv = temp_result.SR_pv;
 
-        arg_search_result->SR_depth = arg_my_depth + singular_extension;
+        arg_search_result->SR_depth =
+          arg_my_depth + (singular_adjustment > 0 ? singular_adjustment : 0);
 
         for (int kmove = imove; kmove > 0; kmove--)
           arg_sort->S_array[kmove] = arg_sort->S_array[kmove - 1];
@@ -2310,7 +2322,7 @@ local void alpha_beta_pv(search_t *arg_with_search,
                          ui32_t arg_my_tweaks,
                          moves_list_t *arg_moves_list,
                          sort_t *arg_sort,
-                         int arg_singular_extension,
+                         int arg_singular_adjustment,
                          search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
@@ -2358,9 +2370,9 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
   for (int jpass = 1; jpass <= NPASS_PV_SEARCH; ++jpass)
   {
-    reset_sort(arg_sort, arg_singular_extension == INVALID ? 1 : 0);
+    reset_sort(arg_sort, arg_singular_adjustment == DEPTH_MAX ? 1 : 0);
 
-    for (int imove = (arg_singular_extension == INVALID ? 1 : 0);
+    for (int imove = (arg_singular_adjustment == DEPTH_MAX ? 1 : 0);
          imove < arg_moves_list->ML_nmoves;
          imove++)
     {
@@ -2373,13 +2385,16 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
       found[jmove] = TRUE;
 
-      int singular_extension = 0;
+      int singular_adjustment = 0;
 
-      if ((arg_singular_extension > 0) and (imove < 1))
+      if ((arg_singular_adjustment != 0) and (imove < 1))
       {
-        singular_extension = arg_singular_extension;
+        singular_adjustment = arg_singular_adjustment;
 
-        ++(arg_with_search->S_total_singular_extensions);
+        if (singular_adjustment > 0)
+          ++(arg_with_search->S_total_singular_extensions);
+        else
+          ++(arg_with_search->S_total_singular_reductions);
       }
 
       score_t temp_alpha;
@@ -2429,12 +2444,13 @@ local void alpha_beta_pv(search_t *arg_with_search,
           arg_with_search,
           -temp_beta,
           -temp_alpha,
-          reduced_depth + singular_extension,
+          reduced_depth + singular_adjustment,
           node_type,
           arg_reduction_depth_root,
           your_tweaks |
             (reduced_depth < your_depth ? TWEAK_MOVE_REDUCED_BIT : 0U) |
-            (singular_extension > 0 ? TWEAK_MOVE_EXTENDED_BIT : 0U),
+            (singular_adjustment > 0 ? TWEAK_MOVE_EXTENDED_BIT : 0U) |
+            (singular_adjustment < 0 ? TWEAK_MOVE_REDUCED_BIT : 0U),
           NULL,
           NULL,
           0,
@@ -2523,7 +2539,8 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
         arg_search_result->SR_pv = temp_result.SR_pv;
 
-        arg_search_result->SR_depth = arg_my_depth + singular_extension;
+        arg_search_result->SR_depth =
+          arg_my_depth + (singular_adjustment > 0 ? singular_adjustment : 0);
 
         for (int kmove = imove; kmove > 0; kmove--)
           arg_sort->S_array[kmove] = arg_sort->S_array[kmove - 1];
@@ -2590,7 +2607,7 @@ local void alpha_beta(search_t *arg_with_search,
                       ui32_t arg_my_tweaks,
                       moves_list_t *arg_moves_list,
                       sort_t *arg_sort,
-                      int arg_singular_extension,
+                      int arg_singular_adjustment,
                       search_result_t *arg_search_result)
 {
   PUSH_NAME(__FUNC__)
@@ -2756,7 +2773,7 @@ local void alpha_beta(search_t *arg_with_search,
   }
 
   if ((options.alpha_beta_cache_size > 0) and
-      (arg_singular_extension != INVALID))
+      (arg_singular_adjustment != DEPTH_MAX))
   {
     alpha_beta_cache_entry_t *entry =
       alpha_beta_cache[arg_with_search->S_network_id][my_colour] +
@@ -2865,7 +2882,7 @@ local void alpha_beta(search_t *arg_with_search,
   alpha_beta_cache_slot_t alpha_beta_cache_slot;
 
   if ((options.alpha_beta_cache_size > 0) and
-      (arg_singular_extension != INVALID))
+      (arg_singular_adjustment != DEPTH_MAX))
   {
     alpha_beta_cache_hit = probe_alpha_beta_cache(
       arg_with_search,
@@ -3031,11 +3048,13 @@ local void alpha_beta(search_t *arg_with_search,
     }
   }
 
-  int singular_extension = arg_singular_extension == INVALID ? INVALID : 0;
+  // DEPTH_MAX marks the exclusion probe, which skips the first move.
+  int singular_adjustment =
+    (arg_singular_adjustment == DEPTH_MAX) ? DEPTH_MAX : 0;
 
   if ((options.prob_cut_depth > 0) and
       (arg_my_depth >= options.prob_cut_depth) and
-      IS_MINIMAL_WINDOW(arg_node_type) and (arg_singular_extension == 0) and
+      IS_MINIMAL_WINDOW(arg_node_type) and (arg_singular_adjustment == 0) and
       !(arg_my_tweaks & TWEAK_MOVE_REDUCED_BIT) and
       !(arg_my_tweaks & TWEAK_MOVE_EXTENDED_BIT) and
       !(arg_my_tweaks & TWEAK_PROB_CUT_BIT) and
@@ -3137,7 +3156,7 @@ local void alpha_beta(search_t *arg_with_search,
   if ((options.singular_probe_depth > 0) and
       (arg_my_depth >= options.singular_probe_depth) and
       (arg_moves_list->ML_nmoves > options.singular_moves_threshold) and
-      (arg_singular_extension == 0) and
+      (arg_singular_adjustment == 0) and
       !(arg_my_tweaks & TWEAK_MOVE_REDUCED_BIT))
   {
     if (alpha_beta_cache_hit and
@@ -3176,7 +3195,7 @@ local void alpha_beta(search_t *arg_with_search,
                  arg_my_tweaks,
                  arg_moves_list,
                  &singular_sort,
-                 INVALID,
+                 DEPTH_MAX,
                  &singular_probe_result);
 
       if (IS_SCORE_NAN(singular_probe_result.SR_score))
@@ -3186,11 +3205,16 @@ local void alpha_beta(search_t *arg_with_search,
       {
         ++(arg_with_search->S_total_singular_extension_probes_le_alpha);
 
-        singular_extension = 1;
+        singular_adjustment = 1;
       }
       else
       {
         ++(arg_with_search->S_total_singular_extension_probes_ge_beta);
+
+        // Leave one ply for the quiet move before reducing the child depth.
+        if ((options.singular_reduction > 0) and
+            (arg_my_depth > options.singular_reduction))
+          singular_adjustment = -options.singular_reduction;
       }
     }
   }
@@ -3215,7 +3239,7 @@ local void alpha_beta(search_t *arg_with_search,
                         arg_my_tweaks,
                         arg_moves_list,
                         sort,
-                        singular_extension,
+                        singular_adjustment,
                         arg_search_result);
 
     if (IS_SCORE_NAN(arg_search_result->SR_score))
@@ -3274,7 +3298,7 @@ local void alpha_beta(search_t *arg_with_search,
                        arg_my_tweaks,
                        arg_moves_list,
                        sort,
-                       singular_extension,
+                       singular_adjustment,
                        arg_search_result);
 
     if (IS_SCORE_NAN(arg_search_result->SR_score))
@@ -3291,7 +3315,7 @@ local void alpha_beta(search_t *arg_with_search,
                   arg_my_tweaks,
                   arg_moves_list,
                   sort,
-                  singular_extension,
+                  singular_adjustment,
                   arg_search_result);
 
     if (IS_SCORE_NAN(arg_search_result->SR_score))
@@ -3334,7 +3358,7 @@ label_store:
   }
 
   if ((options.alpha_beta_cache_size > 0) and
-      (arg_singular_extension != INVALID) and
+      (arg_singular_adjustment != DEPTH_MAX) and
       !IS_SR_DRAW_BY_REP(arg_search_result->SR_flags) and
       (options.cache_draw_results or (arg_search_result->SR_score != 0)))
   {
@@ -3346,6 +3370,10 @@ label_store:
     alpha_beta_cache_slot.ABCS_score = arg_search_result->SR_score;
 
     alpha_beta_cache_slot.ABCS_depth = arg_search_result->SR_depth;
+
+    // The reduced first move can affect the bound even when another move wins.
+    if (singular_adjustment < 0)
+      alpha_beta_cache_slot.ABCS_depth = arg_my_depth + singular_adjustment;
 
     for (int imove = 0; imove < NABCS_MOVES; imove++)
       alpha_beta_cache_slot.ABCS_moves[imove] = INVALID;

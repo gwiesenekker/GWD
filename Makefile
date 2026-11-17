@@ -143,6 +143,8 @@ $(TARGET): $(OBJS) $(COMPATOBJS) $(ENDGAME7OBJS)
 	REVISION=$$(./$(TARGET) --revision); echo $$REVISION;\
         mkdir -p /tmp8/gwies/dxp1/$$REVISION;\
         cp $(TARGET) gwd.json overrides.json network0.json ballot2.fen /tmp8/gwies/dxp1/$$REVISION;\
+        cp $(TARGET) gwd.json overrides.json network0.json ballot2.fen /tmp2/gwies/ZGUI/engine11;\
+        cp $(TARGET) gwd.json overrides.json network0.json ballot2.fen /tmp2/gwies/ZGUI/engine12
 
 HEADERS=boards.h\
   sort.h\

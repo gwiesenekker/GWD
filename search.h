@@ -127,6 +127,7 @@ typedef struct
   i64_t S_total_singular_extension_probes_le_alpha;
   i64_t S_total_singular_extension_probes_ge_beta;
   i64_t S_total_singular_extensions;
+  i64_t S_total_singular_reductions;
 
   i64_t S_total_evaluations;
   i64_t S_total_lazy_alpha_evaluations;

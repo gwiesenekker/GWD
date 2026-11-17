@@ -1933,6 +1933,7 @@ local void load_gwd_json(void)
   options.singular_moves_threshold = 2;
   options.singular_probe_percentage = 50;
   options.singular_probe_margin = 1;
+  options.singular_reduction = 0;
 
   options.sync_clock = FALSE;
 
@@ -2106,6 +2107,8 @@ local void parse_parameters(void)
 
       else if (compat_strcasecmp(parameter_name, "singular_probe_margin") == 0)
         options.singular_probe_margin = ivalue;
+      else if (compat_strcasecmp(parameter_name, "singular_reduction") == 0)
+        options.singular_reduction = ivalue;
 
       else if (compat_strcasecmp(parameter_name, "alpha_beta_cache_size") == 0)
         options.alpha_beta_cache_size = ivalue;
@@ -3058,6 +3061,7 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(singular_moves_threshold);
   PRINTF_CFG_I(singular_probe_percentage);
   PRINTF_CFG_I(singular_probe_margin);
+  PRINTF_CFG_I(singular_reduction);
 
   PRINTF_CFG_B(sync_clock);
 
@@ -3146,6 +3150,7 @@ int main(int argc, char **argv)
   HARDBUG(options.singular_probe_percentage < 1)
   HARDBUG(options.singular_probe_percentage > 99)
   HARDBUG(options.singular_probe_margin < 0)
+  HARDBUG(options.singular_reduction < 0)
 
   HARDBUG(options.alpha_beta_cache_size < 0)
 
