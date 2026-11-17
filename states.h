@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1282 di 17 nov 2026 22:39:46 CET
 #ifndef StatesH
 #define StatesH
 
@@ -6,7 +6,7 @@ typedef struct game_state
 {
   cJSON *cjson_object;
 
-  char string[MY_LINE_MAX];
+  bstring bstate;
 
   void (*printf_game_state)(struct game_state *);
   void (*set_game_state)(struct game_state *, char *);

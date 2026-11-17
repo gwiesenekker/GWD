@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1282 di 17 nov 2026 22:39:46 CET
 #include "globals.h"
 
 // the game state is maintained in a cJSON object
@@ -20,9 +20,9 @@ local void printf_game_state(game_state_t *arg_with_game_state)
 
 local void set_game_state(game_state_t *arg_with_game_state, char *arg_string)
 {
-  arg_with_game_state->cjson_object = cJSON_Parse(arg_string);
+  cJSON *cjson_object = cJSON_Parse(arg_string);
 
-  if (arg_with_game_state->cjson_object == NULL)
+  if (cjson_object == NULL)
   {
     const char *error = cJSON_GetErrorPtr();
 
@@ -31,6 +31,9 @@ local void set_game_state(game_state_t *arg_with_game_state, char *arg_string)
 
     FATAL("gwd.json error", EXIT_FAILURE)
   }
+
+  cJSON_Delete(arg_with_game_state->cjson_object);
+  arg_with_game_state->cjson_object = cjson_object;
 }
 
 local void set_event(game_state_t *arg_with_game_state, char *arg_event)
@@ -259,12 +262,15 @@ local void save2pdn(game_state_t *arg_with_game_state, char *arg_pdn)
 
 local char *get_game_state(game_state_t *arg_with_game_state)
 {
-  HARDBUG(cJSON_PrintPreallocated(arg_with_game_state->cjson_object,
-                                  arg_with_game_state->string,
-                                  MY_LINE_MAX,
-                                  FALSE) == 0)
+  char *string = cJSON_PrintUnformatted(arg_with_game_state->cjson_object);
 
-  return (arg_with_game_state->string);
+  HARDBUG(string == NULL)
+
+  HARDBUG(bassigncstr(arg_with_game_state->bstate, string) == BSTR_ERR)
+
+  cJSON_free(string);
+
+  return (bdata(arg_with_game_state->bstate));
 }
 
 local char *get_event(game_state_t *arg_with_game_state)
@@ -361,37 +367,25 @@ local void load(game_state_t *arg_with_game_state, char *arg_name)
 {
   FILE *fload;
 
-  HARDBUG((fload = fopen(arg_name, "r")) == NULL)
+  HARDBUG((fload = fopen(arg_name, "rb")) == NULL)
 
-  char string[MY_LINE_MAX];
+  BSTRING(bstate)
 
-  strcpy(string, "");
+  HARDBUG(breada(bstate, (bNread)fread, fload) == BSTR_ERR)
+  HARDBUG(ferror(fload))
 
-  while (TRUE)
-  {
-    char line[MY_LINE_MAX];
-
-    if (fgets(line, MY_LINE_MAX, fload) == NULL)
-      break;
-
-    size_t n = strlen(line);
-
-    if (n > 0)
-    {
-      if (line[n - 1] == '\n')
-        line[n - 1] = '\0';
-    }
-    strcat(string, " ");
-    strcat(string, line);
-  }
   FCLOSE(fload)
 
-  arg_with_game_state->set_game_state(arg_with_game_state, string);
+  arg_with_game_state->set_game_state(arg_with_game_state, bdata(bstate));
+
+  BDESTROY(bstate)
 }
 
 void construct_game_state(game_state_t *arg_with_game_state)
 {
   arg_with_game_state->cjson_object = cJSON_CreateObject();
+
+  HARDBUG((arg_with_game_state->bstate = bfromcstr("")) == NULL)
 
   char event[MY_LINE_MAX];
 
@@ -470,6 +464,8 @@ void construct_game_state(game_state_t *arg_with_game_state)
 
 void destroy_game_state(game_state_t *arg_with_game_state)
 {
+  HARDBUG(bdestroy(arg_with_game_state->bstate) == BSTR_ERR)
+
   cJSON_Delete(arg_with_game_state->cjson_object);
 }
 
