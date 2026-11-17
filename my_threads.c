@@ -8,16 +8,31 @@ thread_t threads[NTHREADS_MAX];
 
 thread_t *thread_alpha_beta_master = NULL;
 
+local int is_go_message(int arg_message_id)
+{
+  return ((arg_message_id == MESSAGE_GO) or (arg_message_id == MESSAGE_GO_TIMED) or
+          (arg_message_id == MESSAGE_GO_SHORT_CLOCK));
+}
+
+local dtm_policy_t go_dtm_policy(int arg_message_id)
+{
+  if (arg_message_id == MESSAGE_GO_SHORT_CLOCK)
+    return DTM_ROOT_IF_OPEN;
+  if (arg_message_id == MESSAGE_GO_TIMED)
+    return DTM_ROOT_ONLY;
+  return DTM_ROOT_AND_PV;
+}
+
 /* The previous search may still be unwinding. Acknowledge GO only after
  * its final publication, before any work for the new search is dispatched. */
-local void start_search_workers(char *description)
+local void start_search_workers(int arg_go, char *description)
 {
   for (int i = 1; i < options.nthreads; i++)
   {
     atomic_store_explicit(&threads[i].T_nodes_ready,
                           FALSE,
                           memory_order_relaxed);
-    enqueue(return_thread_queue(threads + i), MESSAGE_GO, description);
+    enqueue(return_thread_queue(threads + i), arg_go, description);
   }
   for (int i = 1; i < options.nthreads; i++)
     while (
@@ -78,7 +93,7 @@ local void solve_problems(void *self, char *arg_name)
                 MESSAGE_FEN,
                 bdata(bfen));
 
-      start_search_workers("threads/solve_problems");
+      start_search_workers(MESSAGE_GO, "threads/solve_problems");
     }
 
     my_printf(&(arg_with_thread->T_my_printf), "problem #%d\n", nproblems);
@@ -242,8 +257,10 @@ local void thread_func_alpha_beta_master(void *self)
 
         destroy_game_state(&game_state);
       }
-      else if (message.message_id == MESSAGE_GO)
+      else if (is_go_message(message.message_id))
       {
+        arg_with_thread->T_search.S_dtm_policy = go_dtm_policy(message.message_id);
+
         my_printf(&(arg_with_thread->T_my_printf),
                   "got GO message %s\n",
                   bdata(message.message_text));
@@ -252,7 +269,7 @@ local void thread_func_alpha_beta_master(void *self)
 
         if (options.nthreads > 1)
         {
-          start_search_workers("threads/thread_alha_beta_master");
+          start_search_workers(message.message_id, "threads/thread_alpha_beta_master");
         }
 
         board_t *with_board = &(arg_with_thread->T_search.S_board);
@@ -332,6 +349,8 @@ local void thread_func_alpha_beta_master(void *self)
       }
       else if (message.message_id == MESSAGE_MCTS)
       {
+        arg_with_thread->T_search.S_dtm_policy = DTM_ROOT_AND_PV;
+
         my_printf(&(arg_with_thread->T_my_printf),
                   "got MCTS message %s\n",
                   bdata(message.message_text));
@@ -460,8 +479,10 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
 
         destroy_game_state(&game_state);
       }
-      else if (message.message_id == MESSAGE_GO)
+      else if (is_go_message(message.message_id))
       {
+        arg_with_thread->T_search.S_dtm_policy = go_dtm_policy(message.message_id);
+
         my_printf(&(arg_with_thread->T_my_printf),
                   "got GO message %s\n",
                   bdata(message.message_text));

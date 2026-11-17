@@ -10,6 +10,7 @@ extern GwdegtbWdlProbe *wdl_probe_alpha_beta_master;
 
 void init_endgame(void);
 int read_endgame(search_t *, const char **);
+int read_endgame_if_open(search_t *);
 score_t return_endgame_score(search_t *);
 void fin_endgame(void);
 

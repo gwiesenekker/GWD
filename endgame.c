@@ -114,24 +114,32 @@ void init_endgame(void)
   PRINTF("..done\n");
 }
 
-int read_endgame(search_t *arg_with_search, const char **arg_dtm_missing_name)
+local int probe_dtm(search_t *arg_with_search, const char **arg_dtm_missing_name,
+                    int arg_only_if_open)
 {
   if (arg_dtm_missing_name != NULL)
     *arg_dtm_missing_name = NULL;
 
   board_t *with_board = &(arg_with_search->S_board);
 
+  if (arg_only_if_open and
+      (BIT_COUNT(with_board->B_white_king_bb | with_board->B_white_man_bb |
+                 with_board->B_black_king_bb | with_board->B_black_man_bb) > EGTB_MAX_PIECES))
+    return ENDGAME_UNKNOWN;
+
+  GwdegtbSide side = (with_board->B_colour2move == WHITE_ENUM) ?
+                     GWDEGTB_WHITE_TO_MOVE : GWDEGTB_BLACK_TO_MOVE;
+
   HARDBUG(compat_mutex_lock(&dtm_probe_mutex) != 0)
 
-  int result = gwdegtb_dtm_lookup(options.egtb_dir,
-                                  16 * MBYTE,
-                                  with_board->B_white_king_bb,
-                                  with_board->B_white_man_bb,
-                                  with_board->B_black_king_bb,
-                                  with_board->B_black_man_bb,
-                                  with_board->B_colour2move == WHITE_ENUM
-                                    ? GWDEGTB_WHITE_TO_MOVE
-                                    : GWDEGTB_BLACK_TO_MOVE);
+  int result = (arg_only_if_open ? gwdegtb_dtm_lookup_if_open : gwdegtb_dtm_lookup)(
+    options.egtb_dir, 16 * MBYTE, with_board->B_white_king_bb, with_board->B_white_man_bb,
+    with_board->B_black_king_bb, with_board->B_black_man_bb, side);
+
+  if (arg_only_if_open and (result == GWDEGTB_DTM_UNAVAILABLE))
+    (void)gwdegtb_dtm_request_open(options.egtb_dir, 16 * MBYTE,
+                                  with_board->B_white_king_bb, with_board->B_white_man_bb,
+                                  with_board->B_black_king_bb, with_board->B_black_man_bb, side);
 
   HARDBUG(compat_mutex_unlock(&dtm_probe_mutex) != 0)
 
@@ -144,6 +152,16 @@ int read_endgame(search_t *arg_with_search, const char **arg_dtm_missing_name)
   }
 
   return (result);
+}
+
+int read_endgame(search_t *arg_with_search, const char **arg_dtm_missing_name)
+{
+  return probe_dtm(arg_with_search, arg_dtm_missing_name, FALSE);
+}
+
+int read_endgame_if_open(search_t *arg_with_search)
+{
+  return probe_dtm(arg_with_search, NULL, TRUE);
 }
 
 score_t return_endgame_score(search_t *arg_with_search)
@@ -221,6 +239,8 @@ score_t return_endgame_score(search_t *arg_with_search)
 
 void fin_endgame(void)
 {
+  gwdegtb_dtm_close_all();
+
   GwdegtbWdlProbeStatistics statistics;
 
   gwdegtb_wdl_probe_statistics(wdl_probe_alpha_beta_master, &statistics);

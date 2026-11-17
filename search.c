@@ -143,7 +143,6 @@
 #undef CHECK_TIME_LIMIT_IN_QUIESCENCE
 
 #define UPDATE_NODES 1000
-#define HUB_WDL_CLOCK_SECONDS 1.0
 
 #define NABCS_MOVES 2
 #define NABCS_SLOTS 4
@@ -3442,7 +3441,7 @@ void do_pv(search_t *arg_with_search,
   }
 
   // A displayed PV must not open DTM files on the playing clock.
-  int temp_mate = (hub_search_time_left >= 0.0) ? ENDGAME_UNKNOWN :
+  int temp_mate = (arg_with_search->S_dtm_policy != DTM_ROOT_AND_PV) ? ENDGAME_UNKNOWN :
                   read_endgame(arg_with_search, NULL);
 
   if (temp_mate != ENDGAME_UNKNOWN)
@@ -3746,10 +3745,10 @@ void do_search(search_t *arg_with_search,
 
   // check for known endgame
 
-  // Under a short Hub clock use the ordinary WDL-aware root search.
-  int short_clock = ((hub_search_time_left >= 0.0) and
-                     (hub_search_time_left <= HUB_WDL_CLOCK_SECONDS));
-  int egtb_mate = short_clock ? ENDGAME_UNKNOWN : read_endgame(arg_with_search, NULL);
+  // Under a short Hub clock queue missing DTMs and use WDL while they open.
+  int short_clock = (arg_with_search->S_dtm_policy == DTM_ROOT_IF_OPEN);
+  int egtb_mate = short_clock ? read_endgame_if_open(arg_with_search) :
+                   read_endgame(arg_with_search, NULL);
 
   if (egtb_mate != ENDGAME_UNKNOWN)
   {
@@ -3762,6 +3761,8 @@ void do_search(search_t *arg_with_search,
     arg_with_search->S_best_score = SCORE(SCORE_MINUS_INFINITY);
 
     int your_mate = INVALID;
+    int optimal_child_mate = (egtb_mate == INVALID) ? INVALID :
+                             ((egtb_mate > 0) ? 1 : -1) - egtb_mate;
 
     reset_sort(&sort, 0);
 
@@ -3777,15 +3778,19 @@ void do_search(search_t *arg_with_search,
 
       const char *dtm_missing_name;
 
-      int temp_mate = read_endgame(arg_with_search, &dtm_missing_name);
+      int temp_mate = short_clock ? read_endgame_if_open(arg_with_search) :
+                      read_endgame(arg_with_search, &dtm_missing_name);
 
       if (temp_mate == ENDGAME_UNKNOWN)
       {
+        undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
+
+        if (short_clock)
+          continue;
+
         HARDBUG(dtm_missing_name == NULL)
 
         PRINTF("WARNING: DTM EGTB %s MISSING!\n", dtm_missing_name);
-
-        undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
         arg_with_search->S_best_score = SCORE(SCORE_MINUS_INFINITY);
 
@@ -3809,7 +3814,7 @@ void do_search(search_t *arg_with_search,
 
       BSTRING(bmove_string)
 
-      move2bstring(arg_moves_list, imove, bmove_string);
+      move2bstring(arg_moves_list, jmove, bmove_string);
 
       my_printf(arg_with_search->S_my_printf,
                 "%s " PRINTF_SCORE_T "\n",
@@ -3830,6 +3835,9 @@ void do_search(search_t *arg_with_search,
         arg_with_search->S_best_move = jmove;
 
         your_mate = temp_mate;
+
+        if (short_clock and (your_mate == optimal_child_mate))
+          break;
       }
 #ifdef DEBUG
       for (int idebug = 0; idebug < arg_moves_list->ML_nmoves; idebug++)
@@ -3843,7 +3851,9 @@ void do_search(search_t *arg_with_search,
 #endif
     }
 
-    if (arg_with_search->S_best_score != SCORE(SCORE_MINUS_INFINITY))
+    // A matching child proves an optimal move even if another table is pending.
+    if ((arg_with_search->S_best_score != SCORE(SCORE_MINUS_INFINITY)) and
+        (!short_clock or (your_mate == optimal_child_mate)))
     {
       arg_with_search->S_best_score_kind = SEARCH_BEST_SCORE_EGTB;
 
@@ -3873,7 +3883,7 @@ void do_search(search_t *arg_with_search,
                          bdata(bmove_string)) == BSTR_ERR)
       }
 
-      if ((your_mate != INVALID) and (hub_search_time_left < 0.0))
+      if ((your_mate != INVALID) and (arg_with_search->S_dtm_policy == DTM_ROOT_AND_PV))
       {
         do_move(&(arg_with_search->S_board), sort.S_array[0], arg_moves_list);
 
@@ -4562,6 +4572,7 @@ void construct_search(search_t *arg_with_search,
   arg_with_search->S_my_printf = arg_my_printf;
 
   arg_with_search->S_thread = arg_thread;
+  arg_with_search->S_dtm_policy = DTM_ROOT_AND_PV;
 
   arg_with_search->S_network_id = arg_network_id;
 

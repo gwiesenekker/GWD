@@ -4,8 +4,7 @@
 #define NARGS_MAX 256
 #define HUB_TIME_RESERVE 0.050 // seconds for getting the move back to the GUI
 
-// A negative value means the current Hub search has no playing clock.
-double hub_search_time_left = -1.0;
+#define HUB_WDL_CLOCK_SECONDS 1.0
 
 // Negative means an ordinary search, zero waits for a hit, positive starts the move clock.
 local _Atomic double ponder_start = -1.0;
@@ -472,9 +471,9 @@ void hub(void)
 
       int clock_think = (compat_strcasecmp(name, "think") == 0) and clock_active;
       int pondering = (compat_strcasecmp(name, "ponder") == 0);
-      hub_search_time_left = -1.0;
+      double time_left = -1.0;
       if (fixed_move_time and ((compat_strcasecmp(name, "think") == 0) or pondering))
-        hub_search_time_left = options.time_limit;
+        time_left = options.time_limit;
       time_control_t ponder_control;
       if (clock_think or (pondering and clock_active))
       {
@@ -493,7 +492,7 @@ void hub(void)
           if (!pondering)
             level_pending = FALSE;
         }
-        hub_search_time_left = return_time_left(control);
+        time_left = return_time_left(control);
         set_time_limit(control, HUB_TIME_RESERVE);
         PRINTF("hub clock imove=%d moves_left=%d time=%.3f limit=%.6f\n",
                return_moves_done(control), return_moves_left(control),
@@ -636,8 +635,13 @@ void hub(void)
                     MESSAGE_STATE,
                     game_state.get_game_state(&game_state));
 
+            int go = MESSAGE_GO;
+            if (time_left >= 0.0)
+              go = (time_left <= HUB_WDL_CLOCK_SECONDS) ? MESSAGE_GO_SHORT_CLOCK :
+                                                         MESSAGE_GO_TIMED;
+
             enqueue(return_thread_queue(thread_alpha_beta_master),
-                    MESSAGE_GO,
+                    go,
                     "hub/hub");
 
             int abort = FALSE;

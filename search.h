@@ -67,11 +67,19 @@ typedef struct
   pv_entries_t SR_pv;
 } search_result_t;
 
+typedef enum
+{
+  DTM_ROOT_AND_PV,
+  DTM_ROOT_ONLY,
+  DTM_ROOT_IF_OPEN
+} dtm_policy_t;
+
 typedef struct
 {
   my_printf_t *S_my_printf;
   void *S_thread;
   int S_network_id;
+  dtm_policy_t S_dtm_policy;
 
   board_t S_board;
 
