@@ -14,11 +14,11 @@ void flush_fbuffer(fbuffer_t *, int);
 
 void append_fbuffer_fmt(fbuffer_t *, const char *, ...);
 
-void append_fbuffer_bin(fbuffer_t *, void *, size_t);
+void append_fbuffer_bin(fbuffer_t *, const void *, size_t);
 
-bstring return_fbuffer_bname(fbuffer_t *);
+bstring return_fbuffer_bname(const fbuffer_t *);
 
-void construct_fbuffer(fbuffer_t *, bstring, char *, int);
+void construct_fbuffer(fbuffer_t *, const_bstring, const char *, int);
 
 void test_fbuffer(void);
 

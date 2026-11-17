@@ -14,10 +14,10 @@ typedef struct record
 } record_t;
 
 void construct_record(record_t *);
-void add_field(record_t *, char *, int, void *);
-void set_field(record_t *, char *, void *);
-void get_field(record_t *, char *, void *);
-void set_record(record_t *, bstring);
+void add_field(record_t *, const char *, int, const void *);
+void set_field(record_t *, const char *, const void *);
+void get_field(const record_t *, const char *, void *);
+void set_record(record_t *, const_bstring);
 bstring get_record(record_t *);
 
 void test_records(void);

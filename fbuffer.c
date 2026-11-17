@@ -49,7 +49,7 @@ void append_fbuffer_fmt(fbuffer_t *arg_with_fbuffer, const char *arg_fmt, ...)
 }
 
 void append_fbuffer_bin(fbuffer_t *arg_with_fbuffer,
-                        void *arg_data,
+                        const void *arg_data,
                         size_t ldata)
 {
   if (arg_data == NULL)
@@ -68,14 +68,14 @@ void append_fbuffer_bin(fbuffer_t *arg_with_fbuffer,
   arg_with_fbuffer->FB_nfbuffer += ldata;
 }
 
-bstring return_fbuffer_bname(fbuffer_t *arg_with_fbuffer)
+bstring return_fbuffer_bname(const fbuffer_t *arg_with_fbuffer)
 {
   return (arg_with_fbuffer->FB_bname);
 }
 
 void construct_fbuffer(fbuffer_t *arg_with_fbuffer,
-                       bstring arg_bname,
-                       char *arg_suffix,
+                       const_bstring arg_bname,
+                       const char *arg_suffix,
                        int arg_remove)
 {
   HARDBUG((arg_with_fbuffer->FB_bname = bfromcstr("")) == NULL)

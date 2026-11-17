@@ -11,13 +11,13 @@ typedef struct
 
 void construct_my_cjson(my_cjson_t *);
 
-void my_cjson_add_int(my_cjson_t *, char *, int);
-void my_cjson_set_int(my_cjson_t *, char *, int);
-int my_cjson_get_int(my_cjson_t *, char *);
+void my_cjson_add_int(my_cjson_t *, const char *, int);
+void my_cjson_set_int(my_cjson_t *, const char *, int);
+int my_cjson_get_int(const my_cjson_t *, const char *);
 
-void my_cjson_add_cstring(my_cjson_t *, char *, char *);
-void my_cjson_set_cstring(my_cjson_t *, char *, char *);
-char *my_cjson_get_cstring(my_cjson_t *, char *);
+void my_cjson_add_cstring(my_cjson_t *, const char *, const char *);
+void my_cjson_set_cstring(my_cjson_t *, const char *, const char *);
+char *my_cjson_get_cstring(const my_cjson_t *, const char *);
 
 char *my_cjson2cstring(my_cjson_t *);
 

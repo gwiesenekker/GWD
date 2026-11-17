@@ -8,14 +8,18 @@ void construct_my_cjson(my_cjson_t *arg_with_my_cjson)
   HARDBUG((arg_with_my_cjson->MCJ_bstring = bfromcstr("")) == NULL)
 }
 
-void my_cjson_add_int(my_cjson_t *arg_with_my_cjson, char *arg_id, int arg_int)
+void my_cjson_add_int(my_cjson_t *arg_with_my_cjson,
+                      const char *arg_id,
+                      int arg_int)
 {
   HARDBUG(cJSON_AddNumberToObject(arg_with_my_cjson->MCJ_cjson,
                                   arg_id,
                                   arg_int) == NULL)
 }
 
-void my_cjson_set_int(my_cjson_t *arg_with_my_cjson, char *arg_id, int arg_int)
+void my_cjson_set_int(my_cjson_t *arg_with_my_cjson,
+                      const char *arg_id,
+                      int arg_int)
 {
   cJSON *number;
 
@@ -27,7 +31,7 @@ void my_cjson_set_int(my_cjson_t *arg_with_my_cjson, char *arg_id, int arg_int)
   cJSON_SetNumberValue(number, arg_int);
 }
 
-int my_cjson_get_int(my_cjson_t *arg_with_my_cjson, char *arg_id)
+int my_cjson_get_int(const my_cjson_t *arg_with_my_cjson, const char *arg_id)
 {
   cJSON *number;
 
@@ -40,8 +44,8 @@ int my_cjson_get_int(my_cjson_t *arg_with_my_cjson, char *arg_id)
 }
 
 void my_cjson_add_cstring(my_cjson_t *arg_with_my_cjson,
-                          char *arg_id,
-                          char *arg_cstring)
+                          const char *arg_id,
+                          const char *arg_cstring)
 {
   HARDBUG(cJSON_AddStringToObject(arg_with_my_cjson->MCJ_cjson,
                                   arg_id,
@@ -49,8 +53,8 @@ void my_cjson_add_cstring(my_cjson_t *arg_with_my_cjson,
 }
 
 void my_cjson_set_cstring(my_cjson_t *arg_with_my_cjson,
-                          char *arg_id,
-                          char *arg_cstring)
+                          const char *arg_id,
+                          const char *arg_cstring)
 {
   cJSON *cstring;
 
@@ -62,7 +66,8 @@ void my_cjson_set_cstring(my_cjson_t *arg_with_my_cjson,
   cJSON_SetValuestring(cstring, arg_cstring);
 }
 
-char *my_cjson_get_cstring(my_cjson_t *arg_with_my_cjson, char *arg_id)
+char *my_cjson_get_cstring(const my_cjson_t *arg_with_my_cjson,
+                           const char *arg_id)
 {
   cJSON *cstring;
 

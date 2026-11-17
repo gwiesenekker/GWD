@@ -6,7 +6,7 @@
 #define CJSON_FIELD_TYPE_ID "field_type"
 #define CJSON_FIELD_VALUE_ID "field_value"
 
-local cJSON *find_field(cJSON *fields, char *arg_field_name)
+local cJSON *find_field(cJSON *fields, const char *arg_field_name)
 {
   HARDBUG(!cJSON_IsArray(fields))
 
@@ -43,9 +43,9 @@ void construct_record(record_t *arg_with_record)
 }
 
 void add_field(record_t *arg_with_record,
-               char *arg_field_name,
+               const char *arg_field_name,
                int arg_field_type,
-               void *arg_field_value)
+               const void *arg_field_value)
 {
   cJSON *fields =
     cJSON_GetObjectItem(arg_with_record->R_cjson, CJSON_FIELDS_ID);
@@ -68,7 +68,7 @@ void add_field(record_t *arg_with_record,
     int value = 0;
 
     if (arg_field_value != NULL)
-      value = *((int *)arg_field_value);
+      value = *((const int *)arg_field_value);
 
     HARDBUG(cJSON_AddNumberToObject(field,
                                     CJSON_FIELD_TYPE_ID,
@@ -107,7 +107,9 @@ void add_field(record_t *arg_with_record,
     FATAL("unsopported field_type", EXIT_FAILURE)
 }
 
-void set_field(record_t *arg_with_record, char *arg_field_name, void *arg_value)
+void set_field(record_t *arg_with_record,
+               const char *arg_field_name,
+               const void *arg_value)
 {
   cJSON *fields =
     cJSON_GetObjectItem(arg_with_record->R_cjson, CJSON_FIELDS_ID);
@@ -128,7 +130,7 @@ void set_field(record_t *arg_with_record, char *arg_field_name, void *arg_value)
 
     HARDBUG(!cJSON_IsNumber(field_value))
 
-    cJSON_SetNumberValue(field_value, *(int *)arg_value);
+    cJSON_SetNumberValue(field_value, *(const int *)arg_value);
   }
   else if (round(cJSON_GetNumberValue(field_type)) == FIELD_TYPE_STRING)
   {
@@ -136,11 +138,13 @@ void set_field(record_t *arg_with_record, char *arg_field_name, void *arg_value)
 
     HARDBUG(!cJSON_IsString(field_value))
 
-    cJSON_SetValuestring(field_value, (char *)arg_value);
+    cJSON_SetValuestring(field_value, (const char *)arg_value);
   }
 }
 
-void get_field(record_t *arg_with_record, char *arg_field_name, void *arg_value)
+void get_field(const record_t *arg_with_record,
+               const char *arg_field_name,
+               void *arg_value)
 {
   cJSON *fields =
     cJSON_GetObjectItem(arg_with_record->R_cjson, CJSON_FIELDS_ID);
@@ -174,7 +178,7 @@ void get_field(record_t *arg_with_record, char *arg_field_name, void *arg_value)
   }
 }
 
-void set_record(record_t *arg_with_record, bstring arg_bstring)
+void set_record(record_t *arg_with_record, const_bstring arg_bstring)
 {
   arg_with_record->R_cjson = cJSON_Parse(bdata(arg_bstring));
 

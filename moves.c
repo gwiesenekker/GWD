@@ -848,7 +848,7 @@ void check_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   END_BLOCK
 }
 
-void move2bstring(moves_list_t *arg_with_moves_list,
+void move2bstring(const moves_list_t *arg_with_moves_list,
                   int arg_imove,
                   bstring arg_bmove_string)
 {
@@ -856,7 +856,7 @@ void move2bstring(moves_list_t *arg_with_moves_list,
 
   HARDBUG(arg_imove >= arg_with_moves_list->ML_nmoves)
 
-  move_t *move = arg_with_moves_list->ML_moves + arg_imove;
+  const move_t *move = arg_with_moves_list->ML_moves + arg_imove;
 
   int ifield = move->M_move_from;
   int kfield = move->M_move_to;
@@ -891,7 +891,7 @@ void move2bstring(moves_list_t *arg_with_moves_list,
   }
 }
 
-local int move2ints(bstring arg_bmove, int arg_m[50])
+local int move2ints(const_bstring arg_bmove, int arg_m[50])
 {
   BSTRING(b)
 
@@ -921,7 +921,8 @@ local int move2ints(bstring arg_bmove, int arg_m[50])
   return (result);
 }
 
-int search_move(moves_list_t *arg_with_moves_list, bstring arg_bmove)
+int search_move(const moves_list_t *arg_with_moves_list,
+                const_bstring arg_bmove)
 {
   int ihit = INVALID;
 

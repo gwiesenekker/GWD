@@ -9,32 +9,32 @@ typedef struct game_state
   bstring bstate;
 
   void (*printf_game_state)(struct game_state *);
-  void (*set_game_state)(struct game_state *, char *);
-  void (*set_event)(struct game_state *, char *);
-  void (*set_date)(struct game_state *, char *);
-  void (*set_white)(struct game_state *, char *);
-  void (*set_black)(struct game_state *, char *);
-  void (*set_result)(struct game_state *, char *);
-  void (*set_starting_position)(struct game_state *, char *);
-  void (*push_move)(struct game_state *, char *, char *);
+  void (*set_game_state)(struct game_state *, const char *);
+  void (*set_event)(struct game_state *, const char *);
+  void (*set_date)(struct game_state *, const char *);
+  void (*set_white)(struct game_state *, const char *);
+  void (*set_black)(struct game_state *, const char *);
+  void (*set_result)(struct game_state *, const char *);
+  void (*set_starting_position)(struct game_state *, const char *);
+  void (*push_move)(struct game_state *, const char *, const char *);
   int (*pop_move)(struct game_state *);
   void (*clear_moves)(struct game_state *);
   void (*set_depth)(struct game_state *, int);
   void (*set_time)(struct game_state *, int);
-  void (*save)(struct game_state *, char *);
-  void (*save2pdn)(struct game_state *, char *);
+  void (*save)(struct game_state *, const char *);
+  void (*save2pdn)(struct game_state *, const char *);
 
   char *(*get_game_state)(struct game_state *);
-  char *(*get_event)(struct game_state *);
-  char *(*get_date)(struct game_state *);
-  char *(*get_white)(struct game_state *);
-  char *(*get_black)(struct game_state *);
-  char *(*get_result)(struct game_state *);
-  char *(*get_starting_position)(struct game_state *);
-  cJSON *(*get_moves)(struct game_state *);
-  int (*get_depth)(struct game_state *);
-  int (*get_time)(struct game_state *);
-  void (*load)(struct game_state *, char *);
+  char *(*get_event)(const struct game_state *);
+  char *(*get_date)(const struct game_state *);
+  char *(*get_white)(const struct game_state *);
+  char *(*get_black)(const struct game_state *);
+  char *(*get_result)(const struct game_state *);
+  char *(*get_starting_position)(const struct game_state *);
+  cJSON *(*get_moves)(const struct game_state *);
+  int (*get_depth)(const struct game_state *);
+  int (*get_time)(const struct game_state *);
+  void (*load)(struct game_state *, const char *);
 } game_state_t;
 
 typedef struct

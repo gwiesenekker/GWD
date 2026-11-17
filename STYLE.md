@@ -129,6 +129,18 @@ process_name(bdata(bname));
 BDESTROY(bname)
 ```
 
+## Read-only parameters
+
+- Use `const char *` for input strings and `const void *` for input buffers.
+  Keep output buffers and deliberately modified parser buffers mutable.
+- Use `const_bstring` for read-only bstring parameters, not `const bstring`
+  (which only makes the pointer constant). Treat the underlying data as
+  read-only too; the library's descriptor does not enforce deep constness.
+- Use `const object_t *` when a function only reads the object. Functions that
+  update cached serialization or other internal state still take mutable objects.
+- Keep declarations, definitions and function-pointer signatures consistent.
+  Do not cast away const to make a call compile.
+
 ## Comments and changes
 
 - Use short comments to explain intent, invariants, ownership, or a non-obvious

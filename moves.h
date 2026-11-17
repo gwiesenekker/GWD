@@ -34,8 +34,8 @@ void do_move(board_t *, int, moves_list_t *);
 void undo_move(board_t *, int, moves_list_t *);
 void check_moves(board_t *, moves_list_t *);
 
-void move2bstring(moves_list_t *, int, bstring);
-int search_move(moves_list_t *, bstring);
+void move2bstring(const moves_list_t *, int, bstring);
+int search_move(const moves_list_t *, const_bstring);
 
 void construct_moves_list(moves_list_t *);
 

@@ -11,7 +11,7 @@ typedef struct
   bstring BS_empty;
 } my_bstream_t;
 
-void construct_my_bstream(my_bstream_t *, char *);
+void construct_my_bstream(my_bstream_t *, const char *);
 int my_bstream_readln(my_bstream_t *, int);
 void destroy_my_bstream(my_bstream_t *);
 

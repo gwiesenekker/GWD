@@ -18,7 +18,8 @@ local void printf_game_state(game_state_t *arg_with_game_state)
   PRINTF("time=%d\n", arg_with_game_state->get_time(arg_with_game_state));
 }
 
-local void set_game_state(game_state_t *arg_with_game_state, char *arg_string)
+local void set_game_state(game_state_t *arg_with_game_state,
+                          const char *arg_string)
 {
   cJSON *cjson_object = cJSON_Parse(arg_string);
 
@@ -36,7 +37,7 @@ local void set_game_state(game_state_t *arg_with_game_state, char *arg_string)
   arg_with_game_state->cjson_object = cjson_object;
 }
 
-local void set_event(game_state_t *arg_with_game_state, char *arg_event)
+local void set_event(game_state_t *arg_with_game_state, const char *arg_event)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_EVENT_ID);
@@ -46,7 +47,7 @@ local void set_event(game_state_t *arg_with_game_state, char *arg_event)
   cJSON_SetValuestring(cjson_item, arg_event);
 }
 
-local void set_date(game_state_t *arg_with_game_state, char *arg_date)
+local void set_date(game_state_t *arg_with_game_state, const char *arg_date)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_DATE_ID);
@@ -56,7 +57,7 @@ local void set_date(game_state_t *arg_with_game_state, char *arg_date)
   cJSON_SetValuestring(cjson_item, arg_date);
 }
 
-local void set_white(game_state_t *arg_with_game_state, char *arg_white)
+local void set_white(game_state_t *arg_with_game_state, const char *arg_white)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_WHITE_ID);
@@ -66,7 +67,7 @@ local void set_white(game_state_t *arg_with_game_state, char *arg_white)
   cJSON_SetValuestring(cjson_item, arg_white);
 }
 
-local void set_black(game_state_t *arg_with_game_state, char *arg_black)
+local void set_black(game_state_t *arg_with_game_state, const char *arg_black)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_BLACK_ID);
@@ -76,7 +77,7 @@ local void set_black(game_state_t *arg_with_game_state, char *arg_black)
   cJSON_SetValuestring(cjson_item, arg_black);
 }
 
-local void set_result(game_state_t *arg_with_game_state, char *arg_result)
+local void set_result(game_state_t *arg_with_game_state, const char *arg_result)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_RESULT_ID);
@@ -87,7 +88,7 @@ local void set_result(game_state_t *arg_with_game_state, char *arg_result)
 }
 
 local void set_starting_position(game_state_t *arg_with_game_state,
-                                 char *arg_position)
+                                 const char *arg_position)
 {
   cJSON *cjson_item = cJSON_GetObjectItem(arg_with_game_state->cjson_object,
                                           CJSON_STARTING_POSITION_ID);
@@ -98,7 +99,9 @@ local void set_starting_position(game_state_t *arg_with_game_state,
 }
 
 local void
-push_move(game_state_t *arg_with_game_state, char *arg_move, char *arg_comment)
+push_move(game_state_t *arg_with_game_state,
+          const char *arg_move,
+          const char *arg_comment)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_MOVES_ID);
@@ -167,7 +170,7 @@ local void set_time(game_state_t *arg_with_game_state, int arg_time)
   cJSON_SetNumberValue(cjson_item, arg_time);
 }
 
-local void save(game_state_t *arg_with_game_state, char *arg_name)
+local void save(game_state_t *arg_with_game_state, const char *arg_name)
 {
   FILE *fsave;
 
@@ -180,7 +183,7 @@ local void save(game_state_t *arg_with_game_state, char *arg_name)
   FCLOSE(fsave)
 }
 
-local void save2pdn(game_state_t *arg_with_game_state, char *arg_pdn)
+local void save2pdn(game_state_t *arg_with_game_state, const char *arg_pdn)
 {
   int fd = compat_lock_file(arg_pdn, TRUE);
 
@@ -274,7 +277,7 @@ local char *get_game_state(game_state_t *arg_with_game_state)
   return (bdata(arg_with_game_state->bstate));
 }
 
-local char *get_event(game_state_t *arg_with_game_state)
+local char *get_event(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_EVENT_ID);
@@ -284,7 +287,7 @@ local char *get_event(game_state_t *arg_with_game_state)
   return (cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_date(game_state_t *arg_with_game_state)
+local char *get_date(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_DATE_ID);
@@ -294,7 +297,7 @@ local char *get_date(game_state_t *arg_with_game_state)
   return (cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_white(game_state_t *arg_with_game_state)
+local char *get_white(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_WHITE_ID);
@@ -304,7 +307,7 @@ local char *get_white(game_state_t *arg_with_game_state)
   return (cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_black(game_state_t *arg_with_game_state)
+local char *get_black(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_BLACK_ID);
@@ -314,7 +317,7 @@ local char *get_black(game_state_t *arg_with_game_state)
   return (cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_result(game_state_t *arg_with_game_state)
+local char *get_result(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_RESULT_ID);
@@ -324,7 +327,7 @@ local char *get_result(game_state_t *arg_with_game_state)
   return (cJSON_GetStringValue(cjson_item));
 }
 
-local char *get_starting_position(game_state_t *arg_with_game_state)
+local char *get_starting_position(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item = cJSON_GetObjectItem(arg_with_game_state->cjson_object,
                                           CJSON_STARTING_POSITION_ID);
@@ -334,7 +337,7 @@ local char *get_starting_position(game_state_t *arg_with_game_state)
   return (cJSON_GetStringValue(cjson_item));
 }
 
-local cJSON *get_moves(game_state_t *arg_with_game_state)
+local cJSON *get_moves(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_MOVES_ID);
@@ -344,7 +347,7 @@ local cJSON *get_moves(game_state_t *arg_with_game_state)
   return (cjson_item);
 }
 
-local int get_depth(game_state_t *arg_with_game_state)
+local int get_depth(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_DEPTH_ID);
@@ -354,7 +357,7 @@ local int get_depth(game_state_t *arg_with_game_state)
   return (round(cJSON_GetNumberValue(cjson_item)));
 }
 
-local int get_time(game_state_t *arg_with_game_state)
+local int get_time(const game_state_t *arg_with_game_state)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_TIME_ID);
@@ -364,7 +367,7 @@ local int get_time(game_state_t *arg_with_game_state)
   return (round(cJSON_GetNumberValue(cjson_item)));
 }
 
-local void load(game_state_t *arg_with_game_state, char *arg_name)
+local void load(game_state_t *arg_with_game_state, const char *arg_name)
 {
   FILE *fload;
 
