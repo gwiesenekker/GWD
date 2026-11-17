@@ -507,7 +507,7 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
                   "got GO message %s\n",
                   bdata(message.message_text));
 
-        atomic_store_explicit(&arg_with_thread->T_published_nodes,
+        atomic_store_explicit(&arg_with_thread->T_npublished_nodes,
                               0,
                               memory_order_relaxed);
         atomic_store_explicit(&arg_with_thread->T_nodes_ready,
@@ -774,10 +774,10 @@ local void create_thread(void *self, int arg_role)
 
   arg_with_thread->thread_role = arg_role;
 
-  atomic_init(&arg_with_thread->T_published_nodes, 0);
+  atomic_init(&arg_with_thread->T_npublished_nodes, 0);
   atomic_init(&arg_with_thread->T_nodes_ready, FALSE);
 
-  HARDBUG(!atomic_is_lock_free(&arg_with_thread->T_published_nodes))
+  HARDBUG(!atomic_is_lock_free(&arg_with_thread->T_npublished_nodes))
 
   construct_my_printf(&(arg_with_thread->T_my_printf), "log", FALSE);
 

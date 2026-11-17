@@ -112,10 +112,10 @@ static void test_cache(int nembed, int concat)
   dense->DNS_final_activation = NETWORK_ACTIVATION_LINEAR;
   dense->DNS_16x8_kernel = dense->DNS_ninputs == 16;
 
-  const int ids[] = {MATERIAL_NWHITE_MAN_ID,
-                     MATERIAL_NBLACK_MAN_ID,
-                     MATERIAL_NWHITE_KING_ID,
-                     MATERIAL_NBLACK_KING20_ID,
+  const int ids[] = {MATERIAL_NWHITE_MEN_ID,
+                     MATERIAL_NBLACK_MEN_ID,
+                     MATERIAL_NWHITE_KINGS_ID,
+                     MATERIAL_NBLACK_KINGS20_ID,
                      MATERIAL_MAN_KING_ID};
 
   const int counts[] = {21,

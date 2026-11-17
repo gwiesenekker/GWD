@@ -124,8 +124,8 @@ local int probe_dtm(search_t *arg_with_search,
   board_t *with_board = &(arg_with_search->S_board);
 
   if (arg_only_if_open and
-      (BIT_COUNT(with_board->B_white_king_bb | with_board->B_white_man_bb |
-                 with_board->B_black_king_bb | with_board->B_black_man_bb) >
+      (BIT_COUNT(with_board->B_white_kings_bb | with_board->B_white_men_bb |
+                 with_board->B_black_kings_bb | with_board->B_black_men_bb) >
        EGTB_MAX_PIECES))
     return ENDGAME_UNKNOWN;
 
@@ -139,19 +139,19 @@ local int probe_dtm(search_t *arg_with_search,
     (arg_only_if_open ? gwdegtb_dtm_lookup_if_open
                       : gwdegtb_dtm_lookup)(bdata(options.egtb_dir),
                                             16 * MBYTE,
-                                            with_board->B_white_king_bb,
-                                            with_board->B_white_man_bb,
-                                            with_board->B_black_king_bb,
-                                            with_board->B_black_man_bb,
+                                            with_board->B_white_kings_bb,
+                                            with_board->B_white_men_bb,
+                                            with_board->B_black_kings_bb,
+                                            with_board->B_black_men_bb,
                                             side);
 
   if (arg_only_if_open and (result == GWDEGTB_DTM_UNAVAILABLE))
     (void)gwdegtb_dtm_request_open(bdata(options.egtb_dir),
                                    16 * MBYTE,
-                                   with_board->B_white_king_bb,
-                                   with_board->B_white_man_bb,
-                                   with_board->B_black_king_bb,
-                                   with_board->B_black_man_bb,
+                                   with_board->B_white_kings_bb,
+                                   with_board->B_white_men_bb,
+                                   with_board->B_black_kings_bb,
+                                   with_board->B_black_men_bb,
                                    side);
 
   HARDBUG(compat_mutex_unlock(&dtm_probe_mutex) != 0)
@@ -183,8 +183,8 @@ score_t return_endgame_score(search_t *arg_with_search)
 
   board_t *with_board = &(arg_with_search->S_board);
 
-  if (BIT_COUNT(with_board->B_white_king_bb | with_board->B_white_man_bb |
-                with_board->B_black_king_bb | with_board->B_black_man_bb) >
+  if (BIT_COUNT(with_board->B_white_kings_bb | with_board->B_white_men_bb |
+                with_board->B_black_kings_bb | with_board->B_black_men_bb) >
       EGTB_MAX_PIECES)
     return (result);
 
@@ -199,18 +199,18 @@ score_t return_endgame_score(search_t *arg_with_search)
     wdl_probe = arg_with_search->S_wdl_probe;
 
   temp_mate = gwdegtb_wdl_lookup_probe(wdl_probe,
-                                       with_board->B_white_king_bb,
-                                       with_board->B_white_man_bb,
-                                       with_board->B_black_king_bb,
-                                       with_board->B_black_man_bb,
+                                       with_board->B_white_kings_bb,
+                                       with_board->B_white_men_bb,
+                                       with_board->B_black_kings_bb,
+                                       with_board->B_black_men_bb,
                                        with_board->B_colour2move == WHITE_ENUM
                                          ? GWDEGTB_WHITE_TO_MOVE
                                          : GWDEGTB_BLACK_TO_MOVE);
 #else
-  temp_mate = gwdegtb_wdl_lookup(with_board->B_white_king_bb,
-                                 with_board->B_white_man_bb,
-                                 with_board->B_black_king_bb,
-                                 with_board->B_black_man_bb,
+  temp_mate = gwdegtb_wdl_lookup(with_board->B_white_kings_bb,
+                                 with_board->B_white_men_bb,
+                                 with_board->B_black_kings_bb,
+                                 with_board->B_black_men_bb,
                                  with_board->B_colour2move == WHITE_ENUM
                                    ? GWDEGTB_WHITE_TO_MOVE
                                    : GWDEGTB_BLACK_TO_MOVE);

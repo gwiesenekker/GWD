@@ -75,7 +75,7 @@ local int probe_score_cache(search_t *arg_with_search,
 
   if (crc32 != arg_score_cache_slot->SCS_crc32)
   {
-    arg_with_search->S_total_score_cache_crc_errors++;
+    arg_with_search->S_ntotal_score_cache_crc_errors++;
 
     *arg_score_cache_slot = score_cache_slot_default;
   }
@@ -135,15 +135,15 @@ score_t return_score_from_board(board_t *arg_with_board,
 
   if (IS_BLACK(arg_with_board->B_colour2move))
   {
-    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_man_bb);
-    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_man_bb);
-    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_king_bb);
-    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_king_bb);
+    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_men_bb);
+    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_men_bb);
+    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_kings_bb);
+    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_kings_bb);
 
-    arg_with_board->B_white_man_bb = white_man_bb;
-    arg_with_board->B_black_man_bb = black_man_bb;
-    arg_with_board->B_white_king_bb = white_king_bb;
-    arg_with_board->B_black_king_bb = black_king_bb;
+    arg_with_board->B_white_men_bb = white_man_bb;
+    arg_with_board->B_black_men_bb = black_man_bb;
+    arg_with_board->B_white_kings_bb = white_king_bb;
+    arg_with_board->B_black_kings_bb = black_king_bb;
 
     arg_with_board->B_colour2move = WHITE_ENUM;
     mirror = TRUE;
@@ -167,10 +167,10 @@ score_t return_score_from_board(board_t *arg_with_board,
   for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
     with_current_thread->LT_dot[ioutput] = 0;
 
-  int nwhite_man = BIT_COUNT(arg_with_board->B_white_man_bb);
-  int nblack_man = BIT_COUNT(arg_with_board->B_black_man_bb);
-  int nwhite_king = BIT_COUNT(arg_with_board->B_white_king_bb);
-  int nblack_king = BIT_COUNT(arg_with_board->B_black_king_bb);
+  int nwhite_men = BIT_COUNT(arg_with_board->B_white_men_bb);
+  int nblack_men = BIT_COUNT(arg_with_board->B_black_men_bb);
+  int nwhite_kings = BIT_COUNT(arg_with_board->B_white_kings_bb);
+  int nblack_kings = BIT_COUNT(arg_with_board->B_black_kings_bb);
 
 #ifdef USE_AVX2_INTRINSICS
   __m256 sum0;
@@ -275,10 +275,10 @@ score_t return_score_from_board(board_t *arg_with_board,
   if (with_network->N_material_architecture != NETWORK_ARCHITECTURE_NULL)
     evaluate_material_network(with_network,
                               &network_state->NS_material_dense_network_state,
-                              nwhite_man,
-                              nblack_man,
-                              nwhite_king,
-                              nblack_king,
+                              nwhite_men,
+                              nblack_men,
+                              nwhite_kings,
+                              nblack_kings,
                               arg_network_score_scaled != NULL);
 
   // prepare inputs
@@ -356,15 +356,15 @@ score_t return_score_from_board(board_t *arg_with_board,
 
   if (mirror)
   {
-    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_man_bb);
-    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_man_bb);
-    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_king_bb);
-    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_king_bb);
+    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_men_bb);
+    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_men_bb);
+    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_kings_bb);
+    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_kings_bb);
 
-    arg_with_board->B_white_man_bb = white_man_bb;
-    arg_with_board->B_black_man_bb = black_man_bb;
-    arg_with_board->B_white_king_bb = white_king_bb;
-    arg_with_board->B_black_king_bb = black_king_bb;
+    arg_with_board->B_white_men_bb = white_man_bb;
+    arg_with_board->B_black_men_bb = black_man_bb;
+    arg_with_board->B_white_kings_bb = white_king_bb;
+    arg_with_board->B_black_kings_bb = black_king_bb;
 
     arg_with_board->B_colour2move = BLACK_ENUM;
   }
@@ -375,8 +375,8 @@ score_t return_score_from_board(board_t *arg_with_board,
   */
 
 #ifdef GEN_CSV
-  if ((BIT_COUNT(arg_with_board->B_black_king_bb) == 0) and
-      (BIT_COUNT(arg_with_board->B_white_king_bb) == 0))
+  if ((BIT_COUNT(arg_with_board->B_black_kings_bb) == 0) and
+      (BIT_COUNT(arg_with_board->B_white_kings_bb) == 0))
   {
     static int ncsv = 0;
 
@@ -412,7 +412,7 @@ score_t return_score(search_t *arg_with_search)
                           score_cache[my_colour],
                           &score_cache_slot))
     {
-      ++(arg_with_search->S_total_score_cache_hits);
+      ++(arg_with_search->S_ntotal_score_cache_hits);
 
       result = score_cache_slot.SCS_score;
 
@@ -426,13 +426,13 @@ score_t return_score(search_t *arg_with_search)
 
   if (options.material_only)
   {
-    ++(arg_with_search->S_total_material_only_evaluations);
+    ++(arg_with_search->S_ntotal_material_only_evaluations);
 
     result = material_score;
   }
   else
   {
-    ++(arg_with_search->S_total_network_evaluations);
+    ++(arg_with_search->S_ntotal_network_evaluations);
 
     result = return_score_from_board(with, NULL);
 
@@ -461,21 +461,21 @@ score_t return_score(search_t *arg_with_search)
 
 int return_npieces(const board_t *arg_with_board)
 {
-  return (BIT_COUNT(arg_with_board->B_white_man_bb) +
-          BIT_COUNT(arg_with_board->B_white_king_bb) +
-          BIT_COUNT(arg_with_board->B_black_man_bb) +
-          BIT_COUNT(arg_with_board->B_black_king_bb));
+  return (BIT_COUNT(arg_with_board->B_white_men_bb) +
+          BIT_COUNT(arg_with_board->B_white_kings_bb) +
+          BIT_COUNT(arg_with_board->B_black_men_bb) +
+          BIT_COUNT(arg_with_board->B_black_kings_bb));
 }
 
 score_t return_material_score(const board_t *arg_with_board)
 {
-  int nwhite_man = BIT_COUNT(arg_with_board->B_white_man_bb);
-  int nblack_man = BIT_COUNT(arg_with_board->B_black_man_bb);
-  int nwhite_king = BIT_COUNT(arg_with_board->B_white_king_bb);
-  int nblack_king = BIT_COUNT(arg_with_board->B_black_king_bb);
+  int nwhite_men = BIT_COUNT(arg_with_board->B_white_men_bb);
+  int nblack_men = BIT_COUNT(arg_with_board->B_black_men_bb);
+  int nwhite_kings = BIT_COUNT(arg_with_board->B_white_kings_bb);
+  int nblack_kings = BIT_COUNT(arg_with_board->B_black_kings_bb);
 
-  score_t material_score = SCORE((nwhite_man - nblack_man) * SCORE_MAN +
-                                 (nwhite_king - nblack_king) * SCORE_KING);
+  score_t material_score = SCORE((nwhite_men - nblack_men) * SCORE_MAN +
+                                 (nwhite_kings - nblack_kings) * SCORE_KING);
 
   if (IS_WHITE(arg_with_board->B_colour2move))
     return (material_score);

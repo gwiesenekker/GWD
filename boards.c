@@ -102,14 +102,14 @@ void construct_board(board_t *arg_with_board,
                           arg_with_board->B_network_id,
                           TRUE);
 
-  arg_with_board->B_nstate = 0;
+  arg_with_board->B_nstates = 0;
 }
 
 void push_board_state(board_t *arg_with_board)
 {
-  HARDBUG(arg_with_board->B_nstate >= NODE_MAX)
+  HARDBUG(arg_with_board->B_nstates >= NODE_MAX)
 
-  board_state_t *state = arg_with_board->B_states + arg_with_board->B_nstate;
+  board_state_t *state = arg_with_board->B_states + arg_with_board->B_nstates;
 
   state->BS_key = arg_with_board->B_key;
 
@@ -117,21 +117,21 @@ void push_board_state(board_t *arg_with_board)
          arg_with_board->B_bit_boards,
          sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
-  state->BS_npieces = BIT_COUNT(arg_with_board->B_white_man_bb) +
-                      BIT_COUNT(arg_with_board->B_white_king_bb) +
-                      BIT_COUNT(arg_with_board->B_black_man_bb) +
-                      BIT_COUNT(arg_with_board->B_black_king_bb);
+  state->BS_npieces = BIT_COUNT(arg_with_board->B_white_men_bb) +
+                      BIT_COUNT(arg_with_board->B_white_kings_bb) +
+                      BIT_COUNT(arg_with_board->B_black_men_bb) +
+                      BIT_COUNT(arg_with_board->B_black_kings_bb);
 
-  arg_with_board->B_nstate++;
+  arg_with_board->B_nstates++;
 }
 
 void pop_board_state(board_t *arg_with_board)
 {
-  arg_with_board->B_nstate--;
+  arg_with_board->B_nstates--;
 
-  HARDBUG(arg_with_board->B_nstate < 0)
+  HARDBUG(arg_with_board->B_nstates < 0)
 
-  board_state_t *state = arg_with_board->B_states + arg_with_board->B_nstate;
+  board_state_t *state = arg_with_board->B_states + arg_with_board->B_nstates;
 
   arg_with_board->B_key = state->BS_key;
 
@@ -139,17 +139,17 @@ void pop_board_state(board_t *arg_with_board)
          state->BS_bit_boards,
          sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
-  HARDBUG(state->BS_npieces != (BIT_COUNT(arg_with_board->B_white_man_bb) +
-                                BIT_COUNT(arg_with_board->B_white_king_bb) +
-                                BIT_COUNT(arg_with_board->B_black_man_bb) +
-                                BIT_COUNT(arg_with_board->B_black_king_bb)))
+  HARDBUG(state->BS_npieces != (BIT_COUNT(arg_with_board->B_white_men_bb) +
+                                BIT_COUNT(arg_with_board->B_white_kings_bb) +
+                                BIT_COUNT(arg_with_board->B_black_men_bb) +
+                                BIT_COUNT(arg_with_board->B_black_kings_bb)))
 }
 
 hash_key_t return_key_from_bb(const board_t *arg_with_board)
 {
   hash_key_t result = 0;
 
-  ui64_t bb = arg_with_board->B_white_man_bb;
+  ui64_t bb = arg_with_board->B_white_men_bb;
 
   while (bb != 0)
   {
@@ -160,7 +160,7 @@ hash_key_t return_key_from_bb(const board_t *arg_with_board)
     bb &= ~BITULL(ifield);
   }
 
-  bb = arg_with_board->B_white_king_bb;
+  bb = arg_with_board->B_white_kings_bb;
 
   while (bb != 0)
   {
@@ -171,7 +171,7 @@ hash_key_t return_key_from_bb(const board_t *arg_with_board)
     bb &= ~BITULL(ifield);
   }
 
-  bb = arg_with_board->B_black_man_bb;
+  bb = arg_with_board->B_black_men_bb;
 
   while (bb != 0)
   {
@@ -182,7 +182,7 @@ hash_key_t return_key_from_bb(const board_t *arg_with_board)
     bb &= ~BITULL(ifield);
   }
 
-  bb = arg_with_board->B_black_king_bb;
+  bb = arg_with_board->B_black_kings_bb;
 
   while (bb != 0)
   {
@@ -207,10 +207,10 @@ void string2board(board_t *arg_with_board, const char *arg_s)
     arg_with_board->B_valid_bb |= BITULL(ifield);
   }
 
-  arg_with_board->B_white_man_bb = 0;
-  arg_with_board->B_white_king_bb = 0;
-  arg_with_board->B_black_man_bb = 0;
-  arg_with_board->B_black_king_bb = 0;
+  arg_with_board->B_white_men_bb = 0;
+  arg_with_board->B_white_kings_bb = 0;
+  arg_with_board->B_black_men_bb = 0;
+  arg_with_board->B_black_kings_bb = 0;
 
   char wO_local = *wO;
   char wX_local = *wX;
@@ -242,21 +242,21 @@ void string2board(board_t *arg_with_board, const char *arg_s)
     {
       HARDBUG(i <= 5)
 
-      arg_with_board->B_white_man_bb |= BITULL(ifield);
+      arg_with_board->B_white_men_bb |= BITULL(ifield);
     }
     else if (arg_s[i] == wX_local)
     {
-      arg_with_board->B_white_king_bb |= BITULL(ifield);
+      arg_with_board->B_white_kings_bb |= BITULL(ifield);
     }
     else if (arg_s[i] == bO_local)
     {
       HARDBUG(i >= 46)
 
-      arg_with_board->B_black_man_bb |= BITULL(ifield);
+      arg_with_board->B_black_men_bb |= BITULL(ifield);
     }
     else if (arg_s[i] == bX_local)
     {
-      arg_with_board->B_black_king_bb |= BITULL(ifield);
+      arg_with_board->B_black_kings_bb |= BITULL(ifield);
     }
     else if (arg_s[i] == nn_local)
     {
@@ -268,7 +268,7 @@ void string2board(board_t *arg_with_board, const char *arg_s)
 
   arg_with_board->B_key = return_key_from_bb(arg_with_board);
 
-  arg_with_board->B_nstate = 0;
+  arg_with_board->B_nstates = 0;
 
   arg_with_board->B_inode = 0;
 
@@ -439,10 +439,10 @@ void board2fen(const board_t *arg_with_board,
     bcatcstr(arg_bfen, "B");
 
   ui64_t white_bb =
-    arg_with_board->B_white_man_bb | arg_with_board->B_white_king_bb;
+    arg_with_board->B_white_men_bb | arg_with_board->B_white_kings_bb;
 
   ui64_t black_bb =
-    arg_with_board->B_black_man_bb | arg_with_board->B_black_king_bb;
+    arg_with_board->B_black_men_bb | arg_with_board->B_black_kings_bb;
 
   for (int i = 1; i <= 50; ++i)
   {
@@ -453,7 +453,7 @@ void board2fen(const board_t *arg_with_board,
       if (wcomma)
         bcatcstr(bwfen, ",");
 
-      if (arg_with_board->B_white_king_bb & BITULL(ifield))
+      if (arg_with_board->B_white_kings_bb & BITULL(ifield))
         bcatcstr(bwfen, "K");
 
       bcatcstr(bwfen, nota[ifield]);
@@ -465,7 +465,7 @@ void board2fen(const board_t *arg_with_board,
       if (bcomma)
         bcatcstr(bbfen, ",");
 
-      if (arg_with_board->B_black_king_bb & BITULL(ifield))
+      if (arg_with_board->B_black_kings_bb & BITULL(ifield))
         bcatcstr(bbfen, "K");
 
       bcatcstr(bbfen, nota[ifield]);
@@ -500,28 +500,29 @@ void print_board(const board_t *arg_with_board)
 
       int ifield = square2field[i];
 
-      if (arg_with_board->B_white_man_bb & BITULL(ifield))
+      if (arg_with_board->B_white_men_bb & BITULL(ifield))
         my_printf(arg_with_board->B_my_printf, "  wO");
-      else if (arg_with_board->B_white_king_bb & BITULL(ifield))
+      else if (arg_with_board->B_white_kings_bb & BITULL(ifield))
         my_printf(arg_with_board->B_my_printf, "  wX");
-      else if (arg_with_board->B_black_man_bb & BITULL(ifield))
+      else if (arg_with_board->B_black_men_bb & BITULL(ifield))
         my_printf(arg_with_board->B_my_printf, "  bO");
-      else if (arg_with_board->B_black_king_bb & BITULL(ifield))
+      else if (arg_with_board->B_black_kings_bb & BITULL(ifield))
         my_printf(arg_with_board->B_my_printf, "  bX");
       else
         my_printf(arg_with_board->B_my_printf, "  ..");
     }
     my_printf(arg_with_board->B_my_printf, "\n");
   }
-  my_printf(
-    arg_with_board->B_my_printf,
-    "(%d) (%dx%d) (%dx%d)",
-    BIT_COUNT(arg_with_board->B_white_man_bb | arg_with_board->B_white_king_bb |
-              arg_with_board->B_black_man_bb | arg_with_board->B_black_king_bb),
-    BIT_COUNT(arg_with_board->B_white_man_bb),
-    BIT_COUNT(arg_with_board->B_black_man_bb),
-    BIT_COUNT(arg_with_board->B_white_king_bb),
-    BIT_COUNT(arg_with_board->B_black_king_bb));
+  my_printf(arg_with_board->B_my_printf,
+            "(%d) (%dx%d) (%dx%d)",
+            BIT_COUNT(arg_with_board->B_white_men_bb |
+                      arg_with_board->B_white_kings_bb |
+                      arg_with_board->B_black_men_bb |
+                      arg_with_board->B_black_kings_bb),
+            BIT_COUNT(arg_with_board->B_white_men_bb),
+            BIT_COUNT(arg_with_board->B_black_men_bb),
+            BIT_COUNT(arg_with_board->B_white_kings_bb),
+            BIT_COUNT(arg_with_board->B_black_kings_bb));
 
   if (IS_WHITE(arg_with_board->B_colour2move))
     my_printf(arg_with_board->B_my_printf, " WHITE to move\n");
@@ -564,28 +565,28 @@ board2string(const board_t *arg_with_board, int arg_hub, bstring arg_string)
   {
     int ifield = square2field[i];
 
-    if (arg_with_board->B_white_man_bb & BITULL(ifield))
+    if (arg_with_board->B_white_men_bb & BITULL(ifield))
     {
       if (!arg_hub)
         bdata(arg_string)[i] = *wO;
       else
         bdata(arg_string)[i] = *wO_hub;
     }
-    else if (arg_with_board->B_white_king_bb & BITULL(ifield))
+    else if (arg_with_board->B_white_kings_bb & BITULL(ifield))
     {
       if (!arg_hub)
         bdata(arg_string)[i] = *wX;
       else
         bdata(arg_string)[i] = *wX_hub;
     }
-    else if (arg_with_board->B_black_man_bb & BITULL(ifield))
+    else if (arg_with_board->B_black_men_bb & BITULL(ifield))
     {
       if (!arg_hub)
         bdata(arg_string)[i] = *bO;
       else
         bdata(arg_string)[i] = *bO_hub;
     }
-    else if (arg_with_board->B_black_king_bb & BITULL(ifield))
+    else if (arg_with_board->B_black_kings_bb & BITULL(ifield))
     {
       if (!arg_hub)
         bdata(arg_string)[i] = *bX;

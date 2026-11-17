@@ -78,8 +78,8 @@ typedef struct
   int N_input_activation;
   int N_activation;
   int N_final_activation;
-  int N_nman_min;
-  int N_nman_max;
+  int N_nmen_min;
+  int N_nmen_max;
 
   patterns_shared_t N_shared_patterns;
   materials_shared_t N_shared_materials;

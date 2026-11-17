@@ -50,7 +50,7 @@ local my_malloc_t *my_mallocs = NULL;
 typedef struct my_name_stack
 {
   my_name_t names[NMY_NAMES_MAX];
-  int count;
+  int nnames;
   my_mutex_t mutex;
   struct my_name_stack *next;
 } my_name_stack_t;
@@ -431,14 +431,14 @@ local int print_name_stack(my_name_stack_t *stack)
 
   HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
 
-  int count = stack->count;
+  int nnames = stack->nnames;
 
-  memcpy(snapshot, stack->names, (size_t)count * sizeof(*snapshot));
+  memcpy(snapshot, stack->names, (size_t)nnames * sizeof(*snapshot));
 
   HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 
   /* Never hold a stack lock while printing or invoking fatal diagnostics. */
-  for (int i = count - 1; i >= 0; --i)
+  for (int i = nnames - 1; i >= 0; --i)
     PRINTF("iname=%d name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
            i,
            snapshot[i].MN_name,
@@ -447,7 +447,7 @@ local int print_name_stack(my_name_stack_t *stack)
            snapshot[i].MN_line,
            snapshot[i].MN_pthread_self);
 
-  return count;
+  return nnames;
 }
 
 local int print_all_name_stacks(void)
@@ -459,12 +459,12 @@ local int print_all_name_stacks(void)
   HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
 
   /* Links are immutable after publication and entries are never freed. */
-  int count = 0;
+  int nnames = 0;
 
   for (; stack != NULL; stack = stack->next)
-    count += print_name_stack(stack);
+    nnames += print_name_stack(stack);
 
-  return count;
+  return nnames;
 }
 
 void print_my_names(int arg_all)
@@ -484,7 +484,7 @@ void push_name(const char *arg_name,
 
   HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
 
-  if (stack->count >= NMY_NAMES_MAX)
+  if (stack->nnames >= NMY_NAMES_MAX)
   {
     HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 
@@ -492,7 +492,7 @@ void push_name(const char *arg_name,
     FATAL("TOO MANY PUSH_NAMES", EXIT_FAILURE)
   }
 
-  stack->names[stack->count++] =
+  stack->names[stack->nnames++] =
     (my_name_t){arg_name, arg_file, arg_func, arg_line, compat_pthread_self()};
 
   HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
@@ -510,12 +510,12 @@ void pop_name(const char *arg_name,
 
   HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
 
-  int empty = stack->count == 0;
+  int empty = stack->nnames == 0;
   int mismatch =
-    !empty && strcmp(stack->names[stack->count - 1].MN_name, arg_name) != 0;
+    !empty && strcmp(stack->names[stack->nnames - 1].MN_name, arg_name) != 0;
 
   if (!empty && !mismatch)
-    --stack->count;
+    --stack->nnames;
 
   HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 

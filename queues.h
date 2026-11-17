@@ -40,7 +40,7 @@ typedef struct
 
   int Q_nread;
   int Q_nwrite;
-  int Q_length_max;
+  int Q_nmessages_max;
 
   my_mutex_t Q_mutex;
   my_random_t Q_my_random;

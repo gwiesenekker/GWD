@@ -15,7 +15,7 @@ void construct_queue(queue_t *arg_with_queue,
 
   arg_with_queue->Q_nread = 0;
   arg_with_queue->Q_nwrite = -1;
-  arg_with_queue->Q_length_max = 0;
+  arg_with_queue->Q_nmessages_max = 0;
 
   HARDBUG(compat_mutex_init(&(arg_with_queue->Q_mutex)) != 0)
 
@@ -83,19 +83,19 @@ void enqueue(queue_t *arg_with_queue,
 
   message->message_read = FALSE;
 
-  int length = arg_with_queue->Q_nwrite - arg_with_queue->Q_nread + 1;
+  int nmessages = arg_with_queue->Q_nwrite - arg_with_queue->Q_nread + 1;
 
-  if (length > arg_with_queue->Q_length_max)
+  if (nmessages > arg_with_queue->Q_nmessages_max)
   {
 #ifdef DEBUG
     my_printf(arg_with_queue->Q_my_printf,
               "length queue %s after enqueue is %d message_id=%d message=%s\n",
               bdata(arg_with_queue->Q_name),
-              length,
+              nmessages,
               arg_message_id,
               arg_message_text);
 #endif
-    arg_with_queue->Q_length_max = length;
+    arg_with_queue->Q_nmessages_max = nmessages;
   }
 
   HARDBUG(compat_mutex_unlock(&(arg_with_queue->Q_mutex)) != 0)

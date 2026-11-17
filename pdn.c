@@ -165,7 +165,7 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
 
   board_t *with_board = &board;
 
-  bucket_t bucket_nman;
+  bucket_t bucket_nmen;
 
   bucket_t bucket_rows[NPIECES_MAX + 1];
 
@@ -173,7 +173,7 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
 
   bucket_t bucket_nmoves[NPIECES_MAX + 1];
 
-  construct_bucket(&bucket_nman,
+  construct_bucket(&bucket_nmen,
                    "bucket_nman",
                    1,
                    0,
@@ -276,30 +276,30 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
 
       // update statistics
 
-      update_bucket(&bucket_nman, BIT_COUNT(with_board->B_black_man_bb));
+      update_bucket(&bucket_nmen, BIT_COUNT(with_board->B_black_men_bb));
 
       for (int i = 1; i <= 50; ++i)
       {
         int ifield = square2field[i];
 
-        if (with_board->B_black_man_bb & BITULL(ifield))
+        if (with_board->B_black_men_bb & BITULL(ifield))
         {
-          update_bucket(bucket_rows + BIT_COUNT(with_board->B_black_man_bb),
+          update_bucket(bucket_rows + BIT_COUNT(with_board->B_black_men_bb),
                         (i - 1) / 5);
         }
       }
 
-      update_bucket(bucket_kings + BIT_COUNT(with_board->B_black_man_bb),
-                    BIT_COUNT(with_board->B_black_king_bb));
+      update_bucket(bucket_kings + BIT_COUNT(with_board->B_black_men_bb),
+                    BIT_COUNT(with_board->B_black_kings_bb));
 
       if (IS_WHITE(with_board->B_colour2move))
       {
-        update_bucket(bucket_nmoves + BIT_COUNT(with_board->B_white_man_bb),
+        update_bucket(bucket_nmoves + BIT_COUNT(with_board->B_white_men_bb),
                       moves_list.ML_nmoves);
       }
       else
       {
-        update_bucket(bucket_nmoves + BIT_COUNT(with_board->B_black_man_bb),
+        update_bucket(bucket_nmoves + BIT_COUNT(with_board->B_black_men_bb),
                       moves_list.ML_nmoves);
       }
 
@@ -431,7 +431,7 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
                       "evaluation = excluded.evaluation;",
                       FALSE) != SQLITE_OK)
 
-  printf_bucket(&bucket_nman);
+  printf_bucket(&bucket_nmen);
 
   for (int npieces = 0; npieces <= NPIECES_MAX; ++npieces)
   {

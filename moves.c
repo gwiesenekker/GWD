@@ -35,8 +35,9 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
   arg_moves_list->ML_nmoves = 0;
   arg_moves_list->ML_ncaptx = 0;
 
-  ui64_t my_bb = (arg_with_board->my_man_bb | arg_with_board->my_king_bb);
-  ui64_t your_bb = (arg_with_board->your_man_bb | arg_with_board->your_king_bb);
+  ui64_t my_bb = (arg_with_board->my_men_bb | arg_with_board->my_kings_bb);
+  ui64_t your_bb =
+    (arg_with_board->your_men_bb | arg_with_board->your_kings_bb);
   ui64_t empty_bb = arg_with_board->B_valid_bb & ~(my_bb | your_bb);
 
   while (my_bb != 0)
@@ -54,7 +55,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
     {
       int jfield1 = ifield1 + my_dir[i];
 
-      if (arg_with_board->my_man_bb & BITULL(ifield1))
+      if (arg_with_board->my_men_bb & BITULL(ifield1))
       {
         if ((i < 2) and (arg_moves_list->ML_ncaptx == 0))
         {
@@ -158,7 +159,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
           jfield1 = ifield[ncapt] + jdir[ncapt];
 
-          if (arg_with_board->my_king_bb & BITULL(ifield1))
+          if (arg_with_board->my_kings_bb & BITULL(ifield1))
             while (empty_bb & BITULL(jfield1))
               jfield1 += jdir[ncapt];
 
@@ -181,7 +182,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
           jfield1 = ifield[ncapt] + jdir[ncapt];
 
-          if (arg_with_board->my_king_bb & BITULL(ifield1))
+          if (arg_with_board->my_kings_bb & BITULL(ifield1))
             while (empty_bb & BITULL(jfield1))
               jfield1 += jdir[ncapt];
 
@@ -203,7 +204,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
           jfield1 = ifield[ncapt] + idir[ncapt];
 
-          if ((arg_with_board->my_king_bb & BITULL(ifield1)) and
+          if ((arg_with_board->my_kings_bb & BITULL(ifield1)) and
               (empty_bb & BITULL(jfield1)))
           {
             kfield1 = ifield[ncapt] = jfield1;
@@ -254,7 +255,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
     arg_moves_list->ML_move_flags[imove] = 0;
 
-    if (arg_with_board->my_man_bb & BITULL(ifield))
+    if (arg_with_board->my_men_bb & BITULL(ifield))
     {
       if (my_row[kfield] >= 9)
       {
@@ -404,9 +405,10 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   colour_enum your_colour = white ? BLACK_ENUM : WHITE_ENUM;
   const int *dirs = white ? white_dir : black_dir;
   const int *rows = white ? white_row : black_row;
-  ui64_t men = arg_with_board->my_man_bb;
-  ui64_t kings = arg_with_board->my_king_bb;
-  ui64_t opponents = arg_with_board->your_man_bb | arg_with_board->your_king_bb;
+  ui64_t men = arg_with_board->my_men_bb;
+  ui64_t kings = arg_with_board->my_kings_bb;
+  ui64_t opponents =
+    arg_with_board->your_men_bb | arg_with_board->your_kings_bb;
   ui64_t empty = arg_with_board->B_valid_bb & ~(men | kings | opponents);
   moves_list_t *list = arg_moves_list;
 
@@ -529,8 +531,9 @@ int can_capture(const board_t *arg_with_board, int arg_kings)
 
   result = TRUE;
 
-  ui64_t my_bb = (arg_with_board->my_man_bb | arg_with_board->my_king_bb);
-  ui64_t your_bb = (arg_with_board->your_man_bb | arg_with_board->your_king_bb);
+  ui64_t my_bb = (arg_with_board->my_men_bb | arg_with_board->my_kings_bb);
+  ui64_t your_bb =
+    (arg_with_board->your_men_bb | arg_with_board->your_kings_bb);
   ui64_t empty_bb = arg_with_board->B_valid_bb & ~(my_bb | your_bb);
 
   while (my_bb != 0)
@@ -544,7 +547,7 @@ int can_capture(const board_t *arg_with_board, int arg_kings)
 
     my_bb &= ~BITULL(ifield);
 
-    if (arg_with_board->my_man_bb & BITULL(ifield))
+    if (arg_with_board->my_men_bb & BITULL(ifield))
     {
       if ((your_bb & BITULL(ifield - 6)) and
           (empty_bb & BITULL(ifield - 6 - 6)))
@@ -574,7 +577,7 @@ int can_capture(const board_t *arg_with_board, int arg_kings)
     if (!arg_kings)
       continue;
 
-    if (arg_with_board->my_king_bb & BITULL(ifield))
+    if (arg_with_board->my_kings_bb & BITULL(ifield))
     {
       int jfield = ifield - 6;
 
@@ -673,18 +676,18 @@ void do_move(board_t *arg_with_board,
 
   if (ifield != kfield)
   {
-    if (arg_with_board->my_man_bb & BITULL(ifield))
+    if (arg_with_board->my_men_bb & BITULL(ifield))
     {
       move_key = my_man_key[ifield];
 
       arg_with_board->B_key ^= my_man_key[ifield];
 
-      arg_with_board->my_man_bb &= ~BITULL(ifield);
+      arg_with_board->my_men_bb &= ~BITULL(ifield);
 
       if (my_row[kfield] == 10)
-        arg_with_board->my_king_bb |= BITULL(kfield);
+        arg_with_board->my_kings_bb |= BITULL(kfield);
       else
-        arg_with_board->my_man_bb |= BITULL(kfield);
+        arg_with_board->my_men_bb |= BITULL(kfield);
     }
     else
     {
@@ -692,12 +695,12 @@ void do_move(board_t *arg_with_board,
 
       arg_with_board->B_key ^= my_king_key[ifield];
 
-      arg_with_board->my_king_bb &= ~BITULL(ifield);
+      arg_with_board->my_kings_bb &= ~BITULL(ifield);
 
-      arg_with_board->my_king_bb |= BITULL(kfield);
+      arg_with_board->my_kings_bb |= BITULL(kfield);
     }
 
-    if (arg_with_board->my_man_bb & BITULL(kfield))
+    if (arg_with_board->my_men_bb & BITULL(kfield))
     {
       move_key ^= my_man_key[kfield];
 
@@ -719,13 +722,13 @@ void do_move(board_t *arg_with_board,
 
     captures_bb &= ~BITULL(jfield);
 
-    if (arg_with_board->your_man_bb & BITULL(jfield))
+    if (arg_with_board->your_men_bb & BITULL(jfield))
     {
       move_key ^= your_man_key[jfield];
 
       arg_with_board->B_key ^= your_man_key[jfield];
 
-      arg_with_board->your_man_bb &= ~BITULL(jfield);
+      arg_with_board->your_men_bb &= ~BITULL(jfield);
     }
     else
     {
@@ -733,7 +736,7 @@ void do_move(board_t *arg_with_board,
 
       arg_with_board->B_key ^= your_king_key[jfield];
 
-      arg_with_board->your_king_bb &= ~BITULL(jfield);
+      arg_with_board->your_kings_bb &= ~BITULL(jfield);
     }
   }
 

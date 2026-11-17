@@ -354,7 +354,7 @@ local void solve_problems_mcts(const char *arg_name,
       {
         mcts_globals.mcts_globals_time_limit = arg_mcts_time_limit;
 
-        mcts_globals.mcts_globals_nodes = 0;
+        mcts_globals.mcts_globals_nnodes = 0;
 
         reset_my_timer(&(with_search->S_timer));
 
@@ -916,8 +916,8 @@ local double probability_one_king(int arg_npieces)
   return (a * exp(b * arg_npieces));
 }
 
-local int add_man_random(int arg_nwhite_man,
-                         int arg_nblack_man,
+local int add_man_random(int arg_nwhite_men,
+                         int arg_nblack_men,
                          int arg_shape,
                          int arg_scale,
                          my_random_t *arg_random,
@@ -942,7 +942,7 @@ local int add_man_random(int arg_nwhite_man,
     for (int i = 1; i <= 50; ++i)
       arg_s[i] = *nn;
 
-    for (int iwhite_man = 1; iwhite_man <= arg_nwhite_man; ++iwhite_man)
+    for (int iwhite_man = 1; iwhite_man <= arg_nwhite_men; ++iwhite_man)
     {
       int i = INVALID;
 
@@ -966,7 +966,7 @@ local int add_man_random(int arg_nwhite_man,
       arg_s[i] = *wO;
     }
 
-    for (int iblack_man = 1; iblack_man <= arg_nblack_man; ++iblack_man)
+    for (int iblack_man = 1; iblack_man <= arg_nblack_men; ++iblack_man)
     {
       int i = INVALID;
 
@@ -1427,18 +1427,18 @@ local void gen_random(const char *arg_fen_name,
                    NMAN_MIN,
                    BUCKET_LINEAR);
 
-  bucket_t bucket_nwhite_man;
+  bucket_t bucket_nwhite_men;
 
-  construct_bucket(&bucket_nwhite_man,
+  construct_bucket(&bucket_nwhite_men,
                    "bucket_nwhite_man",
                    1,
                    0,
                    NPIECES_MAX,
                    BUCKET_LINEAR);
 
-  bucket_t bucket_nblack_man;
+  bucket_t bucket_nblack_men;
 
-  construct_bucket(&bucket_nblack_man,
+  construct_bucket(&bucket_nblack_men,
                    "bucket_nblack_man",
                    1,
                    0,
@@ -1479,18 +1479,18 @@ local void gen_random(const char *arg_fen_name,
     int npieces = INVALID;
     int nwhite = INVALID;
     int nblack = INVALID;
-    int nwhite_man = INVALID;
+    int nwhite_men = INVALID;
     int nwhite_kings = INVALID;
-    int nblack_man = INVALID;
+    int nblack_men = INVALID;
     int nblack_kings = INVALID;
 
     while (TRUE)
     {
-      nwhite_man =
+      nwhite_men =
         return_my_random(&temp_random) % (20 - arg_nkings_max - NMAN_MIN + 1) +
         NMAN_MIN;
 
-      nblack_man = nwhite_man;
+      nblack_men = nwhite_men;
 
       int ndelta = 0;
 
@@ -1513,11 +1513,11 @@ local void gen_random(const char *arg_fen_name,
 
       if ((return_my_random(&temp_random) % 2) == 0)
       {
-        nwhite_man -= ndelta;
+        nwhite_men -= ndelta;
       }
       else
       {
-        nblack_man -= ndelta;
+        nblack_men -= ndelta;
       }
 
       nwhite_kings = 0;
@@ -1529,7 +1529,7 @@ local void gen_random(const char *arg_fen_name,
         {
           probability = return_my_random(&temp_random) / (double)ULL_MAX;
 
-          cumulative_probability = 1.0 - probability_one_king(nwhite_man);
+          cumulative_probability = 1.0 - probability_one_king(nwhite_men);
 
           delta_probability = (1.0 - cumulative_probability) / arg_nkings_max;
 
@@ -1548,7 +1548,7 @@ local void gen_random(const char *arg_fen_name,
 
           probability = return_my_random(&temp_random) / (double)ULL_MAX;
 
-          cumulative_probability = 1.0 - probability_one_king(nblack_man);
+          cumulative_probability = 1.0 - probability_one_king(nblack_men);
 
           delta_probability = (1.0 - cumulative_probability) / arg_nkings_max;
 
@@ -1570,8 +1570,8 @@ local void gen_random(const char *arg_fen_name,
         }
       }
 
-      nwhite = nwhite_man + nwhite_kings;
-      nblack = nblack_man + nblack_kings;
+      nwhite = nwhite_men + nwhite_kings;
+      nblack = nblack_men + nblack_kings;
 
       npieces = nwhite + nblack;
 
@@ -1582,9 +1582,9 @@ local void gen_random(const char *arg_fen_name,
     HARDBUG(npieces == INVALID)
     HARDBUG(nwhite == INVALID)
     HARDBUG(nblack == INVALID)
-    HARDBUG(nwhite_man == INVALID)
+    HARDBUG(nwhite_men == INVALID)
     HARDBUG(nwhite_kings == INVALID)
-    HARDBUG(nblack_man == INVALID)
+    HARDBUG(nblack_men == INVALID)
     HARDBUG(nblack_kings == INVALID)
 
     PRINTF("trying iposition=%lld"
@@ -1595,8 +1595,8 @@ local void gen_random(const char *arg_fen_name,
            npieces,
            nwhite,
            nblack,
-           nwhite_man,
-           nblack_man,
+           nwhite_men,
+           nblack_men,
            nwhite_kings,
            nblack_kings);
 
@@ -1616,8 +1616,8 @@ local void gen_random(const char *arg_fen_name,
 
     if ((nwhite_kings == 0) and (nblack_kings == 0))
     {
-      result = add_man_random(nwhite_man,
-                              nblack_man,
+      result = add_man_random(nwhite_men,
+                              nblack_men,
                               shape,
                               scale,
                               &temp_random,
@@ -1627,8 +1627,8 @@ local void gen_random(const char *arg_fen_name,
     }
     else
     {
-      result = add_man_random(nwhite_man,
-                              nblack_man,
+      result = add_man_random(nwhite_men,
+                              nblack_men,
                               shape,
                               scale,
                               &temp_random,
@@ -1670,8 +1670,8 @@ local void gen_random(const char *arg_fen_name,
 
       ++nsame;
 
-      HARDBUG(BIT_COUNT(with_search->S_board.B_white_man_bb) != nwhite_man)
-      HARDBUG(BIT_COUNT(with_search->S_board.B_black_man_bb) != nblack_man)
+      HARDBUG(BIT_COUNT(with_search->S_board.B_white_men_bb) != nwhite_men)
+      HARDBUG(BIT_COUNT(with_search->S_board.B_black_men_bb) != nblack_men)
 
       HARDBUG(best_score == SCORE_PLUS_INFINITY)
 
@@ -1689,10 +1689,10 @@ local void gen_random(const char *arg_fen_name,
              npieces,
              nwhite,
              nblack,
-             BIT_COUNT(with_search->S_board.B_white_man_bb),
-             BIT_COUNT(with_search->S_board.B_black_man_bb),
-             BIT_COUNT(with_search->S_board.B_white_king_bb),
-             BIT_COUNT(with_search->S_board.B_black_king_bb),
+             BIT_COUNT(with_search->S_board.B_white_men_bb),
+             BIT_COUNT(with_search->S_board.B_black_men_bb),
+             BIT_COUNT(with_search->S_board.B_white_kings_bb),
+             BIT_COUNT(with_search->S_board.B_black_kings_bb),
              root_score,
              SCORE2PRINTF(best_score));
 
@@ -1700,23 +1700,23 @@ local void gen_random(const char *arg_fen_name,
 
       update_bucket(&bucket_npieces, npieces);
 
-      update_bucket(&bucket_ndelta, nwhite_man - nblack_man);
+      update_bucket(&bucket_ndelta, nwhite_men - nblack_men);
 
-      update_bucket(&bucket_nwhite_man,
-                    BIT_COUNT(with_search->S_board.B_white_man_bb));
+      update_bucket(&bucket_nwhite_men,
+                    BIT_COUNT(with_search->S_board.B_white_men_bb));
 
-      update_bucket(&bucket_nblack_man,
-                    BIT_COUNT(with_search->S_board.B_black_man_bb));
+      update_bucket(&bucket_nblack_men,
+                    BIT_COUNT(with_search->S_board.B_black_men_bb));
 
       update_bucket(&bucket_nwhite_kings,
-                    BIT_COUNT(with_search->S_board.B_white_king_bb));
+                    BIT_COUNT(with_search->S_board.B_white_kings_bb));
 
       update_bucket(&bucket_nblack_kings,
-                    BIT_COUNT(with_search->S_board.B_black_king_bb));
+                    BIT_COUNT(with_search->S_board.B_black_kings_bb));
 
       update_bucket(&bucket_nkings,
-                    BIT_COUNT(with_search->S_board.B_white_king_bb) +
-                      BIT_COUNT(with_search->S_board.B_black_king_bb));
+                    BIT_COUNT(with_search->S_board.B_white_kings_bb) +
+                      BIT_COUNT(with_search->S_board.B_black_kings_bb));
 
       BSTRING(bfen)
 
@@ -1749,8 +1749,8 @@ local void gen_random(const char *arg_fen_name,
   printf_bucket(&bucket_root_score);
   printf_bucket(&bucket_npieces);
   printf_bucket(&bucket_ndelta);
-  printf_bucket(&bucket_nwhite_man);
-  printf_bucket(&bucket_nblack_man);
+  printf_bucket(&bucket_nwhite_men);
+  printf_bucket(&bucket_nblack_men);
   printf_bucket(&bucket_nwhite_kings);
   printf_bucket(&bucket_nblack_kings);
   printf_bucket(&bucket_nkings);
@@ -1775,9 +1775,9 @@ local void gen_random(const char *arg_fen_name,
 
   my_mpi_bucket_aggregate(&bucket_ndelta, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nwhite_man, my_mpi_globals.MMG_slave_comm);
+  my_mpi_bucket_aggregate(&bucket_nwhite_men, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nblack_man, my_mpi_globals.MMG_slave_comm);
+  my_mpi_bucket_aggregate(&bucket_nblack_men, my_mpi_globals.MMG_slave_comm);
 
   my_mpi_bucket_aggregate(&bucket_nwhite_kings, my_mpi_globals.MMG_slave_comm);
 
@@ -1791,9 +1791,9 @@ local void gen_random(const char *arg_fen_name,
 
   printf_bucket(&bucket_ndelta);
 
-  printf_bucket(&bucket_nwhite_man);
+  printf_bucket(&bucket_nwhite_men);
 
-  printf_bucket(&bucket_nblack_man);
+  printf_bucket(&bucket_nblack_men);
 
   printf_bucket(&bucket_nwhite_kings);
 

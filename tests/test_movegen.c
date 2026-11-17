@@ -62,10 +62,10 @@ void print_board(const board_t *board)
   fprintf(stderr,
           "side=%d men=%llx/%llx kings=%llx/%llx\n",
           board->B_colour2move,
-          board->B_white_man_bb,
-          board->B_black_man_bb,
-          board->B_white_king_bb,
-          board->B_black_king_bb);
+          board->B_white_men_bb,
+          board->B_black_men_bb,
+          board->B_white_kings_bb,
+          board->B_black_kings_bb);
 }
 void zzzzzz(const char *file,
             const char *func,
@@ -172,8 +172,8 @@ int main(int argc, char **argv)
     {
       for (int i = 1; i <= 20; ++i)
       {
-        board.B_black_man_bb |= BITULL(square2field[i]);
-        board.B_white_man_bb |= BITULL(square2field[51 - i]);
+        board.B_black_men_bb |= BITULL(square2field[i]);
+        board.B_white_men_bb |= BITULL(square2field[51 - i]);
       }
     }
     else

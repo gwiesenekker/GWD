@@ -144,23 +144,23 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
     {
       int jfield = square2field[j];
 
-      if (arg_with_dxp->DXP_search.S_board.B_white_man_bb & BITULL(jfield))
+      if (arg_with_dxp->DXP_search.S_board.B_white_men_bb & BITULL(jfield))
       {
         strcpy(arg_buffer + i, "w");
         i++;
       }
-      else if (arg_with_dxp->DXP_search.S_board.B_white_king_bb &
+      else if (arg_with_dxp->DXP_search.S_board.B_white_kings_bb &
                BITULL(jfield))
       {
         strcpy(arg_buffer + i, "W");
         i++;
       }
-      else if (arg_with_dxp->DXP_search.S_board.B_black_man_bb & BITULL(jfield))
+      else if (arg_with_dxp->DXP_search.S_board.B_black_men_bb & BITULL(jfield))
       {
         strcpy(arg_buffer + i, "z");
         i++;
       }
-      else if (arg_with_dxp->DXP_search.S_board.B_black_king_bb &
+      else if (arg_with_dxp->DXP_search.S_board.B_black_kings_bb &
                BITULL(jfield))
       {
         strcpy(arg_buffer + i, "Z");

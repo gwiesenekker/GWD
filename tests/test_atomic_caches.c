@@ -55,7 +55,7 @@ static void *worker(void *argument)
 
   for (unsigned i = 0; i < 50000; ++i)
   {
-    search->S_total_nodes = i + 1;
+    search->S_ntotal_nodes = i + 1;
 
     if (i % 1000 == 0)
       publish_nodes(search);
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
   unsigned keys[4] = {1, 2, 3, 4};
 
   for (int i = 0; i < 4; ++i)
-    atomic_init(&publication_threads[i].T_published_nodes, 0);
+    atomic_init(&publication_threads[i].T_npublished_nodes, 0);
 
   for (int i = 0; i < 4; ++i)
     assert(compat_thread_create(&threads[i], worker, &keys[i]) == 0);
@@ -177,7 +177,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < 4; ++i)
     {
       i64_t nodes =
-        atomic_load_explicit(&publication_threads[i].T_published_nodes,
+        atomic_load_explicit(&publication_threads[i].T_npublished_nodes,
                              memory_order_relaxed);
 
       assert(nodes >= 0 && nodes <= 50000);
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
     assert(compat_thread_join(threads[i]) == 0);
 
   for (int i = 0; i < 4; ++i)
-    assert(atomic_load_explicit(&publication_threads[i].T_published_nodes,
+    assert(atomic_load_explicit(&publication_threads[i].T_npublished_nodes,
                                 memory_order_relaxed) == 50000);
 
   puts("atomic cache tests passed");

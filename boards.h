@@ -31,16 +31,16 @@
 #define IS_MAN(X) ((X) == MAN_ENUM)
 #define IS_KING(X) ((X) == KING_ENUM)
 
-#define B_white_man_bb B_bit_boards[WHITE_ENUM][MAN_ENUM]
-#define B_black_man_bb B_bit_boards[BLACK_ENUM][MAN_ENUM]
-#define B_white_king_bb B_bit_boards[WHITE_ENUM][KING_ENUM]
-#define B_black_king_bb B_bit_boards[BLACK_ENUM][KING_ENUM]
+#define B_white_men_bb B_bit_boards[WHITE_ENUM][MAN_ENUM]
+#define B_black_men_bb B_bit_boards[BLACK_ENUM][MAN_ENUM]
+#define B_white_kings_bb B_bit_boards[WHITE_ENUM][KING_ENUM]
+#define B_black_kings_bb B_bit_boards[BLACK_ENUM][KING_ENUM]
 
-#define my_man_bb B_bit_boards[my_colour][MAN_ENUM]
-#define your_man_bb B_bit_boards[your_colour][MAN_ENUM]
+#define my_men_bb B_bit_boards[my_colour][MAN_ENUM]
+#define your_men_bb B_bit_boards[your_colour][MAN_ENUM]
 
-#define my_king_bb B_bit_boards[my_colour][KING_ENUM]
-#define your_king_bb B_bit_boards[your_colour][KING_ENUM]
+#define my_kings_bb B_bit_boards[my_colour][KING_ENUM]
+#define your_kings_bb B_bit_boards[your_colour][KING_ENUM]
 
 #define my_man_key hash_keys[my_colour][MAN_ENUM]
 #define your_man_key hash_keys[your_colour][MAN_ENUM]
@@ -95,7 +95,7 @@ typedef struct board
 
   network_state_t B_network_state;
 
-  int B_nstate;
+  int B_nstates;
   board_state_t B_states[NODE_MAX];
 } board_t;
 

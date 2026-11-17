@@ -754,7 +754,7 @@ local void construct_network_shared(const char *arg_network_name,
     with_network->N_shared_materials.MSS_nmaterials =
       cJSON_GetArraySize(cjson_materials);
 
-  HARDBUG(with_network->N_shared_materials.MSS_nmaterials > NMATERIAL_MAX)
+  HARDBUG(with_network->N_shared_materials.MSS_nmaterials > NMATERIALS_MAX)
 
   BSTRING(bmaterial_name)
 
@@ -780,59 +780,59 @@ local void construct_network_shared(const char *arg_network_name,
 
     HARDBUG((bmaterial_name = bfromcstr(material_name)) == NULL)
 
-    if (biseqcstr(bmaterial_name, MATERIAL_NWHITE_MAN_CNAME) == 1)
+    if (biseqcstr(bmaterial_name, MATERIAL_NWHITE_MEN_CNAME) == 1)
     {
       HARDBUG((with_material_shared->MS_bname =
-                 bfromcstr(MATERIAL_NWHITE_MAN_CNAME)) == NULL)
+                 bfromcstr(MATERIAL_NWHITE_MEN_CNAME)) == NULL)
 
-      with_material_shared->MS_id = MATERIAL_NWHITE_MAN_ID;
+      with_material_shared->MS_id = MATERIAL_NWHITE_MEN_ID;
 
       with_material_shared->MS_nstates = (NPIECES_MAX + 1);
     }
-    else if (biseqcstr(bmaterial_name, MATERIAL_NBLACK_MAN_CNAME) == 1)
+    else if (biseqcstr(bmaterial_name, MATERIAL_NBLACK_MEN_CNAME) == 1)
     {
       HARDBUG((with_material_shared->MS_bname =
-                 bfromcstr(MATERIAL_NBLACK_MAN_CNAME)) == NULL)
+                 bfromcstr(MATERIAL_NBLACK_MEN_CNAME)) == NULL)
 
-      with_material_shared->MS_id = MATERIAL_NBLACK_MAN_ID;
+      with_material_shared->MS_id = MATERIAL_NBLACK_MEN_ID;
 
       with_material_shared->MS_nstates = (NPIECES_MAX + 1);
     }
-    else if (biseqcstr(bmaterial_name, MATERIAL_NWHITE_KING_CNAME) == 1)
+    else if (biseqcstr(bmaterial_name, MATERIAL_NWHITE_KINGS_CNAME) == 1)
     {
       HARDBUG((with_material_shared->MS_bname =
-                 bfromcstr(MATERIAL_NWHITE_KING_CNAME)) == NULL)
+                 bfromcstr(MATERIAL_NWHITE_KINGS_CNAME)) == NULL)
 
-      with_material_shared->MS_id = MATERIAL_NWHITE_KING_ID;
+      with_material_shared->MS_id = MATERIAL_NWHITE_KINGS_ID;
 
       with_material_shared->MS_nstates = (MATERIAL_KING_MAX + 1);
       // with_material_shared->MS_nstates = (NPIECES_MAX + 1);
     }
-    else if (biseqcstr(bmaterial_name, MATERIAL_NBLACK_KING_CNAME) == 1)
+    else if (biseqcstr(bmaterial_name, MATERIAL_NBLACK_KINGS_CNAME) == 1)
     {
       HARDBUG((with_material_shared->MS_bname =
-                 bfromcstr(MATERIAL_NBLACK_KING_CNAME)) == NULL)
+                 bfromcstr(MATERIAL_NBLACK_KINGS_CNAME)) == NULL)
 
-      with_material_shared->MS_id = MATERIAL_NBLACK_KING_ID;
+      with_material_shared->MS_id = MATERIAL_NBLACK_KINGS_ID;
 
       with_material_shared->MS_nstates = (MATERIAL_KING_MAX + 1);
       // with_material_shared->MS_nstates = (NPIECES_MAX + 1);
     }
-    else if (biseqcstr(bmaterial_name, MATERIAL_NWHITE_KING20_CNAME) == 1)
+    else if (biseqcstr(bmaterial_name, MATERIAL_NWHITE_KINGS20_CNAME) == 1)
     {
       HARDBUG((with_material_shared->MS_bname =
-                 bfromcstr(MATERIAL_NWHITE_KING20_CNAME)) == NULL)
+                 bfromcstr(MATERIAL_NWHITE_KINGS20_CNAME)) == NULL)
 
-      with_material_shared->MS_id = MATERIAL_NWHITE_KING20_ID;
+      with_material_shared->MS_id = MATERIAL_NWHITE_KINGS20_ID;
 
       with_material_shared->MS_nstates = (NPIECES_MAX + 1);
     }
-    else if (biseqcstr(bmaterial_name, MATERIAL_NBLACK_KING20_CNAME) == 1)
+    else if (biseqcstr(bmaterial_name, MATERIAL_NBLACK_KINGS20_CNAME) == 1)
     {
       HARDBUG((with_material_shared->MS_bname =
-                 bfromcstr(MATERIAL_NBLACK_KING20_CNAME)) == NULL)
+                 bfromcstr(MATERIAL_NBLACK_KINGS20_CNAME)) == NULL)
 
-      with_material_shared->MS_id = MATERIAL_NBLACK_KING20_ID;
+      with_material_shared->MS_id = MATERIAL_NBLACK_KINGS20_ID;
 
       with_material_shared->MS_nstates = (NPIECES_MAX + 1);
     }
@@ -1034,7 +1034,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   // nman_min
 
-  with_network->N_nman_min = 0;
+  with_network->N_nmen_min = 0;
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_NMAN_MIN_ID);
 
@@ -1044,17 +1044,17 @@ local void construct_network_shared(const char *arg_network_name,
 
     HARDBUG((ivalue < 0) or (ivalue > 40))
 
-    with_network->N_nman_min = ivalue;
+    with_network->N_nmen_min = ivalue;
 
     if (arg_verbose)
     {
-      PRINTF("N_nman_min=%d\n", with_network->N_nman_min);
+      PRINTF("N_nman_min=%d\n", with_network->N_nmen_min);
     }
   }
 
   // nman_max
 
-  with_network->N_nman_max = 40;
+  with_network->N_nmen_max = 40;
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_NMAN_MAX_ID);
 
@@ -1064,15 +1064,15 @@ local void construct_network_shared(const char *arg_network_name,
 
     HARDBUG((ivalue < 0) or (ivalue > 40))
 
-    with_network->N_nman_max = ivalue;
+    with_network->N_nmen_max = ivalue;
 
     if (arg_verbose)
     {
-      PRINTF("N_nman_max=%d\n", with_network->N_nman_max);
+      PRINTF("N_nman_max=%d\n", with_network->N_nmen_max);
     }
   }
 
-  HARDBUG(with_network->N_nman_min > with_network->N_nman_max)
+  HARDBUG(with_network->N_nmen_min > with_network->N_nmen_max)
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_PRAGMA_ID);
 
@@ -2233,8 +2233,8 @@ int base3_index_v2(const board_t *arg_board, ui64_t arg_pattern_bb)
   int result = 0;
   int power = 1;
 
-  ui64_t white_man_bb = arg_board->B_white_man_bb;
-  ui64_t black_man_bb = arg_board->B_black_man_bb;
+  ui64_t white_man_bb = arg_board->B_white_men_bb;
+  ui64_t black_man_bb = arg_board->B_black_men_bb;
 
   while (arg_pattern_bb != 0)
   {
@@ -2255,8 +2255,8 @@ int base3_index_v2(const board_t *arg_board, ui64_t arg_pattern_bb)
 
 int base3_index_v3(const board_t *arg_board, ui64_t arg_pattern_bb)
 {
-  uint64_t wm = _pext_u64(arg_board->B_white_man_bb, arg_pattern_bb);
-  uint64_t bm = _pext_u64(arg_board->B_black_man_bb, arg_pattern_bb);
+  uint64_t wm = _pext_u64(arg_board->B_white_men_bb, arg_pattern_bb);
+  uint64_t bm = _pext_u64(arg_board->B_black_men_bb, arg_pattern_bb);
 
   return base3_table[wm | (bm << 8)];
 }
@@ -2265,8 +2265,8 @@ int base3_index_v4(const board_t *arg_board, ui64_t arg_pattern_bb)
 {
   // HARDBUG(BIT_COUNT(arg_pattern_bb) > BASE3_PATTERN_BITS)
 
-  uint32_t wm = (uint32_t)_pext_u64(arg_board->B_white_man_bb, arg_pattern_bb);
-  uint32_t bm = (uint32_t)_pext_u64(arg_board->B_black_man_bb, arg_pattern_bb);
+  uint32_t wm = (uint32_t)_pext_u64(arg_board->B_white_men_bb, arg_pattern_bb);
+  uint32_t bm = (uint32_t)_pext_u64(arg_board->B_black_men_bb, arg_pattern_bb);
 
   HARDBUG((wm & bm) != 0)
 
@@ -2781,12 +2781,12 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
     HARDBUG(IS_BLACK(with_board->B_colour2move))
 
-    int nwhite_man = BIT_COUNT(with_board->B_white_man_bb);
-    int nblack_man = BIT_COUNT(with_board->B_black_man_bb);
-    int nwhite_king = BIT_COUNT(with_board->B_white_king_bb);
-    int nblack_king = BIT_COUNT(with_board->B_black_king_bb);
+    int nwhite_men = BIT_COUNT(with_board->B_white_men_bb);
+    int nblack_men = BIT_COUNT(with_board->B_black_men_bb);
+    int nwhite_kings = BIT_COUNT(with_board->B_white_kings_bb);
+    int nblack_kings = BIT_COUNT(with_board->B_black_kings_bb);
 
-    int npieces = nwhite_man + nblack_man + nwhite_king + nblack_king;
+    int npieces = nwhite_men + nblack_men + nwhite_kings + nblack_kings;
 
     if ((NPIECES_PERCENTILE != INVALID) and (npieces != NPIECES_PERCENTILE))
       continue;
@@ -3083,29 +3083,29 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
     // check_moves(with, &moves_list);
 
-    int nwhite_king = BIT_COUNT(with_board->B_white_king_bb);
-    int nblack_king = BIT_COUNT(with_board->B_black_king_bb);
+    int nwhite_kings = BIT_COUNT(with_board->B_white_kings_bb);
+    int nblack_kings = BIT_COUNT(with_board->B_black_kings_bb);
 
-    if ((nwhite_king > 0) or (nblack_king > 0))
+    if ((nwhite_kings > 0) or (nblack_kings > 0))
       continue;
 
-    int nwhite_man = BIT_COUNT(with_board->B_white_man_bb);
-    int nblack_man = BIT_COUNT(with_board->B_black_man_bb);
+    int nwhite_men = BIT_COUNT(with_board->B_white_men_bb);
+    int nblack_men = BIT_COUNT(with_board->B_black_men_bb);
 
-    if ((nwhite_man == 0) or (nblack_man == 0))
+    if ((nwhite_men == 0) or (nblack_men == 0))
       continue;
 
-    int delta_man = nwhite_man - nblack_man;
+    int delta_men = nwhite_men - nblack_men;
 
-    if (delta_man < 0)
+    if (delta_men < 0)
       continue;
 
     // if (fabs(score_scaled[ifen] - result) > percentile)
     //   continue;
 
-    nfactor[delta_man]++;
-    factor[delta_man] += fabs(score_scaled[ifen]);
-    score[delta_man] += ABS_SCORE_T(return_score_from_board(with_board, NULL));
+    nfactor[delta_men]++;
+    factor[delta_men] += fabs(score_scaled[ifen]);
+    score[delta_men] += ABS_SCORE_T(return_score_from_board(with_board, NULL));
   }
 
   finalize_progress(&progress);
@@ -3183,10 +3183,10 @@ local void append_fen(const board_t *arg_with_board,
 
   HARDBUG(IS_BLACK(arg_with_board->B_colour2move))
 
-  int nwhite_man = BIT_COUNT(arg_with_board->B_white_man_bb);
-  int nblack_man = BIT_COUNT(arg_with_board->B_black_man_bb);
-  int nwhite_king = BIT_COUNT(arg_with_board->B_white_king_bb);
-  int nblack_king = BIT_COUNT(arg_with_board->B_black_king_bb);
+  int nwhite_men = BIT_COUNT(arg_with_board->B_white_men_bb);
+  int nblack_men = BIT_COUNT(arg_with_board->B_black_men_bb);
+  int nwhite_kings = BIT_COUNT(arg_with_board->B_white_kings_bb);
+  int nblack_kings = BIT_COUNT(arg_with_board->B_black_kings_bb);
 
   network_t *with_network = networks + arg_with_board->B_network_id;
 
@@ -3216,67 +3216,68 @@ local void append_fen(const board_t *arg_with_board,
     material_shared_t *with_material_shared =
       with_network->N_shared_materials.MSS_materials + imaterial;
 
-    if (with_material_shared->MS_id == MATERIAL_NWHITE_MAN_ID)
+    if (with_material_shared->MS_id == MATERIAL_NWHITE_MEN_ID)
     {
-      bin_t ibin = nwhite_man;
+      bin_t ibin = nwhite_men;
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
-    else if (with_material_shared->MS_id == MATERIAL_NBLACK_MAN_ID)
+    else if (with_material_shared->MS_id == MATERIAL_NBLACK_MEN_ID)
     {
-      bin_t ibin = nblack_man;
+      bin_t ibin = nblack_men;
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
-    else if (with_material_shared->MS_id == MATERIAL_NWHITE_KING_ID)
+    else if (with_material_shared->MS_id == MATERIAL_NWHITE_KINGS_ID)
     {
-      int mwhite_king = nwhite_king;
+      int ncapped_white_kings = nwhite_kings;
 
-      if (mwhite_king > MATERIAL_KING_MAX)
-        mwhite_king = MATERIAL_KING_MAX;
+      if (ncapped_white_kings > MATERIAL_KING_MAX)
+        ncapped_white_kings = MATERIAL_KING_MAX;
 
-      bin_t ibin = mwhite_king;
+      bin_t ibin = ncapped_white_kings;
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
-    else if (with_material_shared->MS_id == MATERIAL_NBLACK_KING_ID)
+    else if (with_material_shared->MS_id == MATERIAL_NBLACK_KINGS_ID)
     {
-      int mblack_king = nblack_king;
+      int ncapped_black_kings = nblack_kings;
 
-      if (mblack_king > MATERIAL_KING_MAX)
-        mblack_king = MATERIAL_KING_MAX;
+      if (ncapped_black_kings > MATERIAL_KING_MAX)
+        ncapped_black_kings = MATERIAL_KING_MAX;
 
-      bin_t ibin = mblack_king;
+      bin_t ibin = ncapped_black_kings;
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
-    else if (with_material_shared->MS_id == MATERIAL_NWHITE_KING20_ID)
+    else if (with_material_shared->MS_id == MATERIAL_NWHITE_KINGS20_ID)
     {
-      bin_t ibin = nwhite_king;
+      bin_t ibin = nwhite_kings;
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
-    else if (with_material_shared->MS_id == MATERIAL_NBLACK_KING20_ID)
+    else if (with_material_shared->MS_id == MATERIAL_NBLACK_KINGS20_ID)
     {
-      bin_t ibin = nblack_king;
+      bin_t ibin = nblack_kings;
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
     else if (with_material_shared->MS_id == MATERIAL_MAN_KING_ID)
     {
-      int mwhite_king = nwhite_king;
+      int ncapped_white_kings = nwhite_kings;
 
-      if (mwhite_king > MATERIAL_KING_MAX)
-        mwhite_king = MATERIAL_KING_MAX;
+      if (ncapped_white_kings > MATERIAL_KING_MAX)
+        ncapped_white_kings = MATERIAL_KING_MAX;
 
-      int mblack_king = nblack_king;
+      int ncapped_black_kings = nblack_kings;
 
-      if (mblack_king > MATERIAL_KING_MAX)
-        mblack_king = MATERIAL_KING_MAX;
+      if (ncapped_black_kings > MATERIAL_KING_MAX)
+        ncapped_black_kings = MATERIAL_KING_MAX;
 
-      bin_t ibin = (nwhite_man * (MATERIAL_KING_MAX + 1) + mwhite_king) *
-                     (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
-                   nblack_man * (MATERIAL_KING_MAX + 1) + mblack_king;
+      bin_t ibin =
+        (nwhite_men * (MATERIAL_KING_MAX + 1) + ncapped_white_kings) *
+          (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
+        nblack_men * (MATERIAL_KING_MAX + 1) + ncapped_black_kings;
 
       append_fbuffer_bin(arg_fcsv, &ibin, sizeof(bin_t));
     }
@@ -3527,18 +3528,18 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
                    SCORE_WON,
                    BUCKET_LINEAR);
 
-  bucket_t bucket_nwhite_man;
+  bucket_t bucket_nwhite_men;
 
-  construct_bucket(&bucket_nwhite_man,
+  construct_bucket(&bucket_nwhite_men,
                    "bucket_nwhite_man",
                    1,
                    0,
                    NPIECES_MAX,
                    BUCKET_LINEAR);
 
-  bucket_t bucket_nblack_man;
+  bucket_t bucket_nblack_men;
 
-  construct_bucket(&bucket_nblack_man,
+  construct_bucket(&bucket_nblack_men,
                    "bucket_nblack_man",
                    1,
                    0,
@@ -3563,9 +3564,9 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
                    NPIECES_MAX,
                    BUCKET_LINEAR);
 
-  bucket_t bucket_nman;
+  bucket_t bucket_nmen;
 
-  construct_bucket(&bucket_nman,
+  construct_bucket(&bucket_nmen,
                    "bucket_nman",
                    1,
                    0,
@@ -3630,34 +3631,34 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
       if (label_white2move)
         result = -result;
 
-      ui64_t white_man_bb = mirror_bb(with_board->B_black_man_bb);
-      ui64_t black_man_bb = mirror_bb(with_board->B_white_man_bb);
-      ui64_t white_king_bb = mirror_bb(with_board->B_black_king_bb);
-      ui64_t black_king_bb = mirror_bb(with_board->B_white_king_bb);
+      ui64_t white_man_bb = mirror_bb(with_board->B_black_men_bb);
+      ui64_t black_man_bb = mirror_bb(with_board->B_white_men_bb);
+      ui64_t white_king_bb = mirror_bb(with_board->B_black_kings_bb);
+      ui64_t black_king_bb = mirror_bb(with_board->B_white_kings_bb);
 
-      with_board->B_white_man_bb = white_man_bb;
-      with_board->B_black_man_bb = black_man_bb;
-      with_board->B_white_king_bb = white_king_bb;
-      with_board->B_black_king_bb = black_king_bb;
+      with_board->B_white_men_bb = white_man_bb;
+      with_board->B_black_men_bb = black_man_bb;
+      with_board->B_white_kings_bb = white_king_bb;
+      with_board->B_black_kings_bb = black_king_bb;
 
       with_board->B_colour2move = WHITE_ENUM;
 
       board2fen(with_board, bfen, FALSE);
     }
 
-    int nwhite_man = BIT_COUNT(with_board->B_white_man_bb);
+    int nwhite_men = BIT_COUNT(with_board->B_white_men_bb);
 
-    int nblack_man = BIT_COUNT(with_board->B_black_man_bb);
+    int nblack_men = BIT_COUNT(with_board->B_black_men_bb);
 
-    int nman = nwhite_man + nblack_man;
+    int nmen = nwhite_men + nblack_men;
 
-    int nwhite_kings = BIT_COUNT(with_board->B_white_king_bb);
+    int nwhite_kings = BIT_COUNT(with_board->B_white_kings_bb);
 
-    int nblack_kings = BIT_COUNT(with_board->B_black_king_bb);
+    int nblack_kings = BIT_COUNT(with_board->B_black_kings_bb);
 
     int nkings = nwhite_kings + nblack_kings;
 
-    int npieces = nman + nkings;
+    int npieces = nmen + nkings;
 
     if ((npieces < arg_npieces_min) or (npieces > arg_npieces_max))
       continue;
@@ -3679,23 +3680,23 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
     update_bucket(&bucket_material_score, material_score);
 
-    update_bucket(&bucket_nwhite_man, nwhite_man);
+    update_bucket(&bucket_nwhite_men, nwhite_men);
 
-    update_bucket(&bucket_nblack_man, nblack_man);
+    update_bucket(&bucket_nblack_men, nblack_men);
 
     update_bucket(&bucket_nwhite_kings, nwhite_kings);
 
     update_bucket(&bucket_nblack_kings, nblack_kings);
 
-    update_bucket(&bucket_nman, nman);
+    update_bucket(&bucket_nmen, nmen);
 
     update_bucket(&bucket_nkings, nkings);
 
     {
-      int delta_nman = nwhite_man - nblack_man;
+      int delta_nmen = nwhite_men - nblack_men;
       int delta_nkings = nwhite_kings - nblack_kings;
 
-      nman = nwhite_man + nblack_man;
+      nmen = nwhite_men + nblack_men;
 
       double result_wtm = result;
 
@@ -3704,7 +3705,7 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
       append_fbuffer_fmt(&fdata,
                          "%d,%d,%.6f\n",
-                         delta_nman,
+                         delta_nmen,
                          delta_nkings,
                          result_wtm);
     }
@@ -3761,15 +3762,15 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
   my_mpi_bucket_aggregate(&bucket_material_score,
                           my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nwhite_man, my_mpi_globals.MMG_slave_comm);
+  my_mpi_bucket_aggregate(&bucket_nwhite_men, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nblack_man, my_mpi_globals.MMG_slave_comm);
+  my_mpi_bucket_aggregate(&bucket_nblack_men, my_mpi_globals.MMG_slave_comm);
 
   my_mpi_bucket_aggregate(&bucket_nwhite_kings, my_mpi_globals.MMG_slave_comm);
 
   my_mpi_bucket_aggregate(&bucket_nblack_kings, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nman, my_mpi_globals.MMG_slave_comm);
+  my_mpi_bucket_aggregate(&bucket_nmen, my_mpi_globals.MMG_slave_comm);
 
   my_mpi_bucket_aggregate(&bucket_nkings, my_mpi_globals.MMG_slave_comm);
 
@@ -3790,15 +3791,15 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
   printf_bucket(&bucket_material_score);
 
-  printf_bucket(&bucket_nwhite_man);
+  printf_bucket(&bucket_nwhite_men);
 
-  printf_bucket(&bucket_nblack_man);
+  printf_bucket(&bucket_nblack_men);
 
   printf_bucket(&bucket_nwhite_kings);
 
   printf_bucket(&bucket_nblack_kings);
 
-  printf_bucket(&bucket_nman);
+  printf_bucket(&bucket_nmen);
 
   printf_bucket(&bucket_nkings);
 
@@ -3819,10 +3820,10 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
 void evaluate_material_network(const network_t *with_network,
                                dense_network_state_t *arg_state,
-                               int nwhite_man,
-                               int nblack_man,
-                               int nwhite_king,
-                               int nblack_king,
+                               int nwhite_men,
+                               int nblack_men,
+                               int nwhite_kings,
+                               int nblack_kings,
                                int arg_inputs)
 {
   const dense_network_shared_t *dense =
@@ -3834,19 +3835,19 @@ void evaluate_material_network(const network_t *with_network,
 
   int noutputs = dense->DNS_layers[ilast].LS_noutputs;
 
-  HARDBUG((nwhite_man < 0) or (nblack_man < 0) or (nwhite_king < 0) or
-          (nblack_king < 0))
+  HARDBUG((nwhite_men < 0) or (nblack_men < 0) or (nwhite_kings < 0) or
+          (nblack_kings < 0))
 
   // Diagnostics need the intermediate inputs as well as the final outputs.
   if (!arg_inputs and (with_network->N_material_cache != NULL) and
-      (nwhite_man <= NPIECES_MAX) and (nblack_man <= NPIECES_MAX) and
-      (nwhite_king <= NPIECES_MAX) and (nblack_king <= NPIECES_MAX))
+      (nwhite_men <= NPIECES_MAX) and (nblack_men <= NPIECES_MAX) and
+      (nwhite_kings <= NPIECES_MAX) and (nblack_kings <= NPIECES_MAX))
   {
     size_t index =
-      ((nwhite_man * (NPIECES_MAX + 1) + nblack_man) * (NPIECES_MAX + 1) +
-       nwhite_king) *
+      ((nwhite_men * (NPIECES_MAX + 1) + nblack_men) * (NPIECES_MAX + 1) +
+       nwhite_kings) *
         (NPIECES_MAX + 1) +
-      nblack_king;
+      nblack_kings;
     memcpy(arg_state->DNS_layers[ilast].LT_outputs,
            with_network->N_material_cache + index * noutputs,
            noutputs * sizeof(scaled_double_t));
@@ -3892,44 +3893,44 @@ void evaluate_material_network(const network_t *with_network,
 
     int istate = INVALID;
 
-    if (with_material_shared->MS_id == MATERIAL_NWHITE_MAN_ID)
+    if (with_material_shared->MS_id == MATERIAL_NWHITE_MEN_ID)
     {
-      istate = nwhite_man;
+      istate = nwhite_men;
     }
-    else if (with_material_shared->MS_id == MATERIAL_NBLACK_MAN_ID)
+    else if (with_material_shared->MS_id == MATERIAL_NBLACK_MEN_ID)
     {
-      istate = nblack_man;
+      istate = nblack_men;
     }
-    else if ((with_material_shared->MS_id == MATERIAL_NWHITE_KING_ID) or
-             (with_material_shared->MS_id == MATERIAL_NWHITE_KING20_ID))
+    else if ((with_material_shared->MS_id == MATERIAL_NWHITE_KINGS_ID) or
+             (with_material_shared->MS_id == MATERIAL_NWHITE_KINGS20_ID))
     {
-      istate = nwhite_king;
+      istate = nwhite_kings;
 
       if (istate >= with_material_shared->MS_nstates)
         istate = with_material_shared->MS_nstates - 1;
     }
-    else if ((with_material_shared->MS_id == MATERIAL_NBLACK_KING_ID) or
-             (with_material_shared->MS_id == MATERIAL_NBLACK_KING20_ID))
+    else if ((with_material_shared->MS_id == MATERIAL_NBLACK_KINGS_ID) or
+             (with_material_shared->MS_id == MATERIAL_NBLACK_KINGS20_ID))
     {
-      istate = nblack_king;
+      istate = nblack_kings;
 
       if (istate >= with_material_shared->MS_nstates)
         istate = with_material_shared->MS_nstates - 1;
     }
     else if (with_material_shared->MS_id == MATERIAL_MAN_KING_ID)
     {
-      int mwhite_king = nwhite_king;
-      int mblack_king = nblack_king;
+      int ncapped_white_kings = nwhite_kings;
+      int ncapped_black_kings = nblack_kings;
 
-      if (mwhite_king > MATERIAL_KING_MAX)
-        mwhite_king = MATERIAL_KING_MAX;
+      if (ncapped_white_kings > MATERIAL_KING_MAX)
+        ncapped_white_kings = MATERIAL_KING_MAX;
 
-      if (mblack_king > MATERIAL_KING_MAX)
-        mblack_king = MATERIAL_KING_MAX;
+      if (ncapped_black_kings > MATERIAL_KING_MAX)
+        ncapped_black_kings = MATERIAL_KING_MAX;
 
-      istate = (nwhite_man * (MATERIAL_KING_MAX + 1) + mwhite_king) *
+      istate = (nwhite_men * (MATERIAL_KING_MAX + 1) + ncapped_white_kings) *
                  (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
-               nblack_man * (MATERIAL_KING_MAX + 1) + mblack_king;
+               nblack_men * (MATERIAL_KING_MAX + 1) + ncapped_black_kings;
     }
 
     HARDBUG((istate < 0) or (istate >= with_material_shared->MS_nstates))

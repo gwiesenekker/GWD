@@ -255,23 +255,23 @@ local inline void publish_nodes(search_t *search)
   thread_t *thread = search->S_thread;
 
   if (thread != NULL)
-    atomic_store_explicit(&thread->T_published_nodes,
-                          search->S_total_nodes,
+    atomic_store_explicit(&thread->T_npublished_nodes,
+                          search->S_ntotal_nodes,
                           memory_order_relaxed);
 }
 
 local i64_t published_global_nodes(search_t *search)
 {
   if (search->S_thread == NULL)
-    return search->S_total_nodes;
+    return search->S_ntotal_nodes;
 
   publish_nodes(search);
 
   i64_t nodes = 0;
 
   for (int i = 0; i < options.nthreads; i++)
-    nodes +=
-      atomic_load_explicit(&threads[i].T_published_nodes, memory_order_relaxed);
+    nodes += atomic_load_explicit(&threads[i].T_npublished_nodes,
+                                  memory_order_relaxed);
 
   return nodes;
 }
@@ -343,13 +343,13 @@ int move_repetition(board_t *arg_with_board)
 
   if (IS_WHITE(arg_with_board->B_colour2move))
   {
-    npieces = BIT_COUNT(arg_with_board->B_white_man_bb |
-                        arg_with_board->B_white_king_bb);
+    npieces = BIT_COUNT(arg_with_board->B_white_men_bb |
+                        arg_with_board->B_white_kings_bb);
   }
   else
   {
-    npieces = BIT_COUNT(arg_with_board->B_black_man_bb |
-                        arg_with_board->B_black_king_bb);
+    npieces = BIT_COUNT(arg_with_board->B_black_men_bb |
+                        arg_with_board->B_black_kings_bb);
   }
 
   if (npieces > 1)
@@ -435,63 +435,63 @@ local inline ui64_t abcs2crc64(ui64_t abcs_key, ui64_t abcs_data)
 
 void clear_totals(search_t *arg_with_search)
 {
-  arg_with_search->S_total_move_repetitions = 0;
+  arg_with_search->S_ntotal_move_repetitions = 0;
 
-  arg_with_search->S_total_nodes = 0;
-  arg_with_search->S_total_alpha_beta_nodes = 0;
-  arg_with_search->S_total_alpha_beta_1move = 0;
-  arg_with_search->S_total_capture_nodes = 0;
-  arg_with_search->S_total_minimal_window_nodes = 0;
-  arg_with_search->S_total_pv_nodes = 0;
-  arg_with_search->S_total_quiescence_nodes = 0;
-  arg_with_search->S_total_quiescence_1move = 0;
+  arg_with_search->S_ntotal_nodes = 0;
+  arg_with_search->S_ntotal_alpha_beta_nodes = 0;
+  arg_with_search->S_ntotal_alpha_beta_single_move_nodes = 0;
+  arg_with_search->S_ntotal_capture_nodes = 0;
+  arg_with_search->S_ntotal_minimal_window_nodes = 0;
+  arg_with_search->S_ntotal_pv_nodes = 0;
+  arg_with_search->S_ntotal_quiescence_nodes = 0;
+  arg_with_search->S_ntotal_quiescence_single_move_nodes = 0;
 
-  arg_with_search->S_total_reductions = 0;
-  arg_with_search->S_total_reductions_lost = 0;
-  arg_with_search->S_total_reductions_le_alpha = 0;
-  arg_with_search->S_total_reductions_ge_beta = 0;
+  arg_with_search->S_ntotal_reductions = 0;
+  arg_with_search->S_ntotal_lost_reductions = 0;
+  arg_with_search->S_ntotal_le_alpha_reductions = 0;
+  arg_with_search->S_ntotal_ge_beta_reductions = 0;
 
-  arg_with_search->S_total_prob_cut_probes = 0;
-  arg_with_search->S_total_prob_cut_probes_le_alpha = 0;
-  arg_with_search->S_total_prob_cut_probes_ge_beta = 0;
-  arg_with_search->S_total_prob_cut_nodes = 0;
-  arg_with_search->S_total_prob_cut_nodes_le_alpha = 0;
-  arg_with_search->S_total_prob_cut_nodes_ge_beta = 0;
-  arg_with_search->S_total_prob_cut_probes_aborted = 0;
-  arg_with_search->S_total_prob_cut_nodes_aborted = 0;
+  arg_with_search->S_ntotal_prob_cut_probes = 0;
+  arg_with_search->S_ntotal_prob_cut_le_alpha_probes = 0;
+  arg_with_search->S_ntotal_prob_cut_ge_beta_probes = 0;
+  arg_with_search->S_ntotal_prob_cut_nodes = 0;
+  arg_with_search->S_ntotal_prob_cut_le_alpha_nodes = 0;
+  arg_with_search->S_ntotal_prob_cut_ge_beta_nodes = 0;
+  arg_with_search->S_ntotal_prob_cut_aborted_probes = 0;
+  arg_with_search->S_ntotal_prob_cut_aborted_nodes = 0;
 
-  arg_with_search->S_total_singular_extension_probes = 0;
-  arg_with_search->S_total_singular_extension_probes_le_alpha = 0;
-  arg_with_search->S_total_singular_extension_probes_ge_beta = 0;
-  arg_with_search->S_total_singular_extensions = 0;
-  arg_with_search->S_total_singular_reductions = 0;
+  arg_with_search->S_ntotal_singular_extension_probes = 0;
+  arg_with_search->S_ntotal_singular_extension_le_alpha_probes = 0;
+  arg_with_search->S_ntotal_singular_extension_ge_beta_probes = 0;
+  arg_with_search->S_ntotal_singular_extensions = 0;
+  arg_with_search->S_ntotal_singular_reductions = 0;
 
-  arg_with_search->S_total_evaluations = 0;
-  arg_with_search->S_total_lazy_alpha_evaluations = 0;
-  arg_with_search->S_total_lazy_beta_evaluations = 0;
-  arg_with_search->S_total_material_only_evaluations = 0;
-  arg_with_search->S_total_network_evaluations = 0;
+  arg_with_search->S_ntotal_evaluations = 0;
+  arg_with_search->S_ntotal_lazy_alpha_evaluations = 0;
+  arg_with_search->S_ntotal_lazy_beta_evaluations = 0;
+  arg_with_search->S_ntotal_material_only_evaluations = 0;
+  arg_with_search->S_ntotal_network_evaluations = 0;
 
-  arg_with_search->S_total_alpha_beta_cache_updates = 0;
-  arg_with_search->S_total_alpha_beta_cache_aged = 0;
-  arg_with_search->S_total_alpha_beta_cache_hits = 0;
-  arg_with_search->S_total_alpha_beta_cache_depth_hits = 0;
-  arg_with_search->S_total_alpha_beta_cache_le_alpha_hits = 0;
-  arg_with_search->S_total_alpha_beta_cache_le_alpha_cutoffs = 0;
-  arg_with_search->S_total_alpha_beta_cache_ge_beta_hits = 0;
-  arg_with_search->S_total_alpha_beta_cache_ge_beta_cutoffs = 0;
-  arg_with_search->S_total_alpha_beta_cache_true_score_hits = 0;
-  arg_with_search->S_total_alpha_beta_cache_le_alpha_stored = 0;
-  arg_with_search->S_total_alpha_beta_cache_ge_beta_stored = 0;
-  arg_with_search->S_total_alpha_beta_cache_true_score_stored = 0;
-  arg_with_search->S_total_alpha_beta_cache_nmoves_errors = 0;
-  arg_with_search->S_total_alpha_beta_cache_nprobes = 0;
-  arg_with_search->S_total_alpha_beta_cache_memory_hits = 0;
-  arg_with_search->S_total_alpha_beta_cache_local_hits = 0;
-  arg_with_search->S_total_alpha_beta_cache_crc_errors = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_updates = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_aged_entries = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_hits = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_depth_hits = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_le_alpha_hits = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_le_alpha_cutoffs = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_ge_beta_hits = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_ge_beta_cutoffs = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_true_score_hits = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_le_alpha_stored_entries = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_ge_beta_stored_entries = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_true_score_stored_entries = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_nmoves_errors = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_probes = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_memory_hits = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_local_hits = 0;
+  arg_with_search->S_ntotal_alpha_beta_cache_crc_errors = 0;
 
-  arg_with_search->S_total_score_cache_hits = 0;
-  arg_with_search->S_total_score_cache_crc_errors = 0;
+  arg_with_search->S_ntotal_score_cache_hits = 0;
+  arg_with_search->S_ntotal_score_cache_crc_errors = 0;
 
   memset(arg_with_search->S_history, 0, sizeof(arg_with_search->S_history));
 }
@@ -548,63 +548,63 @@ local void update_history(search_t *arg_with_search,
 void print_totals(search_t *arg_with_search){
   // clang-format off
 
-  PRINTF_TOTAL(S_total_move_repetitions)
+  PRINTF_TOTAL(S_ntotal_move_repetitions)
 
-  PRINTF_TOTAL(S_total_nodes)
-  PRINTF_TOTAL(S_total_alpha_beta_nodes)
-  PRINTF_TOTAL(S_total_alpha_beta_1move)
-  PRINTF_TOTAL(S_total_capture_nodes)
-  PRINTF_TOTAL(S_total_minimal_window_nodes)
-  PRINTF_TOTAL(S_total_pv_nodes)
-  PRINTF_TOTAL(S_total_quiescence_nodes)
-  PRINTF_TOTAL(S_total_quiescence_1move)
+  PRINTF_TOTAL(S_ntotal_nodes)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_nodes)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_single_move_nodes)
+  PRINTF_TOTAL(S_ntotal_capture_nodes)
+  PRINTF_TOTAL(S_ntotal_minimal_window_nodes)
+  PRINTF_TOTAL(S_ntotal_pv_nodes)
+  PRINTF_TOTAL(S_ntotal_quiescence_nodes)
+  PRINTF_TOTAL(S_ntotal_quiescence_single_move_nodes)
 
-  PRINTF_TOTAL(S_total_reductions)
-  PRINTF_TOTAL(S_total_reductions_lost)
-  PRINTF_TOTAL(S_total_reductions_le_alpha)
-  PRINTF_TOTAL(S_total_reductions_ge_beta)
+  PRINTF_TOTAL(S_ntotal_reductions)
+  PRINTF_TOTAL(S_ntotal_lost_reductions)
+  PRINTF_TOTAL(S_ntotal_le_alpha_reductions)
+  PRINTF_TOTAL(S_ntotal_ge_beta_reductions)
 
-  PRINTF_TOTAL(S_total_prob_cut_probes)
-  PRINTF_TOTAL(S_total_prob_cut_probes_le_alpha)
-  PRINTF_TOTAL(S_total_prob_cut_probes_ge_beta)
-  PRINTF_TOTAL(S_total_prob_cut_nodes)
-  PRINTF_TOTAL(S_total_prob_cut_nodes_le_alpha)
-  PRINTF_TOTAL(S_total_prob_cut_nodes_ge_beta)
-  PRINTF_TOTAL(S_total_prob_cut_probes_aborted)
-  PRINTF_TOTAL(S_total_prob_cut_nodes_aborted)
+  PRINTF_TOTAL(S_ntotal_prob_cut_probes)
+  PRINTF_TOTAL(S_ntotal_prob_cut_le_alpha_probes)
+  PRINTF_TOTAL(S_ntotal_prob_cut_ge_beta_probes)
+  PRINTF_TOTAL(S_ntotal_prob_cut_nodes)
+  PRINTF_TOTAL(S_ntotal_prob_cut_le_alpha_nodes)
+  PRINTF_TOTAL(S_ntotal_prob_cut_ge_beta_nodes)
+  PRINTF_TOTAL(S_ntotal_prob_cut_aborted_probes)
+  PRINTF_TOTAL(S_ntotal_prob_cut_aborted_nodes)
 
-  PRINTF_TOTAL(S_total_singular_extension_probes)
-  PRINTF_TOTAL(S_total_singular_extension_probes_le_alpha)
-  PRINTF_TOTAL(S_total_singular_extension_probes_ge_beta)
-  PRINTF_TOTAL(S_total_singular_extensions)
-  PRINTF_TOTAL(S_total_singular_reductions)
+  PRINTF_TOTAL(S_ntotal_singular_extension_probes)
+  PRINTF_TOTAL(S_ntotal_singular_extension_le_alpha_probes)
+  PRINTF_TOTAL(S_ntotal_singular_extension_ge_beta_probes)
+  PRINTF_TOTAL(S_ntotal_singular_extensions)
+  PRINTF_TOTAL(S_ntotal_singular_reductions)
 
-  PRINTF_TOTAL(S_total_evaluations)
-  PRINTF_TOTAL(S_total_lazy_alpha_evaluations)
-  PRINTF_TOTAL(S_total_lazy_beta_evaluations)
-  PRINTF_TOTAL(S_total_material_only_evaluations)
-  PRINTF_TOTAL(S_total_network_evaluations)
+  PRINTF_TOTAL(S_ntotal_evaluations)
+  PRINTF_TOTAL(S_ntotal_lazy_alpha_evaluations)
+  PRINTF_TOTAL(S_ntotal_lazy_beta_evaluations)
+  PRINTF_TOTAL(S_ntotal_material_only_evaluations)
+  PRINTF_TOTAL(S_ntotal_network_evaluations)
 
-  PRINTF_TOTAL(S_total_alpha_beta_cache_updates)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_aged)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_hits)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_depth_hits)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_le_alpha_hits)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_le_alpha_cutoffs)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_ge_beta_hits)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_ge_beta_cutoffs)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_true_score_hits)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_le_alpha_stored)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_ge_beta_stored)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_true_score_stored)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_nmoves_errors)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_nprobes)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_memory_hits)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_local_hits)
-  PRINTF_TOTAL(S_total_alpha_beta_cache_crc_errors)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_updates)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_aged_entries)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_hits)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_depth_hits)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_le_alpha_hits)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_le_alpha_cutoffs)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_ge_beta_hits)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_ge_beta_cutoffs)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_true_score_hits)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_le_alpha_stored_entries)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_ge_beta_stored_entries)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_true_score_stored_entries)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_nmoves_errors)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_probes)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_memory_hits)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_local_hits)
+  PRINTF_TOTAL(S_ntotal_alpha_beta_cache_crc_errors)
 
-  PRINTF_TOTAL(S_total_score_cache_hits)
-  PRINTF_TOTAL(S_total_score_cache_crc_errors)
+  PRINTF_TOTAL(S_ntotal_score_cache_hits)
+  PRINTF_TOTAL(S_ntotal_score_cache_crc_errors)
 
   // clang-format on
 }
@@ -617,7 +617,7 @@ local
 {
   BEGIN_BLOCK(__func__)
 
-  arg_with_search->S_total_alpha_beta_cache_nprobes++;
+  arg_with_search->S_ntotal_alpha_beta_cache_probes++;
 
   int result = FALSE;
 
@@ -659,7 +659,7 @@ local
     }
     else
     {
-      arg_with_search->S_total_alpha_beta_cache_crc_errors++;
+      arg_with_search->S_ntotal_alpha_beta_cache_crc_errors++;
     }
   }
 
@@ -1490,11 +1490,11 @@ local void quiescence(search_t *arg_with_search,
 
   *arg_best_score = SCORE(SCORE_MINUS_INFINITY);
 
-  ++(arg_with_search->S_total_nodes);
+  ++(arg_with_search->S_ntotal_nodes);
 
-  ++(arg_with_search->S_total_quiescence_nodes);
+  ++(arg_with_search->S_ntotal_quiescence_nodes);
 
-  if ((arg_with_search->S_total_quiescence_nodes % UPDATE_NODES) == 0)
+  if ((arg_with_search->S_ntotal_quiescence_nodes % UPDATE_NODES) == 0)
   {
     publish_nodes(arg_with_search);
     // only thread[0] should check the time limit
@@ -1603,7 +1603,7 @@ local void quiescence(search_t *arg_with_search,
   if ((arg_moves_list->ML_nmoves == 1) and
       !move_repetition(&(arg_with_search->S_board)))
   {
-    ++(arg_with_search->S_total_quiescence_1move);
+    ++(arg_with_search->S_ntotal_quiescence_single_move_nodes);
 
     do_move(&(arg_with_search->S_board), 0, arg_moves_list);
 
@@ -1638,7 +1638,7 @@ local void quiescence(search_t *arg_with_search,
 
   if (nmoves < arg_moves_list->ML_nmoves)
   {
-    ++(arg_with_search->S_total_evaluations);
+    ++(arg_with_search->S_ntotal_evaluations);
 
     *arg_best_score = return_score(arg_with_search);
 
@@ -1796,9 +1796,9 @@ local void alpha_beta_captures(search_t *arg_with_search,
   HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
           ((arg_my_beta - arg_my_alpha) != 1))
 
-  ++(arg_with_search->S_total_nodes);
+  ++(arg_with_search->S_ntotal_nodes);
 
-  ++(arg_with_search->S_total_capture_nodes);
+  ++(arg_with_search->S_ntotal_capture_nodes);
 
   HARDBUG(arg_moves_list->ML_nmoves == 0)
 
@@ -1830,9 +1830,9 @@ local void alpha_beta_captures(search_t *arg_with_search,
       singular_adjustment = arg_singular_adjustment;
 
       if (singular_adjustment > 0)
-        ++(arg_with_search->S_total_singular_extensions);
+        ++(arg_with_search->S_ntotal_singular_extensions);
       else
-        ++(arg_with_search->S_total_singular_reductions);
+        ++(arg_with_search->S_ntotal_singular_reductions);
     }
 
     score_t temp_alpha;
@@ -2025,9 +2025,9 @@ local void alpha_beta_minimal(search_t *arg_with_search,
                           SCORE(SCORE_MINUS_INFINITY),
                           SR_NULL);
 
-  ++(arg_with_search->S_total_nodes);
+  ++(arg_with_search->S_ntotal_nodes);
 
-  ++(arg_with_search->S_total_minimal_window_nodes);
+  ++(arg_with_search->S_ntotal_minimal_window_nodes);
 
   int your_depth = arg_my_depth - 1;
 
@@ -2080,9 +2080,9 @@ local void alpha_beta_minimal(search_t *arg_with_search,
         singular_adjustment = arg_singular_adjustment;
 
         if (singular_adjustment > 0)
-          ++(arg_with_search->S_total_singular_extensions);
+          ++(arg_with_search->S_ntotal_singular_extensions);
         else
-          ++(arg_with_search->S_total_singular_reductions);
+          ++(arg_with_search->S_ntotal_singular_reductions);
       }
 
       construct_search_result(&temp_result,
@@ -2131,7 +2131,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
           if ((jpass == NPASS_REDUCED_SEARCH) and (reduced_depth < your_depth))
           {
-            arg_with_search->S_total_reductions++;
+            arg_with_search->S_ntotal_reductions++;
 
             temp_alpha = arg_search_result->SR_score - options.reduction_margin;
 
@@ -2188,9 +2188,9 @@ local void alpha_beta_minimal(search_t *arg_with_search,
         else
         {
           if (temp_result.SR_score <= temp_alpha)
-            arg_with_search->S_total_reductions_le_alpha++;
+            arg_with_search->S_ntotal_le_alpha_reductions++;
           else
-            arg_with_search->S_total_reductions_ge_beta++;
+            arg_with_search->S_ntotal_ge_beta_reductions++;
         }
 
         if (ipass == 2)
@@ -2343,9 +2343,9 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
   HARDBUG(!IS_PV(arg_node_type))
 
-  ++(arg_with_search->S_total_nodes);
+  ++(arg_with_search->S_ntotal_nodes);
 
-  ++(arg_with_search->S_total_pv_nodes);
+  ++(arg_with_search->S_ntotal_pv_nodes);
 
   construct_search_result(arg_search_result,
                           SCORE(SCORE_MINUS_INFINITY),
@@ -2392,9 +2392,9 @@ local void alpha_beta_pv(search_t *arg_with_search,
         singular_adjustment = arg_singular_adjustment;
 
         if (singular_adjustment > 0)
-          ++(arg_with_search->S_total_singular_extensions);
+          ++(arg_with_search->S_ntotal_singular_extensions);
         else
-          ++(arg_with_search->S_total_singular_reductions);
+          ++(arg_with_search->S_ntotal_singular_reductions);
       }
 
       score_t temp_alpha;
@@ -2690,11 +2690,11 @@ local void alpha_beta(search_t *arg_with_search,
                           SCORE_NOT_A_NUMBER,
                           SR_NULL);
 
-  ++(arg_with_search->S_total_nodes);
+  ++(arg_with_search->S_ntotal_nodes);
 
-  ++(arg_with_search->S_total_alpha_beta_nodes);
+  ++(arg_with_search->S_ntotal_alpha_beta_nodes);
 
-  if ((arg_with_search->S_total_alpha_beta_nodes % UPDATE_NODES) == 0)
+  if ((arg_with_search->S_ntotal_alpha_beta_nodes % UPDATE_NODES) == 0)
   {
     publish_nodes(arg_with_search);
     // only thread[0] should check the time limit
@@ -2854,7 +2854,7 @@ local void alpha_beta(search_t *arg_with_search,
   if ((arg_moves_list->ML_nmoves == 1) and
       !move_repetition(&(arg_with_search->S_board)))
   {
-    ++(arg_with_search->S_total_alpha_beta_1move);
+    ++(arg_with_search->S_ntotal_alpha_beta_single_move_nodes);
 
     do_move(&(arg_with_search->S_board), 0, arg_moves_list);
 
@@ -2925,16 +2925,16 @@ local void alpha_beta(search_t *arg_with_search,
 
     if (alpha_beta_cache_hit)
     {
-      ++(arg_with_search->S_total_alpha_beta_cache_hits);
+      ++(arg_with_search->S_ntotal_alpha_beta_cache_hits);
 
       if (!IS_PV(arg_node_type) and
           (alpha_beta_cache_slot.ABCS_depth >= arg_my_depth))
       {
-        ++(arg_with_search->S_total_alpha_beta_cache_depth_hits);
+        ++(arg_with_search->S_ntotal_alpha_beta_cache_depth_hits);
 
         if (alpha_beta_cache_slot.ABCS_flags & ABCS_SCORE_LE_ALPHA_BIT)
         {
-          ++(arg_with_search->S_total_alpha_beta_cache_le_alpha_hits);
+          ++(arg_with_search->S_ntotal_alpha_beta_cache_le_alpha_hits);
 
           if (alpha_beta_cache_slot.ABCS_score <= arg_my_alpha)
           {
@@ -2942,7 +2942,7 @@ local void alpha_beta(search_t *arg_with_search,
                            "LE ALPHA HIT",
                            &alpha_beta_cache_slot)
 
-            ++(arg_with_search->S_total_alpha_beta_cache_le_alpha_cutoffs);
+            ++(arg_with_search->S_ntotal_alpha_beta_cache_le_alpha_cutoffs);
 
             construct_search_result(arg_search_result,
                                     alpha_beta_cache_slot.ABCS_score,
@@ -2960,7 +2960,7 @@ local void alpha_beta(search_t *arg_with_search,
         }
         else if (alpha_beta_cache_slot.ABCS_flags & ABCS_SCORE_GE_BETA_BIT)
         {
-          ++(arg_with_search->S_total_alpha_beta_cache_ge_beta_hits);
+          ++(arg_with_search->S_ntotal_alpha_beta_cache_ge_beta_hits);
 
           if (alpha_beta_cache_slot.ABCS_score >= arg_my_beta)
           {
@@ -2968,7 +2968,7 @@ local void alpha_beta(search_t *arg_with_search,
                            "GE BETA HIT",
                            &alpha_beta_cache_slot)
 
-            ++(arg_with_search->S_total_alpha_beta_cache_ge_beta_cutoffs);
+            ++(arg_with_search->S_ntotal_alpha_beta_cache_ge_beta_cutoffs);
 
             construct_search_result(arg_search_result,
                                     alpha_beta_cache_slot.ABCS_score,
@@ -2990,7 +2990,7 @@ local void alpha_beta(search_t *arg_with_search,
                          "TRUE SCORE HIT",
                          &alpha_beta_cache_slot)
 
-          ++(arg_with_search->S_total_alpha_beta_cache_true_score_hits);
+          ++(arg_with_search->S_ntotal_alpha_beta_cache_true_score_hits);
 
           construct_search_result(arg_search_result,
                                   alpha_beta_cache_slot.ABCS_score,
@@ -3027,7 +3027,7 @@ local void alpha_beta(search_t *arg_with_search,
 
       if (kmove >= arg_moves_list->ML_nmoves)
       {
-        arg_with_search->S_total_alpha_beta_cache_nmoves_errors++;
+        arg_with_search->S_ntotal_alpha_beta_cache_nmoves_errors++;
 
         kmove = INVALID;
       }
@@ -3077,7 +3077,7 @@ local void alpha_beta(search_t *arg_with_search,
 
     if ((prob_cut_depth < arg_my_depth) and !alpha_beta_cache_probe_fails)
     {
-      ++(arg_with_search->S_total_prob_cut_probes);
+      ++(arg_with_search->S_ntotal_prob_cut_probes);
 
       HARDBUG(prob_cut_depth < 0)
 
@@ -3090,8 +3090,8 @@ local void alpha_beta(search_t *arg_with_search,
 
       prob_cut_result.SR_pv = arg_search_result->SR_pv;
 
-      i64_t total_nodes = arg_with_search->S_total_nodes;
-      i64_t total_prob_cut_nodes = arg_with_search->S_total_prob_cut_nodes;
+      i64_t total_nodes = arg_with_search->S_ntotal_nodes;
+      i64_t total_prob_cut_nodes = arg_with_search->S_ntotal_prob_cut_nodes;
 
       // Same-position probe: do not append the capture history twice.
       // Descendant move searches construct fresh tweaks, as for LMR.
@@ -3107,32 +3107,32 @@ local void alpha_beta(search_t *arg_with_search,
                  0,
                  &prob_cut_result);
 
-      HARDBUG(arg_with_search->S_total_nodes < total_nodes)
-      HARDBUG(arg_with_search->S_total_prob_cut_nodes < total_prob_cut_nodes)
+      HARDBUG(arg_with_search->S_ntotal_nodes < total_nodes)
+      HARDBUG(arg_with_search->S_ntotal_prob_cut_nodes < total_prob_cut_nodes)
 
       // Attribute each node to its innermost probe, even on interruption.
       i64_t prob_cut_nodes =
-        (arg_with_search->S_total_nodes - total_nodes) -
-        (arg_with_search->S_total_prob_cut_nodes - total_prob_cut_nodes);
+        (arg_with_search->S_ntotal_nodes - total_nodes) -
+        (arg_with_search->S_ntotal_prob_cut_nodes - total_prob_cut_nodes);
 
       HARDBUG(prob_cut_nodes < 0)
 
-      arg_with_search->S_total_prob_cut_nodes += prob_cut_nodes;
+      arg_with_search->S_ntotal_prob_cut_nodes += prob_cut_nodes;
 
       if (IS_SCORE_NAN(prob_cut_result.SR_score))
       {
-        ++(arg_with_search->S_total_prob_cut_probes_aborted);
+        ++(arg_with_search->S_ntotal_prob_cut_aborted_probes);
 
-        arg_with_search->S_total_prob_cut_nodes_aborted += prob_cut_nodes;
+        arg_with_search->S_ntotal_prob_cut_aborted_nodes += prob_cut_nodes;
 
         goto label_return;
       }
 
       if (prob_cut_result.SR_score >= prob_cut_beta)
       {
-        ++(arg_with_search->S_total_prob_cut_probes_ge_beta);
+        ++(arg_with_search->S_ntotal_prob_cut_ge_beta_probes);
 
-        arg_with_search->S_total_prob_cut_nodes_ge_beta += prob_cut_nodes;
+        arg_with_search->S_ntotal_prob_cut_ge_beta_nodes += prob_cut_nodes;
 
         construct_search_result(arg_search_result,
                                 arg_my_beta,
@@ -3147,9 +3147,9 @@ local void alpha_beta(search_t *arg_with_search,
         goto label_return;
       }
 
-      ++(arg_with_search->S_total_prob_cut_probes_le_alpha);
+      ++(arg_with_search->S_ntotal_prob_cut_le_alpha_probes);
 
-      arg_with_search->S_total_prob_cut_nodes_le_alpha += prob_cut_nodes;
+      arg_with_search->S_ntotal_prob_cut_le_alpha_nodes += prob_cut_nodes;
     }
   }
 
@@ -3165,7 +3165,7 @@ local void alpha_beta(search_t *arg_with_search,
         !IS_SCORE_WON(alpha_beta_cache_slot.ABCS_score) and
         !IS_SCORE_LOST(alpha_beta_cache_slot.ABCS_score))
     {
-      ++(arg_with_search->S_total_singular_extension_probes);
+      ++(arg_with_search->S_ntotal_singular_extension_probes);
 
       score_t singular_probe_alpha =
         alpha_beta_cache_slot.ABCS_score - SCORE(options.singular_probe_margin);
@@ -3203,13 +3203,13 @@ local void alpha_beta(search_t *arg_with_search,
 
       if (singular_probe_result.SR_score <= singular_probe_alpha)
       {
-        ++(arg_with_search->S_total_singular_extension_probes_le_alpha);
+        ++(arg_with_search->S_ntotal_singular_extension_le_alpha_probes);
 
         singular_adjustment = 1;
       }
       else
       {
-        ++(arg_with_search->S_total_singular_extension_probes_ge_beta);
+        ++(arg_with_search->S_ntotal_singular_extension_ge_beta_probes);
 
         // Leave one ply for the quiet move before reducing the child depth.
         if ((options.singular_reduction > 0) and
@@ -3390,7 +3390,7 @@ label_store:
     {
       HARDBUG(IS_SR_GE_BETA(arg_search_result->SR_flags))
 
-      ++(arg_with_search->S_total_alpha_beta_cache_le_alpha_stored);
+      ++(arg_with_search->S_ntotal_alpha_beta_cache_le_alpha_stored_entries);
 
       alpha_beta_cache_slot.ABCS_flags = ABCS_SCORE_LE_ALPHA_BIT;
 
@@ -3400,7 +3400,7 @@ label_store:
     {
       HARDBUG(IS_SR_LE_ALPHA(arg_search_result->SR_flags))
 
-      ++(arg_with_search->S_total_alpha_beta_cache_ge_beta_stored);
+      ++(arg_with_search->S_ntotal_alpha_beta_cache_ge_beta_stored_entries);
 
       alpha_beta_cache_slot.ABCS_score = arg_my_beta;
 
@@ -3410,7 +3410,7 @@ label_store:
     }
     else
     {
-      ++(arg_with_search->S_total_alpha_beta_cache_true_score_stored);
+      ++(arg_with_search->S_ntotal_alpha_beta_cache_true_score_stored_entries);
 
       alpha_beta_cache_slot.ABCS_flags = ABCS_SCORE_TRUE_SCORE_BIT;
 
@@ -3600,15 +3600,15 @@ local void print_pv(search_t *arg_with_search,
 
   if (options.hub)
   {
-    i64_t global_nodes = published_global_nodes(arg_with_search);
+    i64_t nglobal_nodes = published_global_nodes(arg_with_search);
 
     bformata(bpv_string,
              "depth=%d score=%.3f time=%.2f nps=%.2f pv=\"%s",
              arg_my_depth,
              (float)SCORE2PRINTF(arg_move_score) / (float)SCORE_MAN,
              return_my_timer(&(arg_with_search->S_timer), FALSE),
-             global_nodes / return_my_timer(&(arg_with_search->S_timer), TRUE) /
-               1000000.0,
+             nglobal_nodes /
+               return_my_timer(&(arg_with_search->S_timer), TRUE) / 1000000.0,
              bdata(bmove_string));
   }
   else
@@ -3625,9 +3625,9 @@ local void print_pv(search_t *arg_with_search,
              (float)SCORE2PRINTF(arg_move_score) / (float)SCORE_MAN,
              SCORE2PRINTF(arg_with_search->S_root_score),
              return_my_timer(&(arg_with_search->S_timer), FALSE),
-             arg_with_search->S_total_nodes,
-             arg_with_search->S_total_alpha_beta_nodes,
-             arg_with_search->S_total_quiescence_nodes,
+             arg_with_search->S_ntotal_nodes,
+             arg_with_search->S_ntotal_alpha_beta_nodes,
+             arg_with_search->S_ntotal_quiescence_nodes,
              arg_move_status,
              bdata(bmove_string));
   }
@@ -3820,7 +3820,7 @@ void do_search(search_t *arg_with_search,
 
       do_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
-      ++(arg_with_search->S_total_nodes);
+      ++(arg_with_search->S_ntotal_nodes);
 
       const char *dtm_missing_name;
 
@@ -4549,9 +4549,9 @@ label_limit:
   my_printf(arg_with_search->S_my_printf,
             "%lld nodes in %.2f seconds\n"
             "%.0f nodes/second\n",
-            arg_with_search->S_total_nodes,
+            arg_with_search->S_ntotal_nodes,
             return_my_timer(&(arg_with_search->S_timer), FALSE),
-            arg_with_search->S_total_nodes /
+            arg_with_search->S_ntotal_nodes /
               return_my_timer(&(arg_with_search->S_timer), FALSE));
 
   if (options.verbose > 0)
@@ -4560,14 +4560,14 @@ label_limit:
   if ((arg_with_search->S_thread != NULL) and
       (arg_with_search->S_thread == thread_alpha_beta_master))
   {
-    i64_t global_nodes = published_global_nodes(arg_with_search);
+    i64_t nglobal_nodes = published_global_nodes(arg_with_search);
 
     my_printf(arg_with_search->S_my_printf,
               "%lld global_nodes in %.2f seconds\n"
               "%.0f global_nodes/second\n",
-              global_nodes,
+              nglobal_nodes,
               return_my_timer(&(arg_with_search->S_timer), FALSE),
-              global_nodes /
+              nglobal_nodes /
                 return_my_timer(&(arg_with_search->S_timer), FALSE));
   }
 

@@ -3,7 +3,7 @@
 #define PatternsH
 
 #define NPATTERNS_MAX 32
-#define NMATERIAL_MAX 20
+#define NMATERIALS_MAX 20
 #define NLINEAR_MAX 16
 
 #define PATTERN_BASE3_INDEX_CNAME "base3_index"
@@ -12,20 +12,20 @@
 
 #define MATERIAL_KING_MAX 5
 
-#define MATERIAL_NWHITE_MAN_CNAME "nwhite_man"
-#define MATERIAL_NBLACK_MAN_CNAME "nblack_man"
-#define MATERIAL_NWHITE_KING_CNAME "nwhite_king"
-#define MATERIAL_NBLACK_KING_CNAME "nblack_king"
-#define MATERIAL_NWHITE_KING20_CNAME "nwhite_king20"
-#define MATERIAL_NBLACK_KING20_CNAME "nblack_king20"
+#define MATERIAL_NWHITE_MEN_CNAME "nwhite_man"
+#define MATERIAL_NBLACK_MEN_CNAME "nblack_man"
+#define MATERIAL_NWHITE_KINGS_CNAME "nwhite_king"
+#define MATERIAL_NBLACK_KINGS_CNAME "nblack_king"
+#define MATERIAL_NWHITE_KINGS20_CNAME "nwhite_king20"
+#define MATERIAL_NBLACK_KINGS20_CNAME "nblack_king20"
 #define MATERIAL_MAN_KING_CNAME "man_king"
 
-#define MATERIAL_NWHITE_MAN_ID 1
-#define MATERIAL_NBLACK_MAN_ID 2
-#define MATERIAL_NWHITE_KING_ID 3
-#define MATERIAL_NBLACK_KING_ID 4
-#define MATERIAL_NWHITE_KING20_ID 5
-#define MATERIAL_NBLACK_KING20_ID 6
+#define MATERIAL_NWHITE_MEN_ID 1
+#define MATERIAL_NBLACK_MEN_ID 2
+#define MATERIAL_NWHITE_KINGS_ID 3
+#define MATERIAL_NBLACK_KINGS_ID 4
+#define MATERIAL_NWHITE_KINGS20_ID 5
+#define MATERIAL_NBLACK_KINGS20_ID 6
 #define MATERIAL_MAN_KING_ID 7
 
 typedef struct
@@ -63,7 +63,7 @@ typedef struct
 typedef struct
 {
   int MSS_nmaterials;
-  material_shared_t MSS_materials[NMATERIAL_MAX];
+  material_shared_t MSS_materials[NMATERIALS_MAX];
 } materials_shared_t;
 
 void construct_patterns_shared(patterns_shared_t *, const char *);

@@ -30,12 +30,12 @@ static void *worker(void *argument)
     push_name("outer", __FILE__, __func__, __LINE__);
     push_name("inner", __FILE__, __func__, __LINE__);
 
-    assert(name_stack->count == 2);
+    assert(name_stack->nnames == 2);
 
     pop_name("inner", __FILE__, __func__, __LINE__);
     pop_name("outer", __FILE__, __func__, __LINE__);
 
-    assert(name_stack->count == 0);
+    assert(name_stack->nnames == 0);
   }
 
   return NULL;

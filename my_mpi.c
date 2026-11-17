@@ -1357,13 +1357,13 @@ void my_mpi_barrier_v3(const char *arg_info,
 
   HARDBUG(my_semop(semid, SEM_MUTEX, -1, 0) != 0)
 
-  int count = my_sem_getval(semid, SEM_COUNT);
+  int narrivals = my_sem_getval(semid, SEM_COUNT);
 
-  ++count;
+  ++narrivals;
 
-  my_sem_setval(semid, SEM_COUNT, count);
+  my_sem_setval(semid, SEM_COUNT, narrivals);
 
-  if (count == nprocs)
+  if (narrivals == nprocs)
   {
     // close second gate
 
@@ -1386,13 +1386,13 @@ void my_mpi_barrier_v3(const char *arg_info,
 
   HARDBUG(my_semop(semid, SEM_MUTEX, -1, 0) != 0)
 
-  count = my_sem_getval(semid, SEM_COUNT);
+  narrivals = my_sem_getval(semid, SEM_COUNT);
 
-  --count;
+  --narrivals;
 
-  my_sem_setval(semid, SEM_COUNT, count);
+  my_sem_setval(semid, SEM_COUNT, narrivals);
 
-  if (count == 0)
+  if (narrivals == 0)
   {
     // close the first gate
 

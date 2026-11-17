@@ -36,7 +36,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
   if (mcts_globals.mcts_globals_time_limit != 0.0)
   {
-    if ((mcts_globals.mcts_globals_nodes++ % 100) == 0)
+    if ((mcts_globals.mcts_globals_nnodes++ % 100) == 0)
     {
       if (poll_queue(return_thread_queue(arg_with_search->S_thread)) != INVALID)
       {
@@ -425,7 +425,7 @@ void mcts_search(search_t *arg_with_search,
                     imove,
                     bdata(bmove_string),
                     SCORE2PRINTF(*arg_best_score),
-                    mcts_globals.mcts_globals_nodes,
+                    mcts_globals.mcts_globals_nnodes,
                     return_my_timer(&(arg_with_search->S_timer), FALSE),
                     SCORE2PRINTF(my_alpha),
                     SCORE2PRINTF(my_beta));
@@ -771,5 +771,5 @@ double mcts_shoot_outs(search_t *arg_with_search,
 void init_mcts(void)
 {
   mcts_globals.mcts_globals_time_limit = 100000.0;
-  mcts_globals.mcts_globals_nodes = 0;
+  mcts_globals.mcts_globals_nnodes = 0;
 }
