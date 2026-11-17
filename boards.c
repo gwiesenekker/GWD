@@ -264,7 +264,7 @@ void string2board(board_t *arg_with_board, const char *arg_position)
       // do nothing
     }
     else
-      FATAL("arg_s[i] error", EXIT_FAILURE)
+      FATAL("arg_position[isquare] error", EXIT_FAILURE)
   }
 
   arg_with_board->B_key = return_key_from_bb(arg_with_board);

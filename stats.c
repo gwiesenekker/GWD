@@ -4,7 +4,7 @@
 
 void clear_stats(stats_t *arg_with_stats)
 {
-  arg_with_stats->S_n = 0;
+  arg_with_stats->S_nsamples = 0;
 
   arg_with_stats->S_min = DBL_MAX;
   arg_with_stats->S_max = -DBL_MAX;
@@ -25,12 +25,12 @@ void construct_stats(stats_t *arg_with_stats, const char *arg_name)
 
 void mean_sigma(stats_t *arg_with_stats)
 {
-  if (arg_with_stats->S_n == 0)
+  if (arg_with_stats->S_nsamples == 0)
     return;
 
-  arg_with_stats->S_mean = arg_with_stats->S_sum / arg_with_stats->S_n;
+  arg_with_stats->S_mean = arg_with_stats->S_sum / arg_with_stats->S_nsamples;
 
-  double variance = sqrt(arg_with_stats->S_sum2 / arg_with_stats->S_n -
+  double variance = sqrt(arg_with_stats->S_sum2 / arg_with_stats->S_nsamples -
                          arg_with_stats->S_mean * arg_with_stats->S_mean);
 
   if (variance < 0.0)
@@ -42,7 +42,7 @@ void mean_sigma(stats_t *arg_with_stats)
 void printf_stats(const stats_t *arg_with_stats)
 {
   PRINTF("name=%s\n", bdata(arg_with_stats->S_name));
-  PRINTF("n=%lld\n", arg_with_stats->S_n);
+  PRINTF("nsamples=%lld\n", arg_with_stats->S_nsamples);
   PRINTF("min=%.6f\n", arg_with_stats->S_min);
   PRINTF("max=%.6f\n", arg_with_stats->S_max);
 
@@ -56,7 +56,7 @@ void my_stats_aggregate(stats_t *arg_with_stats, MPI_Comm arg_comm)
     return;
 
   my_mpi_allreduce(MPI_IN_PLACE,
-                   &(arg_with_stats->S_n),
+                   &(arg_with_stats->S_nsamples),
                    1,
                    MPI_LONG_LONG_INT,
                    MPI_SUM,

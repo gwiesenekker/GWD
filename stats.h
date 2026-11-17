@@ -7,7 +7,7 @@
 typedef struct
 {
   bstring S_name;
-  i64_t S_n;
+  i64_t S_nsamples;
 
   double S_min;
   double S_max;
@@ -23,9 +23,9 @@ void clear_stats(stats_t *);
 
 inline local void update_stats(stats_t *arg_with_stats, double arg_sample)
 {
-  arg_with_stats->S_n++;
+  arg_with_stats->S_nsamples++;
 
-  if (arg_with_stats->S_n == 1)
+  if (arg_with_stats->S_nsamples == 1)
   {
     arg_with_stats->S_min = arg_sample;
     arg_with_stats->S_max = arg_sample;

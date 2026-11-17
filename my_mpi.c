@@ -1507,7 +1507,7 @@ void test_my_mpi(void)
     PRINTF("Process %d released semaphore\n$", my_mpi_globals.MMG_global_id);
   }
 
-  // HARDBUG(compat_sleep(my_mpi_globals.MMG_id_global + MILLI_SECOND) != 0)
+  // HARDBUG(compat_sleep(my_mpi_globals.MMG_global_id + MILLI_SECOND) != 0)
 
   my_mpi_barrier_v3("after semaphores",
                     my_mpi_globals.MMG_global_comm,

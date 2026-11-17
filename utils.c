@@ -17,7 +17,7 @@ _Noreturn void zzzzzz(const char *arg_file,
 {
   fprintf(stderr,
           "** %s **\n"
-          " my_mpi_globals.MMG_id_global=%d\n"
+          " my_mpi_globals.MMG_global_id=%d\n"
           " my_mpi_globals.MMG_nglobal=%d\n"
           " pthread_self=%#lX\n"
           " file=%s\n"
@@ -46,7 +46,7 @@ _Noreturn void zzzzzz(const char *arg_file,
     print_my_names(FALSE);
 
     PRINTF("** %s **\n"
-           " my_mpi_globals.MMG_id_global=%d\n"
+           " my_mpi_globals.MMG_global_id=%d\n"
            " my_mpi_globals.MMG_nglobal=%d\n"
            " pthread_self=%#lX\n"
            " file=%s\n"

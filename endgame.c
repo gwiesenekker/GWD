@@ -79,8 +79,8 @@ void init_endgame(void)
 
     /*
     my_mpi_barrier_v3("gwdegtb_wdl_decompress",
-                      my_mpi_globals.MMG_comm_global,
-                      my_mpi_globals.MMG_semkey_init_endgame_barrier,
+                      my_mpi_globals.MMG_global_comm,
+                      my_mpi_globals.MMG_init_endgame_barrier_semkey,
                       TRUE);
     */
 

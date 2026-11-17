@@ -858,7 +858,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   if (arg_verbose)
   {
-    PRINTF("with_network->N_materials_shared.MSS_nmaterials=%d\n",
+    PRINTF("with_network->N_shared_materials.MSS_nmaterials=%d\n",
            with_network->N_shared_materials.MSS_nmaterials);
 
     for (int imaterial = 0;
@@ -1034,7 +1034,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   if (arg_verbose)
   {
-    PRINTF("with_network->N_activation_last=%s\n",
+    PRINTF("with_network->N_final_activation=%s\n",
            activation_last2string(with_network->N_final_activation, TRUE));
   }
 
@@ -1054,7 +1054,7 @@ local void construct_network_shared(const char *arg_network_name,
 
     if (arg_verbose)
     {
-      PRINTF("N_nman_min=%d\n", with_network->N_nmen_min);
+      PRINTF("N_nmen_min=%d\n", with_network->N_nmen_min);
     }
   }
 
@@ -1074,7 +1074,7 @@ local void construct_network_shared(const char *arg_network_name,
 
     if (arg_verbose)
     {
-      PRINTF("N_nman_max=%d\n", with_network->N_nmen_max);
+      PRINTF("N_nmen_max=%d\n", with_network->N_nmen_max);
     }
   }
 
@@ -1358,7 +1358,7 @@ local void construct_network_shared(const char *arg_network_name,
         .LS_noutputs;
   }
 
-  PRINTF("with_network->N_dense_network_shared.DNS_ninputs=%d\n",
+  PRINTF("with_network->N_shared_dense_network.DNS_ninputs=%d\n",
          with_network->N_shared_dense_network.DNS_ninputs);
 
   HARDBUG(with_network->N_shared_dense_network.DNS_ninputs >= NINPUTS_MAX)
@@ -1368,9 +1368,9 @@ local void construct_network_shared(const char *arg_network_name,
   if (with_network->N_shared_dense_network.DNS_ninputs !=
       with_network->N_shared_dense_network.DNS_layers[0].LS_ninputs)
   {
-    PRINTF("with_network->N_dense_network_shared.DNS_ninputs=%d\n",
+    PRINTF("with_network->N_shared_dense_network.DNS_ninputs=%d\n",
            with_network->N_shared_dense_network.DNS_ninputs);
-    PRINTF("with_network->N_dense_network_shared.DNS_layers[0].LS_ninputs=%d\n",
+    PRINTF("with_network->N_shared_dense_network.DNS_layers[0].LS_ninputs=%d\n",
            with_network->N_shared_dense_network.DNS_layers[0].LS_ninputs);
 
     FATAL("topology error", EXIT_FAILURE)
@@ -3369,7 +3369,7 @@ local void append_fen(const board_t *arg_with_board,
     append_fbuffer_bin(arg_fcsv, &result, sizeof(float));
   }
   else
-    FATAL("unknown with_network->N_activation_last", EXIT_FAILURE)
+    FATAL("unknown with_network->N_final_activation", EXIT_FAILURE)
 
   append_fbuffer_bin(arg_fcsv, NULL, 0);
 

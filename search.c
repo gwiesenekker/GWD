@@ -4588,8 +4588,8 @@ label_limit:
       mean_sigma(
         &(lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]));
 
-      if (lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX].S_n >
-          0)
+      if (lazy_stats[ndelta_man + NPIECES_MAX][ndelta_king + NPIECES_MAX]
+            .S_nsamples > 0)
       {
         PRINTF("ndelta_man=%d ndelta_king=%d\n", ndelta_man, ndelta_king);
 

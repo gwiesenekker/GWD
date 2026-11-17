@@ -326,23 +326,25 @@ local void capture_man_bb(moves_list_t *arg_moves_list,
                  arg_ncaptures);
 
   int perpendicular = 11 - abs(arg_incoming_direction);
-  int dirs[3] = {perpendicular, -perpendicular, arg_incoming_direction};
-  ui64_t available = arg_opponents_bb & ~arg_captures_bb;
+  int directions[3] = {perpendicular, -perpendicular, arg_incoming_direction};
+  ui64_t available_bb = arg_opponents_bb & ~arg_captures_bb;
 
   for (int idirection = 0; idirection < 3; ++idirection)
   {
-    ui64_t victim = move_shift(arg_current_bb, dirs[idirection]) & available;
-    ui64_t landing = move_shift(victim, dirs[idirection]) & arg_empty_bb;
+    ui64_t victim_bb =
+      move_shift(arg_current_bb, directions[idirection]) & available_bb;
+    ui64_t landing_bb =
+      move_shift(victim_bb, directions[idirection]) & arg_empty_bb;
 
-    if (landing)
+    if (landing_bb)
       capture_man_bb(arg_moves_list,
                      arg_from_field,
-                     landing,
+                     landing_bb,
                      arg_empty_bb,
                      arg_opponents_bb,
-                     arg_captures_bb | victim,
+                     arg_captures_bb | victim_bb,
                      arg_ncaptures + 1,
-                     dirs[idirection]);
+                     directions[idirection]);
   }
 }
 
@@ -356,7 +358,7 @@ local void capture_king_bb(moves_list_t *arg_moves_list,
                            int arg_incoming_direction)
 {
   int perpendicular = 11 - abs(arg_incoming_direction);
-  ui64_t available = arg_opponents_bb & ~arg_captures_bb;
+  ui64_t available_bb = arg_opponents_bb & ~arg_captures_bb;
 
   do
   {
@@ -366,39 +368,41 @@ local void capture_king_bb(moves_list_t *arg_moves_list,
                    arg_captures_bb,
                    arg_ncaptures);
 
-    for (int dir = perpendicular; dir != 0; dir = dir > 0 ? -dir : 0)
+    for (int direction = perpendicular; direction != 0;
+         direction = direction > 0 ? -direction : 0)
     {
-      ui64_t victim = move_shift(arg_current_bb, dir);
+      ui64_t victim_bb = move_shift(arg_current_bb, direction);
 
-      while (victim & arg_empty_bb)
-        victim = move_shift(victim, dir);
-      victim &= available;
+      while (victim_bb & arg_empty_bb)
+        victim_bb = move_shift(victim_bb, direction);
+      victim_bb &= available_bb;
 
-      ui64_t landing = move_shift(victim, dir) & arg_empty_bb;
+      ui64_t landing_bb = move_shift(victim_bb, direction) & arg_empty_bb;
 
-      if (landing)
+      if (landing_bb)
         capture_king_bb(arg_moves_list,
                         arg_from_field,
-                        landing,
+                        landing_bb,
                         arg_empty_bb,
                         arg_opponents_bb,
-                        arg_captures_bb | victim,
+                        arg_captures_bb | victim_bb,
                         arg_ncaptures + 1,
-                        dir);
+                        direction);
     }
     arg_current_bb = move_shift(arg_current_bb, arg_incoming_direction);
   } while (arg_current_bb & arg_empty_bb);
 
-  ui64_t victim = arg_current_bb & available;
-  ui64_t landing = move_shift(victim, arg_incoming_direction) & arg_empty_bb;
+  ui64_t victim_bb = arg_current_bb & available_bb;
+  ui64_t landing_bb =
+    move_shift(victim_bb, arg_incoming_direction) & arg_empty_bb;
 
-  if (landing)
+  if (landing_bb)
     capture_king_bb(arg_moves_list,
                     arg_from_field,
-                    landing,
+                    landing_bb,
                     arg_empty_bb,
                     arg_opponents_bb,
-                    arg_captures_bb | victim,
+                    arg_captures_bb | victim_bb,
                     arg_ncaptures + 1,
                     arg_incoming_direction);
 }
@@ -411,108 +415,112 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   int white = IS_WHITE(arg_with_board->B_colour2move);
   colour_enum my_colour = white ? WHITE_ENUM : BLACK_ENUM;
   colour_enum your_colour = white ? BLACK_ENUM : WHITE_ENUM;
-  const int *dirs = white ? white_dir : black_dir;
+  const int *directions = white ? white_dir : black_dir;
   const int *rows = white ? white_row : black_row;
-  ui64_t men = arg_with_board->my_men_bb;
-  ui64_t kings = arg_with_board->my_kings_bb;
-  ui64_t opponents =
+  ui64_t men_bb = arg_with_board->my_men_bb;
+  ui64_t kings_bb = arg_with_board->my_kings_bb;
+  ui64_t opponents_bb =
     arg_with_board->your_men_bb | arg_with_board->your_kings_bb;
-  ui64_t empty = arg_with_board->B_valid_bb & ~(men | kings | opponents);
-  moves_list_t *list = arg_moves_list;
+  ui64_t empty_bb =
+    arg_with_board->B_valid_bb & ~(men_bb | kings_bb | opponents_bb);
+  moves_list_t *with_moves_list = arg_moves_list;
 
-  list->ML_nmoves = list->ML_ncaptx = 0;
+  with_moves_list->ML_nmoves = with_moves_list->ML_ncaptx = 0;
 
   /* Test all men simultaneously, without visiting non-capturing pieces. */
-  ui64_t sources =
-    men &
-    (((opponents >> 5) & (empty >> 10)) | ((opponents >> 6) & (empty >> 12)) |
-     ((opponents << 5) & (empty << 10)) | ((opponents << 6) & (empty << 12)));
-  sources |= kings;
+  ui64_t sources_bb = men_bb & (((opponents_bb >> 5) & (empty_bb >> 10)) |
+                                ((opponents_bb >> 6) & (empty_bb >> 12)) |
+                                ((opponents_bb << 5) & (empty_bb << 10)) |
+                                ((opponents_bb << 6) & (empty_bb << 12)));
+  sources_bb |= kings_bb;
 
-  while (sources)
+  while (sources_bb)
   {
-    int from = white ? BIT_CTZ(sources) : 63 - BIT_CLZ(sources);
-    ui64_t origin = BITULL(from);
+    int from_field = white ? BIT_CTZ(sources_bb) : 63 - BIT_CLZ(sources_bb);
+    ui64_t origin_bb = BITULL(from_field);
 
-    sources &= ~origin;
+    sources_bb &= ~origin_bb;
 
     for (int idirection = 0; idirection < 4; ++idirection)
     {
-      int dir = dirs[idirection];
-      ui64_t victim = move_shift(origin, dir);
+      int direction = directions[idirection];
+      ui64_t victim_bb = move_shift(origin_bb, direction);
 
-      if (origin & kings)
-        while (victim & empty)
-          victim = move_shift(victim, dir);
-      victim &= opponents;
+      if (origin_bb & kings_bb)
+        while (victim_bb & empty_bb)
+          victim_bb = move_shift(victim_bb, direction);
+      victim_bb &= opponents_bb;
 
-      ui64_t landing = move_shift(victim, dir) & empty;
+      ui64_t landing_bb = move_shift(victim_bb, direction) & empty_bb;
 
-      if (!landing)
+      if (!landing_bb)
         continue;
 
-      if (origin & men)
-        capture_man_bb(list,
-                       from,
-                       landing,
-                       empty | origin,
-                       opponents,
-                       victim,
+      if (origin_bb & men_bb)
+        capture_man_bb(with_moves_list,
+                       from_field,
+                       landing_bb,
+                       empty_bb | origin_bb,
+                       opponents_bb,
+                       victim_bb,
                        1,
-                       dir);
+                       direction);
       else
-        capture_king_bb(list,
-                        from,
-                        landing,
-                        empty | origin,
-                        opponents,
-                        victim,
+        capture_king_bb(with_moves_list,
+                        from_field,
+                        landing_bb,
+                        empty_bb | origin_bb,
+                        opponents_bb,
+                        victim_bb,
                         1,
-                        dir);
+                        direction);
     }
   }
 
-  if (list->ML_ncaptx == 0)
+  if (with_moves_list->ML_ncaptx == 0)
   {
-    sources = kings | (men & (white ? (empty << 6) | (empty << 5)
-                                    : (empty >> 5) | (empty >> 6)));
+    sources_bb =
+      kings_bb | (men_bb & (white ? (empty_bb << 6) | (empty_bb << 5)
+                                  : (empty_bb >> 5) | (empty_bb >> 6)));
 
-    while (sources)
+    while (sources_bb)
     {
-      int from = white ? BIT_CTZ(sources) : 63 - BIT_CLZ(sources);
-      ui64_t origin = BITULL(from);
+      int from_field = white ? BIT_CTZ(sources_bb) : 63 - BIT_CLZ(sources_bb);
+      ui64_t origin_bb = BITULL(from_field);
 
-      sources &= ~origin;
+      sources_bb &= ~origin_bb;
 
-      int king = (origin & kings) != 0;
+      int king = (origin_bb & kings_bb) != 0;
 
       for (int idirection = 0; idirection < (king ? 4 : 2); ++idirection)
       {
-        ui64_t landing = move_shift(origin, dirs[idirection]) & empty;
+        ui64_t landing_bb =
+          move_shift(origin_bb, directions[idirection]) & empty_bb;
 
-        while (landing)
+        while (landing_bb)
         {
-          append_bb_move(list, from, landing, 0, 0);
+          append_bb_move(with_moves_list, from_field, landing_bb, 0, 0);
 
           if (!king)
             break;
-          landing = move_shift(landing, dirs[idirection]) & empty;
+          landing_bb =
+            move_shift(landing_bb, directions[idirection]) & empty_bb;
         }
       }
     }
   }
 
-  for (int imove = 0; imove < list->ML_nmoves; ++imove)
+  for (int imove = 0; imove < with_moves_list->ML_nmoves; ++imove)
   {
-    const move_t *move = &list->ML_moves[imove];
+    const move_t *move = &with_moves_list->ML_moves[imove];
 
-    list->ML_move_flags[imove] =
-      (men & BITULL(move->M_move_from)) && rows[move->M_move_to] >= 9
+    with_moves_list->ML_move_flags[imove] =
+      (men_bb & BITULL(move->M_move_from)) && rows[move->M_move_to] >= 9
         ? MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT
         : 0;
   }
   arg_with_board->B_nodes[arg_with_board->B_inode].node_ncaptx =
-    list->ML_ncaptx;
+    with_moves_list->ML_ncaptx;
   END_BLOCK
   POP_NAME(__FUNC__)
 }
@@ -967,7 +975,7 @@ int search_move(const moves_list_t *arg_with_moves_list,
 
       for (int irequested = 2; irequested < nrequested_fields; irequested++)
       {
-        // search m1[i1] in m2[2..n2]
+        // Match each requested capture against the candidate capture fields.
 
         nmatches = 0;
 

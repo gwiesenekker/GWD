@@ -422,17 +422,17 @@ local void solve_problems_multi_threaded(const char *arg_name)
   }
 }
 
-local char *secs2string(int arg_t, bstring arg_string)
+local char *secs2string(int arg_seconds, bstring arg_string)
 {
   int hours;
   int minutes;
   int seconds;
 
-  hours = arg_t / 3600;
-  minutes = (arg_t - hours * 3600) / 60;
-  seconds = arg_t - hours * 3600 - minutes * 60;
+  hours = arg_seconds / 3600;
+  minutes = (arg_seconds - hours * 3600) / 60;
+  seconds = arg_seconds - hours * 3600 - minutes * 60;
 
-  HARDBUG((hours * 3600 + minutes * 60 + seconds) != arg_t)
+  HARDBUG((hours * 3600 + minutes * 60 + seconds) != arg_seconds)
 
   HARDBUG(
     bassignformat(arg_string, "%02d:%02d:%02d", hours, minutes, seconds) ==
@@ -923,7 +923,7 @@ local int add_man_random(int arg_nwhite_men,
                          int arg_scale,
                          my_random_t *arg_random,
                          search_t *arg_with_search,
-                         char *arg_s,
+                         char *arg_position,
                          score_t *arg_best_score)
 {
   int result = FALSE;
@@ -941,7 +941,7 @@ local int add_man_random(int arg_nwhite_men,
     ++ntry;
 
     for (int isquare = 1; isquare <= 50; ++isquare)
-      arg_s[isquare] = *nn;
+      arg_position[isquare] = *nn;
 
     for (int iwhite_man = 1; iwhite_man <= arg_nwhite_men; ++iwhite_man)
     {
@@ -958,13 +958,13 @@ local int add_man_random(int arg_nwhite_men,
 
         HARDBUG(isquare > 50)
 
-        if (arg_s[isquare] == *nn)
+        if (arg_position[isquare] == *nn)
           break;
       }
 
       HARDBUG(isquare == INVALID)
 
-      arg_s[isquare] = *wO;
+      arg_position[isquare] = *wO;
     }
 
     for (int iblack_man = 1; iblack_man <= arg_nblack_men; ++iblack_man)
@@ -982,18 +982,18 @@ local int add_man_random(int arg_nwhite_men,
 
         HARDBUG(isquare > 50)
 
-        if (arg_s[isquare] == *nn)
+        if (arg_position[isquare] == *nn)
           break;
       }
 
       HARDBUG(isquare == INVALID)
 
-      arg_s[isquare] = *bO;
+      arg_position[isquare] = *bO;
     }
 
-    arg_s[51] = '\0';
+    arg_position[51] = '\0';
 
-    string2board(&(arg_with_search->S_board), arg_s);
+    string2board(&(arg_with_search->S_board), arg_position);
 
     moves_list_t moves_list;
 
@@ -1088,14 +1088,14 @@ local int add_kings_random(int arg_nwhite_kings,
                            search_t *arg_with_search,
                            ui64_t *arg_white_kings_mask,
                            ui64_t *arg_black_kings_mask,
-                           char *arg_s,
+                           char *arg_position,
                            score_t *arg_best_score)
 {
   HARDBUG((arg_nwhite_kings + arg_nblack_kings) == 0)
 
   // just to be sure
 
-  arg_s[51] = '\0';
+  arg_position[51] = '\0';
 
   int result = FALSE;
 
@@ -1110,7 +1110,7 @@ local int add_kings_random(int arg_nwhite_kings,
   ui64_t empty = 0;
 
   for (int isquare = 1; isquare <= 50; ++isquare)
-    if (arg_s[isquare] == *nn)
+    if (arg_position[isquare] == *nn)
       empty |= BITULL(isquare);
 
   HARDBUG(empty == 0)
@@ -1125,7 +1125,7 @@ local int add_kings_random(int arg_nwhite_kings,
     int squares[NPIECES_MAX];
     int nsquares = 0;
 
-    string2board(&(arg_with_search->S_board), arg_s);
+    string2board(&(arg_with_search->S_board), arg_position);
 
     /*
         PRINTF("before while\n");
@@ -1176,11 +1176,11 @@ local int add_kings_random(int arg_nwhite_kings,
         int isquare =
           return_random_set_bit(arg_random, empty & ~(*arg_white_kings_mask));
 
-        HARDBUG(arg_s[isquare] != *nn)
+        HARDBUG(arg_position[isquare] != *nn)
 
         HARDBUG(!(empty & BITULL(isquare)))
 
-        arg_s[isquare] = *wX;
+        arg_position[isquare] = *wX;
 
         empty &= ~(BITULL(isquare));
 
@@ -1199,11 +1199,11 @@ local int add_kings_random(int arg_nwhite_kings,
         int isquare =
           return_random_set_bit(arg_random, empty & ~(*arg_black_kings_mask));
 
-        HARDBUG(arg_s[isquare] != *nn)
+        HARDBUG(arg_position[isquare] != *nn)
 
         HARDBUG(!(empty & BITULL(isquare)))
 
-        arg_s[isquare] = *bX;
+        arg_position[isquare] = *bX;
 
         empty &= ~(BITULL(isquare));
 
@@ -1228,7 +1228,7 @@ local int add_kings_random(int arg_nwhite_kings,
 
     /*
         PRINTF("after while\n");
-        string2board(&(arg_with_search->S_board), arg_s);
+        string2board(&(arg_with_search->S_board), arg_position);
         print_board(&(arg_with_search->S_board));
     */
 
@@ -1241,7 +1241,7 @@ local int add_kings_random(int arg_nwhite_kings,
 
     HARDBUG((nwhite_kings + nblack_kings) != nsquares)
 
-    string2board(&(arg_with_search->S_board), arg_s);
+    string2board(&(arg_with_search->S_board), arg_position);
 
     moves_list_t moves_list;
 
@@ -1303,18 +1303,18 @@ local int add_kings_random(int arg_nwhite_kings,
 
     for (int isquare = 0; isquare < nsquares; isquare++)
     {
-      if (arg_s[squares[isquare]] == *wX)
+      if (arg_position[squares[isquare]] == *wX)
       {
         *arg_white_kings_mask |= BITULL(squares[isquare]);
       }
-      else if (arg_s[squares[isquare]] == *bX)
+      else if (arg_position[squares[isquare]] == *bX)
       {
         *arg_black_kings_mask |= BITULL(squares[isquare]);
       }
       else
-        FATAL("invalid arg_s", EXIT_FAILURE)
+        FATAL("invalid arg_position", EXIT_FAILURE)
 
-      arg_s[squares[isquare]] = *nn;
+      arg_position[squares[isquare]] = *nn;
     }
 
     if (result)
@@ -3096,12 +3096,12 @@ int main(int argc, char **argv)
   PRINTF_CFG_I(nthreads);
 
   PRINTF("my_mpi_globals.MMG_nslaves=%d"
-         " my_mpi_globals.MMG_id_slave=%d\n",
+         " my_mpi_globals.MMG_slave_id=%d\n",
          my_mpi_globals.MMG_nslaves,
          my_mpi_globals.MMG_slave_id);
 
   PRINTF("my_mpi_globals.MMG_nglobal=%d"
-         " my_mpi_globals.MMG_id_global=%d\n",
+         " my_mpi_globals.MMG_global_id=%d\n",
          my_mpi_globals.MMG_nglobal,
          my_mpi_globals.MMG_global_id);
 
