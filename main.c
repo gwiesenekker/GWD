@@ -18,7 +18,7 @@ queue_t main_queue;
 
 options_t options;
 
-local void fen2score(char *arg_name)
+local void fen2score(const char *arg_name)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -96,7 +96,7 @@ local void fen2score(char *arg_name)
   END_BLOCK
 }
 
-local void solve_problems(char *arg_name)
+local void solve_problems(const char *arg_name)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -234,7 +234,7 @@ local void solve_problems(char *arg_name)
   END_BLOCK
 }
 
-local void solve_problems_mcts(char *arg_name,
+local void solve_problems_mcts(const char *arg_name,
                                int arg_mcts_depth,
                                double arg_mcts_time_limit,
                                int arg_nshoot_outs)
@@ -394,7 +394,7 @@ local void solve_problems_mcts(char *arg_name,
   END_BLOCK
 }
 
-local void solve_problems_multi_threaded(char *arg_name)
+local void solve_problems_multi_threaded(const char *arg_name)
 {
   enqueue(return_thread_queue(thread_alpha_beta_master),
           MESSAGE_SOLVE,
@@ -442,8 +442,8 @@ local char *secs2string(int arg_t, bstring string)
 
 #define GAME_MOVES 40
 
-void play_game(char *arg_name,
-               char *arg_colour,
+void play_game(const char *arg_name,
+               const char *arg_colour,
                int arg_game_minutes,
                int arg_used_minutes)
 {
@@ -1334,7 +1334,7 @@ local int add_kings_random(int arg_nwhite_kings,
   return (result);
 }
 
-local void gen_random(char *arg_fen_name,
+local void gen_random(const char *arg_fen_name,
                       i64_t arg_npositions_max,
                       int arg_nkings_max,
                       double arg_time_limit)

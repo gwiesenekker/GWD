@@ -9,10 +9,10 @@
 
 int zzzzzz_invocation = 0;
 
-_Noreturn void zzzzzz(char *arg_file,
+_Noreturn void zzzzzz(const char *arg_file,
                       const char *arg_func,
                       long arg_line,
-                      char *arg_error,
+                      const char *arg_error,
                       int arg_code)
 {
   fprintf(stderr,
@@ -86,7 +86,7 @@ _Noreturn void zzzzzz(char *arg_file,
   exit(arg_code);
 }
 
-int fexists(char *arg_name)
+int fexists(const char *arg_name)
 {
   if (compat_access(arg_name, F_OK) == 0)
     return (TRUE);
@@ -131,11 +131,11 @@ static ui64_t crc_table64[256];
 
 void init_crc32(ui32_t *crc) { *crc = 0xFFFFFFFF; }
 
-void update_crc32(ui32_t *crc, void *p, ui32_t n)
+void update_crc32(ui32_t *crc, const void *p, ui32_t n)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  i8_t *a = (i8_t *)p;
+  const i8_t *a = (const i8_t *)p;
 
   for (ui32_t i = 0; i < n; i++)
     *crc = crc_table32[(*crc ^ a[i]) & 0xFF] ^ (*crc >> 8);
@@ -143,9 +143,9 @@ void update_crc32(ui32_t *crc, void *p, ui32_t n)
   END_BLOCK
 }
 
-ui32_t return_crc32(void *a, ui32_t n)
+ui32_t return_crc32(const void *a, ui32_t n)
 {
-  i8_t *b = (i8_t *)a;
+  const i8_t *b = (const i8_t *)a;
 
   ui32_t crc = 0xFFFFFFFF;
 
@@ -155,11 +155,11 @@ ui32_t return_crc32(void *a, ui32_t n)
   return (~crc);
 }
 
-ui64_t return_crc64(void *p, ui64_t n, int flip)
+ui64_t return_crc64(const void *p, ui64_t n, int flip)
 {
   ui64_t crc = 0xFFFFFFFFFFFFFFFFULL;
 
-  i8_t *b = (i8_t *)p;
+  const i8_t *b = (const i8_t *)p;
 
   for (ui64_t i = 0; i < n; i++)
     crc = crc_table64[(crc ^ b[i]) & 0xFF] ^ (crc >> 8);
@@ -229,7 +229,7 @@ void test_utils(void)
   BDESTROY(s)
 }
 
-void file2bstring(char *arg_name, bstring arg_bstring)
+void file2bstring(const char *arg_name, bstring arg_bstring)
 {
   i64_t size;
 
@@ -271,7 +271,7 @@ void file2bstring(char *arg_name, bstring arg_bstring)
   BDESTROY(newline)
 }
 
-void file2cjson(char *arg_name, cJSON **arg_cjson)
+void file2cjson(const char *arg_name, cJSON **arg_cjson)
 {
   i64_t fsize;
 
@@ -301,7 +301,7 @@ void file2cjson(char *arg_name, cJSON **arg_cjson)
   CDESTROY(cstring)
 }
 
-cJSON *cJSON_FindItemInObject(cJSON *arg_cjson, char *arg_name)
+cJSON *cJSON_FindItemInObject(const cJSON *arg_cjson, const char *arg_name)
 {
   cJSON *result = NULL;
 

@@ -46,8 +46,8 @@ typedef struct
   my_random_t Q_my_random;
 } queue_t;
 
-void construct_queue(queue_t *, char *, my_printf_t *);
-void enqueue(queue_t *, int, char *);
+void construct_queue(queue_t *, const char *, my_printf_t *);
+void enqueue(queue_t *, int, const char *);
 int poll_queue(queue_t *);
 int dequeue(queue_t *, message_t *);
 

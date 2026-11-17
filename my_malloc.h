@@ -54,14 +54,21 @@
 ui64_t return_XXH3_64(const void *, size_t);
 
 void mark_pointer_read_only(void *);
-void register_heap(char *, char *, const char *, int, void *, size_t, int, int);
+void register_heap(const char *,
+                   const char *,
+                   const char *,
+                   int,
+                   void *,
+                   size_t,
+                   int,
+                   int);
 void *deregister_heap(void *);
 
-void *my_malloc(char *, char *, const char *, int, size_t);
+void *my_malloc(const char *, const char *, const char *, int, size_t);
 void my_free(void *);
 
-void *my_large_malloc(char *,
-                      char *,
+void *my_large_malloc(const char *,
+                      const char *,
                       const char *,
                       int,
                       size_t,
@@ -69,8 +76,8 @@ void *my_large_malloc(char *,
 void my_large_free(void *, compat_large_allocation_t *);
 
 void print_my_names(int);
-void push_name(char *, char *, const char *, int);
-void pop_name(char *, char *, const char *, int);
+void push_name(const char *, const char *, const char *, int);
+void pop_name(const char *, const char *, const char *, int);
 
 void init_my_malloc(void);
 

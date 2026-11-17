@@ -145,7 +145,7 @@ void pop_board_state(board_t *arg_with_board)
                                 BIT_COUNT(arg_with_board->B_black_king_bb)))
 }
 
-hash_key_t return_key_from_bb(board_t *arg_with_board)
+hash_key_t return_key_from_bb(const board_t *arg_with_board)
 {
   hash_key_t result = 0;
 
@@ -196,7 +196,7 @@ hash_key_t return_key_from_bb(board_t *arg_with_board)
   return (result);
 }
 
-void string2board(board_t *arg_with_board, char *arg_s)
+void string2board(board_t *arg_with_board, const char *arg_s)
 {
   arg_with_board->B_valid_bb = 0;
 
@@ -285,14 +285,14 @@ void string2board(board_t *arg_with_board, char *arg_s)
     FATAL("colour2move error", EXIT_FAILURE)
 }
 
-void fen2board(board_t *arg_with_board, char *arg_fen)
+void fen2board(board_t *arg_with_board, const char *arg_fen)
 {
   char s[51];
 
   for (int i = 1; i <= 50; ++i)
     s[i] = *nn;
 
-  char *f = arg_fen;
+  const char *f = arg_fen;
 
   // W or B
 
@@ -413,7 +413,9 @@ void fen2board(board_t *arg_with_board, char *arg_fen)
   string2board(arg_with_board, s);
 }
 
-void board2fen(board_t *arg_with_board, bstring arg_bfen, int arg_brackets)
+void board2fen(const board_t *arg_with_board,
+               bstring arg_bfen,
+               int arg_brackets)
 {
   BSTRING(bwfen)
 
@@ -483,7 +485,7 @@ void board2fen(board_t *arg_with_board, bstring arg_bfen, int arg_brackets)
   BDESTROY(bwfen)
 }
 
-void print_board(board_t *arg_with_board)
+void print_board(const board_t *arg_with_board)
 {
   int i = 0;
 
@@ -537,7 +539,8 @@ void print_board(board_t *arg_with_board)
   BDESTROY(bfen)
 }
 
-char *board2string(board_t *arg_with_board, int arg_hub, bstring arg_string)
+char *
+board2string(const board_t *arg_with_board, int arg_hub, bstring arg_string)
 {
   HARDBUG(bassigncstr(arg_string, "?") == BSTR_ERR)
   HARDBUG(bpattern(arg_string, 51) == BSTR_ERR)

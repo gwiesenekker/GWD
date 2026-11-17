@@ -3,8 +3,11 @@
 #include <assert.h>
 
 int zzzzzz_invocation;
-_Noreturn void
-zzzzzz(char *file, const char *func, long line, char *message, int code)
+_Noreturn void zzzzzz(const char *file,
+                      const char *func,
+                      long line,
+                      const char *message,
+                      int code)
 {
   fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
   exit(code);

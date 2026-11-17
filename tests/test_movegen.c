@@ -7,7 +7,7 @@
 
 int zzzzzz_invocation;
 int square2field[51], white_row[BOARD_MAX], black_row[BOARD_MAX];
-void print_board(board_t *board)
+void print_board(const board_t *board)
 {
   fprintf(stderr,
           "side=%d men=%llx/%llx kings=%llx/%llx\n",
@@ -17,7 +17,11 @@ void print_board(board_t *board)
           board->B_white_king_bb,
           board->B_black_king_bb);
 }
-void zzzzzz(char *file, const char *func, long line, char *message, int code)
+void zzzzzz(const char *file,
+            const char *func,
+            long line,
+            const char *message,
+            int code)
 {
   fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
   exit(code);

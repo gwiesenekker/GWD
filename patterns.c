@@ -30,9 +30,9 @@ local int map_row_col2field(int irow, int icol)
 }
 
 local void add_pattern(patterns_shared_t *arg_with_patterns_shared,
-                       char *arg_name,
+                       const char *arg_name,
                        int arg_nlinear,
-                       int *arg_fields)
+                       const int *arg_fields)
 {
   HARDBUG(arg_nlinear > NLINEAR_MAX)
 
@@ -131,7 +131,7 @@ local void add_squares(patterns_shared_t *arg_with_patterns_shared,
 }
 
 void construct_patterns_shared(patterns_shared_t *arg_with_patterns_shared,
-                               char *arg_shape)
+                               const char *arg_shape)
 {
   arg_with_patterns_shared->PSS_npatterns = 0;
 

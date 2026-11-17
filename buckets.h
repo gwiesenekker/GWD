@@ -24,7 +24,7 @@ typedef struct
 void clear_bucket(bucket_t *);
 void update_bucket(bucket_t *, double);
 void printf_bucket(bucket_t *);
-void construct_bucket(bucket_t *, char *, double, double, double, int);
+void construct_bucket(bucket_t *, const char *, double, double, double, int);
 
 void my_mpi_bucket_aggregate(bucket_t *, MPI_Comm);
 

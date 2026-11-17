@@ -66,6 +66,6 @@ typedef struct
   material_shared_t MSS_materials[NMATERIAL_MAX];
 } materials_shared_t;
 
-void construct_patterns_shared(patterns_shared_t *, char *);
+void construct_patterns_shared(patterns_shared_t *, const char *);
 
 #endif

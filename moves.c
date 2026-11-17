@@ -507,7 +507,7 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   POP_NAME(__FUNC__)
 }
 
-int can_capture(board_t *arg_with_board, int arg_kings)
+int can_capture(const board_t *arg_with_board, int arg_kings)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -629,7 +629,7 @@ label_return:
 
 void do_move(board_t *arg_with_board,
              int arg_imove,
-             moves_list_t *arg_moves_list)
+             const moves_list_t *arg_moves_list)
 {
   PUSH_NAME(__FUNC__)
 
@@ -666,7 +666,7 @@ void do_move(board_t *arg_with_board,
   if (arg_moves_list == NULL)
     goto label_null;
 
-  move_t *move = arg_moves_list->ML_moves + arg_imove;
+  const move_t *move = arg_moves_list->ML_moves + arg_imove;
 
   int ifield = move->M_move_from;
   int kfield = move->M_move_to;
@@ -772,7 +772,7 @@ label_null:
 
 void undo_move(board_t *arg_with_board,
                int arg_imove,
-               moves_list_t *arg_moves_list)
+               const moves_list_t *arg_moves_list)
 {
   PUSH_NAME(__FUNC__)
 
@@ -786,7 +786,7 @@ void undo_move(board_t *arg_with_board,
   else
     arg_with_board->B_colour2move = WHITE_ENUM;
 
-  move_t *move = arg_moves_list->ML_moves + arg_imove;
+  const move_t *move = arg_moves_list->ML_moves + arg_imove;
 
   // now we can restore the board
 
@@ -988,7 +988,7 @@ void construct_moves_list(moves_list_t *arg_with_moves_list)
   arg_with_moves_list->ML_nmoves = 0;
 }
 
-void fprintf_moves_list(moves_list_t *arg_with_moves_list,
+void fprintf_moves_list(const moves_list_t *arg_with_moves_list,
                         my_printf_t *arg_my_printf,
                         int verbose)
 {

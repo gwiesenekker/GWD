@@ -13,7 +13,11 @@ void *STDOUT;
 int zzzzzz_invocation;
 options_t options;
 my_mpi_globals_t my_mpi_globals;
-void zzzzzz(char *file, const char *func, long line, char *message, int code)
+void zzzzzz(const char *file,
+            const char *func,
+            long line,
+            const char *message,
+            int code)
 {
   fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
   exit(code);

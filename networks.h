@@ -109,16 +109,16 @@ extern network_t networks[NETWORKS_MAX];
 
 void construct_network_state(network_state_t *, int, int);
 int base3_index(const int32_t *, int);
-int base3_index_v2(board_t *, ui64_t);
-int base3_index_v3(board_t *, ui64_t);
-int base3_index_v4(board_t *, ui64_t);
+int base3_index_v2(const board_t *, ui64_t);
+int base3_index_v3(const board_t *, ui64_t);
+int base3_index_v4(const board_t *, ui64_t);
 
-void vcopy_a2b(int n, scaled_double_t *, scaled_double_t *);
-void vadd_ab2a(int, scaled_double_t *restrict, scaled_double_t *restrict);
-void vmul_ab2a(int, scaled_double_t *restrict, scaled_double_t *restrict);
+void vcopy_a2b(int n, const scaled_double_t *, scaled_double_t *);
+void vadd_ab2a(int, scaled_double_t *restrict, const scaled_double_t *restrict);
+void vmul_ab2a(int, scaled_double_t *restrict, const scaled_double_t *restrict);
 void vmul_ab2c(int,
-               scaled_double_t *restrict,
-               scaled_double_t *restrict,
+               const scaled_double_t *restrict,
+               const scaled_double_t *restrict,
                scaled_double_t *restrict);
 double return_dense_network_score_scaled(dense_network_shared_t *,
                                          dense_network_state_t *);
@@ -131,8 +131,8 @@ void evaluate_material_network(network_t *,
                                int,
                                int,
                                int);
-void fen2network(char *, i64_t);
-void fen2csv(char *, int, int);
+void fen2network(const char *, i64_t);
+void fen2csv(const char *, int, int);
 void init_networks(void);
 void test_networks(void);
 

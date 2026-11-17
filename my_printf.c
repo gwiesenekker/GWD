@@ -21,7 +21,7 @@ record_t logs[NLOGS];
 
 local my_mutex_t MP_mutex;
 
-void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
+void my_printf(my_printf_t *arg_with_my_printf, const char *arg_format, ...)
 {
   if (arg_with_my_printf == NULL)
   {
@@ -259,7 +259,7 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
 }
 
 void construct_my_printf(my_printf_t *arg_with_my_printf,
-                         char *arg_prefix,
+                         const char *arg_prefix,
                          int arg2stdout)
 {
   arg_with_my_printf->MP2stdout = arg2stdout;

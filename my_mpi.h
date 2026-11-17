@@ -92,14 +92,14 @@ int my_mpi_win_allocate_shared(MPI_Aint,
 int my_mpi_win_shared_query(MPI_Win, int, MPI_Aint *, int *, void *);
 int my_mpi_win_fence(MPI_Comm, int, MPI_Win);
 void my_mpi_allocate_shared(MPI_Comm, size_t, size_t, void **, MPI_Win *);
-void my_mpi_sync_shared(MPI_Comm, MPI_Win, char *);
+void my_mpi_sync_shared(MPI_Comm, MPI_Win, const char *);
 
 int my_mpi_win_free(MPI_Win *);
 
 int my_mpi_finalize(void);
 int my_mpi_abort(MPI_Comm, int);
 
-void my_mpi_barrier(char *, MPI_Comm, int);
+void my_mpi_barrier(const char *, MPI_Comm, int);
 
 void my_mpi_acquire_semaphore(MPI_Comm, MPI_Win);
 void my_mpi_release_semaphore(MPI_Comm, MPI_Win);
@@ -113,8 +113,8 @@ int my_mpi_construct_semaphore_v3(MPI_Comm, int);
 void my_mpi_acquire_semaphore_v3(MPI_Comm, int);
 void my_mpi_release_semaphore_v3(MPI_Comm, int);
 
-void my_mpi_barrier_v3(char *, MPI_Comm, int, int);
-void my_mpi_barrier_v4(char *, MPI_Comm, int, int);
+void my_mpi_barrier_v3(const char *, MPI_Comm, int, int);
+void my_mpi_barrier_v4(const char *, MPI_Comm, int, int);
 
 void test_my_mpi(void);
 

@@ -86,7 +86,7 @@ void append_sql_buffer(my_sqlite3_t *, const char *, ...);
 
 void flush_sql_buffer(my_sqlite3_t *, int);
 
-void construct_my_sqlite3(my_sqlite3_t *, char *, MPI_Comm);
+void construct_my_sqlite3(my_sqlite3_t *, const char *, MPI_Comm);
 
 void close_my_sqlite3(my_sqlite3_t *);
 

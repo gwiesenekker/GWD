@@ -6,15 +6,22 @@
 #endif
 
 int zzzzzz_invocation;
-_Noreturn void
-zzzzzz(char *file, const char *func, long line, char *message, int code)
+_Noreturn void zzzzzz(const char *file,
+                      const char *func,
+                      long line,
+                      const char *message,
+                      int code)
 {
   fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
   exit(code);
 }
 
 /* Isolate the wrapper from the tracked allocator; engine smoke tests use it. */
-void *my_malloc(char *name, char *file, const char *func, int line, size_t size)
+void *my_malloc(const char *name,
+                const char *file,
+                const char *func,
+                int line,
+                size_t size)
 {
   (void)name;
   (void)file;

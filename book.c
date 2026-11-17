@@ -1105,7 +1105,9 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
     HARDBUG(bdestroy(bmoves[imove]) == BSTR_ERR)
 }
 
-void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
+void expand_book(my_sqlite3_t *arg_db,
+                 const char *arg_fen,
+                 int arg_centi_seconds)
 {
   search_t search;
 
@@ -1201,7 +1203,7 @@ void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
   flush_sql_buffer(arg_db, 0);
 }
 
-void walk_book(char *arg_db_name, char *arg_fen)
+void walk_book(const char *arg_db_name, const char *arg_fen)
 {
   sqlite3 *db;
 

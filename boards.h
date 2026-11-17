@@ -114,13 +114,13 @@ void construct_board(board_t *, my_printf_t *, int);
 void push_board_state(board_t *);
 void pop_board_state(board_t *);
 
-hash_key_t return_key_from_bb(board_t *);
-void string2board(board_t *, char *);
-void fen2board(board_t *, char *);
-void board2fen(board_t *, bstring, int);
-void print_board(board_t *);
+hash_key_t return_key_from_bb(const board_t *);
+void string2board(board_t *, const char *);
+void fen2board(board_t *, const char *);
+void board2fen(const board_t *, bstring, int);
+void print_board(const board_t *);
 void init_boards();
 void state2board(board_t *, game_state_t *);
-char *board2string(board_t *, int, bstring);
+char *board2string(const board_t *, int, bstring);
 
 #endif

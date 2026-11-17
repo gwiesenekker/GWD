@@ -4,13 +4,16 @@
 
 void *STDOUT;
 int zzzzzz_invocation;
-void my_printf(my_printf_t *output, char *format, ...)
+void my_printf(my_printf_t *output, const char *format, ...)
 {
   (void)output;
   (void)format;
 }
-_Noreturn void
-zzzzzz(char *file, const char *func, long line, char *message, int code)
+_Noreturn void zzzzzz(const char *file,
+                      const char *func,
+                      long line,
+                      const char *message,
+                      int code)
 {
   fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
   exit(code);

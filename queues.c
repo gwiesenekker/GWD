@@ -2,7 +2,7 @@
 #include "globals.h"
 
 void construct_queue(queue_t *arg_with_queue,
-                     char *arg_queue_name,
+                     const char *arg_queue_name,
                      my_printf_t *arg_queue_my_printf)
 {
   HARDBUG((arg_with_queue->Q_name = bfromcstr(arg_queue_name)) == NULL)
@@ -31,7 +31,7 @@ void construct_queue(queue_t *arg_with_queue,
 
 void enqueue(queue_t *arg_with_queue,
              int arg_message_id,
-             char *arg_message_text)
+             const char *arg_message_text)
 {
   progress_t progress;
 

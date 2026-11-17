@@ -118,7 +118,10 @@ local void init_base3_mask_table(void)
   }
 }
 
-void decode_base64(size_t ns, unsigned char *s, size_t nt, unsigned char *t)
+void decode_base64(size_t ns,
+                   const unsigned char *s,
+                   size_t nt,
+                   unsigned char *t)
 {
   ui32_t v = 0;
   int nb = -8;
@@ -148,7 +151,7 @@ void decode_base64(size_t ns, unsigned char *s, size_t nt, unsigned char *t)
   HARDBUG(j != nt)
 }
 
-local cJSON *open_cjson_file(cJSON *arg_directory, char *arg_name)
+local cJSON *open_cjson_file(const cJSON *arg_directory, const char *arg_name)
 {
   cJSON *files = cJSON_GetObjectItem(arg_directory, CJSON_FILES_ID);
 
@@ -177,8 +180,9 @@ local cJSON *open_cjson_file(cJSON *arg_directory, char *arg_name)
   return (result);
 }
 
-local void
-read_1d_csv_base64(cJSON *arg_csv, int *arg_nrows, scaled_double_t **arg_cells)
+local void read_1d_csv_base64(const cJSON *arg_csv,
+                              int *arg_nrows,
+                              scaled_double_t **arg_cells)
 {
   *arg_cells = NULL;
 
@@ -201,7 +205,7 @@ read_1d_csv_base64(cJSON *arg_csv, int *arg_nrows, scaled_double_t **arg_cells)
   MY_MALLOC_BY_TYPE(cells_float, float, nrows)
 
   decode_base64(strlen(data),
-                (unsigned char *)data,
+                (const unsigned char *)data,
                 nrows * sizeof(float),
                 (unsigned char *)cells_float);
 
@@ -226,7 +230,7 @@ read_1d_csv_base64(cJSON *arg_csv, int *arg_nrows, scaled_double_t **arg_cells)
   *arg_cells = cells;
 }
 
-local void read_2d_csv_base64(cJSON *arg_csv,
+local void read_2d_csv_base64(const cJSON *arg_csv,
                               int *arg_nrows,
                               int *arg_ncols,
                               scaled_double_t **arg_cells_nrowsxncols,
@@ -261,7 +265,7 @@ local void read_2d_csv_base64(cJSON *arg_csv,
   MY_MALLOC_BY_TYPE(cells_float, float, nrows *ncols);
 
   decode_base64(strlen(data),
-                (unsigned char *)data,
+                (const unsigned char *)data,
                 nrows * ncols * sizeof(float),
                 (unsigned char *)cells_float);
 
@@ -356,8 +360,8 @@ local void read_2d_csv_base64(cJSON *arg_csv,
 }
 
 local scaled_double_t dot_scaled(int n,
-                                 scaled_double_t *restrict a,
-                                 scaled_double_t *restrict b)
+                                 const scaled_double_t *restrict a,
+                                 const scaled_double_t *restrict b)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -399,8 +403,8 @@ local scaled_double_t dot_scaled(int n,
 
     for (const i32_t *z = a + n; a < z; a += 8, b += 8)
     {
-      __m256i ta = _mm256_load_si256((__m256i *)a);
-      __m256i tb = _mm256_load_si256((__m256i *)b);
+      __m256i ta = _mm256_load_si256((const __m256i *)a);
+      __m256i tb = _mm256_load_si256((const __m256i *)b);
 
       __m256i ta_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(ta));
       __m256i ta_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(ta, 1));
@@ -521,8 +525,8 @@ local void dense_layer0_dot(dense_network_shared_t *arg_dense,
 }
 
 local void construct_dense_network_shared(network_t *arg_network,
-                                          cJSON *arg_directory,
-                                          char *arg_prefix,
+                                          const cJSON *arg_directory,
+                                          const char *arg_prefix,
                                           int arg_verbose)
 {
   dense_network_shared_t *with_dense_network_shared = NULL;
@@ -679,7 +683,7 @@ local char *activation_last2string(int arg_activation_last, int arg_lc)
   return (result);
 }
 
-local void construct_network_shared(char *arg_network_name,
+local void construct_network_shared(const char *arg_network_name,
                                     int arg_network_id,
                                     int arg_verbose)
 {
@@ -1560,8 +1564,8 @@ void construct_network_state(network_state_t *arg_with_network_state,
 }
 
 local scaled_double_t dot_double(int n,
-                                 scaled_double_t *restrict a,
-                                 scaled_double_t *restrict b)
+                                 const scaled_double_t *restrict a,
+                                 const scaled_double_t *restrict b)
 {
   double s = 0;
 
@@ -1571,7 +1575,9 @@ local scaled_double_t dot_double(int n,
   return (DOUBLE2SCALED(s));
 }
 
-void vcopy_a2b(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
+void vcopy_a2b(int n,
+               const scaled_double_t *restrict a,
+               scaled_double_t *restrict b)
 {
 #ifdef USE_AVX2_INTRINSICS
   if ((n < 8) or ((n % 8) != 0))
@@ -1596,7 +1602,7 @@ void vcopy_a2b(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
 #else
     for (const i32_t *z = a + n; a < z; a += 8, b += 8)
     {
-      __m256i va = _mm256_load_si256((__m256i *)a);
+      __m256i va = _mm256_load_si256((const __m256i *)a);
 
       _mm256_store_si256((__m256i *)b, va);
     }
@@ -1606,8 +1612,8 @@ void vcopy_a2b(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
 }
 
 local void vadd_ab2c(int n,
-                     scaled_double_t *restrict a,
-                     scaled_double_t *restrict b,
+                     const scaled_double_t *restrict a,
+                     const scaled_double_t *restrict b,
                      scaled_double_t *restrict c)
 {
   BEGIN_BLOCK(__FUNC__)
@@ -1638,8 +1644,8 @@ local void vadd_ab2c(int n,
 #else
     for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
     {
-      __m256i va = _mm256_load_si256((__m256i *)a);
-      __m256i vb = _mm256_load_si256((__m256i *)b);
+      __m256i va = _mm256_load_si256((const __m256i *)a);
+      __m256i vb = _mm256_load_si256((const __m256i *)b);
 
       __m256i vc = _mm256_add_epi32(va, vb);
 
@@ -1653,8 +1659,8 @@ local void vadd_ab2c(int n,
 }
 
 void vmul_ab2c(int n,
-               scaled_double_t *restrict a,
-               scaled_double_t *restrict b,
+               const scaled_double_t *restrict a,
+               const scaled_double_t *restrict b,
                scaled_double_t *restrict c)
 {
   BEGIN_BLOCK(__FUNC__)
@@ -1685,8 +1691,8 @@ void vmul_ab2c(int n,
 #else
     for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
     {
-      __m256i va = _mm256_load_si256((__m256i *)a);
-      __m256i vb = _mm256_load_si256((__m256i *)b);
+      __m256i va = _mm256_load_si256((const __m256i *)a);
+      __m256i vb = _mm256_load_si256((const __m256i *)b);
 
       __m256i vc = _mm256_mullo_epi32(va, vb);
 
@@ -1699,7 +1705,9 @@ void vmul_ab2c(int n,
   END_BLOCK
 }
 
-void vadd_ab2a(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
+void vadd_ab2a(int n,
+               scaled_double_t *restrict a,
+               const scaled_double_t *restrict b)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -1729,8 +1737,8 @@ void vadd_ab2a(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
 #else
     for (const i32_t *z = a + n; a < z; a += 8, b += 8)
     {
-      const __m256i va = _mm256_load_si256((__m256i *)a);
-      const __m256i vb = _mm256_load_si256((__m256i *)b);
+      const __m256i va = _mm256_load_si256((const __m256i *)a);
+      const __m256i vb = _mm256_load_si256((const __m256i *)b);
 
       const __m256i vs = _mm256_add_epi32(va, vb);
 
@@ -1743,7 +1751,9 @@ void vadd_ab2a(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
   END_BLOCK
 }
 
-void vmul_ab2a(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
+void vmul_ab2a(int n,
+               scaled_double_t *restrict a,
+               const scaled_double_t *restrict b)
 {
   BEGIN_BLOCK(__FUNC__)
 
@@ -1773,8 +1783,8 @@ void vmul_ab2a(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
 #else
     for (const i32_t *z = a + n; a < z; a += 8, b += 8)
     {
-      const __m256i va = _mm256_load_si256((__m256i *)a);
-      const __m256i vb = _mm256_load_si256((__m256i *)b);
+      const __m256i va = _mm256_load_si256((const __m256i *)a);
+      const __m256i vb = _mm256_load_si256((const __m256i *)b);
 
       const __m256i vs = _mm256_mullo_epi32(va, vb);
 
@@ -1788,7 +1798,7 @@ void vmul_ab2a(int n, scaled_double_t *restrict a, scaled_double_t *restrict b)
 }
 
 local void activation_relu_scaled(int n,
-                                  scaled_double_t *restrict a,
+                                  const scaled_double_t *restrict a,
                                   scaled_double_t *restrict b)
 {
 #ifdef USE_AVX2_INTRINSICS
@@ -1824,7 +1834,7 @@ local void activation_relu_scaled(int n,
 
     for (const int32_t *z = a + n; a < z; a += 8, b += 8)
     {
-      __m256i va = _mm256_load_si256((__m256i *)a);
+      __m256i va = _mm256_load_si256((const __m256i *)a);
 
       va = _mm256_max_epi32(va, zero);
 
@@ -1836,7 +1846,7 @@ local void activation_relu_scaled(int n,
 }
 
 local void activation_relu_double(int n,
-                                  scaled_double_t *restrict a,
+                                  const scaled_double_t *restrict a,
                                   scaled_double_t *restrict b)
 {
   for (int i = 0; i < n; i++)
@@ -1849,7 +1859,7 @@ local void activation_relu_double(int n,
 }
 
 local void activation_tanh_scaled(int n,
-                                  scaled_double_t *restrict a,
+                                  const scaled_double_t *restrict a,
                                   scaled_double_t *restrict b)
 {
 #ifdef USE_AVX2_INTRINSICS
@@ -1903,7 +1913,7 @@ local void activation_tanh_scaled(int n,
 }
 
 local void activation_tanh_double(int n,
-                                  scaled_double_t *restrict a,
+                                  const scaled_double_t *restrict a,
                                   scaled_double_t *restrict b)
 {
   for (int i = 0; i < n; i++)
@@ -1911,7 +1921,7 @@ local void activation_tanh_double(int n,
 }
 
 local void activation_rsqrt_scaled(int n,
-                                   scaled_double_t *restrict a,
+                                   const scaled_double_t *restrict a,
                                    scaled_double_t *restrict b)
 {
 #ifdef USE_AVX2_INTRINSICS
@@ -1959,7 +1969,7 @@ local void activation_rsqrt_scaled(int n,
 }
 
 local void activation_rsqrt_double(int n,
-                                   scaled_double_t *restrict a,
+                                   const scaled_double_t *restrict a,
                                    scaled_double_t *restrict b)
 {
   for (int i = 0; i < n; i++)
@@ -1968,7 +1978,7 @@ local void activation_rsqrt_double(int n,
 }
 
 local void activation_gelu_scaled(int n,
-                                  scaled_double_t *restrict a,
+                                  const scaled_double_t *restrict a,
                                   scaled_double_t *restrict b)
 {
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
@@ -1997,7 +2007,7 @@ local void activation_gelu_scaled(int n,
 }
 
 local void activation_gelu_double(int n,
-                                  scaled_double_t *restrict a,
+                                  const scaled_double_t *restrict a,
                                   scaled_double_t *restrict b)
 {
 #ifdef USE_ERF
@@ -2021,7 +2031,7 @@ local void activation_gelu_double(int n,
 }
 
 local void activation_geluv2_scaled(int n,
-                                    scaled_double_t *restrict a,
+                                    const scaled_double_t *restrict a,
                                     scaled_double_t *restrict b)
 {
 #ifdef USE_AVX2_INTRINSICS
@@ -2134,7 +2144,7 @@ local void activation_geluv2_scaled(int n,
 }
 
 local void activation_geluv2_double(int n,
-                                    scaled_double_t *restrict a,
+                                    const scaled_double_t *restrict a,
                                     scaled_double_t *restrict b)
 {
   const double p = 0.544790;
@@ -2150,7 +2160,7 @@ local void activation_geluv2_double(int n,
 
 local void activation_scaled(int arg_activation,
                              int n,
-                             scaled_double_t *restrict a,
+                             const scaled_double_t *restrict a,
                              scaled_double_t *restrict b)
 {
   if (arg_activation == NETWORK_ACTIVATION_RELU)
@@ -2183,7 +2193,7 @@ local void activation_scaled(int arg_activation,
 
 local void activation_double(int arg_activation,
                              int n,
-                             scaled_double_t *restrict a,
+                             const scaled_double_t *restrict a,
                              scaled_double_t *restrict b)
 {
   if (arg_activation == NETWORK_ACTIVATION_RELU)
@@ -2216,7 +2226,7 @@ local void activation_double(int arg_activation,
 
 local double return_sigmoid(double x) { return (2.0 / (1.0 + exp(-x)) - 1.0); }
 
-int base3_index_v2(board_t *arg_board, ui64_t arg_pattern_bb)
+int base3_index_v2(const board_t *arg_board, ui64_t arg_pattern_bb)
 {
   BEGIN_BLOCK(__func__)
 
@@ -2243,7 +2253,7 @@ int base3_index_v2(board_t *arg_board, ui64_t arg_pattern_bb)
   return (result);
 }
 
-int base3_index_v3(board_t *arg_board, ui64_t arg_pattern_bb)
+int base3_index_v3(const board_t *arg_board, ui64_t arg_pattern_bb)
 {
   uint64_t wm = _pext_u64(arg_board->B_white_man_bb, arg_pattern_bb);
   uint64_t bm = _pext_u64(arg_board->B_black_man_bb, arg_pattern_bb);
@@ -2251,7 +2261,7 @@ int base3_index_v3(board_t *arg_board, ui64_t arg_pattern_bb)
   return base3_table[wm | (bm << 8)];
 }
 
-int base3_index_v4(board_t *arg_board, ui64_t arg_pattern_bb)
+int base3_index_v4(const board_t *arg_board, ui64_t arg_pattern_bb)
 {
   // HARDBUG(BIT_COUNT(arg_pattern_bb) > BASE3_PATTERN_BITS)
 
@@ -2677,7 +2687,7 @@ static inline uint64_t mirror_bb(uint64_t bb)
   return (result);
 }
 
-void fen2network(char *arg_name, i64_t arg_npositions)
+void fen2network(const char *arg_name, i64_t arg_npositions)
 {
   board_t board;
 
@@ -3148,8 +3158,8 @@ void fen2network(char *arg_name, i64_t arg_npositions)
   }
 }
 
-local void append_fen(board_t *arg_with_board,
-                      bstring arg_bfen,
+local void append_fen(const board_t *arg_with_board,
+                      const_bstring arg_bfen,
                       double arg_result,
                       fbuffer_t *arg_fcsv,
                       fbuffer_t *arg_ffen)
@@ -3314,7 +3324,7 @@ local void append_fen(board_t *arg_with_board,
     append_fbuffer_fmt(arg_ffen, "%s {%.6f}\n", bdata(arg_bfen), arg_result);
 }
 
-void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
+void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 {
   my_random_t fen2csv_random;
 

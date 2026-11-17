@@ -571,7 +571,9 @@ void my_mpi_allocate_shared(MPI_Comm arg_comm,
 #endif
 }
 
-void my_mpi_sync_shared(MPI_Comm arg_comm, MPI_Win arg_win, char *arg_info)
+void my_mpi_sync_shared(MPI_Comm arg_comm,
+                        MPI_Win arg_win,
+                        const char *arg_info)
 {
 #ifdef USE_OPENMPI
   if (arg_comm != MPI_COMM_NULL)
@@ -641,7 +643,7 @@ int my_mpi_abort(MPI_Comm comm, int errorcode)
 #endif
 }
 
-void my_mpi_barrier(char *arg_info, MPI_Comm arg_comm, int arg_verbose)
+void my_mpi_barrier(const char *arg_info, MPI_Comm arg_comm, int arg_verbose)
 {
 #ifdef USE_OPENMPI
   if (arg_comm == MPI_COMM_NULL)
@@ -1313,7 +1315,7 @@ void my_mpi_release_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
 #endif
 }
 
-void my_mpi_barrier_v3(char *arg_info,
+void my_mpi_barrier_v3(const char *arg_info,
                        MPI_Comm arg_comm,
                        int arg_semkey,
                        int arg_verbose)

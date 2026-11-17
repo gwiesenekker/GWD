@@ -28,7 +28,7 @@ local dtm_policy_t go_dtm_policy(int arg_message_id)
 
 /* The previous search may still be unwinding. Acknowledge GO only after
  * its final publication, before any work for the new search is dispatched. */
-local void start_search_workers(int arg_go, char *description)
+local void start_search_workers(int arg_go, const char *description)
 {
   for (int i = 1; i < options.nthreads; i++)
   {
@@ -44,7 +44,7 @@ local void start_search_workers(int arg_go, char *description)
       HARDBUG(compat_sleep(CENTI_SECOND) != 0)
 }
 
-local void solve_problems(void *self, char *arg_name)
+local void solve_problems(void *self, const char *arg_name)
 {
   thread_t *arg_with_thread = self;
 

@@ -1122,7 +1122,7 @@ local void trace_ab_cache(search_t *arg_with_search,
                           char *file,
                           const char *func,
                           int line,
-                          char *arg_info,
+                          const char *arg_info,
                           alpha_beta_cache_slot_t *arg_cache_slot)
 {
   for (int idepth = 0; idepth < trace_depth; idepth++)
@@ -1178,7 +1178,7 @@ local void trace_ab_window(ui64_t arg_trace_key,
                            char *file,
                            const char *func,
                            int line,
-                           char *arg_info,
+                           const char *arg_info,
                            int arg_alpha,
                            int arg_beta,
                            moves_list_t *arg_moves_list,
@@ -1247,7 +1247,7 @@ local void trace_ab_result(ui64_t arg_trace_key,
                            char *file,
                            const char *func,
                            int line,
-                           char *arg_info,
+                           const char *arg_info,
                            score_t arg_alpha,
                            score_t arg_beta,
                            moves_list_t *arg_moves_list,
@@ -3590,7 +3590,7 @@ local void print_pv(search_t *arg_with_search,
                     moves_list_t *arg_moves_list,
                     score_t arg_move_score,
                     pv_entries_t *arg_best_pv,
-                    char *arg_move_status)
+                    const char *arg_move_status)
 {
   BSTRING(bmove_string)
 

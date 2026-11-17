@@ -18,7 +18,7 @@
 #define NPLY_PAUSE 10
 
 local int
-get_next_token(bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
+get_next_token(const_bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
 {
   int result = INVALID;
 
@@ -153,7 +153,7 @@ get_next_token(bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
   return (result);
 }
 
-void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
+void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
 {
   BSTRING(string);
 
@@ -457,7 +457,7 @@ void read_games(my_sqlite3_t *arg_db, char *arg_pdn_name)
   PRINTF("ngames=%lld nerrors=%lld\n", ngames, nerrors);
 }
 
-void auto_play(char *arg_txt_name, i64_t arg_npositions)
+void auto_play(const char *arg_txt_name, i64_t arg_npositions)
 {
 #ifdef DEBUG
   arg_npositions = 1000;

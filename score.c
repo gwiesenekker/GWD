@@ -459,7 +459,7 @@ score_t return_score(search_t *arg_with_search)
   return (result);
 }
 
-int return_npieces(board_t *arg_with_board)
+int return_npieces(const board_t *arg_with_board)
 {
   return (BIT_COUNT(arg_with_board->B_white_man_bb) +
           BIT_COUNT(arg_with_board->B_white_king_bb) +
@@ -467,7 +467,7 @@ int return_npieces(board_t *arg_with_board)
           BIT_COUNT(arg_with_board->B_black_king_bb));
 }
 
-score_t return_material_score(board_t *arg_with_board)
+score_t return_material_score(const board_t *arg_with_board)
 {
   int nwhite_man = BIT_COUNT(arg_with_board->B_white_man_bb);
   int nblack_man = BIT_COUNT(arg_with_board->B_black_man_bb);

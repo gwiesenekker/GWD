@@ -10,8 +10,8 @@ void return_book_move(board_t *, moves_list_t *, bstring);
 
 void add_evaluations2book(my_sqlite3_t *, int, int);
 
-void expand_book(my_sqlite3_t *, char *, int);
+void expand_book(my_sqlite3_t *, const char *, int);
 
-void walk_book(char *, char *);
+void walk_book(const char *, const char *);
 
 #endif

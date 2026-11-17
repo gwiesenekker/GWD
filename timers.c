@@ -5,7 +5,7 @@
 #define MY_TIMER_STARTED 1
 
 void construct_my_timer(my_timer_t *arg_with_my_timer,
-                        char *arg_name,
+                        const char *arg_name,
                         my_printf_t *arg_my_printf,
                         int arg_suppress_warnings)
 {
@@ -157,7 +157,7 @@ void destroy_my_timer(my_timer_t *arg_with_my_timer)
 }
 
 void construct_progress(progress_t *arg_progress,
-                        char *arg_name,
+                        const char *arg_name,
                         i64_t arg_ntotal,
                         double arg_seconds)
 {
@@ -317,8 +317,14 @@ void destroy_progress(progress_t *arg_progress)
   destroy_my_timer(&(arg_progress->P_timer));
 }
 
-i64_t return_ndone(progress_t *arg_progress) { return (arg_progress->P_ndone); }
-i64_t return_ntodo(progress_t *arg_progress) { return (arg_progress->P_ntodo); }
+i64_t return_ndone(const progress_t *arg_progress)
+{
+  return (arg_progress->P_ndone);
+}
+i64_t return_ntodo(const progress_t *arg_progress)
+{
+  return (arg_progress->P_ntodo);
+}
 
 void construct_time_control(time_control_t *arg_with_time_control)
 {

@@ -16,7 +16,7 @@ void clear_stats(stats_t *arg_with_stats)
   arg_with_stats->S_sigma = 0.0;
 }
 
-void construct_stats(stats_t *arg_with_stats, char *arg_name)
+void construct_stats(stats_t *arg_with_stats, const char *arg_name)
 {
   HARDBUG((arg_with_stats->S_name = bfromcstr(arg_name)) == NULL)
 

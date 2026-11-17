@@ -35,10 +35,16 @@ typedef struct
   i64_t C_noverwrites;
 } cache_t;
 
-int check_entry_in_cache(cache_t *, void *, void *);
-int store_entry_in_cache(cache_t *, void *, void *);
+int check_entry_in_cache(cache_t *, const void *, void *);
+int store_entry_in_cache(cache_t *, const void *, const void *);
 void clear_cache(cache_t *);
-void construct_cache(cache_t *, char *, i64_t, int, void *, size_t, void *);
+void construct_cache(cache_t *,
+                     const char *,
+                     i64_t,
+                     int,
+                     const void *,
+                     size_t,
+                     const void *);
 
 void test_caches(void);
 

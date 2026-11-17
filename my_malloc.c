@@ -35,8 +35,8 @@ typedef struct
 
 typedef struct
 {
-  char *MN_name;
-  char *MN_file;
+  const char *MN_name;
+  const char *MN_file;
   const char *MN_func;
   int MN_line;
   unsigned long MN_pthread_self;
@@ -137,8 +137,8 @@ void mark_pointer_read_only(void *arg_pointer)
   HARDBUG(compat_mutex_unlock(&my_malloc_mutex) != 0)
 }
 
-void register_heap(char *arg_name,
-                   char *arg_file,
+void register_heap(const char *arg_name,
+                   const char *arg_file,
                    const char *arg_func,
                    int arg_line,
                    void *arg_heap,
@@ -318,8 +318,8 @@ void *deregister_heap(void *arg_pointer)
   return (result);
 }
 
-void *my_malloc(char *arg_name,
-                char *arg_file,
+void *my_malloc(const char *arg_name,
+                const char *arg_file,
                 const char *arg_func,
                 int arg_line,
                 size_t arg_size)
@@ -354,8 +354,8 @@ void *my_malloc(char *arg_name,
   return ((char *)result + NPAD);
 }
 
-void *my_large_malloc(char *arg_name,
-                      char *arg_file,
+void *my_large_malloc(const char *arg_name,
+                      const char *arg_file,
                       const char *arg_func,
                       int arg_line,
                       size_t arg_size,
@@ -475,8 +475,8 @@ void print_my_names(int arg_all)
     (void)print_name_stack(name_stack);
 }
 
-void push_name(char *arg_name,
-               char *arg_file,
+void push_name(const char *arg_name,
+               const char *arg_file,
                const char *arg_func,
                int arg_line)
 {
@@ -498,8 +498,8 @@ void push_name(char *arg_name,
   HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 }
 
-void pop_name(char *arg_name,
-              char *arg_file,
+void pop_name(const char *arg_name,
+              const char *arg_file,
               const char *arg_func,
               int arg_line)
 {

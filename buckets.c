@@ -164,7 +164,7 @@ void printf_bucket(bucket_t *arg_with_bucket)
 }
 
 void construct_bucket(bucket_t *arg_with_bucket,
-                      char *arg_bucket_name,
+                      const char *arg_bucket_name,
                       double arg_bucket_size,
                       double arg_bucket_min,
                       double arg_bucket_max,

@@ -304,7 +304,7 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
   arg_output->slen = *arg_nbuffer - 1;
 }
 
-char decode(int arg_nhuffer, char *arg_buffer, dxp_t *arg_with_dxp)
+char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
 {
   HARDBUG(arg_nhuffer < 1)
 

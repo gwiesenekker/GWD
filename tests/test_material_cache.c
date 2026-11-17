@@ -6,14 +6,21 @@
 int zzzzzz_invocation;
 my_mpi_globals_t my_mpi_globals;
 
-_Noreturn void
-zzzzzz(char *file, const char *func, long line, char *message, int code)
+_Noreturn void zzzzzz(const char *file,
+                      const char *func,
+                      long line,
+                      const char *message,
+                      int code)
 {
   fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
   exit(code);
 }
 
-void *my_malloc(char *name, char *file, const char *func, int line, size_t size)
+void *my_malloc(const char *name,
+                const char *file,
+                const char *func,
+                int line,
+                size_t size)
 {
   (void)name;
   (void)file;
@@ -27,8 +34,8 @@ void *my_malloc(char *name, char *file, const char *func, int line, size_t size)
   return pointer;
 }
 void my_free(void *pointer) { free(pointer); }
-void register_heap(char *name,
-                   char *file,
+void register_heap(const char *name,
+                   const char *file,
                    const char *func,
                    int line,
                    void *pointer,
@@ -59,7 +66,7 @@ void my_mpi_allocate_shared(MPI_Comm comm,
   memset(*pointer, 0xa5, size * count); /* Detect missing zero filling. */
   *win = 0;
 }
-void my_mpi_sync_shared(MPI_Comm comm, MPI_Win win, char *name)
+void my_mpi_sync_shared(MPI_Comm comm, MPI_Win win, const char *name)
 {
   (void)comm;
   (void)win;
@@ -67,7 +74,7 @@ void my_mpi_sync_shared(MPI_Comm comm, MPI_Win win, char *name)
 }
 
 void *STDOUT;
-void my_printf(my_printf_t *out, char *format, ...)
+void my_printf(my_printf_t *out, const char *format, ...)
 {
   (void)out;
   (void)format;

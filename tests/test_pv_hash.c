@@ -4,7 +4,11 @@
 #include <assert.h>
 
 int zzzzzz_invocation;
-void zzzzzz(char *file, const char *func, long line, char *message, int code)
+void zzzzzz(const char *file,
+            const char *func,
+            long line,
+            const char *message,
+            int code)
 {
   fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
   exit(code);

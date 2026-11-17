@@ -21,8 +21,8 @@
 score_t return_score_from_board(board_t *, double_t *);
 score_t return_score(search_t *);
 
-int return_npieces(board_t *);
-score_t return_material_score(board_t *);
+int return_npieces(const board_t *);
+score_t return_material_score(const board_t *);
 
 void init_score(void);
 

@@ -10,17 +10,17 @@
 
 extern int zzzzzz_invocation;
 
-_Noreturn void zzzzzz(char *, const char *, long, char *, int);
-int fexists(char *);
+_Noreturn void zzzzzz(const char *, const char *, long, const char *, int);
+int fexists(const char *);
 
 i64_t first_prime_below(i64_t);
 void init_crc32(ui32_t *);
-void update_crc32(ui32_t *, void *, ui32_t);
-ui32_t return_crc32(void *, ui32_t);
-ui64_t return_crc64(void *, ui64_t, int);
-void file2bstring(char *, bstring);
-void file2cjson(char *, cJSON **);
-cJSON *cJSON_FindItemInObject(cJSON *, char *);
+void update_crc32(ui32_t *, const void *, ui32_t);
+ui32_t return_crc32(const void *, ui32_t);
+ui64_t return_crc64(const void *, ui64_t, int);
+void file2bstring(const char *, bstring);
+void file2cjson(const char *, cJSON **);
+cJSON *cJSON_FindItemInObject(const cJSON *, const char *);
 
 void init_utils(void);
 void test_utils(void);

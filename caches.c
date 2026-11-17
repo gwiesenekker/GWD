@@ -7,7 +7,7 @@
   (P->C_entry_key_size + P->C_entry_key_nalign + P->C_entry_value_size + \
    P->C_entry_value_nalign)
 
-local void printf_cache(cache_t *arg_with_cache)
+local void printf_cache(const cache_t *arg_with_cache)
 {
   PRINTF("C_name=%s\n", bdata(arg_with_cache->C_name));
 
@@ -73,7 +73,7 @@ local void printf_cache(cache_t *arg_with_cache)
 }
 
 int check_entry_in_cache(cache_t *arg_with_cache,
-                         void *arg_entry_key,
+                         const void *arg_entry_key,
                          void *arg_entry_value)
 {
   int result = FALSE;
@@ -134,8 +134,8 @@ int check_entry_in_cache(cache_t *arg_with_cache,
 }
 
 int store_entry_in_cache(cache_t *arg_with_cache,
-                         void *arg_entry_key,
-                         void *arg_entry_value)
+                         const void *arg_entry_key,
+                         const void *arg_entry_value)
 {
   int result = FALSE;
 
@@ -227,12 +227,12 @@ void clear_cache(cache_t *arg_with_cache)
 }
 
 void construct_cache(cache_t *arg_with_cache,
-                     char *arg_cache_name,
+                     const char *arg_cache_name,
                      i64_t arg_cache_size,
                      int arg_entry_key_type,
-                     void *arg_entry_key_default,
+                     const void *arg_entry_key_default,
                      size_t arg_entry_value_size,
-                     void *arg_entry_value_default)
+                     const void *arg_entry_value_default)
 {
   arg_with_cache->C_name = bfromcstr(arg_cache_name);
 

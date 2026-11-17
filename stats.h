@@ -43,7 +43,7 @@ inline local void update_stats(stats_t *arg_with_stats, double x)
   arg_with_stats->S_sum2 += x * x;
 }
 
-void construct_stats(stats_t *, char *);
+void construct_stats(stats_t *, const char *);
 void mean_sigma(stats_t *);
 void printf_stats(stats_t *);
 void my_stats_aggregate(stats_t *, MPI_Comm);

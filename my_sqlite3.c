@@ -658,7 +658,7 @@ void append_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3,
 }
 
 void construct_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3,
-                          char *arg_db_name,
+                          const char *arg_db_name,
                           MPI_Comm arg_comm)
 {
   arg_with_my_sqlite3->MSQL_comm = arg_comm;

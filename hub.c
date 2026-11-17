@@ -157,7 +157,7 @@ local void line2command(char *arg_line, command_t *arg_with_command)
   }
 }
 
-local void write_to_hub(char *arg_line)
+local void write_to_hub(const char *arg_line)
 {
   int nline = strlen(arg_line);
 

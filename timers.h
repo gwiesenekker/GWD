@@ -52,18 +52,18 @@ typedef struct
   double TC_game_time_per_move[NODE_MAX];
 } time_control_t;
 
-void construct_my_timer(my_timer_t *, char *, my_printf_t *, int);
+void construct_my_timer(my_timer_t *, const char *, my_printf_t *, int);
 void reset_my_timer(my_timer_t *);
 double return_my_timer(my_timer_t *, int);
 void stop_my_timer(my_timer_t *);
 void start_my_timer(my_timer_t *);
 void destroy_my_timer(my_timer_t *);
 
-void construct_progress(progress_t *, char *, i64_t, double);
+void construct_progress(progress_t *, const char *, i64_t, double);
 int make_progress(progress_t *, i64_t);
 void finalize_progress(progress_t *);
-i64_t return_ndone(progress_t *);
-i64_t return_ntodo(progress_t *);
+i64_t return_ndone(const progress_t *);
+i64_t return_ntodo(const progress_t *);
 void destroy_progress(progress_t *);
 
 void construct_time_control(time_control_t *);
