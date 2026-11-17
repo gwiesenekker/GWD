@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define NRETRIES 1000000
@@ -511,6 +511,7 @@ void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name)
 #ifdef USE_SQLITE3
   sqlite3 *disk_db;
   sqlite3_backup *backup;
+
   int rc;
 
   rc = sqlite3_open(arg_file_name, &disk_db);
@@ -778,6 +779,7 @@ void close_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3)
                                          SQLITE_CHECKPOINT_TRUNCATE,
                                          &frames_in_wal,
                                          &frames_checkpointed);
+
       if (rc != SQLITE_OK)
       {
         PRINTF("Failed wal_checkpoint_v2: %s\n",

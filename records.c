@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define CJSON_FIELDS_ID "fields"
@@ -78,18 +78,20 @@ void add_field(record_t *arg_with_record,
   }
   else if (arg_field_type == FIELD_TYPE_STRING)
   {
-    char value[MY_LINE_MAX];
-
-    strcpy(value, "");
+    BSTRING(value)
 
     if (arg_field_value != NULL)
-      strncpy(value, arg_field_value, MY_LINE_MAX);
+      HARDBUG(bassigncstr(value, arg_field_value) == BSTR_ERR)
 
     HARDBUG(cJSON_AddNumberToObject(field,
                                     CJSON_FIELD_TYPE_ID,
                                     FIELD_TYPE_STRING) == NULL)
 
-    HARDBUG(cJSON_AddStringToObject(field, CJSON_FIELD_VALUE_ID, value) == NULL)
+    HARDBUG(cJSON_AddStringToObject(field,
+                                    CJSON_FIELD_VALUE_ID,
+                                    bdata(value)) == NULL)
+
+    BDESTROY(value)
   }
   else if (arg_field_type == FIELD_TYPE_ARRAY)
   {

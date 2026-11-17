@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 local int white_dir[4] = {-6, -5, 5, 6};
@@ -91,6 +91,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
           jfield1 += my_dir[i];
         }
       }
+
       if (your_bb & BITULL(jfield1))
       {
         int kfield1 = jfield1 + my_dir[i];
@@ -131,12 +132,14 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
             arg_moves_list->ML_nmoves = 0;
           }
+
           if (ncapt == arg_moves_list->ML_ncaptx)
           {
             if (arg_moves_list->ML_nmoves >= NMOVES_MAX)
             {
               print_board(arg_with_board);
             }
+
             HARDBUG(arg_moves_list->ML_nmoves >= NMOVES_MAX)
 
             move_t *move = arg_moves_list->ML_moves + arg_moves_list->ML_nmoves;
@@ -147,6 +150,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
             arg_moves_list->ML_nmoves++;
           }
+
           if (idir[ncapt] > 0)
             jdir[ncapt] = 11 - idir[ncapt];
           else
@@ -285,13 +289,17 @@ local inline void append_bb_move(moves_list_t *list,
 {
   if (count < list->ML_ncaptx)
     return;
+
   if (count > list->ML_ncaptx)
   {
     list->ML_ncaptx = count;
     list->ML_nmoves = 0;
   }
+
   HARDBUG(list->ML_nmoves >= NMOVES_MAX)
+
   move_t *move = &list->ML_moves[list->ML_nmoves++];
+
   move->M_move_from = from;
   move->M_move_to = BIT_CTZ(to);
   move->M_captures_bb = captures;
@@ -311,13 +319,16 @@ local void capture_man_bb(moves_list_t *list,
                           int incoming)
 {
   append_bb_move(list, from, at, captures, count);
+
   int perpendicular = 11 - abs(incoming);
   int dirs[3] = {perpendicular, -perpendicular, incoming};
   ui64_t available = opponents & ~captures;
+
   for (int i = 0; i < 3; ++i)
   {
     ui64_t victim = move_shift(at, dirs[i]) & available;
     ui64_t landing = move_shift(victim, dirs[i]) & empty;
+
     if (landing)
       capture_man_bb(list,
                      from,
@@ -341,16 +352,21 @@ local void capture_king_bb(moves_list_t *list,
 {
   int perpendicular = 11 - abs(incoming);
   ui64_t available = opponents & ~captures;
+
   do
   {
     append_bb_move(list, from, at, captures, count);
+
     for (int dir = perpendicular; dir != 0; dir = dir > 0 ? -dir : 0)
     {
       ui64_t victim = move_shift(at, dir);
+
       while (victim & empty)
         victim = move_shift(victim, dir);
       victim &= available;
+
       ui64_t landing = move_shift(victim, dir) & empty;
+
       if (landing)
         capture_king_bb(list,
                         from,
@@ -366,6 +382,7 @@ local void capture_king_bb(moves_list_t *list,
 
   ui64_t victim = at & available;
   ui64_t landing = move_shift(victim, incoming) & empty;
+
   if (landing)
     capture_king_bb(list,
                     from,
@@ -392,6 +409,7 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   ui64_t opponents = arg_with_board->your_man_bb | arg_with_board->your_king_bb;
   ui64_t empty = arg_with_board->B_valid_bb & ~(men | kings | opponents);
   moves_list_t *list = arg_moves_list;
+
   list->ML_nmoves = list->ML_ncaptx = 0;
 
   /* Test all men simultaneously, without visiting non-capturing pieces. */
@@ -400,22 +418,29 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
     (((opponents >> 5) & (empty >> 10)) | ((opponents >> 6) & (empty >> 12)) |
      ((opponents << 5) & (empty << 10)) | ((opponents << 6) & (empty << 12)));
   sources |= kings;
+
   while (sources)
   {
     int from = white ? BIT_CTZ(sources) : 63 - BIT_CLZ(sources);
     ui64_t origin = BITULL(from);
+
     sources &= ~origin;
+
     for (int i = 0; i < 4; ++i)
     {
       int dir = dirs[i];
       ui64_t victim = move_shift(origin, dir);
+
       if (origin & kings)
         while (victim & empty)
           victim = move_shift(victim, dir);
       victim &= opponents;
+
       ui64_t landing = move_shift(victim, dir) & empty;
+
       if (!landing)
         continue;
+
       if (origin & men)
         capture_man_bb(list,
                        from,
@@ -441,18 +466,24 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   {
     sources = kings | (men & (white ? (empty << 6) | (empty << 5)
                                     : (empty >> 5) | (empty >> 6)));
+
     while (sources)
     {
       int from = white ? BIT_CTZ(sources) : 63 - BIT_CLZ(sources);
       ui64_t origin = BITULL(from);
+
       sources &= ~origin;
+
       int king = (origin & kings) != 0;
+
       for (int i = 0; i < (king ? 4 : 2); ++i)
       {
         ui64_t landing = move_shift(origin, dirs[i]) & empty;
+
         while (landing)
         {
           append_bb_move(list, from, landing, 0, 0);
+
           if (!king)
             break;
           landing = move_shift(landing, dirs[i]) & empty;
@@ -460,9 +491,11 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
       }
     }
   }
+
   for (int i = 0; i < list->ML_nmoves; ++i)
   {
     const move_t *move = &list->ML_moves[i];
+
     list->ML_move_flags[i] =
       (men & BITULL(move->M_move_from)) && rows[move->M_move_to] >= 9
         ? MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT
@@ -518,16 +551,19 @@ int can_capture(board_t *arg_with_board, int arg_kings)
       {
         goto label_return;
       }
+
       if ((your_bb & BITULL(ifield - 5)) and
           (empty_bb & BITULL(ifield - 5 - 5)))
       {
         goto label_return;
       }
+
       if ((your_bb & BITULL(ifield + 5)) and
           (empty_bb & BITULL(ifield + 5 + 5)))
       {
         goto label_return;
       }
+
       if ((your_bb & BITULL(ifield + 6)) and
           (empty_bb & BITULL(ifield + 6 + 6)))
       {
@@ -791,6 +827,7 @@ void undo_move(board_t *arg_with_board,
 void check_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 {
   BEGIN_BLOCK(__FUNC__)
+
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
   {
     do_move(arg_with_board, imove, arg_moves_list);
@@ -798,11 +835,13 @@ void check_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
     hash_key_t temp_key;
 
     temp_key = return_key_from_bb(arg_with_board);
+
     HARDBUG(temp_key != arg_with_board->B_key)
 
     undo_move(arg_with_board, imove, arg_moves_list);
 
     temp_key = return_key_from_bb(arg_with_board);
+
     HARDBUG(temp_key != arg_with_board->B_key)
   }
 

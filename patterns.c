@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 
 #include "globals.h"
 
@@ -17,6 +17,7 @@ local int map_row_col2field(int irow, int icol)
 {
   if ((irow < 0) or (irow > 9))
     return (INVALID);
+
   if ((icol < 0) or (icol > 9))
     return (INVALID);
 

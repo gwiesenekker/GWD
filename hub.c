@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define NARGS_MAX 256
@@ -6,13 +6,16 @@
 
 #define HUB_WDL_CLOCK_SECONDS 1.0
 
-// Negative means an ordinary search, zero waits for a hit, positive starts the move clock.
+// Negative means an ordinary search, zero waits for a hit, positive starts the
+// move clock.
 local _Atomic double ponder_start = -1.0;
 
 local double monotonic_seconds(void)
 {
   struct timespec now;
+
   HARDBUG(compat_monotonic(&now) != 0)
+
   return (double)now.tv_sec + now.tv_nsec * 1e-9;
 }
 
@@ -21,11 +24,14 @@ double search_clock_used(my_timer_t *arg_timer)
   if (options.hub)
   {
     double start = atomic_load_explicit(&ponder_start, memory_order_relaxed);
+
     if (start == 0.0)
       return -1.0;
+
     if (start > 0.0)
       return monotonic_seconds() - start;
   }
+
   return return_my_timer(arg_timer, FALSE);
 }
 
@@ -53,6 +59,7 @@ local void line2command(char *arg_line, command_t *arg_with_command)
 
   while (isspace(*c))
     c++;
+
   if (*c == '\0')
     return;
 
@@ -95,6 +102,7 @@ local void line2command(char *arg_line, command_t *arg_with_command)
     {
       *c = '\0';
       c++;
+
       while (isspace(*c))
         c++;
     }
@@ -112,6 +120,7 @@ local void line2command(char *arg_line, command_t *arg_with_command)
 
       while (isspace(*c))
         c++;
+
       HARDBUG(*c == '\0')
 
       if (*c == '"')
@@ -122,7 +131,9 @@ local void line2command(char *arg_line, command_t *arg_with_command)
 
         while ((*c != '\0') and (*c != '"'))
           c++;
+
         HARDBUG(*c == '\0');
+
         *c = '\0';
         c++;
       }
@@ -158,36 +169,38 @@ local void write_to_hub(char *arg_line)
 }
 
 // Keep a partial command across polls so a short read cannot stall a search.
-local int read_hub_line(char arg_line[MY_LINE_MAX], int arg_wait)
+local int read_hub_line(bstring arg_line, bstring arg_input, int arg_wait)
 {
-  local char input[MY_LINE_MAX];
-  local int ninput = 0;
-
   while (arg_wait or compat_poll())
   {
     char c;
+
     if (compat_read(0, &c, 1) <= 0)
     {
-      ninput = 0;
+      HARDBUG(btrunc(arg_input, 0) == BSTR_ERR)
+
       return INVALID;
     }
-    HARDBUG(ninput >= (MY_LINE_MAX - 1))
-    input[ninput++] = c;
+
+    HARDBUG(bconchar(arg_input, c) == BSTR_ERR)
+
     if (c == '\n')
     {
-      input[ninput] = '\0';
-      memcpy(arg_line, input, ninput + 1);
-      ninput = 0;
-      PRINTF("read_from_hub: %s", arg_line);
+      HARDBUG(bassign(arg_line, arg_input) == BSTR_ERR)
+      HARDBUG(btrunc(arg_input, 0) == BSTR_ERR)
+
+      PRINTF("read_from_hub: %s", bdata(arg_line));
+
       return TRUE;
     }
   }
+
   return FALSE;
 }
 
-local int read_from_hub(char arg_line[MY_LINE_MAX])
+local int read_from_hub(bstring arg_line, bstring arg_input)
 {
-  return read_hub_line(arg_line, TRUE);
+  return read_hub_line(arg_line, arg_input, TRUE);
 }
 
 local int hub_input(void) { return (compat_poll()); }
@@ -210,6 +223,7 @@ local void read_clock_level(command_t *arg_command, hub_level_t *arg_level)
   for (int iarg = 0; iarg < arg_command->command_nargs; ++iarg)
   {
     arg_t *arg = &arg_command->command_args[iarg];
+
     if (compat_strcasecmp(arg->arg_name, "moves") == 0)
     {
       HARDBUG(arg->arg_value == NULL)
@@ -227,6 +241,7 @@ local void read_clock_level(command_t *arg_command, hub_level_t *arg_level)
       HARDBUG(my_sscanf(arg->arg_value, "%lf", &arg_level->increment) != 1)
     }
   }
+
   HARDBUG((!isfinite(arg_level->time_left)) or (arg_level->time_left < 0.0))
   HARDBUG((!isfinite(arg_level->increment)) or (arg_level->increment < 0.0))
 }
@@ -246,7 +261,9 @@ void hub(void)
   construct_game_state(&game_state);
 
   time_control_t time_control;
+
   construct_time_control(&time_control);
+
   hub_level_t level;
   int clock_active = FALSE;
   int fixed_move_time = TRUE;
@@ -257,23 +274,26 @@ void hub(void)
   int level_depth = INVALID;
   double default_time_limit = options.time_limit;
 
-  char line[MY_LINE_MAX];
-  char pending_line[MY_LINE_MAX] = "";
+  BSTRING(line)
+  BSTRING(pending_line)
+  BSTRING(input)
+  BSTRING(partial_line)
+
   write_to_hub("ready\n");
 
   while (TRUE)
   {
-    if (pending_line[0] != '\0')
+    if (bdata(pending_line)[0] != '\0')
     {
-      strcpy(line, pending_line);
-      pending_line[0] = '\0';
+      HARDBUG(bassign(line, pending_line) == BSTR_ERR)
+      HARDBUG(btrunc(pending_line, 0) == BSTR_ERR)
     }
-    else if (read_from_hub(line) == INVALID)
-      return;
+    else if (read_from_hub(line, partial_line) == INVALID)
+      goto label_return;
 
     command_t command;
 
-    line2command(line, &command);
+    line2command(bdata(line), &command);
 
     if (command.command == NULL)
       continue;
@@ -392,6 +412,7 @@ void hub(void)
         {
           clock_active = FALSE;
           fixed_move_time = FALSE;
+
           HARDBUG(value == NULL)
 
           int d;
@@ -411,6 +432,7 @@ void hub(void)
         {
           clock_active = FALSE;
           fixed_move_time = TRUE;
+
           HARDBUG(value == NULL)
 
           double t;
@@ -437,9 +459,13 @@ void hub(void)
           fixed_move_time = FALSE;
           clock_active = TRUE;
           level_pending = is_configured_time_control(&time_control);
+
           if (!level_pending)
-            configure_time_control(level.time_left, level.moves_left, level.increment,
-                                   TIME_HORIZON_EXACT, &time_control);
+            configure_time_control(level.time_left,
+                                   level.moves_left,
+                                   level.increment,
+                                   TIME_HORIZON_EXACT,
+                                   &time_control);
         }
         else if (compat_strcasecmp(name, "infinite") == 0)
         {
@@ -459,7 +485,9 @@ void hub(void)
     }
     else if (compat_strcasecmp(command.command, "go") == 0)
     {
-      options.depth_limit = (level_depth == INVALID) ? default_depth_limit : level_depth;
+      options.depth_limit =
+        (level_depth == INVALID) ? default_depth_limit : level_depth;
+
       double saved_time_limit = options.time_limit;
       int saved_time_ntrouble = options.time_ntrouble;
 
@@ -469,34 +497,49 @@ void hub(void)
 
       HARDBUG(name == NULL)
 
-      int clock_think = (compat_strcasecmp(name, "think") == 0) and clock_active;
+      int clock_think =
+        (compat_strcasecmp(name, "think") == 0) and clock_active;
+
       int pondering = (compat_strcasecmp(name, "ponder") == 0);
       double time_left = -1.0;
-      if (fixed_move_time and ((compat_strcasecmp(name, "think") == 0) or pondering))
+
+      if (fixed_move_time and
+          ((compat_strcasecmp(name, "think") == 0) or pondering))
         time_left = options.time_limit;
+
       time_control_t ponder_control;
+
       if (clock_think or (pondering and clock_active))
       {
         time_control_t *control = &time_control;
+
         if (pondering)
         {
           // Commit the predicted position's clock report only on a hit.
           ponder_control = time_control;
           control = &ponder_control;
         }
+
         if (level_pending)
         {
           int played = move_played and (last_key != with_search->S_board.B_key);
-          sync_time_control(level.time_left, level.moves_left, level.increment,
-                            played, control);
+
+          sync_time_control(level.time_left,
+                            level.moves_left,
+                            level.increment,
+                            played,
+                            control);
+
           if (!pondering)
             level_pending = FALSE;
         }
         time_left = return_time_left(control);
         set_time_limit(control, HUB_TIME_RESERVE);
         PRINTF("hub clock imove=%d moves_left=%d time=%.3f limit=%.6f\n",
-               return_moves_done(control), return_moves_left(control),
-               return_time_left(control), options.time_limit);
+               return_moves_done(control),
+               return_moves_left(control),
+               return_time_left(control),
+               options.time_limit);
       }
       else if (compat_strcasecmp(name, "analyze") == 0)
       {
@@ -562,14 +605,15 @@ void hub(void)
           {
             PRINTF("got info %s\n", bdata(message.message_text));
 
-            char info[MY_LINE_MAX];
+            BSTRING(info)
 
-            snprintf(info,
-                     MY_LINE_MAX,
-                     "info %s\n",
-                     bdata(message.message_text));
+            HARDBUG(bassignformat(info,
+                                  "info %s\n",
+                                  bdata(message.message_text)) == BSTR_ERR)
 
-            write_to_hub(info);
+            write_to_hub(bdata(info));
+
+            BDESTROY(info)
           }
           else if (message.message_id == MESSAGE_RESULT)
           {
@@ -589,18 +633,17 @@ void hub(void)
                           &lcb,
                           &ucb) != 3)
 
-        snprintf(line,
-                 MY_LINE_MAX,
-                 "done result=%.6f"
-                 " lcb=%.6f"
-                 " ucb=%.6f"
-                 " lcb-ucb=%.6f\n",
-                 result,
-                 lcb,
-                 ucb,
-                 lcb - ucb);
+        HARDBUG(bassignformat(line,
+                              "done result=%.6f"
+                              " lcb=%.6f"
+                              " ucb=%.6f"
+                              " lcb-ucb=%.6f\n",
+                              result,
+                              lcb,
+                              ucb,
+                              lcb - ucb) == BSTR_ERR)
 
-        write_to_hub(line);
+        write_to_hub(bdata(line));
       }
       else
       {
@@ -636,9 +679,10 @@ void hub(void)
                     game_state.get_game_state(&game_state));
 
             int go = MESSAGE_GO;
+
             if (time_left >= 0.0)
-              go = (time_left <= HUB_WDL_CLOCK_SECONDS) ? MESSAGE_GO_SHORT_CLOCK :
-                                                         MESSAGE_GO_TIMED;
+              go = (time_left <= HUB_WDL_CLOCK_SECONDS) ? MESSAGE_GO_SHORT_CLOCK
+                                                        : MESSAGE_GO_TIMED;
 
             enqueue(return_thread_queue(thread_alpha_beta_master),
                     go,
@@ -650,27 +694,36 @@ void hub(void)
 
             while (TRUE)
             {
-              char input[MY_LINE_MAX];
-              int received = abort ? FALSE : read_hub_line(input, result_ready);
+              int received =
+                abort ? FALSE
+                      : read_hub_line(input, partial_line, result_ready);
+
               if (received != FALSE)
               {
                 command_t incoming;
+
                 incoming.command = NULL;
+
                 if (received != INVALID)
                 {
-                  strcpy(pending_line, input);
-                  line2command(input, &incoming);
+                  HARDBUG(bassign(pending_line, input) == BSTR_ERR)
+
+                  line2command(bdata(input), &incoming);
                 }
 
                 if ((incoming.command != NULL) and
                     (compat_strcasecmp(incoming.command, "ponder-hit") == 0))
                 {
-                  pending_line[0] = '\0';
+                  HARDBUG(btrunc(pending_line, 0) == BSTR_ERR)
+
                   if (pondering)
                   {
-                    atomic_store_explicit(&ponder_start, monotonic_seconds(), memory_order_relaxed);
+                    atomic_store_explicit(&ponder_start,
+                                          monotonic_seconds(),
+                                          memory_order_relaxed);
                     pondering = FALSE;
                     clock_think = clock_active;
+
                     if (clock_active)
                     {
                       time_control = ponder_control;
@@ -682,14 +735,16 @@ void hub(void)
                 else if ((incoming.command != NULL) and
                          (compat_strcasecmp(incoming.command, "ping") == 0))
                 {
-                  pending_line[0] = '\0';
+                  HARDBUG(btrunc(pending_line, 0) == BSTR_ERR)
+
                   write_to_hub("pong\n");
                 }
                 else
                 {
                   if (!result_ready)
                     enqueue(return_thread_queue(thread_alpha_beta_master),
-                            MESSAGE_ABORT_SEARCH, "hub/hub");
+                            MESSAGE_ABORT_SEARCH,
+                            "hub/hub");
                   abort = TRUE;
                 }
               }
@@ -698,6 +753,7 @@ void hub(void)
               {
                 if (pondering and !abort)
                   continue;
+
                 break;
               }
 
@@ -712,19 +768,21 @@ void hub(void)
               {
                 PRINTF("got info %s\n", bdata(message.message_text));
 
-                char info[MY_LINE_MAX];
+                BSTRING(info)
 
-                snprintf(info,
-                         MY_LINE_MAX,
-                         "info %s\n",
-                         bdata(message.message_text));
+                HARDBUG(bassignformat(info,
+                                      "info %s\n",
+                                      bdata(message.message_text)) == BSTR_ERR)
 
-                write_to_hub(info);
+                write_to_hub(bdata(info));
+
+                BDESTROY(info)
               }
               else if (message.message_id == MESSAGE_RESULT)
               {
                 PRINTF("got result %s\n", bdata(message.message_text));
                 result_ready = TRUE;
+
                 if ((!pondering) or abort)
                   break;
               }
@@ -733,7 +791,9 @@ void hub(void)
             } // while(TRUE)
 
             atomic_store_explicit(&ponder_start, -1.0, memory_order_relaxed);
+
             char *reply = strstr(bdata(message.message_text), " ponder=");
+
             if (reply != NULL)
               HARDBUG(bassigncstr(bponder_string, reply) == BSTR_ERR)
 
@@ -750,9 +810,12 @@ void hub(void)
 
         HARDBUG(compat_strcasecmp(bdata(bmove_string), "NULL") == 0)
 
-        snprintf(line, MY_LINE_MAX, "done move=%s%s\n", bdata(bmove_string), bdata(bponder_string));
+        HARDBUG(bassignformat(line,
+                              "done move=%s%s\n",
+                              bdata(bmove_string),
+                              bdata(bponder_string)) == BSTR_ERR)
 
-        write_to_hub(line);
+        write_to_hub(bdata(line));
 
         if (clock_think)
         {
@@ -761,8 +824,10 @@ void hub(void)
         }
 
         BDESTROY(bponder_string)
+
         BDESTROY(bmove_string)
       }
+
       if (!clock_think)
       {
         options.time_limit = saved_time_limit;
@@ -771,41 +836,50 @@ void hub(void)
     }
     else if (compat_strcasecmp(command.command, "ping") == 0)
     {
-      snprintf(line, MY_LINE_MAX, "pong\n");
+      HARDBUG(bassignformat(line, "pong\n") == BSTR_ERR)
 
-      write_to_hub(line);
+      write_to_hub(bdata(line));
     }
     else
     {
       PRINTF("ignoring command %s\n", command.command);
     }
   }
+label_return:
+  BDESTROY(partial_line)
+
+  BDESTROY(input)
+
+  BDESTROY(pending_line)
+
+  BDESTROY(line)
+
   destroy_game_state(&game_state);
 }
 
 void init_hub(void)
 {
-  char line[MY_LINE_MAX];
+  BSTRING(line)
+  BSTRING(partial_line)
 
   PRINTF("waiting for 'hub'..\n");
 
-  if (read_from_hub(line) == INVALID)
-    return;
+  if (read_from_hub(line, partial_line) == INVALID)
+    goto label_return;
 
   command_t command;
 
-  line2command(line, &command);
+  line2command(bdata(line), &command);
 
   HARDBUG(command.command == NULL)
 
   HARDBUG(compat_strcasecmp(command.command, "hub") != 0)
 
-  snprintf(line,
-           MY_LINE_MAX,
-           "id name=Gwd version=%s author=\"GW KB\" country=NL\n",
-           options.hub_version);
+  HARDBUG(bassignformat(line,
+                        "id name=Gwd version=%s author=\"GW KB\" country=NL\n",
+                        bdata(options.hub_version)) == BSTR_ERR)
 
-  write_to_hub(line);
+  write_to_hub(bdata(line));
 
   cJSON *parameters = cJSON_GetObjectItem(gwd_json, CJSON_PARAMETERS_ID);
 
@@ -849,11 +923,9 @@ void init_hub(void)
 
       int value = round(cJSON_GetNumberValue(cjson_value));
 
-      snprintf(line,
-               MY_LINE_MAX,
-               "param name=%s type=int value=%d\n",
-               ui,
-               value);
+      HARDBUG(
+        bassignformat(line, "param name=%s type=int value=%d\n", ui, value) ==
+        BSTR_ERR)
     }
     else if (compat_strcasecmp(parameter_type, "double") == 0)
     {
@@ -863,11 +935,10 @@ void init_hub(void)
 
       double value = cJSON_GetNumberValue(cjson_value);
 
-      snprintf(line,
-               MY_LINE_MAX,
-               "param name=%s type=real value=%.2f\n",
-               ui,
-               value);
+      HARDBUG(bassignformat(line,
+                            "param name=%s type=real value=%.2f\n",
+                            ui,
+                            value) == BSTR_ERR)
     }
     else if (compat_strcasecmp(parameter_type, "string") == 0)
     {
@@ -877,11 +948,10 @@ void init_hub(void)
 
       HARDBUG(string == NULL)
 
-      snprintf(line,
-               MY_LINE_MAX,
-               "param name=%s type=string value=\"%s\"\n",
-               ui,
-               string);
+      HARDBUG(bassignformat(line,
+                            "param name=%s type=string value=\"%s\"\n",
+                            ui,
+                            string) == BSTR_ERR)
     }
     else if (compat_strcasecmp(parameter_type, "bool") == 0)
     {
@@ -890,17 +960,18 @@ void init_hub(void)
       HARDBUG(!cJSON_IsBool(cjson_value))
 
       if (cJSON_IsFalse(cjson_value))
-        snprintf(line,
-                 MY_LINE_MAX,
-                 "param name=%s type=bool value=false\n",
-                 ui);
+        HARDBUG(bassignformat(line,
+                              "param name=%s type=bool value=false\n",
+                              ui) == BSTR_ERR)
       else
-        snprintf(line, MY_LINE_MAX, "param name=%s type=bool value=true\n", ui);
+        HARDBUG(bassignformat(line,
+                              "param name=%s type=bool value=true\n",
+                              ui) == BSTR_ERR)
     }
     else
       FATAL("unknown parameter_type", EXIT_FAILURE)
 
-    write_to_hub(line);
+    write_to_hub(bdata(line));
   }
   write_to_hub("wait\n");
 
@@ -908,11 +979,11 @@ void init_hub(void)
   {
     PRINTF("waiting for 'set-param' or 'init'..\n");
 
-    HARDBUG(read_from_hub(line) == INVALID)
+    HARDBUG(read_from_hub(line, partial_line) == INVALID)
 
-    PRINTF("got line: %s\n", line);
+    PRINTF("got line: %s\n", bdata(line));
 
-    line2command(line, &command);
+    line2command(bdata(line), &command);
 
     if (command.command == NULL)
       continue;
@@ -1021,4 +1092,8 @@ void init_hub(void)
         FATAL("unknown parameter_type", EXIT_FAILURE)
     }
   }
+label_return:
+  BDESTROY(partial_line)
+
+  BDESTROY(line)
 }

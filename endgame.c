@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 
 #include "globals.h"
 #include "material.h" // GWDEGTB's EGTB_MAX_PIECES
@@ -15,7 +15,7 @@ void init_endgame(void)
 
   size_t egtb_ram = 0;
 
-  cJSON *egtbs = cJSON_GetObjectItem(gwd_json, options.egtb_ram_wdl);
+  cJSON *egtbs = cJSON_GetObjectItem(gwd_json, bdata(options.egtb_ram_wdl));
 
   HARDBUG(!cJSON_IsArray(egtbs))
 
@@ -32,7 +32,7 @@ void init_endgame(void)
     size_t egtb_size;
 
 #ifdef USE_COMPRESSED_WDL
-    HARDBUG(!gwdegtb_wdl_compressed_info_threads(options.egtb_dir_wdl,
+    HARDBUG(!gwdegtb_wdl_compressed_info_threads(bdata(options.egtb_dir_wdl),
                                                  endgame_name,
                                                  &egtb_size,
                                                  4));
@@ -63,13 +63,13 @@ void init_endgame(void)
     if (my_mpi_globals.MMG_is_master)
     {
 #ifdef USE_COMPRESSED_WDL
-      HARDBUG(!gwdegtb_wdl_compressed_load_threads(options.egtb_dir_wdl,
+      HARDBUG(!gwdegtb_wdl_compressed_load_threads(bdata(options.egtb_dir_wdl),
                                                    endgame_name,
                                                    pendgame,
                                                    egtb_size,
                                                    4));
 #else
-      HARDBUG(!gwdegtb_wdl_decompress_threads(options.egtb_dir_wdl,
+      HARDBUG(!gwdegtb_wdl_decompress_threads(bdata(options.egtb_dir_wdl),
                                               endgame_name,
                                               pendgame,
                                               egtb_size,
@@ -114,7 +114,8 @@ void init_endgame(void)
   PRINTF("..done\n");
 }
 
-local int probe_dtm(search_t *arg_with_search, const char **arg_dtm_missing_name,
+local int probe_dtm(search_t *arg_with_search,
+                    const char **arg_dtm_missing_name,
                     int arg_only_if_open)
 {
   if (arg_dtm_missing_name != NULL)
@@ -124,22 +125,34 @@ local int probe_dtm(search_t *arg_with_search, const char **arg_dtm_missing_name
 
   if (arg_only_if_open and
       (BIT_COUNT(with_board->B_white_king_bb | with_board->B_white_man_bb |
-                 with_board->B_black_king_bb | with_board->B_black_man_bb) > EGTB_MAX_PIECES))
+                 with_board->B_black_king_bb | with_board->B_black_man_bb) >
+       EGTB_MAX_PIECES))
     return ENDGAME_UNKNOWN;
 
-  GwdegtbSide side = (with_board->B_colour2move == WHITE_ENUM) ?
-                     GWDEGTB_WHITE_TO_MOVE : GWDEGTB_BLACK_TO_MOVE;
+  GwdegtbSide side = (with_board->B_colour2move == WHITE_ENUM)
+                       ? GWDEGTB_WHITE_TO_MOVE
+                       : GWDEGTB_BLACK_TO_MOVE;
 
   HARDBUG(compat_mutex_lock(&dtm_probe_mutex) != 0)
 
-  int result = (arg_only_if_open ? gwdegtb_dtm_lookup_if_open : gwdegtb_dtm_lookup)(
-    options.egtb_dir, 16 * MBYTE, with_board->B_white_king_bb, with_board->B_white_man_bb,
-    with_board->B_black_king_bb, with_board->B_black_man_bb, side);
+  int result =
+    (arg_only_if_open ? gwdegtb_dtm_lookup_if_open
+                      : gwdegtb_dtm_lookup)(bdata(options.egtb_dir),
+                                            16 * MBYTE,
+                                            with_board->B_white_king_bb,
+                                            with_board->B_white_man_bb,
+                                            with_board->B_black_king_bb,
+                                            with_board->B_black_man_bb,
+                                            side);
 
   if (arg_only_if_open and (result == GWDEGTB_DTM_UNAVAILABLE))
-    (void)gwdegtb_dtm_request_open(options.egtb_dir, 16 * MBYTE,
-                                  with_board->B_white_king_bb, with_board->B_white_man_bb,
-                                  with_board->B_black_king_bb, with_board->B_black_man_bb, side);
+    (void)gwdegtb_dtm_request_open(bdata(options.egtb_dir),
+                                   16 * MBYTE,
+                                   with_board->B_white_king_bb,
+                                   with_board->B_white_man_bb,
+                                   with_board->B_black_king_bb,
+                                   with_board->B_black_man_bb,
+                                   side);
 
   HARDBUG(compat_mutex_unlock(&dtm_probe_mutex) != 0)
 

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 mcts_globals_t mcts_globals;
@@ -448,6 +448,7 @@ void mcts_search(search_t *arg_with_search,
 
     if (IS_SCORE_WON(*arg_best_score))
       goto label_break;
+
     if (IS_SCORE_LOST(*arg_best_score))
       goto label_break;
 
@@ -587,6 +588,7 @@ local double return_wilson_lcb(int nsucc, int ntotal)
 
   if (lcb < 0.0)
     lcb = 0.0;
+
   if (lcb > 1.0)
     lcb = 1.0;
 
@@ -610,6 +612,7 @@ static double return_wilson_ucb(int nsucc, int ntotal)
 
   if (ucb < 0.0)
     ucb = 0.0;
+
   if (ucb > 1.0)
     ucb = 1.0;
 
@@ -659,8 +662,10 @@ double mcts_shoot_outs(search_t *arg_with_search,
 
   if (arg_nwon == NULL)
     arg_nwon = &nwon_local;
+
   if (arg_ndraw == NULL)
     arg_ndraw = &ndraw_local;
+
   if (arg_nlost == NULL)
     arg_nlost = &nlost_local;
 
@@ -756,6 +761,7 @@ double mcts_shoot_outs(search_t *arg_with_search,
 
   if (arg_wilson_lcb != NULL)
     *arg_wilson_lcb = wilson_lcb;
+
   if (arg_wilson_ucb != NULL)
     *arg_wilson_ucb = wilson_ucb;
 

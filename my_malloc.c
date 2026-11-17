@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define NPAD (4 * 64)
@@ -409,23 +409,32 @@ local my_name_stack_t *return_name_stack(void)
   {
     /* Do not use the tracked allocator or BSTRING in this diagnostic path. */
     my_name_stack_t *stack = calloc(1, sizeof(*stack));
+
     HARDBUG(stack == NULL)
     HARDBUG(compat_mutex_init(&stack->mutex) != 0)
     HARDBUG(compat_mutex_lock(&my_names_mutex) != 0)
+
     stack->next = name_stacks;
     name_stacks = stack;
+
     HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
+
     name_stack = stack;
   }
+
   return name_stack;
 }
 
 local int print_name_stack(my_name_stack_t *stack)
 {
   my_name_t snapshot[NMY_NAMES_MAX];
+
   HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
+
   int count = stack->count;
+
   memcpy(snapshot, stack->names, (size_t)count * sizeof(*snapshot));
+
   HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 
   /* Never hold a stack lock while printing or invoking fatal diagnostics. */
@@ -437,19 +446,24 @@ local int print_name_stack(my_name_stack_t *stack)
            snapshot[i].MN_func,
            snapshot[i].MN_line,
            snapshot[i].MN_pthread_self);
+
   return count;
 }
 
 local int print_all_name_stacks(void)
 {
   HARDBUG(compat_mutex_lock(&my_names_mutex) != 0)
+
   my_name_stack_t *stack = name_stacks;
+
   HARDBUG(compat_mutex_unlock(&my_names_mutex) != 0)
 
   /* Links are immutable after publication and entries are never freed. */
   int count = 0;
+
   for (; stack != NULL; stack = stack->next)
     count += print_name_stack(stack);
+
   return count;
 }
 
@@ -467,16 +481,20 @@ void push_name(char *arg_name,
                int arg_line)
 {
   my_name_stack_t *stack = return_name_stack();
+
   HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
+
   if (stack->count >= NMY_NAMES_MAX)
   {
     HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
+
     print_my_names(FALSE);
     FATAL("TOO MANY PUSH_NAMES", EXIT_FAILURE)
   }
 
   stack->names[stack->count++] =
     (my_name_t){arg_name, arg_file, arg_func, arg_line, compat_pthread_self()};
+
   HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 }
 
@@ -486,15 +504,19 @@ void pop_name(char *arg_name,
               int arg_line)
 {
   my_name_stack_t *stack = name_stack;
+
   if (stack == NULL)
     FATAL("NO PUSHED NAMES", EXIT_FAILURE)
 
   HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
+
   int empty = stack->count == 0;
   int mismatch =
     !empty && strcmp(stack->names[stack->count - 1].MN_name, arg_name) != 0;
+
   if (!empty && !mismatch)
     --stack->count;
+
   HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 
   if (empty || mismatch)
@@ -523,15 +545,17 @@ void init_my_malloc(void)
   HARDBUG(compat_mutex_init(&my_names_mutex) != 0)
 
   char *f = "The quick brown fox jumps over the lazy dog";
-  char s[MY_LINE_MAX];
+  BSTRING(s)
 
   ui64_t c = return_XXH3_64(f, strlen(f));
 
-  (void)snprintf(s, MY_LINE_MAX, "%#llX", c);
+  HARDBUG(bassignformat(s, "%#llX", c) == BSTR_ERR)
 
-  // PRINTF("the XXH3_64 of '%s' is %s hex\n", f, s);
+  // PRINTF("the XXH3_64 of '%s' is %s hex\n", f, bdata(s));
 
-  HARDBUG(strcmp(s, "0XCE7D19A5418FB365") != 0)
+  HARDBUG(strcmp(bdata(s), "0XCE7D19A5418FB365") != 0)
+
+  BDESTROY(s)
 }
 
 local void heap_sort_i64(i64_t n, i64_t *p, i64_t *a)
@@ -558,18 +582,22 @@ local void heap_sort_i64(i64_t n, i64_t *p, i64_t *a)
     {
       t = p[n];
       p[n] = p[0];
+
       if (--n == 0)
       {
         p[0] = t;
+
         break;
       }
     }
     i = k;
     j = 2 * k + 1;
+
     while (j <= n)
     {
       if ((j < n) and (a[p[j]] > a[p[j + 1]]))
         j++;
+
       if (a[t] > a[p[j]])
       {
         p[i] = p[j];

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define NPOSITIONS_MAX 100000000
@@ -324,13 +324,15 @@ void open_book(void)
 
   sqlite3 *disk;
 
-  int rc =
-    my_sqlite3_open_v2(options.book_name, &disk, SQLITE_OPEN_READONLY, NULL);
+  int rc = my_sqlite3_open_v2(bdata(options.book_name),
+                              &disk,
+                              SQLITE_OPEN_READONLY,
+                              NULL);
 
   if (rc != SQLITE_OK)
   {
     PRINTF("Cannot open database %s: %s\n",
-           options.book_name,
+           bdata(options.book_name),
            my_sqlite3_errmsg(disk));
 
     FATAL("sqlite3", EXIT_FAILURE)
@@ -345,23 +347,24 @@ void open_book(void)
     FATAL("sqlite3", EXIT_FAILURE)
   }
 
-  char attach_sql[MY_LINE_MAX];
+  BSTRING(attach_sql)
 
-  snprintf(attach_sql,
-           MY_LINE_MAX,
-           "ATTACH DATABASE '%s' AS disk;",
-           options.book_name);
+  HARDBUG(bassignformat(attach_sql,
+                        "ATTACH DATABASE '%s' AS disk;",
+                        bdata(options.book_name)) == BSTR_ERR)
 
-  rc = my_sqlite3_exec(book, attach_sql, 0, 0, 0);
+  rc = my_sqlite3_exec(book, bdata(attach_sql), 0, 0, 0);
 
   if (rc != SQLITE_OK)
   {
     PRINTF("Failed to exec statement: %s errmsg=%s\n",
-           attach_sql,
+           bdata(attach_sql),
            my_sqlite3_errmsg(book));
 
     FATAL("sqlite3", EXIT_FAILURE)
   }
+
+  BDESTROY(attach_sql)
 
   const char *sql = "SELECT name, sql FROM sqlite_master WHERE type='table'";
 
@@ -390,24 +393,25 @@ void open_book(void)
       FATAL("sqlite3", EXIT_FAILURE)
     }
 
-    char create_sql[MY_LINE_MAX];
+    BSTRING(create_sql)
 
-    snprintf(create_sql,
-             MY_LINE_MAX,
-             "INSERT INTO %s SELECT * FROM disk.%s",
-             table_name,
-             table_name);
+    HARDBUG(bassignformat(create_sql,
+                          "INSERT INTO %s SELECT * FROM disk.%s",
+                          table_name,
+                          table_name) == BSTR_ERR)
 
-    rc = my_sqlite3_exec(book, create_sql, 0, 0, 0);
+    rc = my_sqlite3_exec(book, bdata(create_sql), 0, 0, 0);
 
     if (rc != SQLITE_OK)
     {
       PRINTF("Failed to exec statement: %s errmsg=%s\n",
-             create_sql,
+             bdata(create_sql),
              my_sqlite3_errmsg(book));
 
       FATAL("sqlite3", EXIT_FAILURE)
     }
+
+    BDESTROY(create_sql)
   }
 
   HARDBUG(my_sqlite3_finalize(stmt) != SQLITE_OK)
@@ -1125,8 +1129,10 @@ void expand_book(my_sqlite3_t *arg_db, char *arg_fen, int arg_centi_seconds)
 
       if (bchar(bline, 0) == '*')
         break;
+
       if (bchar(bline, 0) == '#')
         continue;
+
       if (strncmp(bdata(bline), "//", 2) == 0)
         continue;
 

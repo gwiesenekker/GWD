@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #ifndef SortH
 #define SortH
 
@@ -42,6 +42,7 @@ static inline void construct_sort(sort_t *arg_sort,
   arg_sort->S_moves_list = NULL;
   arg_sort->S_history = NULL;
   arg_sort->S_scored = FALSE;
+
   if (arg_my_random != NULL)
   {
     seed_my_random(&arg_sort->S_random, return_my_random(arg_my_random));
@@ -150,6 +151,7 @@ static inline void reset_sort(sort_t *arg_sort, int arg_first)
   HARDBUG((arg_first < 0) or (arg_first > arg_sort->S_narray))
 
   initialize_sort(arg_sort);
+
   while (arg_sort->S_ninitialized < arg_first)
     update_sort(arg_sort);
   arg_sort->S_next = arg_first;
@@ -164,15 +166,18 @@ static inline void copy_sort(sort_t *arg_to, sort_t *arg_from)
   arg_to->S_next = arg_from->S_next;
   arg_to->S_isort0 = arg_from->S_isort0;
   arg_to->S_randomize = arg_from->S_randomize;
+
   if (arg_from->S_randomize)
     copy_my_random(&arg_to->S_random, &arg_from->S_random);
   arg_to->S_moves_list = arg_from->S_moves_list;
   arg_to->S_history = arg_from->S_history;
   arg_to->S_scored = arg_from->S_scored;
+
   if (arg_from->S_scored)
     memcpy(arg_to->S_scores,
            arg_from->S_scores,
            arg_from->S_narray * sizeof(arg_from->S_scores[0]));
+
   if (arg_from->S_ninitialized != INVALID)
     memcpy(arg_to->S_array,
            arg_from->S_array,

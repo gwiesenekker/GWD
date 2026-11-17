@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #ifndef TimersH
 #define TimersH
 
@@ -67,7 +67,11 @@ i64_t return_ntodo(progress_t *);
 void destroy_progress(progress_t *);
 
 void construct_time_control(time_control_t *);
-void configure_time_control(double, int, double, time_horizon_t, time_control_t *);
+void configure_time_control(double,
+                            int,
+                            double,
+                            time_horizon_t,
+                            time_control_t *);
 void sync_time_control(double, int, double, int, time_control_t *);
 void update_time_control(double, time_control_t *);
 void set_time_limit(const time_control_t *, double);

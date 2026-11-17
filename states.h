@@ -1,4 +1,4 @@
-// SCU REVISION 8.1282 di 17 nov 2026 22:39:46 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #ifndef StatesH
 #define StatesH
 

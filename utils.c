@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #if COMPAT_ARCH == COMPAT_ARCH_X86_64
@@ -101,6 +101,7 @@ local int is_prime(i64_t n)
 
   if ((n % 2) == 0)
     return (FALSE);
+
   for (i64_t i = 3; (i * i) <= n; i += 2)
     if ((n % i) == 0)
       return (FALSE);
@@ -135,6 +136,7 @@ void update_crc32(ui32_t *crc, void *p, ui32_t n)
   BEGIN_BLOCK(__FUNC__)
 
   i8_t *a = (i8_t *)p;
+
   for (ui32_t i = 0; i < n; i++)
     *crc = crc_table32[(*crc ^ a[i]) & 0xFF] ^ (*crc >> 8);
 
@@ -175,6 +177,7 @@ void init_utils(void)
   for (ui32_t i = 0; i < 256; i++)
   {
     ui32_t part = i;
+
     for (ui32_t j = 0; j < 8; j++)
     {
       if (part & 1)
@@ -188,6 +191,7 @@ void init_utils(void)
   for (ui32_t i = 0; i < 256; i++)
   {
     ui64_t part = i;
+
     for (ui32_t j = 0; j < 8; j++)
     {
       if (part & 1)
@@ -203,7 +207,7 @@ void test_utils(void)
 {
   ui32_t c;
   char *f = "The quick brown fox jumps over the lazy dog";
-  char s[MY_LINE_MAX];
+  BSTRING(s)
 
   init_crc32(&c);
 
@@ -213,15 +217,16 @@ void test_utils(void)
 
   HARDBUG(c != return_crc32(f, strlen(f)))
 
-  (void)snprintf(s, MY_LINE_MAX, "%#X", c);
+  HARDBUG(bassignformat(s, "%#X", c) == BSTR_ERR)
 
-  PRINTF("the crc32 of '%s' is %s hex\n", f, s);
+  PRINTF("the crc32 of '%s' is %s hex\n", f, bdata(s));
 
 #if POLYNOMIAL_CRC32 == 0x82F63B78UL
-  HARDBUG(strcmp(s, "0X22620404") != 0)
+  HARDBUG(strcmp(bdata(s), "0X22620404") != 0)
 #else
-  HARDBUG(strcmp(s, "0X414FA339") != 0)
+  HARDBUG(strcmp(bdata(s), "0X414FA339") != 0)
 #endif
+  BDESTROY(s)
 }
 
 void file2bstring(char *arg_name, bstring arg_bstring)
@@ -230,9 +235,10 @@ void file2bstring(char *arg_name, bstring arg_bstring)
 
   HARDBUG((size = compat_size(arg_name)) == -1)
 
-  btrunc(arg_bstring, 0);
+  HARDBUG(btrunc(arg_bstring, 0) == BSTR_ERR)
 
-  ballocmin(arg_bstring, size);
+  HARDBUG((size < 0) or (size >= INT_MAX))
+  HARDBUG(ballocmin(arg_bstring, (int)size + 1) == BSTR_ERR)
 
   FILE *farg_name;
 
@@ -240,11 +246,12 @@ void file2bstring(char *arg_name, bstring arg_bstring)
 
   struct bStream *barg_name;
 
-  HARDBUG((barg_name = bsopen((bNread)fread, farg_name)) == NULL)
+  HARDBUG((barg_name = bsopen(my_bread, farg_name)) == NULL)
 
   while (bsreadlna(arg_bstring, barg_name, (char)'\n') == BSTR_OK)
     ;
 
+  HARDBUG(ferror(farg_name))
   HARDBUG(bsclose(barg_name) == NULL)
 
   FCLOSE(farg_name)
@@ -257,7 +264,7 @@ void file2bstring(char *arg_name, bstring arg_bstring)
 
   HARDBUG(bassigncstr(space, " ") == BSTR_ERR)
 
-  bfindreplace(arg_bstring, newline, space, 0);
+  HARDBUG(bfindreplace(arg_bstring, newline, space, 0) == BSTR_ERR)
 
   BDESTROY(space)
 
@@ -305,6 +312,7 @@ cJSON *cJSON_FindItemInObject(cJSON *arg_cjson, char *arg_name)
     if (compat_strcasecmp(entry->string, arg_name) == 0)
     {
       result = entry;
+
       break;
     }
   }

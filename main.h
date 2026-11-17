@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #ifndef MainH
 #define MainH
 
@@ -10,14 +10,14 @@
 
 typedef struct
 {
-  char hub_version[MY_LINE_MAX];
+  bstring hub_version;
 
-  char overrides[MY_LINE_MAX];
+  bstring overrides;
 
   int verbose;
 
-  char network0[MY_LINE_MAX];
-  char network1[MY_LINE_MAX];
+  bstring network0;
+  bstring network1;
 
   int network_evaluation_min;
   int network_evaluation_max;
@@ -39,7 +39,7 @@ typedef struct
   int depth_limit;
 
   int use_book;
-  char book_name[MY_LINE_MAX];
+  bstring book_name;
   int book_randomness;
   int book_position_frequency;
   int book_move_frequency;
@@ -85,24 +85,24 @@ typedef struct
 
   int lazy_smp_policy;
 
-  char egtb_dir[MY_LINE_MAX];
-  char egtb_dir_wdl[MY_LINE_MAX];
-  char egtb_ram[MY_LINE_MAX];
-  char egtb_ram_wdl[MY_LINE_MAX];
+  bstring egtb_dir;
+  bstring egtb_dir_wdl;
+  bstring egtb_ram;
+  bstring egtb_ram_wdl;
 
   i64_t egtb_entry_cache_size;
 
-  char dxp_server_ip[MY_LINE_MAX];
+  bstring dxp_server_ip;
   int dxp_port;
   int dxp_initiator;
   int dxp_game_time;
   double dxp_game_increment;
   int dxp_game_moves;
   int dxp_games;
-  char dxp_ballot[MY_LINE_MAX];
+  bstring dxp_ballot;
   int dxp_annotate_level;
   int dxp_strict_gameend;
-  char dxp_tag[MY_LINE_MAX];
+  bstring dxp_tag;
 
   int nthreads;
   int mode;

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #ifndef BstreamsH
 #define BstreamsH
 
@@ -14,5 +14,10 @@ typedef struct
 void construct_my_bstream(my_bstream_t *, char *);
 int my_bstream_readln(my_bstream_t *, int);
 void destroy_my_bstream(my_bstream_t *);
+
+size_t my_bread(void *, size_t, size_t, void *);
+void my_bstrftime(bstring, const char *, time_t);
+int my_breadline(bstring, FILE *);
+void my_bcpu_flags(bstring);
 
 #endif

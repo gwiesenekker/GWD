@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -68,6 +68,7 @@ local int probe_score_cache(search_t *arg_with_search,
     &arg_score_cache[arg_with_search->S_board.B_key % nscore_cache_entries]);
 
   ui32_t crc32 = 0xFFFFFFFF;
+
   crc32 = HW_CRC32_U64(crc32, arg_score_cache_slot->SCS_key);
   crc32 = HW_CRC32_U32(crc32, arg_score_cache_slot->SCS_score);
   crc32 = ~crc32;
@@ -381,6 +382,7 @@ score_t return_score_from_board(board_t *arg_with_board,
 
     PRINTF("CSV %d,%d\n", material_score, result);
     ncsv++;
+
     HARDBUG(ncsv > 1000000)
   }
 #endif
@@ -440,6 +442,7 @@ score_t return_score(search_t *arg_with_search)
       score_cache_slot.SCS_score = result;
 
       ui32_t crc32 = 0xFFFFFFFF;
+
       crc32 = HW_CRC32_U64(crc32, score_cache_slot.SCS_key);
       crc32 = HW_CRC32_U32(crc32, score_cache_slot.SCS_score);
       score_cache_slot.SCS_crc32 = ~crc32;
@@ -473,6 +476,7 @@ score_t return_material_score(board_t *arg_with_board)
 
   score_t material_score = SCORE((nwhite_man - nblack_man) * SCORE_MAN +
                                  (nwhite_king - nblack_king) * SCORE_KING);
+
   if (IS_WHITE(arg_with_board->B_colour2move))
     return (material_score);
   else
@@ -525,6 +529,7 @@ void init_score(void)
     score_cache_slot_default.SCS_score = SCORE_MINUS_INFINITY;
 
     ui32_t crc32 = 0xFFFFFFFF;
+
     crc32 = HW_CRC32_U64(crc32, score_cache_slot_default.SCS_key);
     crc32 = HW_CRC32_U32(crc32, score_cache_slot_default.SCS_score);
     score_cache_slot_default.SCS_crc32 = ~crc32;

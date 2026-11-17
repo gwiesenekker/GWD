@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -84,6 +84,7 @@ int main(int argc, char **argv)
 
       if (delta > largest)
         largest = delta;
+
       if (delta > (mean + 3 * sigma))
         nlarge++;
     }

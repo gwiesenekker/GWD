@@ -1,4 +1,4 @@
-// SCU REVISION 8.1282 di 17 nov 2026 22:39:46 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 // the game state is maintained in a cJSON object
@@ -252,6 +252,7 @@ local void save2pdn(game_state_t *arg_with_game_state, char *arg_pdn)
     if ((iply > 0) and ((iply % 10) == 0))
       HARDBUG(compat_fdprintf(fd, "\n") < 0)
   }
+
   HARDBUG(
     compat_fdprintf(fd,
                     " %s\n\n",
@@ -371,7 +372,8 @@ local void load(game_state_t *arg_with_game_state, char *arg_name)
 
   BSTRING(bstate)
 
-  HARDBUG(breada(bstate, (bNread)fread, fload) == BSTR_ERR)
+  // breada appends the complete stream; bstate starts empty.
+  HARDBUG(breada(bstate, my_bread, fload) == BSTR_ERR)
   HARDBUG(ferror(fload))
 
   FCLOSE(fload)
@@ -387,23 +389,27 @@ void construct_game_state(game_state_t *arg_with_game_state)
 
   HARDBUG((arg_with_game_state->bstate = bfromcstr("")) == NULL)
 
-  char event[MY_LINE_MAX];
+  BSTRING(event)
 
   time_t t = time(NULL);
 
-  HARDBUG(strftime(event, MY_LINE_MAX, "%Y.%m.%d %H:%M:%S", localtime(&t)) == 0)
+  my_bstrftime(event, "%Y.%m.%d %H:%M:%S", t);
 
   HARDBUG(cJSON_AddStringToObject(arg_with_game_state->cjson_object,
                                   CJSON_EVENT_ID,
-                                  event) == NULL)
+                                  bdata(event)) == NULL)
 
-  char date[MY_LINE_MAX];
+  BDESTROY(event)
 
-  HARDBUG(strftime(date, MY_LINE_MAX, "%Y.%m.%d", localtime(&t)) == 0)
+  BSTRING(date)
+
+  my_bstrftime(date, "%Y.%m.%d", t);
 
   HARDBUG(cJSON_AddStringToObject(arg_with_game_state->cjson_object,
                                   CJSON_DATE_ID,
-                                  date) == NULL)
+                                  bdata(date)) == NULL)
+
+  BDESTROY(date)
 
   HARDBUG(cJSON_AddStringToObject(arg_with_game_state->cjson_object,
                                   CJSON_WHITE_ID,

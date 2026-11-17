@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 void construct_queue(queue_t *arg_with_queue,
@@ -153,11 +153,13 @@ void test_queues(void)
 
   for (int itest = 0; itest < NTEST; itest++)
   {
-    char name[MY_LINE_MAX];
+    BSTRING(name)
 
-    snprintf(name, MY_LINE_MAX, "test%d", itest);
+    HARDBUG(bassignformat(name, "test%d", itest) == BSTR_ERR)
 
-    construct_queue(test + itest, name, STDOUT);
+    construct_queue(test + itest, bdata(name), STDOUT);
+
+    BDESTROY(name)
   }
 
   for (int itest = 0; itest < NTEST; itest++)
@@ -166,11 +168,14 @@ void test_queues(void)
     {
       for (int imessage = 0; imessage < 16; imessage++)
       {
-        char text[MY_LINE_MAX];
+        BSTRING(text)
 
-        snprintf(text, MY_LINE_MAX, "message %d from %d", imessage, itest);
+        HARDBUG(bassignformat(text, "message %d from %d", imessage, itest) ==
+                BSTR_ERR)
 
-        enqueue(test + jtest, itest, text);
+        enqueue(test + jtest, itest, bdata(text));
+
+        BDESTROY(text)
       }
     }
   }
@@ -189,10 +194,12 @@ void test_queues(void)
 
     // test WARNING
 
-    char text[MY_LINE_MAX];
+    BSTRING(text)
 
-    snprintf(text, MY_LINE_MAX, "warning %d", itest);
+    HARDBUG(bassignformat(text, "warning %d", itest) == BSTR_ERR)
 
-    enqueue(test + itest, itest, text);
+    enqueue(test + itest, itest, bdata(text));
+
+    BDESTROY(text)
   }
 }

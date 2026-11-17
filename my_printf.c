@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define LOG_PREFIX_ID "LOG_prefix_id"
@@ -59,9 +59,9 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
   {
     flush = TRUE;
 
-    bdelete(arg_with_my_printf->MP_bformat,
-            blength(arg_with_my_printf->MP_bformat) - 1,
-            1);
+    HARDBUG(bdelete(arg_with_my_printf->MP_bformat,
+                    blength(arg_with_my_printf->MP_bformat) - 1,
+                    1) == BSTR_ERR)
   }
 
   int ret;
@@ -86,13 +86,11 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
       continue;
     }
 
-    char time_stamp[MY_LINE_MAX];
+    bstring time_stamp = arg_with_my_printf->MP_btime_stamp;
 
     time_t t = time(NULL);
 
-    HARDBUG(
-      strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t)) ==
-      0)
+    my_bstrftime(time_stamp, "%H:%M:%S-%d/%m/%Y", t);
 
     i64_t pid = compat_getpid();
 
@@ -101,7 +99,7 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
       fprintf(arg_with_my_printf->MP_flog,
               "\n%s|%lld@ PTHREAD_SELF=%#lX"
               " LOG FILE EXCEEDS MAXIMUM SIZE AND WILL BE ROTATED\n",
-              time_stamp,
+              bdata(time_stamp),
               pid,
               compat_pthread_self());
 
@@ -124,7 +122,7 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
 
       for (int irotate = NROTATE; irotate >= 1; --irotate)
       {
-        btrunc(bold_path, 0);
+        HARDBUG(btrunc(bold_path, 0) == BSTR_ERR)
 
         if (irotate > 1)
         {
@@ -140,7 +138,7 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
                            bdata(arg_with_my_printf->MP_bname)) == BSTR_ERR)
         }
 
-        btrunc(bnew_path, 0);
+        HARDBUG(btrunc(bnew_path, 0) == BSTR_ERR)
 
         HARDBUG(bformata(bnew_path,
                          "%s-%d",
@@ -173,7 +171,7 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
       int nchar = fprintf(arg_with_my_printf->MP_flog,
                           "%s|%lld@ PTHREAD_SELF=%#lX"
                           " LOG FILE ROTATED AND RE-OPENED\n\n",
-                          time_stamp,
+                          bdata(time_stamp),
                           pid,
                           compat_pthread_self());
 
@@ -196,7 +194,7 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
 
     int nchar = fprintf(arg_with_my_printf->MP_flog,
                         "%s|%lld@ %s",
-                        time_stamp,
+                        bdata(time_stamp),
                         pid,
                         bdata(arg_with_my_printf->MP_bline));
 
@@ -252,7 +250,7 @@ void my_printf(my_printf_t *arg_with_my_printf, char *arg_format, ...)
       }
     }
 
-    bdelete(arg_with_my_printf->MP_bbuffer, 0, ichar + 1);
+    HARDBUG(bdelete(arg_with_my_printf->MP_bbuffer, 0, ichar + 1) == BSTR_ERR)
 
     ichar = 0;
   }
@@ -266,6 +264,10 @@ void construct_my_printf(my_printf_t *arg_with_my_printf,
 {
   arg_with_my_printf->MP2stdout = arg2stdout;
 
+  // Logging also serves allocation diagnostics; reuse an owned timestamp
+  // string.
+  HARDBUG((arg_with_my_printf->MP_btime_stamp = bfromcstr("")) == NULL)
+
   record_t *with_record = NULL;
 
   int ilog;
@@ -274,11 +276,15 @@ void construct_my_printf(my_printf_t *arg_with_my_printf,
   {
     with_record = logs + ilog;
 
-    bstring prefix = bfromcstr("");
+    BSTRING(prefix)
 
     get_field(with_record, LOG_PREFIX_ID, prefix);
 
-    if (compat_strcasecmp(bdata(prefix), arg_prefix) == 0)
+    int found = (compat_strcasecmp(bdata(prefix), arg_prefix) == 0);
+
+    BDESTROY(prefix)
+
+    if (found)
       break;
   }
 
@@ -326,18 +332,17 @@ void construct_my_printf(my_printf_t *arg_with_my_printf,
     exit(EXIT_FAILURE);
   }
 
-  char time_stamp[MY_LINE_MAX];
+  bstring time_stamp = arg_with_my_printf->MP_btime_stamp;
 
   time_t t = time(NULL);
 
-  HARDBUG(
-    strftime(time_stamp, MY_LINE_MAX, "%H:%M:%S-%d/%m/%Y", localtime(&t)) == 0)
+  my_bstrftime(time_stamp, "%H:%M:%S-%d/%m/%Y", t);
 
   i64_t pid = compat_getpid();
 
   int nchar = fprintf(arg_with_my_printf->MP_flog,
                       "%s|%lld@ PTHREAD_SELF=%#lX LOG FILE OPENED\n\n",
-                      time_stamp,
+                      bdata(time_stamp),
                       pid,
                       compat_pthread_self());
 
@@ -400,12 +405,14 @@ void init_my_printf(void)
       BSTR_ERR)
 
   CompatStat directory;
+
   if (compat_stat(bdata(my_printf_logs_dir), &directory) != 0)
   {
     HARDBUG(errno != ENOENT)
     HARDBUG(compat_mkdir(bdata(my_printf_logs_dir)) != 0)
     HARDBUG(compat_stat(bdata(my_printf_logs_dir), &directory) != 0)
   }
+
   HARDBUG(!directory.is_directory)
 
   nlogs = 0;
@@ -427,23 +434,27 @@ void test_my_printf(void)
   {
     int nchar = (iline - 1) % 10 + 1;
 
-    char line[MY_LINE_MAX];
+    BSTRING(line)
 
-    snprintf(line, MY_LINE_MAX, "%d:", iline);
+    HARDBUG(bassignformat(line, "%d:", iline) == BSTR_ERR)
 
     for (int itest = 0; itest < NTEST; itest++)
-      my_printf(test + itest, "%s", line);
+      my_printf(test + itest, "%s", bdata(line));
 
     for (int ichar = 1; ichar <= nchar; ichar++)
     {
-      snprintf(line, MY_LINE_MAX, " %d", ichar);
+      HARDBUG(bassignformat(line, " %d", ichar) == BSTR_ERR)
 
       for (int itest = 0; itest < NTEST; itest++)
-        my_printf(test + itest, "%s", line);
+        my_printf(test + itest, "%s", bdata(line));
     }
+
     for (int itest = 0; itest < NTEST; itest++)
       my_printf(test + itest, "\n");
+
+    BDESTROY(line)
   }
+
   for (int itest = 0; itest < NTEST; itest++)
     my_printf(test + itest, "$");
 }

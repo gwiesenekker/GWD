@@ -14,6 +14,7 @@ int main(int argc, char **argv)
 {
   (void)argc;
   (void)argv;
+
   static search_t search;
   pv_entries_t pv;
   ui64_t keys[NPV_SLOTS + 1];
@@ -35,33 +36,52 @@ int main(int argc, char **argv)
       search.S_board.B_key = keys[i];
       search.S_board.B_colour2move = first_colour;
       update_pv(&pv, &search, 7 + i);
+
       assert(probe_pv(&pv, &search) == 7 + i);
+
       search.S_board.B_colour2move = 1 - first_colour;
+
       assert(probe_pv(&pv, &search) == INVALID);
+
       update_pv(&pv, &search, 20 + i);
+
       assert(probe_pv(&pv, &search) == 20 + i);
+
       search.S_board.B_colour2move = first_colour;
+
       assert(probe_pv(&pv, &search) == 7 + i);
     }
     /* A matching-key update must not reset the other colour's move. */
     search.S_board.B_key = keys[0];
     update_pv(&pv, &search, 42);
+
     assert(probe_pv(&pv, &search) == 42);
+
     search.S_board.B_colour2move = 1 - first_colour;
+
     assert(probe_pv(&pv, &search) == 20);
 
     /* Replacement must initialize the key and clear the evicted moves. */
-    int victim = ((ui32_t)return_fmix64(keys[NPV_SLOTS]) >> 30) &
-                 (NPV_SLOTS - 1);
+    int victim =
+      ((ui32_t)return_fmix64(keys[NPV_SLOTS]) >> 30) & (NPV_SLOTS - 1);
+
     ui64_t evicted = keys[victim];
+
     search.S_board.B_key = keys[NPV_SLOTS];
     update_pv(&pv, &search, 63);
+
     assert(probe_pv(&pv, &search) == 63);
+
     search.S_board.B_colour2move = first_colour;
+
     assert(probe_pv(&pv, &search) == INVALID);
+
     search.S_board.B_key = evicted;
+
     assert(probe_pv(&pv, &search) == INVALID);
   }
-  puts("Hash-PV tests passed: empty slots, matching keys, both colours and replacement.");
+  puts("Hash-PV tests passed: empty slots, matching keys, both colours and "
+       "replacement.");
+
   return 0;
 }

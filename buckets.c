@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #undef WEIBULL
@@ -47,6 +47,7 @@ void update_bucket(bucket_t *arg_with_bucket, double arg_value)
         bucket_max = arg_with_bucket->bucket_min +
                      pow(arg_with_bucket->bucket_size, ibucket + 1);
       }
+
       if (ibucket >= arg_with_bucket->nbuckets)
         ibucket = arg_with_bucket->nbuckets - 1;
 
@@ -97,6 +98,7 @@ void printf_bucket(bucket_t *arg_with_bucket)
       {
         if (nzero == 2)
           PRINTF("[.., ..>\n");
+
         continue;
       }
     }

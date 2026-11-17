@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #ifndef BoardsH
 #define BoardsH
 
@@ -95,8 +95,6 @@ typedef struct board
 
   network_state_t B_network_state;
 
-  char B_string[MY_LINE_MAX];
-
   int B_nstate;
   board_state_t B_states[NODE_MAX];
 } board_t;
@@ -123,6 +121,6 @@ void board2fen(board_t *, bstring, int);
 void print_board(board_t *);
 void init_boards();
 void state2board(board_t *, game_state_t *);
-char *board2string(board_t *, int);
+char *board2string(board_t *, int, bstring);
 
 #endif

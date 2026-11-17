@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define THREAD_ALPHA_BETA_MASTER 0
@@ -10,7 +10,8 @@ thread_t *thread_alpha_beta_master = NULL;
 
 local int is_go_message(int arg_message_id)
 {
-  return ((arg_message_id == MESSAGE_GO) or (arg_message_id == MESSAGE_GO_TIMED) or
+  return ((arg_message_id == MESSAGE_GO) or
+          (arg_message_id == MESSAGE_GO_TIMED) or
           (arg_message_id == MESSAGE_GO_SHORT_CLOCK));
 }
 
@@ -18,8 +19,10 @@ local dtm_policy_t go_dtm_policy(int arg_message_id)
 {
   if (arg_message_id == MESSAGE_GO_SHORT_CLOCK)
     return DTM_ROOT_IF_OPEN;
+
   if (arg_message_id == MESSAGE_GO_TIMED)
     return DTM_ROOT_ONLY;
+
   return DTM_ROOT_AND_PV;
 }
 
@@ -34,6 +37,7 @@ local void start_search_workers(int arg_go, char *description)
                           memory_order_relaxed);
     enqueue(return_thread_queue(threads + i), arg_go, description);
   }
+
   for (int i = 1; i < options.nthreads; i++)
     while (
       !atomic_load_explicit(&threads[i].T_nodes_ready, memory_order_acquire))
@@ -61,6 +65,7 @@ local void solve_problems(void *self, char *arg_name)
 
     if (bchar(bline, 0) == '*')
       break;
+
     if (bchar(bline, 0) == '#')
       continue;
 
@@ -146,6 +151,7 @@ local void solve_problems(void *self, char *arg_name)
                 MESSAGE_ABORT_SEARCH,
                 "threads/solve_problems");
     }
+
     BDESTROY(bfen)
   }
 
@@ -171,6 +177,7 @@ local void thread_func_alpha_beta_master(void *self)
 
   my_printf(&(arg_with_thread->T_my_printf), "alpha_beta master thread\n");
   my_printf(&(arg_with_thread->T_my_printf), "$");
+
   while (TRUE)
   {
     message_t message;
@@ -259,7 +266,8 @@ local void thread_func_alpha_beta_master(void *self)
       }
       else if (is_go_message(message.message_id))
       {
-        arg_with_thread->T_search.S_dtm_policy = go_dtm_policy(message.message_id);
+        arg_with_thread->T_search.S_dtm_policy =
+          go_dtm_policy(message.message_id);
 
         my_printf(&(arg_with_thread->T_my_printf),
                   "got GO message %s\n",
@@ -269,7 +277,8 @@ local void thread_func_alpha_beta_master(void *self)
 
         if (options.nthreads > 1)
         {
-          start_search_workers(message.message_id, "threads/thread_alpha_beta_master");
+          start_search_workers(message.message_id,
+                               "threads/thread_alpha_beta_master");
         }
 
         board_t *with_board = &(arg_with_thread->T_search.S_board);
@@ -318,15 +327,24 @@ local void thread_func_alpha_beta_master(void *self)
         if (options.hub and options.ponder)
         {
           search_t *with_search = &arg_with_thread->T_search;
+
           do_move(with_board, with_search->S_best_move, &moves_list);
+
           moves_list_t replies;
+
           construct_moves_list(&replies);
           gen_moves(with_board, &replies);
-          int ireply = (replies.ML_nmoves == 1) ? 0 : probe_pv(&with_search->S_best_pv, with_search);
+
+          int ireply = (replies.ML_nmoves == 1)
+                         ? 0
+                         : probe_pv(&with_search->S_best_pv, with_search);
+
           if ((ireply >= 0) and (ireply < replies.ML_nmoves))
           {
             move2bstring(&replies, ireply, bmove_string);
-            HARDBUG(bformata(btext, " ponder=%s", bdata(bmove_string)) == BSTR_ERR)
+
+            HARDBUG(bformata(btext, " ponder=%s", bdata(bmove_string)) ==
+                    BSTR_ERR)
           }
           undo_move(with_board, with_search->S_best_move, &moves_list);
         }
@@ -409,6 +427,7 @@ local void thread_func_alpha_beta_master(void *self)
       else
         FATAL("message.message_id error", EXIT_FAILURE)
     }
+
     HARDBUG(compat_sleep(CENTI_SECOND) != 0)
   }
 }
@@ -481,7 +500,8 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
       }
       else if (is_go_message(message.message_id))
       {
-        arg_with_thread->T_search.S_dtm_policy = go_dtm_policy(message.message_id);
+        arg_with_thread->T_search.S_dtm_policy =
+          go_dtm_policy(message.message_id);
 
         my_printf(&(arg_with_thread->T_my_printf),
                   "got GO message %s\n",
@@ -499,6 +519,7 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
           if (dequeue(&(arg_with_thread->T_queue), &message) == INVALID)
           {
             HARDBUG(compat_sleep(CENTI_SECOND) != 0)
+
             continue;
           }
 
@@ -755,6 +776,7 @@ local void create_thread(void *self, int arg_role)
 
   atomic_init(&arg_with_thread->T_published_nodes, 0);
   atomic_init(&arg_with_thread->T_nodes_ready, FALSE);
+
   HARDBUG(!atomic_is_lock_free(&arg_with_thread->T_published_nodes))
 
   construct_my_printf(&(arg_with_thread->T_my_printf), "log", FALSE);

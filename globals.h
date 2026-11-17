@@ -1,8 +1,8 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #ifndef GlobalsH
 #define GlobalsH
 
-#define REVISION "8.1279"
+#define REVISION "8.1285"
 
 // generic includes
 
@@ -37,7 +37,6 @@ _Static_assert(CHAR_BIT == 8, "GWD requires 8-bit bytes");
 
 #undef LINE_MAX // dirent.h
 #define LINE_MAX do_not_use_LINE_MAX
-#define MY_LINE_MAX 8192
 
 typedef long long i64_t;
 typedef unsigned long long ui64_t;

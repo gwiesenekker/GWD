@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #undef SEMS_USE_SHM
@@ -100,7 +100,9 @@ local void my_sem_setval(int arg_semid, int arg_sem_num, int arg_value)
   union semun
   {
     int val;
+
     struct semid_ds *buf;
+
     unsigned short *array;
   };
 
@@ -438,6 +440,7 @@ int my_mpi_comm_size(MPI_Comm comm, int *size)
   return (MPI_Comm_size(comm, size));
 #else
   *size = 1;
+
   return (MPI_SUCCESS);
 #endif
 }
@@ -448,6 +451,7 @@ int my_mpi_comm_rank(MPI_Comm comm, int *rank)
   return (MPI_Comm_rank(comm, rank));
 #else
   *rank = 0;
+
   return (MPI_SUCCESS);
 #endif
 }
@@ -1122,6 +1126,7 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
     for (iproc = 0; iproc < nprocs; iproc++)
     {
       double latency = now - wall[iproc];
+
       if (latency > latency_max)
         ilatency_max = iproc;
     }

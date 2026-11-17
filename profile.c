@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "profile.h"
 
 #ifdef PROFILE
@@ -447,6 +447,7 @@ void init_profile(void)
   }
 
   (void)remove("profile.txt");
+
   for (int ithread = 0; ithread < THREAD_MAX; ithread++)
   {
     char name[NAME_MAX];
@@ -467,6 +468,7 @@ void init_profile(void)
   frequency = TICKS(counter_end) - TICKS(counter_begin);
 
   int pid = PID;
+
   PG.counter_pointer = &counter_dummy;
 
   double mn = 0.0;
@@ -573,6 +575,7 @@ void dump_profile(int pid, int verbose)
 
     if (strcmp(with_block->block_name, "main") == 0)
       with_main = with_block;
+
     if (strcmp(with_block->block_name, "main-thread") == 0)
       with_main_thread = with_block;
 
@@ -635,6 +638,7 @@ void dump_profile(int pid, int verbose)
     }
 
     int t = sort[iblock];
+
     sort[iblock] = sort[kblock];
     sort[kblock] = t;
   }
@@ -686,6 +690,7 @@ void dump_profile(int pid, int verbose)
     }
 
     int t = sort[iblock];
+
     sort[iblock] = sort[kblock];
     sort[kblock] = t;
   }
@@ -765,6 +770,7 @@ void dump_profile(int pid, int verbose)
     }
 
     int t = sort[iblock];
+
     sort[iblock] = sort[kblock];
     sort[kblock] = t;
   }
@@ -790,7 +796,9 @@ void dump_profile(int pid, int verbose)
     {
       double self_time_per_call = PL.block[jblock].block_time_recursive_total /
                                   PL.block[jblock].block_calls_recursive_total;
+
       long long ticks_per_call = -1;
+
       if (self_time_per_call < 1.0)
         ticks_per_call = round(self_time_per_call * frequency);
 

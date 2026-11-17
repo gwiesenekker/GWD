@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 // clang-format off
@@ -288,6 +288,7 @@ void string2board(board_t *arg_with_board, char *arg_s)
 void fen2board(board_t *arg_with_board, char *arg_fen)
 {
   char s[51];
+
   for (int i = 1; i <= 50; ++i)
     s[i] = *nn;
 
@@ -329,23 +330,27 @@ void fen2board(board_t *arg_with_board, char *arg_fen)
     if ((*f == 'W') or (*f == 'B'))
     {
       c = *f++;
+
       continue;
     }
 
     if (*f == 'K')
     {
       k = *f++;
+
       continue;
     }
 
     if (isdigit(*f))
     {
       int i = 0;
+
       while (isdigit(*f))
       {
         i = i * 10 + (*f - '0');
         f++;
       }
+
       HARDBUG(i < 1)
       HARDBUG(i > 50)
 
@@ -433,6 +438,7 @@ void board2fen(board_t *arg_with_board, bstring arg_bfen, int arg_brackets)
 
   ui64_t white_bb =
     arg_with_board->B_white_man_bb | arg_with_board->B_white_king_bb;
+
   ui64_t black_bb =
     arg_with_board->B_black_man_bb | arg_with_board->B_black_king_bb;
 
@@ -473,16 +479,19 @@ void board2fen(board_t *arg_with_board, bstring arg_bfen, int arg_brackets)
     bcatcstr(arg_bfen, ".\"]");
 
   BDESTROY(bbfen)
+
   BDESTROY(bwfen)
 }
 
 void print_board(board_t *arg_with_board)
 {
   int i = 0;
+
   for (int irow = 10; irow >= 1; --irow)
   {
     if ((irow & 1) == 0)
       my_printf(arg_with_board->B_my_printf, "  ");
+
     for (int icol = 1; icol <= 5; ++icol)
     {
       ++i;
@@ -528,24 +537,24 @@ void print_board(board_t *arg_with_board)
   BDESTROY(bfen)
 }
 
-char *board2string(board_t *arg_with_board, int arg_hub)
+char *board2string(board_t *arg_with_board, int arg_hub, bstring arg_string)
 {
-  for (int i = 0; i <= 50; ++i)
-    arg_with_board->B_string[i] = '?';
+  HARDBUG(bassigncstr(arg_string, "?") == BSTR_ERR)
+  HARDBUG(bpattern(arg_string, 51) == BSTR_ERR)
 
   if (IS_WHITE(arg_with_board->B_colour2move))
   {
     if (!arg_hub)
-      arg_with_board->B_string[0] = 'w';
+      bdata(arg_string)[0] = 'w';
     else
-      arg_with_board->B_string[0] = 'W';
+      bdata(arg_string)[0] = 'W';
   }
   else
   {
     if (!arg_hub)
-      arg_with_board->B_string[0] = 'b';
+      bdata(arg_string)[0] = 'b';
     else
-      arg_with_board->B_string[0] = 'B';
+      bdata(arg_string)[0] = 'B';
   }
 
   for (int i = 1; i <= 50; ++i)
@@ -555,42 +564,42 @@ char *board2string(board_t *arg_with_board, int arg_hub)
     if (arg_with_board->B_white_man_bb & BITULL(ifield))
     {
       if (!arg_hub)
-        arg_with_board->B_string[i] = *wO;
+        bdata(arg_string)[i] = *wO;
       else
-        arg_with_board->B_string[i] = *wO_hub;
+        bdata(arg_string)[i] = *wO_hub;
     }
     else if (arg_with_board->B_white_king_bb & BITULL(ifield))
     {
       if (!arg_hub)
-        arg_with_board->B_string[i] = *wX;
+        bdata(arg_string)[i] = *wX;
       else
-        arg_with_board->B_string[i] = *wX_hub;
+        bdata(arg_string)[i] = *wX_hub;
     }
     else if (arg_with_board->B_black_man_bb & BITULL(ifield))
     {
       if (!arg_hub)
-        arg_with_board->B_string[i] = *bO;
+        bdata(arg_string)[i] = *bO;
       else
-        arg_with_board->B_string[i] = *bO_hub;
+        bdata(arg_string)[i] = *bO_hub;
     }
     else if (arg_with_board->B_black_king_bb & BITULL(ifield))
     {
       if (!arg_hub)
-        arg_with_board->B_string[i] = *bX;
+        bdata(arg_string)[i] = *bX;
       else
-        arg_with_board->B_string[i] = *bX_hub;
+        bdata(arg_string)[i] = *bX_hub;
     }
     else
     {
       if (!arg_hub)
-        arg_with_board->B_string[i] = *nn;
+        bdata(arg_string)[i] = *nn;
       else
-        arg_with_board->B_string[i] = *nn_hub;
+        bdata(arg_string)[i] = *nn_hub;
     }
   }
-  arg_with_board->B_string[51] = '\0';
+  bdata(arg_string)[51] = '\0';
 
-  return (arg_with_board->B_string);
+  return (bdata(arg_string));
 }
 
 void init_boards(void)
@@ -627,6 +636,7 @@ void state2board(board_t *arg_with_board, game_state_t *arg_game)
   // read game moves
 
   moves_list_t moves_list;
+
   construct_moves_list(&moves_list);
 
   cJSON *game_move;
@@ -656,5 +666,6 @@ void state2board(board_t *arg_with_board, game_state_t *arg_game)
 
     do_move(arg_with_board, imove, &moves_list);
   }
+
   BDESTROY(bmove)
 }

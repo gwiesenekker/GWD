@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define NAG '$'
@@ -98,6 +98,7 @@ get_next_token(bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
 
       jchar++;
     }
+
     HARDBUG(nest != 0)
 
     jchar++;
@@ -124,6 +125,7 @@ get_next_token(bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
     {
       if (bchar(arg_bstring, jchar) == ' ')
         break;
+
       if (bchar(arg_bstring, jchar) == '.')
         break;
 

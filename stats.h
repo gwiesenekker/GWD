@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #ifndef StatsH
 #define StatsH
 
@@ -34,6 +34,7 @@ inline local void update_stats(stats_t *arg_with_stats, double x)
   {
     if (x > arg_with_stats->S_max)
       arg_with_stats->S_max = x;
+
     if (x < arg_with_stats->S_min)
       arg_with_stats->S_min = x;
   }

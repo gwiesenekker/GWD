@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 void copy_my_random(my_random_t *arg_to, const my_random_t *arg_from)
@@ -204,6 +204,7 @@ void test_my_random(void)
     construct_my_random(&test_random, NULL);
 
     stats_t stats;
+
     construct_stats(&stats, "test_random");
 
     int nsamples = TEST_NBUCKETS * TEST_NFILL;
@@ -227,6 +228,7 @@ void test_my_random(void)
     {
       if (buckets[ibucket] < min)
         min = buckets[ibucket];
+
       if (buckets[ibucket] > max)
         max = buckets[ibucket];
     }
@@ -246,10 +248,13 @@ void test_my_random(void)
     {
       if (stats.S_mean < mean_min)
         mean_min = stats.S_mean;
+
       if (stats.S_mean > mean_max)
         mean_max = stats.S_mean;
+
       if (stats.S_sigma < sigma_min)
         sigma_min = stats.S_sigma;
+
       if (stats.S_sigma > sigma_max)
         sigma_max = stats.S_sigma;
     }
@@ -277,6 +282,7 @@ void test_my_random(void)
       for (int irandom = 0; irandom < 2; irandom++)
       {
         sort_t sort;
+
         construct_sort(&sort, narray, irandom ? &test_random : NULL, sort0);
 
         int found[NMOVES_MAX] = {0};
@@ -298,6 +304,7 @@ void test_my_random(void)
         HARDBUG(return_next_sort(&sort) != INVALID)
 
         reset_sort(&sort, 0);
+
         for (int isort = 0; isort < narray; isort++)
           HARDBUG(return_next_sort(&sort) != array[isort])
 

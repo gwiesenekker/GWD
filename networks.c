@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 #include <float.h>
 
@@ -440,6 +440,7 @@ local inline void dense_fixed_x8(const float *arg_inputs,
   // Callers supply 2 or 4 chunks. Preserve dot_scaled's accumulation order,
   // including the initial FMA with zero and left-to-right scalar reduction.
   __m256 inputs[4];
+
   for (int ichunk = 0; ichunk < arg_nchunks; ichunk++)
     inputs[ichunk] = _mm256_loadu_ps(arg_inputs + 8 * ichunk);
 
@@ -496,13 +497,18 @@ local void dense_layer0_dot(dense_network_shared_t *arg_dense,
   if (arg_dense->DNS_16x8_kernel)
   {
     HARDBUG(layer->LS_ninputs != 16 || layer->LS_noutputs != 8)
+
     dense_16x8(arg_inputs, layer->LS_weights_noutputsxninputs, arg_dot);
+
     return;
   }
+
   if (arg_dense->DNS_32x8_kernel)
   {
     HARDBUG(layer->LS_ninputs != 32 || layer->LS_noutputs != 8)
+
     dense_32x8(arg_inputs, layer->LS_weights_noutputsxninputs, arg_dot);
+
     return;
   }
 #endif
@@ -627,6 +633,7 @@ local void construct_dense_network_shared(network_t *arg_network,
   {
     layer_shared_t *with_current =
       with_dense_network_shared->DNS_layers + ilayer;
+
     layer_shared_t *with_next =
       with_dense_network_shared->DNS_layers + ilayer + 1;
 
@@ -1262,6 +1269,7 @@ local void construct_network_shared(char *arg_network_name,
     if ((with_pattern_shared->PS_nembed != 16) or
         (with_pattern_shared->PS_offset != 0))
       with_network->N_pattern_dense_network_16x8_kernel = FALSE;
+
     if ((with_pattern_shared->PS_nembed != 64) or
         (with_pattern_shared->PS_offset != 0))
       with_network->N_pattern_dense_network_64x16_kernel = FALSE;
@@ -1304,6 +1312,7 @@ local void construct_network_shared(char *arg_network_name,
       if ((with_material_shared->MS_nembed != 16) or
           (with_material_shared->MS_offset != 0))
         with_network->N_material_dense_network_16x8_kernel = FALSE;
+
       if ((with_material_shared->MS_nembed != 64) or
           (with_material_shared->MS_offset != 0))
         with_network->N_material_dense_network_64x16_kernel = FALSE;
@@ -1941,6 +1950,7 @@ local void activation_rsqrt_scaled(int n,
     for (int i = 0; i < n; i++)
     {
       float af = SCALED2FLOAT(a[i]);
+
       b[i] = af / sqrtf(1.0f + af * af);
     }
 #endif
@@ -2435,6 +2445,7 @@ double return_dense_network_score_scaled(
 
     if (logits1 > logitsm)
       logitsm = logits1;
+
     if (logits2 > logitsm)
       logitsm = logits2;
 
@@ -2592,18 +2603,22 @@ local void heap_sort_double(i64_t n, i64_t *p, double *a)
     {
       t = p[n];
       p[n] = p[0];
+
       if (--n == 0)
       {
         p[0] = t;
+
         break;
       }
     }
     i = k;
     j = 2 * k + 1;
+
     while (j <= n)
     {
       if ((j < n) and (a[p[j]] < a[p[j + 1]]))
         j++;
+
       if (a[t] < a[p[j]])
       {
         p[i] = p[j];
@@ -2727,6 +2742,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
   construct_progress(&progress, "fen2network:stats", nfen, 10);
 
   FILE *fcsv;
+
   fcsv = fopen("xyz.csv", "w");
 
   for (i64_t ifen = 0; ifen < nfen; ifen++)
@@ -3070,6 +3086,7 @@ void fen2network(char *arg_name, i64_t arg_npositions)
       continue;
 
     int delta_man = nwhite_man - nblack_man;
+
     if (delta_man < 0)
       continue;
 
@@ -3667,6 +3684,7 @@ void fen2csv(char *arg_name, int arg_npieces_min, int arg_npieces_max)
     {
       int delta_nman = nwhite_man - nblack_man;
       int delta_nkings = nwhite_kings - nblack_kings;
+
       nman = nwhite_man + nblack_man;
 
       double result_wtm = result;
@@ -3799,8 +3817,11 @@ void evaluate_material_network(network_t *with_network,
 {
   dense_network_shared_t *dense =
     &with_network->N_material_dense_network_shared;
+
   int ilast = dense->DNS_nlayers - 1;
+
   HARDBUG(ilast < 0)
+
   int noutputs = dense->DNS_layers[ilast].LS_noutputs;
 
   HARDBUG((nwhite_man < 0) or (nblack_man < 0) or (nwhite_king < 0) or
@@ -3819,6 +3840,7 @@ void evaluate_material_network(network_t *with_network,
     memcpy(arg_state->DNS_layers[ilast].LT_outputs,
            with_network->N_material_cache + index * noutputs,
            noutputs * sizeof(scaled_double_t));
+
     return;
   }
 
@@ -3845,6 +3867,7 @@ void evaluate_material_network(network_t *with_network,
     sum0 = _mm256_setzero_ps();
     sum1 = _mm256_setzero_ps();
   }
+
   if (with_network->N_material_dense_network_64x16_kernel)
     for (int ichunk = 0; ichunk < 8; ichunk++)
       sum64[ichunk] = _mm256_setzero_ps();
@@ -3890,6 +3913,7 @@ void evaluate_material_network(network_t *with_network,
 
       if (mwhite_king > MATERIAL_KING_MAX)
         mwhite_king = MATERIAL_KING_MAX;
+
       if (mblack_king > MATERIAL_KING_MAX)
         mblack_king = MATERIAL_KING_MAX;
 
@@ -3965,30 +3989,37 @@ void evaluate_material_network(network_t *with_network,
 local void construct_material_cache(network_t *arg_network)
 {
   arg_network->N_material_cache = NULL;
+
   if ((arg_network->N_network_id == INVALID) or
       (arg_network->N_architecture_material == NETWORK_ARCHITECTURE_NULL))
     return;
 
   dense_network_shared_t *dense = &arg_network->N_material_dense_network_shared;
+
   if (dense->DNS_nlayers == 0)
     return; // A dummy network has no loaded weights.
+
   int ilast = dense->DNS_nlayers - 1;
   int noutputs = dense->DNS_layers[ilast].LS_noutputs;
   size_t ncounts = NPIECES_MAX + 1;
   size_t nentries = ncounts * ncounts * ncounts * ncounts;
   void *memory;
   MPI_Win win;
+
   my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
                          sizeof(scaled_double_t),
                          nentries * noutputs,
                          &memory,
                          &win);
+
   scaled_double_t *cache = memory;
 
   if (my_mpi_globals.MMG_is_master)
   {
     dense_network_state_t state = {0};
+
     construct_dense_network_state(dense, &state);
+
     size_t ientry = 0;
     // Fill every count tuple, including unreachable ones: no uninitialized
     // rows.
@@ -4009,6 +4040,7 @@ local void construct_material_cache(network_t *arg_network)
                    noutputs * sizeof(scaled_double_t));
             ientry++;
           }
+
     for (int ilayer = 0; ilayer < dense->DNS_nlayers; ilayer++)
     {
       my_free(state.DNS_layers[ilayer].LT_dot);
@@ -4036,10 +4068,10 @@ void init_networks(void)
   networks[NETWORK0_ID].N_network_id = INVALID;
   networks[NETWORK1_ID].N_network_id = INVALID;
 
-  construct_network_shared(options.network0, NETWORK0_ID, TRUE);
+  construct_network_shared(bdata(options.network0), NETWORK0_ID, TRUE);
 
-  if (compat_strcasecmp(options.network1, "NULL") != 0)
-    construct_network_shared(options.network1, NETWORK1_ID, TRUE);
+  if (compat_strcasecmp(bdata(options.network1), "NULL") != 0)
+    construct_network_shared(bdata(options.network1), NETWORK1_ID, TRUE);
 
   for (int inetwork = 0; inetwork < NETWORKS_MAX; inetwork++)
     construct_material_cache(networks + inetwork);

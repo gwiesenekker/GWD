@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 // objects are derived from a class
@@ -141,7 +141,7 @@ typedef struct
 
   int object_id;
 
-  char object_stamp[MY_LINE_MAX];
+  bstring object_stamp;
 
   // specific methods
 
@@ -156,7 +156,7 @@ local void printf_my_object(void *self)
 
   PRINTF("printing my_object object_id=%d\n", object->object_id);
 
-  PRINTF("object_stamp=%s\n", object->object_stamp);
+  PRINTF("object_stamp=%s\n", bdata(object->object_stamp));
 }
 
 // the object constructor
@@ -175,10 +175,9 @@ local void *construct_my_object(void)
 
   time_t t = time(NULL);
 
-  HARDBUG(strftime(object->object_stamp,
-                   MY_LINE_MAX,
-                   "%H:%M:%S-%d/%m/%Y",
-                   localtime(&t)) == 0)
+  HARDBUG((object->object_stamp = bfromcstr("")) == NULL)
+
+  my_bstrftime(object->object_stamp, "%H:%M:%S-%d/%m/%Y", t);
 
   // register object methods
 
@@ -194,6 +193,8 @@ local void destroy_my_object(void *self)
   my_object_t *object = self;
 
   PRINTF("destroying my_object object_id=%d\n", object->object_id);
+
+  HARDBUG(bdestroy(object->object_stamp) == BSTR_ERR)
 
   // call the class 'destructor'
 

@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 
 #define GWD_JSON "gwd.json"
@@ -42,8 +42,10 @@ local void fen2score(char *arg_name)
 
     if (bchar(bline, 0) == '*')
       break;
+
     if (bchar(bline, 0) == '#')
       continue;
+
     if (strncmp(bdata(bline), "//", 2) == 0)
       continue;
 
@@ -137,8 +139,10 @@ local void solve_problems(char *arg_name)
 
     if (bchar(bline, 0) == '*')
       break;
+
     if (bchar(bline, 0) == '#')
       continue;
+
     if (strncmp(bdata(bline), "//", 2) == 0)
       continue;
 
@@ -265,6 +269,7 @@ local void solve_problems_mcts(char *arg_name,
 
     if (bchar(bline, 0) == '*')
       break;
+
     if (bchar(bline, 0) == '#')
       continue;
 
@@ -291,6 +296,7 @@ local void solve_problems_mcts(char *arg_name,
 
     if (bchar(bline, 0) == '*')
       break;
+
     if (bchar(bline, 0) == '#')
       continue;
 
@@ -411,13 +417,13 @@ local void solve_problems_multi_threaded(char *arg_name)
       else
         FATAL("message.message_id error", EXIT_FAILURE)
     }
+
     HARDBUG(compat_sleep(CENTI_SECOND) != 0)
   }
 }
 
-local char *secs2string(int arg_t)
+local char *secs2string(int arg_t, bstring string)
 {
-  local char string[MY_LINE_MAX];
   int hours;
   int minutes;
   int seconds;
@@ -425,16 +431,19 @@ local char *secs2string(int arg_t)
   hours = arg_t / 3600;
   minutes = (arg_t - hours * 3600) / 60;
   seconds = arg_t - hours * 3600 - minutes * 60;
+
   HARDBUG((hours * 3600 + minutes * 60 + seconds) != arg_t)
 
-  snprintf(string, MY_LINE_MAX, "%02d:%02d:%02d", hours, minutes, seconds);
-  return (string);
+  HARDBUG(bassignformat(string, "%02d:%02d:%02d", hours, minutes, seconds) ==
+          BSTR_ERR)
+
+  return (bdata(string));
 }
 
 #define GAME_MOVES 40
 
-void play_game(char arg_name[MY_LINE_MAX],
-               char arg_colour[MY_LINE_MAX],
+void play_game(char *arg_name,
+               char *arg_colour,
                int arg_game_minutes,
                int arg_used_minutes)
 {
@@ -445,6 +454,12 @@ void play_game(char arg_name[MY_LINE_MAX],
   game_state_t game_state;
 
   construct_game_state(&game_state);
+
+  BSTRING(btime)
+  BSTRING(line)
+  BSTRING(comment)
+  BSTRING(bbest_move)
+  BSTRING(banswer)
 
   if (fexists(arg_name))
   {
@@ -527,31 +542,26 @@ void play_game(char arg_name[MY_LINE_MAX],
       {
         PRINTF("\nMinutes remaining "
                " (press <ENTER> to accept the default (%s)?\n",
-               secs2string(round(game_time - game_time_used)));
+               secs2string(round(game_time - game_time_used), btime));
 
-        char line[MY_LINE_MAX];
-
-        if (fgets(line, MY_LINE_MAX, stdin) == NULL)
+        if (!my_breadline(line, stdin))
           goto label_return;
 
         int t;
 
-        if (my_sscanf(line, "%d", &t) == 1)
+        if (my_sscanf(bdata(line), "%d", &t) == 1)
         {
           game_time_used = game_time - t * 60.0;
 
           PRINTF("remaining %s minutes\n",
-                 secs2string(round(game_time - game_time_used)));
+                 secs2string(round(game_time - game_time_used), btime));
         }
       }
-
-      BSTRING(bbest_move)
 
       double t1 = compat_time();
 
       while (TRUE)
       {
-        BSTRING(banswer)
 
         if (automatic)
         {
@@ -567,23 +577,26 @@ void play_game(char arg_name[MY_LINE_MAX],
                  "'.': play a random move;\n"
                  "'a': play random moves automatically from now on.\n\n");
 
-          char line[MY_LINE_MAX];
-
-          if (fgets(line, MY_LINE_MAX, stdin) == NULL)
+          if (!my_breadline(line, stdin))
             goto label_return;
 
-          CSTRING(canswer, strlen(line))
+          HARDBUG(bassign(banswer, line) == BSTR_ERR)
+          HARDBUG(bltrimws(banswer) == BSTR_ERR)
 
-          if (my_sscanf(line, "%s", canswer) != 1)
+          int nanswer = 0;
+
+          while ((nanswer < blength(banswer)) and
+                 !isspace((unsigned char)bchar(banswer, nanswer)))
+            ++nanswer;
+
+          HARDBUG(btrunc(banswer, nanswer) == BSTR_ERR)
+
+          if (nanswer == 0)
           {
             PRINTF("\neh?\n");
 
             continue;
           }
-
-          HARDBUG(bassigncstr(banswer, canswer) == BSTR_ERR)
-
-          CDESTROY(canswer)
         }
 
         if (bchar(banswer, 0) == '?')
@@ -637,6 +650,7 @@ void play_game(char arg_name[MY_LINE_MAX],
         if (bchar(banswer, 0) == 'a')
         {
           automatic = TRUE;
+
           continue;
         }
 
@@ -653,8 +667,6 @@ void play_game(char arg_name[MY_LINE_MAX],
 
         move2bstring(&moves_list, imove, bbest_move);
 
-        BDESTROY(banswer)
-
         break;
       }
 
@@ -662,13 +674,11 @@ void play_game(char arg_name[MY_LINE_MAX],
 
       double wait_time = t2 - t1;
 
-      PRINTF("waited %s\n", secs2string(round(wait_time)));
+      PRINTF("waited %s\n", secs2string(round(wait_time), btime));
 
-      char comment[MY_LINE_MAX];
+      HARDBUG(bassignformat(comment, "%d", 0) == BSTR_ERR)
 
-      snprintf(comment, MY_LINE_MAX, "%d", 0);
-
-      game_state.push_move(&game_state, bdata(bbest_move), comment);
+      game_state.push_move(&game_state, bdata(bbest_move), bdata(comment));
 
       ++ndone;
 
@@ -691,17 +701,17 @@ void play_game(char arg_name[MY_LINE_MAX],
             if (message.message_id == MESSAGE_RESULT)
             {
               PRINTF("got hint %s\n", bdata(message.message_text));
+
               break;
             }
           }
+
           HARDBUG(compat_sleep(CENTI_SECOND) != 0)
         }
       }
-      BDESTROY(bbest_move)
     }
     else
     {
-      BSTRING(bbest_move)
 
       int best_score;
 
@@ -788,6 +798,7 @@ void play_game(char arg_name[MY_LINE_MAX],
           else
             FATAL("message.message_id error", EXIT_FAILURE)
         }
+
         HARDBUG(compat_sleep(CENTI_SECOND) != 0)
       }
 
@@ -801,21 +812,18 @@ void play_game(char arg_name[MY_LINE_MAX],
 
       game_time_used += move_time;
 
-      PRINTF("used   %s\n", secs2string(round(move_time)));
+      PRINTF("used   %s\n", secs2string(round(move_time), btime));
 
-      PRINTF("total  %s\n", secs2string(round(game_time_used)));
+      PRINTF("total  %s\n", secs2string(round(game_time_used), btime));
 
-      PRINTF("remain %s\n", secs2string(round(game_time - game_time_used)));
+      PRINTF("remain %s\n",
+             secs2string(round(game_time - game_time_used), btime));
 
       PRINTF("\n* * * * * * * * * * %s %d\n\n", bdata(bbest_move), best_score);
 
-      char comment[MY_LINE_MAX];
+      HARDBUG(bassignformat(comment, "%d", best_score) == BSTR_ERR)
 
-      snprintf(comment, MY_LINE_MAX, "%d", best_score);
-
-      game_state.push_move(&game_state, bdata(bbest_move), comment);
-
-      BDESTROY(bbest_move)
+      game_state.push_move(&game_state, bdata(bbest_move), bdata(comment));
     }
   }
 label_return:
@@ -823,6 +831,16 @@ label_return:
   game_state.save(&game_state, arg_name);
 
   game_state.save2pdn(&game_state, "play.pdn");
+
+  BDESTROY(banswer)
+
+  BDESTROY(bbest_move)
+
+  BDESTROY(comment)
+
+  BDESTROY(line)
+
+  BDESTROY(btime)
 
   destroy_game_state(&game_state);
 }
@@ -865,6 +883,7 @@ int weibull_sample_row(double arg_probability,
 
     if (result < 1)
       result = 1;
+
     if (result > 9)
       result = 9;
   }
@@ -1339,6 +1358,11 @@ local void gen_random(char *arg_fen_name,
 
   reset_my_timer(&timer);
 
+  BSTRING(s)
+
+  HARDBUG(bassigncstr(s, "?") == BSTR_ERR)
+  HARDBUG(bpattern(s, 51) == BSTR_ERR)
+
   BSTRING(bfen_name)
 
   HARDBUG(bassigncstr(bfen_name, arg_fen_name) == BSTR_ERR)
@@ -1581,12 +1605,10 @@ local void gen_random(char *arg_fen_name,
 
     PRINTF("shape=%.2f scale=%.2f\n", shape, scale);
 
-    char s[MY_LINE_MAX];
-
     if ((return_my_random(&temp_random) % 2) == 0)
-      s[0] = 'w';
+      bdata(s)[0] = 'w';
     else
-      s[0] = 'b';
+      bdata(s)[0] = 'b';
 
     score_t best_score = SCORE_PLUS_INFINITY;
 
@@ -1600,7 +1622,7 @@ local void gen_random(char *arg_fen_name,
                               scale,
                               &temp_random,
                               with_search,
-                              s,
+                              bdata(s),
                               &best_score);
     }
     else
@@ -1611,7 +1633,7 @@ local void gen_random(char *arg_fen_name,
                               scale,
                               &temp_random,
                               with_search,
-                              s,
+                              bdata(s),
                               NULL);
     }
 
@@ -1637,7 +1659,7 @@ local void gen_random(char *arg_fen_name,
                               with_search,
                               &white_kings_mask,
                               &black_kings_mask,
-                              s,
+                              bdata(s),
                               &best_score))
         {
           PRINTF("add_kings_random failed nsame=%d\n", nsame);
@@ -1780,6 +1802,8 @@ local void gen_random(char *arg_fen_name,
   printf_bucket(&bucket_nkings);
 
   BDESTROY(bfen_name)
+
+  BDESTROY(s)
 }
 
 local void test_cJSON(void)
@@ -1818,13 +1842,20 @@ local void test_cJSON(void)
     cJSON_AddItemToArray(resolutions, resolution);
   }
 
-  char string[MY_LINE_MAX];
+  BSTRING(string)
 
-  HARDBUG(cJSON_PrintPreallocated(monitor, string, MY_LINE_MAX, FALSE) == 0)
+  char *serialized = cJSON_PrintUnformatted(monitor);
+
+  HARDBUG(serialized == NULL)
+  HARDBUG(bassigncstr(string, serialized) == BSTR_ERR)
+
+  cJSON_free(serialized);
 
   cJSON_Delete(monitor);
 
-  PRINTF("monitor=%s\n", string);
+  PRINTF("monitor=%s\n", bdata(string));
+
+  BDESTROY(string)
 }
 
 #define ARGS_TXT "args.txt"
@@ -1837,14 +1868,14 @@ local void load_gwd_json(void)
 
   // set defaults
 
-  strcpy(options.hub_version, "NULL");
+  HARDBUG((options.hub_version = bfromcstr("NULL")) == NULL)
 
-  strcpy(options.overrides, "NULL");
+  HARDBUG((options.overrides = bfromcstr("NULL")) == NULL)
 
   options.verbose = 1;
 
-  strcpy(options.network0, "NULL");
-  strcpy(options.network1, "NULL");
+  HARDBUG((options.network0 = bfromcstr("NULL")) == NULL)
+  HARDBUG((options.network1 = bfromcstr("NULL")) == NULL)
 
   options.network_evaluation_min = -100;
   options.network_evaluation_max = -25;
@@ -1866,7 +1897,9 @@ local void load_gwd_json(void)
   options.depth_limit = 64;
 
   options.use_book = TRUE;
-  strncpy(options.book_name, "book.db", MY_LINE_MAX);
+
+  HARDBUG((options.book_name = bfromcstr("book.db")) == NULL)
+
   options.book_randomness = 0;
   options.book_position_frequency = 5;
   options.book_move_frequency = 5;
@@ -1911,25 +1944,29 @@ local void load_gwd_json(void)
   options.nthreads_alpha_beta = 4;
   options.lazy_smp_policy = 1;
 
-  strcpy(options.egtb_dir, "NULL");
-  strcpy(options.egtb_dir_wdl, "NULL");
+  HARDBUG((options.egtb_dir = bfromcstr("NULL")) == NULL)
+  HARDBUG((options.egtb_dir_wdl = bfromcstr("NULL")) == NULL)
 
-  strcpy(options.egtb_ram, "egtb56");
-  strcpy(options.egtb_ram_wdl, "egtb3");
+  HARDBUG((options.egtb_ram = bfromcstr("egtb56")) == NULL)
+  HARDBUG((options.egtb_ram_wdl = bfromcstr("egtb3")) == NULL)
 
   options.egtb_entry_cache_size = 4;
 
-  strcpy(options.dxp_server_ip, "127.0.0.1");
+  HARDBUG((options.dxp_server_ip = bfromcstr("127.0.0.1")) == NULL)
+
   options.dxp_port = 27531;
   options.dxp_initiator = TRUE;
   options.dxp_game_time = 10;
   options.dxp_game_increment = 0.0;
   options.dxp_game_moves = 75;
   options.dxp_games = 1000;
-  strcpy(options.dxp_ballot, "NULL");
+
+  HARDBUG((options.dxp_ballot = bfromcstr("NULL")) == NULL)
+
   options.dxp_annotate_level = 1;
   options.dxp_strict_gameend = FALSE;
-  strcpy(options.dxp_tag, "NULL");
+
+  HARDBUG((options.dxp_tag = bfromcstr("NULL")) == NULL)
 
   options.nthreads = INVALID;
   options.mode = INVALID;
@@ -2117,9 +2154,12 @@ local void parse_parameters(void)
       else if (compat_strcasecmp(parameter_name, "dxp_game_increment") == 0)
       {
         HARDBUG((!isfinite(dvalue)) or (dvalue < 0.0) or (dvalue > 999999.0))
+
         char field[7];
+
         if ((dvalue > 0.0) and (format_dxp_increment(dvalue, field) == 0.0))
-          FATAL("dxp_game_increment rounds to zero in the DXP Fischer request", EXIT_FAILURE)
+          FATAL("dxp_game_increment rounds to zero in the DXP Fischer request",
+                EXIT_FAILURE)
         options.dxp_game_increment = dvalue;
       }
 
@@ -2139,40 +2179,40 @@ local void parse_parameters(void)
       HARDBUG(svalue == NULL)
 
       if (compat_strcasecmp(parameter_name, "hub_version") == 0)
-        strncpy(options.hub_version, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.hub_version, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "overrides") == 0)
-        strncpy(options.overrides, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.overrides, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "network0") == 0)
-        strncpy(options.network0, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.network0, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "network1") == 0)
-        strncpy(options.network1, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.network1, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "book_name") == 0)
-        strncpy(options.book_name, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.book_name, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "egtb_dir") == 0)
-        strncpy(options.egtb_dir, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.egtb_dir, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "egtb_dir_wdl") == 0)
-        strncpy(options.egtb_dir_wdl, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.egtb_dir_wdl, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "egtb_ram") == 0)
-        strncpy(options.egtb_ram, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.egtb_ram, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "egtb_ram_wdl") == 0)
-        strncpy(options.egtb_ram_wdl, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.egtb_ram_wdl, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "dxp_server_ip") == 0)
-        strncpy(options.dxp_server_ip, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.dxp_server_ip, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "dxp_ballot") == 0)
-        strncpy(options.dxp_ballot, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.dxp_ballot, svalue) == BSTR_ERR)
 
       else if (compat_strcasecmp(parameter_name, "dxp_tag") == 0)
-        strncpy(options.dxp_tag, svalue, MY_LINE_MAX);
+        HARDBUG(bassigncstr(options.dxp_tag, svalue) == BSTR_ERR)
 
       else
         PRINTF("ignoring string parameter %s\n", parameter_name);
@@ -2184,6 +2224,7 @@ local void parse_parameters(void)
       HARDBUG(!cJSON_IsBool(cjson_value))
 
       int bvalue = 0;
+
       if (cJSON_IsTrue(cjson_value))
         bvalue = 1;
 
@@ -2234,7 +2275,8 @@ local void load_overrides(void)
 {
   file2cjson(OVERRIDES_JSON, &overrides_json);
 
-  cJSON *overrides = cJSON_GetObjectItem(overrides_json, options.overrides);
+  cJSON *overrides =
+    cJSON_GetObjectItem(overrides_json, bdata(options.overrides));
 
   HARDBUG(!cJSON_IsArray(overrides))
 
@@ -2356,6 +2398,7 @@ local void load_overrides(void)
       else
         FATAL("unknown parameter_type", EXIT_FAILURE)
     }
+
     if (nfound != 1)
     {
       PRINTF("unknown override %s\n", override_name);
@@ -2416,6 +2459,7 @@ local void load_overrides(void)
 
       nfound++;
     }
+
     if (nfound != 1)
     {
       PRINTF("unknown column %s\n", column_name);
@@ -2426,6 +2470,11 @@ local void load_overrides(void)
 
 void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 {
+  BSTRING(header)
+  BSTRING(line)
+  BSTRING(stamp)
+  BSTRING(newpath)
+
   cJSON *cjson_csv = cJSON_GetObjectItem(overrides_json, CJSON_CSV_ID);
 
   HARDBUG(cjson_csv == NULL)
@@ -2444,9 +2493,7 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 
   // header
 
-  char header[MY_LINE_MAX];
-
-  strcpy(header, "version,date");
+  HARDBUG(bassigncstr(header, "version,date") == BSTR_ERR)
 
   cJSON *column;
 
@@ -2456,12 +2503,13 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 
     HARDBUG(!cJSON_IsString(cjson_name))
 
-    strcat(header, ",");
-    strcat(header, cJSON_GetStringValue(cjson_name));
+    HARDBUG(bcatcstr(header, ",") == BSTR_ERR)
+    HARDBUG(bcatcstr(header, cJSON_GetStringValue(cjson_name)) == BSTR_ERR)
   }
-  strcat(header, ",nwon,ndraw,nlost,nunknown\n");
 
-  PRINTF("header=%s", header);
+  HARDBUG(bcatcstr(header, ",nwon,ndraw,nlost,nunknown\n") == BSTR_ERR)
+
+  PRINTF("header=%s", bdata(header));
 
   FILE *fcsv;
 
@@ -2470,10 +2518,11 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
     if ((fcsv = fopen(path, "w")) == NULL)
     {
       PRINTF("WARNING: cannot open file %s!\n", path);
-      return;
+
+      goto label_return;
     }
 
-    HARDBUG(fprintf(fcsv, "%s", header) < 0)
+    HARDBUG(fprintf(fcsv, "%s", bdata(header)) < 0)
   }
   else
   {
@@ -2481,13 +2530,11 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 
     HARDBUG((fcsv = fopen(path, "r")) == NULL)
 
-    char line[MY_LINE_MAX];
-
-    HARDBUG(fgets(line, MY_LINE_MAX, fcsv) == NULL)
+    HARDBUG(!my_breadline(line, fcsv))
 
     FCLOSE(fcsv)
 
-    if (strcmp(line, header) == 0)
+    if (strcmp(bdata(line), bdata(header)) == 0)
     {
       HARDBUG((fcsv = fopen(path, "a")) == NULL)
     }
@@ -2495,35 +2542,29 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
     {
       PRINTF("header has changed!\n");
 
-      char stamp[MY_LINE_MAX];
-
       time_t t = time(NULL);
 
-      HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t)) == 0)
+      my_bstrftime(stamp, "%d%b%Y-%H%M%S", t);
 
-      char newpath[MY_LINE_MAX];
+      HARDBUG(bassignformat(newpath, "%s-%s", path, bdata(stamp)) == BSTR_ERR)
 
-      snprintf(newpath, MY_LINE_MAX, "%s-%s", path, stamp);
+      remove(bdata(newpath));
 
-      remove(newpath);
-
-      HARDBUG(rename(path, newpath) == -1)
+      HARDBUG(rename(path, bdata(newpath)) == -1)
 
       HARDBUG((fcsv = fopen(path, "w")) == NULL)
 
-      HARDBUG(fprintf(fcsv, "%s", header) < 0)
+      HARDBUG(fprintf(fcsv, "%s", bdata(header)) < 0)
     }
   }
 
   HARDBUG(fcsv == NULL)
 
-  char stamp[MY_LINE_MAX];
-
   time_t t = time(NULL);
 
-  HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t)) == 0)
+  my_bstrftime(stamp, "%d%b%Y-%H%M%S", t);
 
-  HARDBUG(fprintf(fcsv, "\"%s\",\"%s\"", REVISION, stamp) < 0)
+  HARDBUG(fprintf(fcsv, "\"%s\",\"%s\"", REVISION, bdata(stamp)) < 0)
 
   cJSON_ArrayForEach(column, columns)
   {
@@ -2618,6 +2659,7 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
       else
         FATAL("unknown parameter_type", EXIT_FAILURE)
     }
+
     if (nfound != 1)
     {
       PRINTF("unknown column %s\n", column_name);
@@ -2627,6 +2669,15 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
   fprintf(fcsv, ",%d,%d,%d,%d\n", arg_nwon, arg_ndraw, arg_nlost, arg_nunknown);
 
   FCLOSE(fcsv)
+
+label_return:
+  BDESTROY(newpath)
+
+  BDESTROY(stamp)
+
+  BDESTROY(line)
+
+  BDESTROY(header)
 }
 
 #define PRINTF_CFG_B(I) \
@@ -2634,7 +2685,7 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 #define PRINTF_CFG_I(I) PRINTF("options." #I "=%d\n", options.I);
 #define PRINTF_CFG_D(D) PRINTF("options." #D "=%.2f\n", options.D);
 #define PRINTF_CFG_I64(I64) PRINTF("options." #I64 "=%lld\n", options.I64);
-#define PRINTF_CFG_S(S) PRINTF("options." #S "=%s\n", options.S);
+#define PRINTF_CFG_S(S) PRINTF("options." #S "=%s\n", bdata(options.S));
 
 int main(int argc, char **argv)
 {
@@ -2645,6 +2696,7 @@ int main(int argc, char **argv)
     PRINTF("could not open '%s'\n", ARGS_TXT);
     exit(EXIT_FAILURE);
   }
+
   for (int iarg = 0; iarg < argc; iarg++)
   {
     if (fprintf(farg, "%d %s\n", iarg, argv[iarg]) < 0)
@@ -2653,6 +2705,7 @@ int main(int argc, char **argv)
       exit(EXIT_FAILURE);
     }
   }
+
   if (fclose(farg) == EOF)
   {
     PRINTF("could not fclose '%s'\n", ARGS_TXT);
@@ -2689,12 +2742,13 @@ int main(int argc, char **argv)
 
   parse_parameters();
 
-  if (compat_strcasecmp(options.hub_version, "NULL") == 0)
+  if (compat_strcasecmp(bdata(options.hub_version), "NULL") == 0)
   {
     PRINTF("required parameter hub_version not found in gwd.json!\n");
     exit(EXIT_FAILURE);
   }
-  if (compat_strcasecmp(options.overrides, "NULL") == 0)
+
+  if (compat_strcasecmp(bdata(options.overrides), "NULL") == 0)
   {
     PRINTF("required parameter overrides not found in gwd.json!\n");
     exit(EXIT_FAILURE);
@@ -2747,20 +2801,25 @@ int main(int argc, char **argv)
 
       cJSON_ArrayForEach(cjson_arg, cjson_args)
       {
+        BSTRING(format)
+        BSTRING(svalue)
+
+        HARDBUG(strlen(argv[iarg]) >= INT_MAX)
+        HARDBUG(balloc(svalue, (int)strlen(argv[iarg]) + 1) == BSTR_ERR)
+
         char *arg = cJSON_GetStringValue(cjson_arg);
 
         HARDBUG(arg == NULL)
 
         if (compat_strcasecmp(parameter_type, "int") == 0)
         {
-          char format[MY_LINE_MAX];
 
-          sprintf(format, "%s=%%d", arg);
+          HARDBUG(bassignformat(format, "%s=%%d", arg) == BSTR_ERR)
 
           int ivalue;
 
-          if (my_sscanf(argv[iarg], format, &ivalue) != 1)
-            continue;
+          if (my_sscanf(argv[iarg], bdata(format), &ivalue) != 1)
+            goto label_next_arg;
 
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -2774,14 +2833,13 @@ int main(int argc, char **argv)
         }
         else if (compat_strcasecmp(parameter_type, "double") == 0)
         {
-          char format[MY_LINE_MAX];
 
-          sprintf(format, "%s=%%lf", arg);
+          HARDBUG(bassignformat(format, "%s=%%lf", arg) == BSTR_ERR)
 
           double dvalue;
 
-          if (my_sscanf(argv[iarg], format, &dvalue) != 1)
-            continue;
+          if (my_sscanf(argv[iarg], bdata(format), &dvalue) != 1)
+            goto label_next_arg;
 
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
@@ -2795,20 +2853,19 @@ int main(int argc, char **argv)
         }
         else if (compat_strcasecmp(parameter_type, "string") == 0)
         {
-          char format[MY_LINE_MAX];
 
-          sprintf(format, "%s=%%s", arg);
+          HARDBUG(bassignformat(format, "%s=%%s", arg) == BSTR_ERR)
 
-          char svalue[MY_LINE_MAX];
+          if (my_sscanf(argv[iarg], bdata(format), bdata(svalue)) != 1)
+            goto label_next_arg;
 
-          if (my_sscanf(argv[iarg], format, svalue) != 1)
-            continue;
+          svalue->slen = (int)strlen(bdata(svalue));
 
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
           HARDBUG(!cJSON_IsString(cjson_value))
 
-          cJSON_SetValuestring(cjson_value, svalue);
+          cJSON_SetValuestring(cjson_value, bdata(svalue));
 
           cJSON_AddBoolToObject(parameter, "cli", TRUE);
 
@@ -2816,22 +2873,21 @@ int main(int argc, char **argv)
         }
         else if (compat_strcasecmp(parameter_type, "bool") == 0)
         {
-          char format[MY_LINE_MAX];
 
-          sprintf(format, "%s=%%s", arg);
+          HARDBUG(bassignformat(format, "%s=%%s", arg) == BSTR_ERR)
 
-          char svalue[MY_LINE_MAX];
+          if (my_sscanf(argv[iarg], bdata(format), bdata(svalue)) != 1)
+            goto label_next_arg;
 
-          if (my_sscanf(argv[iarg], format, svalue) != 1)
-            continue;
+          svalue->slen = (int)strlen(bdata(svalue));
 
           cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
           HARDBUG(!cJSON_IsBool(cjson_value))
 
-          if ((compat_strcasecmp(svalue, "false") == 0) or
-              (compat_strcasecmp(svalue, "off") == 0) or
-              (compat_strcasecmp(svalue, "0") == 0))
+          if ((compat_strcasecmp(bdata(svalue), "false") == 0) or
+              (compat_strcasecmp(bdata(svalue), "off") == 0) or
+              (compat_strcasecmp(bdata(svalue), "0") == 0))
             cJSON_SetBoolValue(cjson_value, 0);
           else
             cJSON_SetBoolValue(cjson_value, 1);
@@ -2840,9 +2896,15 @@ int main(int argc, char **argv)
 
           nfound++;
         }
+      label_next_arg:
+        BDESTROY(svalue)
+
+        BDESTROY(format)
       }
     }
+
     HARDBUG(nfound > 1)
+
     if (nfound == 0)
       break;
 
@@ -2913,11 +2975,13 @@ int main(int argc, char **argv)
 
   PRINTF("physical_cpus=%d\n", physical_cpus);
 
-  char cpu_flags[MY_LINE_MAX];
+  BSTRING(cpu_flags)
 
-  HARDBUG(return_cpu_flags(cpu_flags) != 0)
+  my_bcpu_flags(cpu_flags);
 
-  PRINTF("cpu flags=%s\n", cpu_flags);
+  PRINTF("cpu flags=%s\n", bdata(cpu_flags));
+
+  BDESTROY(cpu_flags)
 
 #ifdef USE_HARDWARE_CRC32
   PRINTF("using HARDWARE crc32\n");
@@ -3213,6 +3277,7 @@ int main(int argc, char **argv)
   if (compat_strcasecmp(argv[iarg], "fen2score") == 0)
   {
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     fen2score(argv[iarg]);
@@ -3220,6 +3285,7 @@ int main(int argc, char **argv)
   else if (compat_strcasecmp(argv[iarg], "solve_problems") == 0)
   {
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     solve_problems(argv[iarg]);
@@ -3234,6 +3300,7 @@ int main(int argc, char **argv)
     char *name = argv[iarg];
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     int mcts_depth;
@@ -3241,6 +3308,7 @@ int main(int argc, char **argv)
     HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     double mcts_time_limit;
@@ -3248,6 +3316,7 @@ int main(int argc, char **argv)
     HARDBUG(my_sscanf(argv[iarg], "%lf", &mcts_time_limit) != 1)
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     int nshoot_outs;
@@ -3262,6 +3331,7 @@ int main(int argc, char **argv)
   else if (compat_strcasecmp(argv[iarg], "solve_problems_multi_threaded") == 0)
   {
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     start_threads();
@@ -3287,6 +3357,7 @@ int main(int argc, char **argv)
   else if (compat_strcasecmp(argv[iarg], "gen_random") == 0)
   {
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     char *fen_name;
@@ -3296,6 +3367,7 @@ int main(int argc, char **argv)
     //
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     i64_t npositions_max;
@@ -3305,6 +3377,7 @@ int main(int argc, char **argv)
     //
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     int nkings_max;
@@ -3314,6 +3387,7 @@ int main(int argc, char **argv)
     //
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     double mcts_time_limit;
@@ -3451,6 +3525,7 @@ int main(int argc, char **argv)
   else if (compat_strcasecmp(argv[iarg], "auto_play") == 0)
   {
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     char *txt_name;
@@ -3458,6 +3533,7 @@ int main(int argc, char **argv)
     txt_name = argv[iarg];
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     i64_t npositions;
@@ -3480,6 +3556,7 @@ int main(int argc, char **argv)
   else if (compat_strcasecmp(argv[iarg], "gen_db") == 0)
   {
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     char *db_name;
@@ -3487,6 +3564,7 @@ int main(int argc, char **argv)
     db_name = argv[iarg];
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     int mcts_depth;
@@ -3494,6 +3572,7 @@ int main(int argc, char **argv)
     HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     i64_t npositions;
@@ -3522,6 +3601,7 @@ int main(int argc, char **argv)
   else if (compat_strcasecmp(argv[iarg], "update_db") == 0)
   {
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     char *db_name;
@@ -3529,6 +3609,7 @@ int main(int argc, char **argv)
     db_name = argv[iarg];
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     int mcts_depth;
@@ -3536,6 +3617,7 @@ int main(int argc, char **argv)
     HARDBUG(my_sscanf(argv[iarg], "%d", &mcts_depth) != 1)
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     int frequency;
@@ -3563,36 +3645,46 @@ int main(int argc, char **argv)
   }
   else if (compat_strcasecmp(argv[iarg], "play_game") == 0)
   {
+    BSTRING(name)
+    BSTRING(colour)
+    BSTRING(line)
+    BSTRING(oldpath)
+    BSTRING(newpath)
+
     // name
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
-    char name[MY_LINE_MAX];
-    HARDBUG(my_sscanf(argv[iarg], "%s", name) != 1)
+    HARDBUG(bassigncstr(name, argv[iarg]) == BSTR_ERR)
 
     // colour
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
-    char colour[MY_LINE_MAX];
-    HARDBUG(my_sscanf(argv[iarg], "%s", colour) != 1)
+    HARDBUG(bassigncstr(colour, argv[iarg]) == BSTR_ERR)
 
     // game_minutes
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     int game_minutes;
+
     HARDBUG(my_sscanf(argv[iarg], "%d", &game_minutes) != 1)
 
     // used_minutes
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     int used_minutes;
+
     HARDBUG(my_sscanf(argv[iarg], "%d", &used_minutes) != 1)
 
     options.mode = GAME_MODE;
@@ -3601,77 +3693,77 @@ int main(int argc, char **argv)
 
     while (TRUE)
     {
-      char line[MY_LINE_MAX];
 
-      if (fexists(name))
+      if (fexists(bdata(name)))
       {
-        PRINTF("\nDo you want to resume the game from %s (y/n)?\n", name);
+        PRINTF("\nDo you want to resume the game from %s (y/n)?\n",
+               bdata(name));
 
-        if (fgets(line, MY_LINE_MAX, stdin) == NULL)
+        if (!my_breadline(line, stdin))
           break;
 
-        CSTRING(canswer, strlen(line))
+        CSTRING(canswer, strlen(bdata(line)))
 
-        if (my_sscanf(line, "%s", canswer) != 1)
+        if (my_sscanf(bdata(line), "%s", canswer) != 1)
           strcpy(canswer, "y");
 
         if (*canswer == 'y')
         {
-          PRINTF("Resuming game from %s\n", name);
+          PRINTF("Resuming game from %s\n", bdata(name));
         }
         else
         {
-          PRINTF("New game %s\n", name);
+          PRINTF("New game %s\n", bdata(name));
 
-          remove(name);
+          remove(bdata(name));
         }
 
         CDESTROY(canswer)
       }
 
-      play_game(name, colour, game_minutes, used_minutes);
+      play_game(bdata(name), bdata(colour), game_minutes, used_minutes);
 
       PRINTF("\nDo you want to play another game (y/n)?\n");
 
-      if (fgets(line, MY_LINE_MAX, stdin) == NULL)
+      if (!my_breadline(line, stdin))
         break;
 
-      CSTRING(canswer, strlen(line))
+      CSTRING(canswer, strlen(bdata(line)))
 
-      if (my_sscanf(line, "%s", canswer) != 1)
+      if (my_sscanf(bdata(line), "%s", canswer) != 1)
       {
         PRINTF("\neh?\n");
+
+        CDESTROY(canswer)
 
         continue;
       }
 
-      char *answer = canswer;
+      int finished = (*canswer == 'n');
 
       CDESTROY(canswer)
 
-      if (*answer == 'n')
+      if (finished)
         break;
 
       for (int ihistory = 10; ihistory > 1; --ihistory)
       {
-        char oldpath[MY_LINE_MAX];
-        char newpath[MY_LINE_MAX];
 
-        snprintf(oldpath, MY_LINE_MAX, "%s-%d", name, ihistory - 1);
-        snprintf(newpath, MY_LINE_MAX, "%s-%d", name, ihistory);
+        HARDBUG(bassignformat(oldpath, "%s-%d", bdata(name), ihistory - 1) ==
+                BSTR_ERR)
+        HARDBUG(bassignformat(newpath, "%s-%d", bdata(name), ihistory) ==
+                BSTR_ERR)
 
-        remove(newpath);
+        remove(bdata(newpath));
 
-        rename(oldpath, newpath);
+        rename(bdata(oldpath), bdata(newpath));
       }
 
-      char newpath[MY_LINE_MAX];
+      HARDBUG(bassignformat(newpath, "%s-1", bdata(name)) == BSTR_ERR)
 
-      snprintf(newpath, MY_LINE_MAX, "%s-1", name);
+      remove(bdata(newpath));
 
-      remove(newpath);
-
-      rename(name, newpath);
+      rename(bdata(name), bdata(newpath));
     }
 
     if (options.nthreads > 1)
@@ -3688,10 +3780,21 @@ int main(int argc, char **argv)
 
     PRINTF("before join\n");
     join_threads();
+
+    BDESTROY(newpath)
+
+    BDESTROY(oldpath)
+
+    BDESTROY(line)
+
+    BDESTROY(colour)
+
+    BDESTROY(name)
   }
   else if (compat_strcasecmp(argv[iarg], "fen2network") == 0)
   {
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     char *fen_name;
@@ -3699,9 +3802,11 @@ int main(int argc, char **argv)
     fen_name = argv[iarg];
 
     iarg++;
+
     HARDBUG(argv[iarg] == NULL)
 
     i64_t npositions;
+
     HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
 
     int memory_slaves = memory * my_mpi_globals.MMG_nslaves;
@@ -3720,6 +3825,7 @@ int main(int argc, char **argv)
   else if (compat_strcasecmp(argv[iarg], "fen2csv") == 0)
   {
     iarg++;
+
     if (argv[iarg] == NULL)
       FATAL("npieces_min argument missing", EXIT_FAILURE)
 
@@ -3728,6 +3834,7 @@ int main(int argc, char **argv)
     HARDBUG(my_sscanf(argv[iarg], "%d", &npieces_min) != 1)
 
     iarg++;
+
     if (argv[iarg] == NULL)
       FATAL("npieces_max argument missing", EXIT_FAILURE)
 
@@ -3738,6 +3845,7 @@ int main(int argc, char **argv)
     //
 
     iarg++;
+
     if (argv[iarg] == NULL)
       FATAL("file argument missing", EXIT_FAILURE)
 
@@ -3840,6 +3948,19 @@ label_hub:
   fin_endgame();
 
   fin_search();
+
+  HARDBUG(bdestroy(options.hub_version) == BSTR_ERR)
+  HARDBUG(bdestroy(options.overrides) == BSTR_ERR)
+  HARDBUG(bdestroy(options.network0) == BSTR_ERR)
+  HARDBUG(bdestroy(options.network1) == BSTR_ERR)
+  HARDBUG(bdestroy(options.book_name) == BSTR_ERR)
+  HARDBUG(bdestroy(options.egtb_dir) == BSTR_ERR)
+  HARDBUG(bdestroy(options.egtb_dir_wdl) == BSTR_ERR)
+  HARDBUG(bdestroy(options.egtb_ram) == BSTR_ERR)
+  HARDBUG(bdestroy(options.egtb_ram_wdl) == BSTR_ERR)
+  HARDBUG(bdestroy(options.dxp_server_ip) == BSTR_ERR)
+  HARDBUG(bdestroy(options.dxp_ballot) == BSTR_ERR)
+  HARDBUG(bdestroy(options.dxp_tag) == BSTR_ERR)
 
   fin_my_malloc(FALSE);
 

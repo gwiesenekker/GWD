@@ -1,4 +1,4 @@
-// SCU REVISION 8.1279 zo 15 nov 2026 16:49:05 CET
+// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
 #include "globals.h"
 #include <stdatomic.h>
 
@@ -253,6 +253,7 @@ local pv_entries_t pv_entries_default;
 local inline void publish_nodes(search_t *search)
 {
   thread_t *thread = search->S_thread;
+
   if (thread != NULL)
     atomic_store_explicit(&thread->T_published_nodes,
                           search->S_total_nodes,
@@ -265,10 +266,13 @@ local i64_t published_global_nodes(search_t *search)
     return search->S_total_nodes;
 
   publish_nodes(search);
+
   i64_t nodes = 0;
+
   for (int i = 0; i < options.nthreads; i++)
     nodes +=
       atomic_load_explicit(&threads[i].T_published_nodes, memory_order_relaxed);
+
   return nodes;
 }
 
@@ -416,6 +420,7 @@ local inline ui64_t abcs2crc64(ui64_t abcs_key, ui64_t abcs_data)
   crc64 ^= crc64 >> 31;
 #else
   ui32_t crc32 = 0xFFFFFFFF;
+
   crc32 = HW_CRC32_U64(crc32, abcs_key);
   crc32 = HW_CRC32_U64(crc32, abcs_data);
   crc64 = ~crc32;
@@ -679,6 +684,7 @@ update_alpha_beta_cache(search_t *arg_with_search,
   for (islot = 0; islot < NABCS_SLOTS; islot++)
   {
     alpha_beta_cache_slot_t abcs_slot;
+
     load_alpha_beta_cache_slot(&abcs_slot,
                                &with_alpha_beta_cache_entry->ABCE_slots[islot]);
 
@@ -702,6 +708,7 @@ update_alpha_beta_cache(search_t *arg_with_search,
   while (islot > 0)
   {
     alpha_beta_cache_slot_t moved;
+
     load_alpha_beta_cache_slot(
       &moved,
       &with_alpha_beta_cache_entry->ABCE_slots[islot - 1]);
@@ -764,6 +771,7 @@ int probe_pv(pv_entries_t *arg_pv, search_t *arg_with_search)
       break;
     }
   }
+
   return (result);
 }
 
@@ -827,6 +835,7 @@ endgame_pv(search_t *arg_with_search, int arg_mate, bstring arg_bpv_string)
 
     return;
   }
+
   if (arg_mate == 0)
   {
     if (options.hub)
@@ -888,6 +897,7 @@ endgame_pv(search_t *arg_with_search, int arg_mate, bstring arg_bpv_string)
         temp_mate = -your_mate - 1;
       else
         temp_mate = -your_mate + 1;
+
       if (best_mate == ENDGAME_UNKNOWN)
       {
         best_mate = temp_mate;
@@ -924,6 +934,7 @@ endgame_pv(search_t *arg_with_search, int arg_mate, bstring arg_bpv_string)
       }
     }
   }
+
   HARDBUG(ibest_move == INVALID)
 
   HARDBUG(best_mate == ENDGAME_UNKNOWN)
@@ -1505,8 +1516,7 @@ local void quiescence(search_t *arg_with_search,
         goto label_return;
       }
 
-      if (search_clock_used(&(arg_with_search->S_timer)) >=
-          options.time_limit)
+      if (search_clock_used(&(arg_with_search->S_timer)) >= options.time_limit)
       {
         if ((arg_with_search->S_best_score < 0) and
             ((arg_with_search->S_best_score - arg_with_search->S_root_score) <
@@ -1531,8 +1541,7 @@ local void quiescence(search_t *arg_with_search,
         }
       }
       // check time_limit again
-      if (search_clock_used(&(arg_with_search->S_timer)) >=
-          options.time_limit)
+      if (search_clock_used(&(arg_with_search->S_timer)) >= options.time_limit)
       {
         *arg_best_score = SCORE_NOT_A_NUMBER;
 
@@ -1636,6 +1645,7 @@ local void quiescence(search_t *arg_with_search,
   }
 
   sort_t sort;
+
   construct_sort(&sort,
                  arg_moves_list->ML_nmoves,
                  &(arg_with_search->S_random),
@@ -2694,8 +2704,7 @@ local void alpha_beta(search_t *arg_with_search,
         goto label_return;
       }
 
-      if (search_clock_used(&(arg_with_search->S_timer)) >=
-          options.time_limit)
+      if (search_clock_used(&(arg_with_search->S_timer)) >= options.time_limit)
       {
         if ((arg_with_search->S_best_score < 0) and
             ((arg_with_search->S_best_score - arg_with_search->S_root_score) <
@@ -2720,8 +2729,7 @@ local void alpha_beta(search_t *arg_with_search,
         }
       }
       // check time_limit again
-      if (search_clock_used(&(arg_with_search->S_timer)) >=
-          options.time_limit)
+      if (search_clock_used(&(arg_with_search->S_timer)) >= options.time_limit)
       {
         construct_search_result(arg_search_result,
                                 SCORE_NOT_A_NUMBER,
@@ -2985,6 +2993,7 @@ local void alpha_beta(search_t *arg_with_search,
   }
 
   sort_t sort_local;
+
   construct_sort(&sort_local, 0, NULL, INVALID);
 
   sort_t *sort = arg_sort;
@@ -3054,6 +3063,7 @@ local void alpha_beta(search_t *arg_with_search,
       HARDBUG(prob_cut_depth < 0)
 
       sort_t prob_cut_sort;
+
       construct_sort(&prob_cut_sort, 0, NULL, INVALID);
       copy_sort(&prob_cut_sort, sort);
 
@@ -3149,6 +3159,7 @@ local void alpha_beta(search_t *arg_with_search,
       HARDBUG(singular_probe_depth < 1)
 
       sort_t singular_sort;
+
       construct_sort(&singular_sort, 0, NULL, INVALID);
       copy_sort(&singular_sort, sort);
 
@@ -3340,6 +3351,7 @@ label_store:
       alpha_beta_cache_slot.ABCS_moves[imove] = INVALID;
 
     int nmoves = NABCS_MOVES;
+
     if (arg_moves_list->ML_nmoves < nmoves)
       nmoves = arg_moves_list->ML_nmoves;
 
@@ -3441,8 +3453,9 @@ void do_pv(search_t *arg_with_search,
   }
 
   // A displayed PV must not open DTM files on the playing clock.
-  int temp_mate = (arg_with_search->S_dtm_policy != DTM_ROOT_AND_PV) ? ENDGAME_UNKNOWN :
-                  read_endgame(arg_with_search, NULL);
+  int temp_mate = (arg_with_search->S_dtm_policy != DTM_ROOT_AND_PV)
+                    ? ENDGAME_UNKNOWN
+                    : read_endgame(arg_with_search, NULL);
 
   if (temp_mate != ENDGAME_UNKNOWN)
   {
@@ -3473,6 +3486,7 @@ void do_pv(search_t *arg_with_search,
       }
       endgame_pv(arg_with_search, temp_mate, arg_bpv_string);
     }
+
     return;
   }
 
@@ -3559,6 +3573,7 @@ local void print_pv(search_t *arg_with_search,
   if (options.hub)
   {
     i64_t global_nodes = published_global_nodes(arg_with_search);
+
     bformata(bpv_string,
              "depth=%d score=%.3f time=%.2f nps=%.2f pv=\"%s",
              arg_my_depth,
@@ -3640,6 +3655,7 @@ local int pv_equal(search_t *arg_with_search,
       return (TRUE);
 
     arg_jmove = 0;
+
     int kmove = 0;
 
     if (arg_moves_list->ML_nmoves > 1)
@@ -3730,6 +3746,7 @@ void do_search(search_t *arg_with_search,
 
   if (arg_depth_min == INVALID)
     arg_depth_min = 1;
+
   if (arg_depth_max == INVALID)
     arg_depth_max = options.depth_limit;
 
@@ -3741,14 +3758,15 @@ void do_search(search_t *arg_with_search,
   reset_my_timer(&(arg_with_search->S_timer));
 
   sort_t sort;
+
   construct_sort(&sort, arg_moves_list->ML_nmoves, arg_shuffle, INVALID);
 
   // check for known endgame
 
   // Under a short Hub clock queue missing DTMs and use WDL while they open.
   int short_clock = (arg_with_search->S_dtm_policy == DTM_ROOT_IF_OPEN);
-  int egtb_mate = short_clock ? read_endgame_if_open(arg_with_search) :
-                   read_endgame(arg_with_search, NULL);
+  int egtb_mate = short_clock ? read_endgame_if_open(arg_with_search)
+                              : read_endgame(arg_with_search, NULL);
 
   if (egtb_mate != ENDGAME_UNKNOWN)
   {
@@ -3761,8 +3779,8 @@ void do_search(search_t *arg_with_search,
     arg_with_search->S_best_score = SCORE(SCORE_MINUS_INFINITY);
 
     int your_mate = INVALID;
-    int optimal_child_mate = (egtb_mate == INVALID) ? INVALID :
-                             ((egtb_mate > 0) ? 1 : -1) - egtb_mate;
+    int optimal_child_mate =
+      (egtb_mate == INVALID) ? INVALID : ((egtb_mate > 0) ? 1 : -1) - egtb_mate;
 
     reset_sort(&sort, 0);
 
@@ -3778,8 +3796,9 @@ void do_search(search_t *arg_with_search,
 
       const char *dtm_missing_name;
 
-      int temp_mate = short_clock ? read_endgame_if_open(arg_with_search) :
-                      read_endgame(arg_with_search, &dtm_missing_name);
+      int temp_mate = short_clock
+                        ? read_endgame_if_open(arg_with_search)
+                        : read_endgame(arg_with_search, &dtm_missing_name);
 
       if (temp_mate == ENDGAME_UNKNOWN)
       {
@@ -3843,9 +3862,11 @@ void do_search(search_t *arg_with_search,
       for (int idebug = 0; idebug < arg_moves_list->ML_nmoves; idebug++)
       {
         int ndebug = 0;
+
         for (int jdebug = 0; jdebug < arg_moves_list->ML_nmoves; jdebug++)
           if (sort.S_array[jdebug] == idebug)
             ++ndebug;
+
         HARDBUG(ndebug != 1)
       }
 #endif
@@ -3883,7 +3904,8 @@ void do_search(search_t *arg_with_search,
                          bdata(bmove_string)) == BSTR_ERR)
       }
 
-      if ((your_mate != INVALID) and (arg_with_search->S_dtm_policy == DTM_ROOT_AND_PV))
+      if ((your_mate != INVALID) and
+          (arg_with_search->S_dtm_policy == DTM_ROOT_AND_PV))
       {
         do_move(&(arg_with_search->S_board), sort.S_array[0], arg_moves_list);
 
@@ -4024,6 +4046,7 @@ void do_search(search_t *arg_with_search,
         }
       }
     }
+
     BDESTROY(bmessage)
 
     BDESTROY(bmove_string)
@@ -4274,6 +4297,7 @@ void do_search(search_t *arg_with_search,
                      move_score,
                      &(temp_result.SR_pv),
                      "==");
+
             break;
           }
         }
@@ -4361,9 +4385,11 @@ void do_search(search_t *arg_with_search,
         for (int idebug = 0; idebug < arg_moves_list->ML_nmoves; idebug++)
         {
           int ndebug = 0;
+
           for (int jdebug = 0; jdebug < arg_moves_list->ML_nmoves; jdebug++)
             if (sort.S_array[jdebug] == idebug)
               ++ndebug;
+
           HARDBUG(ndebug != 1)
         }
 
@@ -4372,6 +4398,7 @@ void do_search(search_t *arg_with_search,
 
       if (IS_SCORE_WON(arg_with_search->S_best_score))
         goto label_limit;
+
       if (IS_SCORE_LOST(arg_with_search->S_best_score))
         goto label_limit;
 
@@ -4447,11 +4474,11 @@ label_limit:
                 my_depth,
                 arg_with_search->S_best_depth);
 
-      char stamp[MY_LINE_MAX];
+      BSTRING(stamp)
 
       time_t t = time(NULL);
 
-      HARDBUG(strftime(stamp, MY_LINE_MAX, "%d%b%Y-%H%M%S", localtime(&t)) == 0)
+      my_bstrftime(stamp, "%d%b%Y-%H%M%S", t);
 
       FILE *fbugs;
 
@@ -4460,7 +4487,7 @@ label_limit:
       fprintf(fbugs,
               "%s %s %s bs=" PRINTF_SCORE_T " bm=%s md=%d bd=%d\n",
               bdata(bfen),
-              stamp,
+              bdata(stamp),
               REVISION,
               SCORE2PRINTF(arg_with_search->S_best_score),
               bdata(bmove_string),
@@ -4468,6 +4495,8 @@ label_limit:
               arg_with_search->S_best_depth);
 
       FCLOSE(fbugs)
+
+      BDESTROY(stamp)
 
       BDESTROY(bmove_string)
 
@@ -4631,6 +4660,7 @@ void init_search(void)
     alpha_beta_cache_slot_default.ABCS_key = 0;
     alpha_beta_cache_slot_default.ABCS_depth = 0;
     alpha_beta_cache_slot_default.ABCS_flags = 0;
+
     for (int imove = 0; imove < NABCS_MOVES; imove++)
       alpha_beta_cache_slot_default.ABCS_moves[imove] = INVALID;
     alpha_beta_cache_slot_default.ABCS_score = SCORE(SCORE_MINUS_INFINITY);
