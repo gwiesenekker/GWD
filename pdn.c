@@ -278,14 +278,14 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
 
       update_bucket(&bucket_nmen, BIT_COUNT(with_board->B_black_men_bb));
 
-      for (int i = 1; i <= 50; ++i)
+      for (int isquare = 1; isquare <= 50; ++isquare)
       {
-        int ifield = square2field[i];
+        int ifield = square2field[isquare];
 
         if (with_board->B_black_men_bb & BITULL(ifield))
         {
           update_bucket(bucket_rows + BIT_COUNT(with_board->B_black_men_bb),
-                        (i - 1) / 5);
+                        (isquare - 1) / 5);
         }
       }
 

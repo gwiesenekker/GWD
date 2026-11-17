@@ -28,25 +28,25 @@ local dtm_policy_t go_dtm_policy(int arg_message_id)
 
 /* The previous search may still be unwinding. Acknowledge GO only after
  * its final publication, before any work for the new search is dispatched. */
-local void start_search_workers(int arg_go, const char *description)
+local void start_search_workers(int arg_go, const char *arg_description)
 {
-  for (int i = 1; i < options.nthreads; i++)
+  for (int ithread = 1; ithread < options.nthreads; ithread++)
   {
-    atomic_store_explicit(&threads[i].T_nodes_ready,
+    atomic_store_explicit(&threads[ithread].T_nodes_ready,
                           FALSE,
                           memory_order_relaxed);
-    enqueue(return_thread_queue(threads + i), arg_go, description);
+    enqueue(return_thread_queue(threads + ithread), arg_go, arg_description);
   }
 
-  for (int i = 1; i < options.nthreads; i++)
-    while (
-      !atomic_load_explicit(&threads[i].T_nodes_ready, memory_order_acquire))
+  for (int ithread = 1; ithread < options.nthreads; ithread++)
+    while (!atomic_load_explicit(&threads[ithread].T_nodes_ready,
+                                 memory_order_acquire))
       HARDBUG(compat_sleep(CENTI_SECOND) != 0)
 }
 
-local void solve_problems(void *self, const char *arg_name)
+local void solve_problems(void *arg_self, const char *arg_name)
 {
-  thread_t *arg_with_thread = self;
+  thread_t *arg_with_thread = arg_self;
 
   FILE *ftmp;
 
@@ -169,9 +169,9 @@ local void solve_problems(void *self, const char *arg_name)
   BDESTROY(btext)
 }
 
-local void thread_func_alpha_beta_master(void *self)
+local void thread_func_alpha_beta_master(void *arg_self)
 {
-  thread_t *arg_with_thread = self;
+  thread_t *arg_with_thread = arg_self;
 
   // wait for message
 
@@ -713,9 +713,9 @@ local void thread_func_alpha_beta_slave(thread_t *arg_with_thread)
   END_BLOCK
 }
 
-local void *thread_func(void *self)
+local void *thread_func(void *arg_self)
 {
-  thread_t *arg_with_thread = self;
+  thread_t *arg_with_thread = arg_self;
 
   my_printf(&(arg_with_thread->T_my_printf),
             "thread=%p pthread_self=%#lX\n",
@@ -768,9 +768,9 @@ local void *thread_func(void *self)
   return (NULL);
 }
 
-local void create_thread(void *self, int arg_role)
+local void create_thread(void *arg_self, int arg_role)
 {
-  thread_t *arg_with_thread = self;
+  thread_t *arg_with_thread = arg_self;
 
   arg_with_thread->thread_role = arg_role;
 
@@ -783,7 +783,7 @@ local void create_thread(void *self, int arg_role)
 
   BSTRING(queue_name)
 
-  HARDBUG(bformata(queue_name, "thread-%p", self) == BSTR_ERR)
+  HARDBUG(bformata(queue_name, "thread-%p", arg_self) == BSTR_ERR)
 
   construct_queue(&(arg_with_thread->T_queue),
                   bdata(queue_name),
@@ -801,9 +801,9 @@ local void create_thread(void *self, int arg_role)
                                arg_with_thread) != 0)
 }
 
-queue_t *return_thread_queue(void *self)
+queue_t *return_thread_queue(void *arg_self)
 {
-  thread_t *arg_with_thread = self;
+  thread_t *arg_with_thread = arg_self;
 
   if (arg_with_thread == NULL)
     return (NULL);

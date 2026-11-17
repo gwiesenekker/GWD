@@ -62,35 +62,35 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
   HARDBUG(balloc(arg_output, 128 + blength(arg_with_dxp->DXP_move_string)) ==
           BSTR_ERR)
 
-  char *arg_buffer = bdata(arg_output);
+  char *buffer = bdata(arg_output);
 
   *arg_nbuffer = 0;
 
   if ((arg_type == DXP_GAMEREQ) or (arg_type == DXP_FISCHER))
   {
-    int i = 0;
+    int ibuffer = 0;
 
-    arg_buffer[i] = arg_type;
-    i++;
+    buffer[ibuffer] = arg_type;
+    ibuffer++;
 
-    strcpy(arg_buffer + i, "01");
-    i += 2;
+    strcpy(buffer + ibuffer, "01");
+    ibuffer += 2;
 
     //                  01234567890123456789012345678901
 
-    strncpy(arg_buffer + i, bdata(my_name), 32);
+    strncpy(buffer + ibuffer, bdata(my_name), 32);
 
-    i += 32;
+    ibuffer += 32;
 
     if (IS_WHITE(arg_with_dxp->DXP_game_colour))
     {
-      arg_buffer[i] = 'Z';
+      buffer[ibuffer] = 'Z';
     }
     else
     {
-      arg_buffer[i] = 'W';
+      buffer[ibuffer] = 'W';
     }
-    i++;
+    ibuffer++;
 
     double game_time = options.dxp_game_time * 60.0;
     double increment = 0.0;
@@ -100,16 +100,16 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
     {
       HARDBUG((game_time < 0.0) or (game_time > 999999.0))
 
-      snprintf(arg_buffer + i, 7, "%06d", (int)game_time);
-      i += 6;
+      snprintf(buffer + ibuffer, 7, "%06d", (int)game_time);
+      ibuffer += 6;
 
       // Configure our clock with the same precision as the wire field.
       increment =
-        format_dxp_increment(options.dxp_game_increment, arg_buffer + i);
+        format_dxp_increment(options.dxp_game_increment, buffer + ibuffer);
 
       HARDBUG(increment == 0.0)
 
-      i += 6;
+      ibuffer += 6;
       moves = INVALID;
     }
     else
@@ -117,8 +117,8 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
       HARDBUG((options.dxp_game_time < 0) or (options.dxp_game_time > 999))
       HARDBUG((moves < 0) or (moves > 999))
 
-      snprintf(arg_buffer + i, 7, "%03d%03d", options.dxp_game_time, moves);
-      i += 6;
+      snprintf(buffer + ibuffer, 7, "%03d%03d", options.dxp_game_time, moves);
+      ibuffer += 6;
     }
     configure_time_control(game_time,
                            moves,
@@ -126,87 +126,87 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
                            TIME_HORIZON_PADDED,
                            &arg_with_dxp->DXP_time_control);
 
-    strcpy(arg_buffer + i, "B");
-    i++;
+    strcpy(buffer + ibuffer, "B");
+    ibuffer++;
 
     if (IS_WHITE(arg_with_dxp->DXP_search.S_board.B_colour2move))
     {
-      strcpy(arg_buffer + i, "W");
-      i++;
+      strcpy(buffer + ibuffer, "W");
+      ibuffer++;
     }
     else
     {
-      strcpy(arg_buffer + i, "Z");
-      i++;
+      strcpy(buffer + ibuffer, "Z");
+      ibuffer++;
     }
 
-    for (int j = 1; j <= 50; ++j)
+    for (int isquare = 1; isquare <= 50; ++isquare)
     {
-      int jfield = square2field[j];
+      int jfield = square2field[isquare];
 
       if (arg_with_dxp->DXP_search.S_board.B_white_men_bb & BITULL(jfield))
       {
-        strcpy(arg_buffer + i, "w");
-        i++;
+        strcpy(buffer + ibuffer, "w");
+        ibuffer++;
       }
       else if (arg_with_dxp->DXP_search.S_board.B_white_kings_bb &
                BITULL(jfield))
       {
-        strcpy(arg_buffer + i, "W");
-        i++;
+        strcpy(buffer + ibuffer, "W");
+        ibuffer++;
       }
       else if (arg_with_dxp->DXP_search.S_board.B_black_men_bb & BITULL(jfield))
       {
-        strcpy(arg_buffer + i, "z");
-        i++;
+        strcpy(buffer + ibuffer, "z");
+        ibuffer++;
       }
       else if (arg_with_dxp->DXP_search.S_board.B_black_kings_bb &
                BITULL(jfield))
       {
-        strcpy(arg_buffer + i, "Z");
-        i++;
+        strcpy(buffer + ibuffer, "Z");
+        ibuffer++;
       }
       else
       {
-        strcpy(arg_buffer + i, "e");
-        i++;
+        strcpy(buffer + ibuffer, "e");
+        ibuffer++;
       }
     }
 
-    arg_buffer[i] = '\0';
-    i++;
+    buffer[ibuffer] = '\0';
+    ibuffer++;
 
-    *arg_nbuffer = i;
+    *arg_nbuffer = ibuffer;
 
-    PRINTF("DXP_GAMEREQ buffer=%s nbuffer=%d\n", arg_buffer, *arg_nbuffer);
+    PRINTF("DXP_GAMEREQ buffer=%s nbuffer=%d\n", buffer, *arg_nbuffer);
   }
   else if (arg_type == DXP_GAMEACC)
   {
-    int i = 0;
+    int ibuffer = 0;
 
-    arg_buffer[i] = DXP_GAMEACC;
-    i++;
+    buffer[ibuffer] = DXP_GAMEACC;
+    ibuffer++;
 
     //                  01234567890123456789012345678901
-    strncpy(arg_buffer + i, bdata(my_name), 32);
-    i += 32;
+    strncpy(buffer + ibuffer, bdata(my_name), 32);
+    ibuffer += 32;
 
-    arg_buffer[i] = '0';
-    i++;
+    buffer[ibuffer] = '0';
+    ibuffer++;
 
-    arg_buffer[i] = '\0';
-    i++;
+    buffer[ibuffer] = '\0';
+    ibuffer++;
 
-    *arg_nbuffer = i;
+    *arg_nbuffer = ibuffer;
 
-    PRINTF("DXP_GAMEACC buffer=%s nbuffer=%d\n", arg_buffer, *arg_nbuffer);
+    PRINTF("DXP_GAMEACC buffer=%s nbuffer=%d\n", buffer, *arg_nbuffer);
   }
   else if (arg_type == DXP_MOVE)
   {
-    int i = 0;
+    int ibuffer = 0;
 
-    arg_buffer[i] = DXP_MOVE;
-    i++;
+    buffer[ibuffer] = DXP_MOVE;
+    ibuffer++;
 
     BSTRING(string)
 
@@ -217,73 +217,79 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
                                       &arg_with_dxp->DXP_time_control)))) ==
             BSTR_ERR)
 
-    strcpy(arg_buffer + i, bdata(string));
-    i += 4;
+    strcpy(buffer + ibuffer, bdata(string));
+    ibuffer += 4;
 
     // ugly
 
-    int j = 0;
+    int imove_char = 0;
 
-    strncpy(arg_buffer + i, bdata(arg_with_dxp->DXP_move_string) + j, 2);
-    j += 3;
-    i += 2;
+    strncpy(buffer + ibuffer,
+            bdata(arg_with_dxp->DXP_move_string) + imove_char,
+            2);
+    imove_char += 3;
+    ibuffer += 2;
 
-    strncpy(arg_buffer + i, bdata(arg_with_dxp->DXP_move_string) + j, 2);
-    j += 2;
-    i += 2;
+    strncpy(buffer + ibuffer,
+            bdata(arg_with_dxp->DXP_move_string) + imove_char,
+            2);
+    imove_char += 2;
+    ibuffer += 2;
 
-    int n = 0;
-    int k = j;
+    int ncaptures = 0;
+    int icapture_char = imove_char;
 
-    while (bdata(arg_with_dxp->DXP_move_string)[k] == 'x')
+    while (bdata(arg_with_dxp->DXP_move_string)[icapture_char] == 'x')
     {
-      n++;
-      k += 3;
+      ncaptures++;
+      icapture_char += 3;
     }
 
-    HARDBUG(bassignformat(string, "%02d", n) == BSTR_ERR)
+    HARDBUG(bassignformat(string, "%02d", ncaptures) == BSTR_ERR)
 
-    strcpy(arg_buffer + i, bdata(string));
-    i += 2;
+    strcpy(buffer + ibuffer, bdata(string));
+    ibuffer += 2;
 
-    k = j;
+    icapture_char = imove_char;
 
-    while (bdata(arg_with_dxp->DXP_move_string)[k] == 'x')
+    while (bdata(arg_with_dxp->DXP_move_string)[icapture_char] == 'x')
     {
-      k++;
-      strncpy(arg_buffer + i, bdata(arg_with_dxp->DXP_move_string) + k, 2);
-      k += 2;
-      i += 2;
+      icapture_char++;
+      strncpy(buffer + ibuffer,
+              bdata(arg_with_dxp->DXP_move_string) + icapture_char,
+              2);
+      icapture_char += 2;
+      ibuffer += 2;
     }
 
-    arg_buffer[i] = '\0';
-    i++;
+    buffer[ibuffer] = '\0';
+    ibuffer++;
 
     BDESTROY(string)
 
-    *arg_nbuffer = i;
+    *arg_nbuffer = ibuffer;
 
-    PRINTF("DXP_MOVE buffer=%s nbuffer=%d\n", arg_buffer, *arg_nbuffer);
+    PRINTF("DXP_MOVE buffer=%s nbuffer=%d\n", buffer, *arg_nbuffer);
   }
   else if (arg_type == DXP_GAMEEND)
   {
-    int i = 0;
+    int ibuffer = 0;
 
-    arg_buffer[i] = DXP_GAMEEND;
-    i++;
+    buffer[ibuffer] = DXP_GAMEEND;
+    ibuffer++;
 
-    arg_buffer[i] = arg_with_dxp->DXP_game_code;
-    i++;
+    buffer[ibuffer] = arg_with_dxp->DXP_game_code;
+    ibuffer++;
 
-    arg_buffer[i] = '0';
-    i++;
+    buffer[ibuffer] = '0';
+    ibuffer++;
 
-    arg_buffer[i] = '\0';
-    i++;
+    buffer[ibuffer] = '\0';
+    ibuffer++;
 
-    *arg_nbuffer = i;
+    *arg_nbuffer = ibuffer;
 
-    PRINTF("DXP_GAMEEND buffer=%s nbuffer=%d\n", arg_buffer, *arg_nbuffer);
+    PRINTF("DXP_GAMEEND buffer=%s nbuffer=%d\n", buffer, *arg_nbuffer);
   }
   else if (arg_type == DXP_CHAT)
   {
@@ -304,37 +310,37 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
   arg_output->slen = *arg_nbuffer - 1;
 }
 
-char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
+char decode(int arg_nbuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
 {
-  HARDBUG(arg_nhuffer < 1)
+  HARDBUG(arg_nbuffer < 1)
 
   // buffer[nbuffer] = '\0';
-  PRINTF("decode nbuffer=%d buffer=%s\n", arg_nhuffer, arg_buffer);
+  PRINTF("decode nbuffer=%d buffer=%s\n", arg_nbuffer, arg_buffer);
 
   if ((arg_buffer[0] == DXP_GAMEREQ) or (arg_buffer[0] == DXP_FISCHER))
   {
     // ignore version
 
-    int i = 3;
+    int ibuffer = 3;
 
     BSTRING(string)
 
     HARDBUG(bassigncstr(string, "?") == BSTR_ERR)
     HARDBUG(bpattern(string, 51) == BSTR_ERR)
 
-    HARDBUG((i + 31) >= arg_nhuffer)
+    HARDBUG((ibuffer + 31) >= arg_nbuffer)
 
-    HARDBUG(bassignblk(your_name, arg_buffer + i, 32) == BSTR_ERR)
+    HARDBUG(bassignblk(your_name, arg_buffer + ibuffer, 32) == BSTR_ERR)
 
     PRINTF("your_name=%s\n", bdata(your_name));
 
-    i += 32;
+    ibuffer += 32;
 
-    HARDBUG(i >= arg_nhuffer)
+    HARDBUG(ibuffer >= arg_nbuffer)
 
-    char game_colour = arg_buffer[i];
+    char game_colour = arg_buffer[ibuffer];
 
-    i++;
+    ibuffer++;
 
     PRINTF("game_colour=%c\n", game_colour);
 
@@ -348,29 +354,29 @@ char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
 
     if (arg_buffer[0] == DXP_FISCHER)
     {
-      HARDBUG((i + 12) >= arg_nhuffer)
-      HARDBUG(my_sscanf(arg_buffer + i, "%6lf", &game_time) != 1)
+      HARDBUG((ibuffer + 12) >= arg_nbuffer)
+      HARDBUG(my_sscanf(arg_buffer + ibuffer, "%6lf", &game_time) != 1)
 
-      i += 6;
+      ibuffer += 6;
 
-      HARDBUG(my_sscanf(arg_buffer + i, "%6lf", &increment) != 1)
+      HARDBUG(my_sscanf(arg_buffer + ibuffer, "%6lf", &increment) != 1)
 
-      i += 6;
+      ibuffer += 6;
       moves = INVALID;
     }
     else
     {
       int minutes;
 
-      HARDBUG((i + 6) >= arg_nhuffer)
-      HARDBUG(my_sscanf(arg_buffer + i, "%3d", &minutes) != 1)
+      HARDBUG((ibuffer + 6) >= arg_nbuffer)
+      HARDBUG(my_sscanf(arg_buffer + ibuffer, "%3d", &minutes) != 1)
 
-      i += 3;
+      ibuffer += 3;
 
-      HARDBUG(my_sscanf(arg_buffer + i, "%3d", &moves) != 1)
+      HARDBUG(my_sscanf(arg_buffer + ibuffer, "%3d", &moves) != 1)
       HARDBUG(moves < 0)
 
-      i += 3;
+      ibuffer += 3;
       game_time = minutes * 60.0;
       increment = 0.0;
     }
@@ -384,43 +390,43 @@ char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
                            TIME_HORIZON_PADDED,
                            &arg_with_dxp->DXP_time_control);
 
-    HARDBUG(i >= arg_nhuffer)
+    HARDBUG(ibuffer >= arg_nbuffer)
 
-    if (arg_buffer[i] == 'A')
+    if (arg_buffer[ibuffer] == 'A')
     {
       PRINTF("starting position\n");
 
       string2board(&(arg_with_dxp->DXP_search.S_board), STARTING_POSITION);
     }
-    else if (arg_buffer[i] == 'B')
+    else if (arg_buffer[ibuffer] == 'B')
     {
-      i++;
+      ibuffer++;
 
-      HARDBUG(i >= arg_nhuffer)
+      HARDBUG(ibuffer >= arg_nbuffer)
 
-      if (arg_buffer[i] == 'W')
+      if (arg_buffer[ibuffer] == 'W')
         bdata(string)[0] = 'w';
-      else if (arg_buffer[i] == 'Z')
+      else if (arg_buffer[ibuffer] == 'Z')
         bdata(string)[0] = 'b';
       else
         FATAL("error in B/colour2move", EXIT_FAILURE)
 
-      for (int j = 1; j <= 50; j++)
+      for (int isquare = 1; isquare <= 50; isquare++)
       {
-        i++;
+        ibuffer++;
 
-        HARDBUG(i >= arg_nhuffer)
+        HARDBUG(ibuffer >= arg_nbuffer)
 
-        if (arg_buffer[i] == 'e')
-          bdata(string)[j] = *nn;
-        else if (arg_buffer[i] == 'w')
-          bdata(string)[j] = *wO;
-        else if (arg_buffer[i] == 'z')
-          bdata(string)[j] = *bO;
-        else if (arg_buffer[i] == 'W')
-          bdata(string)[j] = *wX;
-        else if (arg_buffer[i] == 'Z')
-          bdata(string)[j] = *bX;
+        if (arg_buffer[ibuffer] == 'e')
+          bdata(string)[isquare] = *nn;
+        else if (arg_buffer[ibuffer] == 'w')
+          bdata(string)[isquare] = *wO;
+        else if (arg_buffer[ibuffer] == 'z')
+          bdata(string)[isquare] = *bO;
+        else if (arg_buffer[ibuffer] == 'W')
+          bdata(string)[isquare] = *wX;
+        else if (arg_buffer[ibuffer] == 'Z')
+          bdata(string)[isquare] = *bX;
         else
           FATAL("error in B/position", EXIT_FAILURE)
       }
@@ -444,19 +450,19 @@ char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
   }
   else if (arg_buffer[0] == DXP_GAMEACC)
   {
-    int i = 1;
+    int ibuffer = 1;
 
-    HARDBUG((i + 31) >= arg_nhuffer)
+    HARDBUG((ibuffer + 31) >= arg_nbuffer)
 
-    HARDBUG(bassignblk(your_name, arg_buffer + i, 32) == BSTR_ERR)
+    HARDBUG(bassignblk(your_name, arg_buffer + ibuffer, 32) == BSTR_ERR)
 
     PRINTF("your_name=%s\n", bdata(your_name));
 
-    i += 32;
+    ibuffer += 32;
 
-    HARDBUG(i >= arg_nhuffer)
+    HARDBUG(ibuffer >= arg_nbuffer)
 
-    char code = arg_buffer[i];
+    char code = arg_buffer[ibuffer];
 
     PRINTF("acceptance code=%c\n", code);
 
@@ -466,52 +472,53 @@ char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
   {
     // ignore time
 
-    int i = 5;
+    int ibuffer = 5;
 
-    int f;
+    int from_field;
 
-    HARDBUG(i >= arg_nhuffer)
-    HARDBUG(my_sscanf(arg_buffer + i, "%2d", &f) != 1)
-    HARDBUG(f < 1)
-    HARDBUG(f > 50)
+    HARDBUG(ibuffer >= arg_nbuffer)
+    HARDBUG(my_sscanf(arg_buffer + ibuffer, "%2d", &from_field) != 1)
+    HARDBUG(from_field < 1)
+    HARDBUG(from_field > 50)
 
-    PRINTF("f=%d\n", f);
-    f = square2field[f];
+    PRINTF("f=%d\n", from_field);
+    from_field = square2field[from_field];
 
-    i += 2;
+    ibuffer += 2;
 
-    int t;
+    int to_field;
 
-    HARDBUG(i >= arg_nhuffer)
-    HARDBUG(my_sscanf(arg_buffer + i, "%2d", &t) != 1)
-    HARDBUG(t < 1)
-    HARDBUG(t > 50)
+    HARDBUG(ibuffer >= arg_nbuffer)
+    HARDBUG(my_sscanf(arg_buffer + ibuffer, "%2d", &to_field) != 1)
+    HARDBUG(to_field < 1)
+    HARDBUG(to_field > 50)
 
-    PRINTF("t=%d\n", t);
-    t = square2field[t];
-    i += 2;
+    PRINTF("t=%d\n", to_field);
+    to_field = square2field[to_field];
+    ibuffer += 2;
 
-    int n;
+    int ncaptures;
 
-    HARDBUG(i >= arg_nhuffer)
-    HARDBUG(my_sscanf(arg_buffer + i, "%2d", &n) != 1)
-    HARDBUG(n > NPIECES_MAX)
+    HARDBUG(ibuffer >= arg_nbuffer)
+    HARDBUG(my_sscanf(arg_buffer + ibuffer, "%2d", &ncaptures) != 1)
+    HARDBUG(ncaptures > NPIECES_MAX)
 
-    PRINTF("n=%d\n", n);
-    i += 2;
+    PRINTF("n=%d\n", ncaptures);
+    ibuffer += 2;
 
-    int c[NPIECES_MAX];
+    int capture_fields[NPIECES_MAX];
 
-    for (int j = 0; j < n; j++)
+    for (int icapture = 0; icapture < ncaptures; icapture++)
     {
-      HARDBUG(i >= arg_nhuffer)
-      HARDBUG(my_sscanf(arg_buffer + i, "%2d", c + j) != 1)
-      HARDBUG(c[j] < 1)
-      HARDBUG(c[j] > 50)
+      HARDBUG(ibuffer >= arg_nbuffer)
+      HARDBUG(
+        my_sscanf(arg_buffer + ibuffer, "%2d", capture_fields + icapture) != 1)
+      HARDBUG(capture_fields[icapture] < 1)
+      HARDBUG(capture_fields[icapture] > 50)
 
-      PRINTF("j=%d c[j]=%d\n", j, c[j]);
-      c[j] = square2field[c[j]];
-      i += 2;
+      PRINTF("j=%d c[j]=%d\n", icapture, capture_fields[icapture]);
+      capture_fields[icapture] = square2field[capture_fields[icapture]];
+      ibuffer += 2;
     }
 
     moves_list_t moves_list;
@@ -522,7 +529,7 @@ char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
 
     HARDBUG(moves_list.ML_nmoves == 0)
 
-    HARDBUG(n != moves_list.ML_ncaptx)
+    HARDBUG(ncaptures != moves_list.ML_ncaptx)
 
     int jmove = INVALID;
 
@@ -534,10 +541,10 @@ char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
       int kfield = move->M_move_to;
       ui64_t captures_bb = move->M_captures_bb;
 
-      if (ifield != f)
+      if (ifield != from_field)
         continue;
 
-      if (kfield != t)
+      if (kfield != to_field)
         continue;
 
       if (captures_bb == 0)
@@ -546,27 +553,27 @@ char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
       }
       else
       {
-        int m = 0;
+        int nmatches = 0;
 
         while (captures_bb != 0)
         {
           int jfield = BIT_CTZ(captures_bb);
 
-          m = 0;
+          nmatches = 0;
 
-          for (int j = 0; j < n; j++)
-            if (c[j] == jfield)
-              m++;
+          for (int icapture = 0; icapture < ncaptures; icapture++)
+            if (capture_fields[icapture] == jfield)
+              nmatches++;
 
-          if (m == 0)
+          if (nmatches == 0)
             break;
 
-          HARDBUG(m != 1)
+          HARDBUG(nmatches != 1)
 
           captures_bb &= ~BITULL(jfield);
         }
 
-        if (m == 1)
+        if (nmatches == 1)
         {
           jmove = imove;
         }
@@ -589,19 +596,19 @@ char decode(int arg_nhuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
   }
   else if (arg_buffer[0] == DXP_GAMEEND)
   {
-    int i = 1;
+    int ibuffer = 1;
 
-    HARDBUG(i >= arg_nhuffer)
+    HARDBUG(ibuffer >= arg_nbuffer)
 
-    PRINTF("reason=%c\n", arg_buffer[i]);
+    PRINTF("reason=%c\n", arg_buffer[ibuffer]);
 
-    arg_with_dxp->DXP_game_code = arg_buffer[i];
+    arg_with_dxp->DXP_game_code = arg_buffer[ibuffer];
 
-    i++;
+    ibuffer++;
 
-    HARDBUG(i >= arg_nhuffer)
+    HARDBUG(ibuffer >= arg_nbuffer)
 
-    PRINTF("stop code=%c\n", arg_buffer[i]);
+    PRINTF("stop code=%c\n", arg_buffer[ibuffer]);
 
     return (DXP_GAMEEND);
   }
@@ -636,16 +643,16 @@ int reads(compat_socket_t arg_sockfd, bstring arg_buffer, int *arg_nbuffer)
 
     while (TRUE)
     {
-      char c;
-      int n = compat_socket_read(arg_sockfd, &c, 1);
+      char character;
+      int nread = compat_socket_read(arg_sockfd, &character, 1);
 
-      if (n != 1)
+      if (nread != 1)
         return (INVALID);
 
-      if (c == '\0')
+      if (character == '\0')
         break;
 
-      HARDBUG(bconchar(arg_buffer, c) == BSTR_ERR)
+      HARDBUG(bconchar(arg_buffer, character) == BSTR_ERR)
     }
 
     if (bdata(arg_buffer)[0] != DXP_CHAT)
@@ -660,7 +667,7 @@ int reads(compat_socket_t arg_sockfd, bstring arg_buffer, int *arg_nbuffer)
   return (*arg_nbuffer);
 }
 
-local char *secs2string(double arg_secs, bstring string)
+local char *secs2string(double arg_secs, bstring arg_string)
 {
   int hours;
   int minutes;
@@ -676,14 +683,14 @@ local char *secs2string(double arg_secs, bstring string)
   minutes = (secs - hours * 3600) / 60;
   seconds = secs - hours * 3600 - minutes * 60;
 
-  HARDBUG(bassignformat(string,
+  HARDBUG(bassignformat(arg_string,
                         "%02d:%02d:%02d.%02d",
                         hours,
                         minutes,
                         seconds,
                         centiseconds) == BSTR_ERR)
 
-  return (bdata(string));
+  return (bdata(arg_string));
 }
 
 local char *rtrim(const char *arg_trim, bstring arg_string)
@@ -1090,7 +1097,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
 
         PRINTF("\nthinking..\n");
 
-        double t1 = compat_time();
+        double start_time = compat_time();
 
         if (moves_list.ML_nmoves == 1)
         {
@@ -1154,9 +1161,9 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
           }
         }
 
-        double t2 = compat_time();
+        double end_time = compat_time();
 
-        double move_time = t2 - t1;
+        double move_time = end_time - start_time;
 
         update_time_control(move_time, with_time_control);
 
@@ -1610,16 +1617,16 @@ void dxp_server(void)
 
   struct sockaddr_in client_address;
 
-  compat_socklen_t len = sizeof(client_address);
+  compat_socklen_t address_size = sizeof(client_address);
 
   compat_socket_t connfd;
 
   PRINTF("server waiting for connection..\n");
 
-  HARDBUG((connfd = accept(sockfd, (SA *)&client_address, &len)) ==
+  HARDBUG((connfd = accept(sockfd, (SA *)&client_address, &address_size)) ==
           COMPAT_INVALID_SOCKET)
 
-  HARDBUG(len > sizeof(client_address))
+  HARDBUG(address_size > sizeof(client_address))
 
   PRINTF("server accepted connection..\n");
 

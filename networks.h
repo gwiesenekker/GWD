@@ -113,7 +113,7 @@ int base3_index_v2(const board_t *, ui64_t);
 int base3_index_v3(const board_t *, ui64_t);
 int base3_index_v4(const board_t *, ui64_t);
 
-void vcopy_a2b(int n, const scaled_double_t *, scaled_double_t *);
+void vcopy_a2b(int arg_nvalues, const scaled_double_t *, scaled_double_t *);
 void vadd_ab2a(int, scaled_double_t *restrict, const scaled_double_t *restrict);
 void vmul_ab2a(int, scaled_double_t *restrict, const scaled_double_t *restrict);
 void vmul_ab2c(int,

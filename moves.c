@@ -51,13 +51,13 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
     my_bb &= ~BITULL(ifield1);
 
-    for (int i = 0; i < 4; i++)
+    for (int idirection = 0; idirection < 4; idirection++)
     {
-      int jfield1 = ifield1 + my_dir[i];
+      int jfield1 = ifield1 + my_dir[idirection];
 
       if (arg_with_board->my_men_bb & BITULL(ifield1))
       {
-        if ((i < 2) and (arg_moves_list->ML_ncaptx == 0))
+        if ((idirection < 2) and (arg_moves_list->ML_ncaptx == 0))
         {
           if (empty_bb & BITULL(jfield1))
           {
@@ -89,13 +89,13 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
             arg_moves_list->ML_nmoves++;
           }
-          jfield1 += my_dir[i];
+          jfield1 += my_dir[idirection];
         }
       }
 
       if (your_bb & BITULL(jfield1))
       {
-        int kfield1 = jfield1 + my_dir[i];
+        int kfield1 = jfield1 + my_dir[idirection];
 
         if (empty_bb & BITULL(kfield1))
         {
@@ -110,7 +110,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
           empty_bb |= BITULL(ifield1);
 
-          idir[1] = my_dir[i];
+          idir[1] = my_dir[idirection];
 
           int ncapt = 0;
 
@@ -277,122 +277,130 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
 /* One-hot padded squares: shifting off the board is harmless. In particular,
  * never form 1ULL << a possibly negative scalar square number. */
-local inline ui64_t move_shift(ui64_t bb, int dir)
+local inline ui64_t move_shift(ui64_t arg_bb, int arg_direction)
 {
-  return dir > 0 ? bb << dir : bb >> -dir;
+  return arg_direction > 0 ? arg_bb << arg_direction : arg_bb >> -arg_direction;
 }
 
-local inline void append_bb_move(moves_list_t *list,
-                                 int from,
-                                 ui64_t to,
-                                 ui64_t captures,
-                                 int count)
+local inline void append_bb_move(moves_list_t *arg_moves_list,
+                                 int arg_from_field,
+                                 ui64_t arg_to_bb,
+                                 ui64_t arg_captures_bb,
+                                 int arg_ncaptures)
 {
-  if (count < list->ML_ncaptx)
+  if (arg_ncaptures < arg_moves_list->ML_ncaptx)
     return;
 
-  if (count > list->ML_ncaptx)
+  if (arg_ncaptures > arg_moves_list->ML_ncaptx)
   {
-    list->ML_ncaptx = count;
-    list->ML_nmoves = 0;
+    arg_moves_list->ML_ncaptx = arg_ncaptures;
+    arg_moves_list->ML_nmoves = 0;
   }
 
-  HARDBUG(list->ML_nmoves >= NMOVES_MAX)
+  HARDBUG(arg_moves_list->ML_nmoves >= NMOVES_MAX)
 
-  move_t *move = &list->ML_moves[list->ML_nmoves++];
+  move_t *move = &arg_moves_list->ML_moves[arg_moves_list->ML_nmoves++];
 
-  move->M_move_from = from;
-  move->M_move_to = BIT_CTZ(to);
-  move->M_captures_bb = captures;
+  move->M_move_from = arg_from_field;
+  move->M_move_to = BIT_CTZ(arg_to_bb);
+  move->M_captures_bb = arg_captures_bb;
 }
 
 /* Captured pieces remain blockers until the entire move is finished. The
  * origin, however, is empty: a capture may return to it (rondslag).
  * Keep legacy's traversal: positive perpendicular, negative perpendicular,
  * then straight ahead. Do not deduplicate different capture routes. */
-local void capture_man_bb(moves_list_t *list,
-                          int from,
-                          ui64_t at,
-                          ui64_t empty,
-                          ui64_t opponents,
-                          ui64_t captures,
-                          int count,
-                          int incoming)
+local void capture_man_bb(moves_list_t *arg_moves_list,
+                          int arg_from_field,
+                          ui64_t arg_current_bb,
+                          ui64_t arg_empty_bb,
+                          ui64_t arg_opponents_bb,
+                          ui64_t arg_captures_bb,
+                          int arg_ncaptures,
+                          int arg_incoming_direction)
 {
-  append_bb_move(list, from, at, captures, count);
+  append_bb_move(arg_moves_list,
+                 arg_from_field,
+                 arg_current_bb,
+                 arg_captures_bb,
+                 arg_ncaptures);
 
-  int perpendicular = 11 - abs(incoming);
-  int dirs[3] = {perpendicular, -perpendicular, incoming};
-  ui64_t available = opponents & ~captures;
+  int perpendicular = 11 - abs(arg_incoming_direction);
+  int dirs[3] = {perpendicular, -perpendicular, arg_incoming_direction};
+  ui64_t available = arg_opponents_bb & ~arg_captures_bb;
 
-  for (int i = 0; i < 3; ++i)
+  for (int idirection = 0; idirection < 3; ++idirection)
   {
-    ui64_t victim = move_shift(at, dirs[i]) & available;
-    ui64_t landing = move_shift(victim, dirs[i]) & empty;
+    ui64_t victim = move_shift(arg_current_bb, dirs[idirection]) & available;
+    ui64_t landing = move_shift(victim, dirs[idirection]) & arg_empty_bb;
 
     if (landing)
-      capture_man_bb(list,
-                     from,
+      capture_man_bb(arg_moves_list,
+                     arg_from_field,
                      landing,
-                     empty,
-                     opponents,
-                     captures | victim,
-                     count + 1,
-                     dirs[i]);
+                     arg_empty_bb,
+                     arg_opponents_bb,
+                     arg_captures_bb | victim,
+                     arg_ncaptures + 1,
+                     dirs[idirection]);
   }
 }
 
-local void capture_king_bb(moves_list_t *list,
-                           int from,
-                           ui64_t at,
-                           ui64_t empty,
-                           ui64_t opponents,
-                           ui64_t captures,
-                           int count,
-                           int incoming)
+local void capture_king_bb(moves_list_t *arg_moves_list,
+                           int arg_from_field,
+                           ui64_t arg_current_bb,
+                           ui64_t arg_empty_bb,
+                           ui64_t arg_opponents_bb,
+                           ui64_t arg_captures_bb,
+                           int arg_ncaptures,
+                           int arg_incoming_direction)
 {
-  int perpendicular = 11 - abs(incoming);
-  ui64_t available = opponents & ~captures;
+  int perpendicular = 11 - abs(arg_incoming_direction);
+  ui64_t available = arg_opponents_bb & ~arg_captures_bb;
 
   do
   {
-    append_bb_move(list, from, at, captures, count);
+    append_bb_move(arg_moves_list,
+                   arg_from_field,
+                   arg_current_bb,
+                   arg_captures_bb,
+                   arg_ncaptures);
 
     for (int dir = perpendicular; dir != 0; dir = dir > 0 ? -dir : 0)
     {
-      ui64_t victim = move_shift(at, dir);
+      ui64_t victim = move_shift(arg_current_bb, dir);
 
-      while (victim & empty)
+      while (victim & arg_empty_bb)
         victim = move_shift(victim, dir);
       victim &= available;
 
-      ui64_t landing = move_shift(victim, dir) & empty;
+      ui64_t landing = move_shift(victim, dir) & arg_empty_bb;
 
       if (landing)
-        capture_king_bb(list,
-                        from,
+        capture_king_bb(arg_moves_list,
+                        arg_from_field,
                         landing,
-                        empty,
-                        opponents,
-                        captures | victim,
-                        count + 1,
+                        arg_empty_bb,
+                        arg_opponents_bb,
+                        arg_captures_bb | victim,
+                        arg_ncaptures + 1,
                         dir);
     }
-    at = move_shift(at, incoming);
-  } while (at & empty);
+    arg_current_bb = move_shift(arg_current_bb, arg_incoming_direction);
+  } while (arg_current_bb & arg_empty_bb);
 
-  ui64_t victim = at & available;
-  ui64_t landing = move_shift(victim, incoming) & empty;
+  ui64_t victim = arg_current_bb & available;
+  ui64_t landing = move_shift(victim, arg_incoming_direction) & arg_empty_bb;
 
   if (landing)
-    capture_king_bb(list,
-                    from,
+    capture_king_bb(arg_moves_list,
+                    arg_from_field,
                     landing,
-                    empty,
-                    opponents,
-                    captures | victim,
-                    count + 1,
-                    incoming);
+                    arg_empty_bb,
+                    arg_opponents_bb,
+                    arg_captures_bb | victim,
+                    arg_ncaptures + 1,
+                    arg_incoming_direction);
 }
 
 void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
@@ -428,9 +436,9 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
     sources &= ~origin;
 
-    for (int i = 0; i < 4; ++i)
+    for (int idirection = 0; idirection < 4; ++idirection)
     {
-      int dir = dirs[i];
+      int dir = dirs[idirection];
       ui64_t victim = move_shift(origin, dir);
 
       if (origin & kings)
@@ -478,9 +486,9 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
       int king = (origin & kings) != 0;
 
-      for (int i = 0; i < (king ? 4 : 2); ++i)
+      for (int idirection = 0; idirection < (king ? 4 : 2); ++idirection)
       {
-        ui64_t landing = move_shift(origin, dirs[i]) & empty;
+        ui64_t landing = move_shift(origin, dirs[idirection]) & empty;
 
         while (landing)
         {
@@ -488,17 +496,17 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
           if (!king)
             break;
-          landing = move_shift(landing, dirs[i]) & empty;
+          landing = move_shift(landing, dirs[idirection]) & empty;
         }
       }
     }
   }
 
-  for (int i = 0; i < list->ML_nmoves; ++i)
+  for (int imove = 0; imove < list->ML_nmoves; ++imove)
   {
-    const move_t *move = &list->ML_moves[i];
+    const move_t *move = &list->ML_moves[imove];
 
-    list->ML_move_flags[i] =
+    list->ML_move_flags[imove] =
       (men & BITULL(move->M_move_from)) && rows[move->M_move_to] >= 9
         ? MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT
         : 0;
@@ -894,21 +902,22 @@ void move2bstring(const moves_list_t *arg_with_moves_list,
   }
 }
 
-local int move2ints(const_bstring arg_bmove, int arg_m[50])
+local int move2ints(const_bstring arg_bmove, int arg_fields[50])
 {
-  BSTRING(b)
+  BSTRING(bseparators)
 
-  bassigncstr(b, "-x");
+  bassigncstr(bseparators, "-x");
 
   struct bstrList *btokens;
 
-  HARDBUG((btokens = bsplits(arg_bmove, b)) == NULL)
+  HARDBUG((btokens = bsplits(arg_bmove, bseparators)) == NULL)
 
   HARDBUG(btokens->qty > 50)
 
   for (int itoken = 0; itoken < btokens->qty; itoken++)
   {
-    if (my_sscanf(bdata(btokens->entry[itoken]), "%d", arg_m + itoken) != 1)
+    if (my_sscanf(bdata(btokens->entry[itoken]), "%d", arg_fields + itoken) !=
+        1)
     {
       PRINTF("bmove=%s\n", bdata(arg_bmove));
       FATAL("eh?", EXIT_FAILURE)
@@ -919,7 +928,7 @@ local int move2ints(const_bstring arg_bmove, int arg_m[50])
 
   HARDBUG(bstrListDestroy(btokens) == BSTR_ERR)
 
-  BDESTROY(b)
+  BDESTROY(bseparators)
 
   return (result);
 }
@@ -931,45 +940,46 @@ int search_move(const moves_list_t *arg_with_moves_list,
 
   int nhits = 0;
 
-  int m1[50];
+  int requested_fields[50];
 
-  int n1 = move2ints(arg_bmove, m1);
+  int nrequested_fields = move2ints(arg_bmove, requested_fields);
 
-  if (n1 < 2)
+  if (nrequested_fields < 2)
     return (INVALID);
 
   BSTRING(bmove_string)
 
   for (int imove = 0; imove < arg_with_moves_list->ML_nmoves; imove++)
   {
-    int m2[50];
+    int candidate_fields[50];
 
     move2bstring(arg_with_moves_list, imove, bmove_string);
 
-    int n2 = move2ints(bmove_string, m2);
+    int ncandidate_fields = move2ints(bmove_string, candidate_fields);
 
-    if (n2 < 2)
+    if (ncandidate_fields < 2)
       return (INVALID);
 
-    if ((m1[0] == m2[0]) and (m1[1] == m2[1]))
+    if ((requested_fields[0] == candidate_fields[0]) and
+        (requested_fields[1] == candidate_fields[1]))
     {
-      int n = 1;
+      int nmatches = 1;
 
-      for (int i1 = 2; i1 < n1; i1++)
+      for (int irequested = 2; irequested < nrequested_fields; irequested++)
       {
         // search m1[i1] in m2[2..n2]
 
-        n = 0;
+        nmatches = 0;
 
-        for (int i2 = 2; i2 < n2; i2++)
-          if (m1[i1] == m2[i2])
-            n++;
+        for (int icandidate = 2; icandidate < ncandidate_fields; icandidate++)
+          if (requested_fields[irequested] == candidate_fields[icandidate])
+            nmatches++;
 
-        if (n != 1)
+        if (nmatches != 1)
           break;
       }
 
-      if (n == 1)
+      if (nmatches == 1)
       {
         ihit = imove;
 
@@ -993,11 +1003,11 @@ void construct_moves_list(moves_list_t *arg_with_moves_list)
 
 void fprintf_moves_list(const moves_list_t *arg_with_moves_list,
                         my_printf_t *arg_my_printf,
-                        int verbose)
+                        int arg_verbose)
 {
   BSTRING(bmove_string)
 
-  if (verbose == 0)
+  if (arg_verbose == 0)
   {
     for (int imove = 0; imove < arg_with_moves_list->ML_nmoves; imove++)
     {

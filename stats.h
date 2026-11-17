@@ -21,26 +21,26 @@ typedef struct
 
 void clear_stats(stats_t *);
 
-inline local void update_stats(stats_t *arg_with_stats, double x)
+inline local void update_stats(stats_t *arg_with_stats, double arg_sample)
 {
   arg_with_stats->S_n++;
 
   if (arg_with_stats->S_n == 1)
   {
-    arg_with_stats->S_min = x;
-    arg_with_stats->S_max = x;
+    arg_with_stats->S_min = arg_sample;
+    arg_with_stats->S_max = arg_sample;
   }
   else
   {
-    if (x > arg_with_stats->S_max)
-      arg_with_stats->S_max = x;
+    if (arg_sample > arg_with_stats->S_max)
+      arg_with_stats->S_max = arg_sample;
 
-    if (x < arg_with_stats->S_min)
-      arg_with_stats->S_min = x;
+    if (arg_sample < arg_with_stats->S_min)
+      arg_with_stats->S_min = arg_sample;
   }
 
-  arg_with_stats->S_sum += x;
-  arg_with_stats->S_sum2 += x * x;
+  arg_with_stats->S_sum += arg_sample;
+  arg_with_stats->S_sum2 += arg_sample * arg_sample;
 }
 
 void construct_stats(stats_t *, const char *);

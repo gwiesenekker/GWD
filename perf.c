@@ -10,24 +10,26 @@ typedef struct timespec counter_t;
 
 #define TICKS(TV) (TV.tv_sec * 1000000000 + TV.tv_nsec)
 
-void update_mean_sigma(long long n,
-                       long long x,
-                       long long *xmax,
-                       double *mn,
-                       double *sn)
+void update_mean_sigma(long long arg_nsamples,
+                       long long arg_sample,
+                       long long *arg_maximum,
+                       double *arg_mean,
+                       double *arg_squared_deviations)
 {
-  double mnm1 = *mn;
-  double snm1 = *sn;
+  double previous_mean = *arg_mean;
+  double previous_squared_deviations = *arg_squared_deviations;
 
-  if (xmax != NULL)
+  if (arg_maximum != NULL)
   {
-    if (x > *xmax)
-      *xmax = x;
+    if (arg_sample > *arg_maximum)
+      *arg_maximum = arg_sample;
   }
 
-  *mn = mnm1 + (x - mnm1) / n;
+  *arg_mean = previous_mean + (arg_sample - previous_mean) / arg_nsamples;
 
-  *sn = snm1 + (x - mnm1) * (x - *mn);
+  *arg_squared_deviations =
+    previous_squared_deviations +
+    (arg_sample - previous_mean) * (arg_sample - *arg_mean);
 }
 
 #define NCALL 1000000LL
@@ -39,23 +41,23 @@ int main(int argc, char **argv)
 
   counter_pointer = &counter_dummy;
 
-  for (int j = 0; j < 10; j++)
+  for (int itrial = 0; itrial < 10; itrial++)
   {
-    double mn = 0.0;
-    double sn = 0.0;
+    double sample_mean = 0.0;
+    double squared_deviations = 0.0;
 
-    for (long long n = 1; n <= NCALL; ++n)
+    for (long long isample = 1; isample <= NCALL; ++isample)
     {
       counter_t counter_stamp;
 
       GET_COUNTER(&counter_stamp);
       GET_COUNTER(counter_pointer);
 
-      update_mean_sigma(n,
+      update_mean_sigma(isample,
                         TICKS(counter_dummy) - TICKS(counter_stamp),
                         NULL,
-                        &mn,
-                        &sn);
+                        &sample_mean,
+                        &squared_deviations);
     }
 
     // note that the distribution is very skewed, so the distribution
@@ -67,13 +69,13 @@ int main(int argc, char **argv)
     // to check for large positive deviations instead of
     // round(sqrt(sigma / NCALL));
 
-    long long sigma = round(mn / 3.0);
-    long long mean = round(mn);
+    long long sigma = round(sample_mean / 3.0);
+    long long mean = round(sample_mean);
 
     long long nlarge = 0;
     long long largest = 0;
 
-    for (long long n = 1; n <= NCALL; ++n)
+    for (long long isample = 1; isample <= NCALL; ++isample)
     {
       counter_t counter_stamp;
 

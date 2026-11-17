@@ -14,15 +14,15 @@ local const int map_row_col[10][10] = {
   {-1, 41, -1, 42, -1, 43, -1, 44, -1, 45},
   {46, -1, 47, -1, 48, -1, 49, -1, 50, -1}};
 
-local int map_row_col2field(int irow, int icol)
+local int map_row_col2field(int arg_irow, int arg_icol)
 {
-  if ((irow < 0) or (irow > 9))
+  if ((arg_irow < 0) or (arg_irow > 9))
     return (INVALID);
 
-  if ((icol < 0) or (icol > 9))
+  if ((arg_icol < 0) or (arg_icol > 9))
     return (INVALID);
 
-  int isquare = map_row_col[irow][icol];
+  int isquare = map_row_col[arg_irow][arg_icol];
 
   if (isquare == INVALID)
     return (INVALID);
@@ -147,13 +147,13 @@ void construct_patterns_shared(patterns_shared_t *arg_with_patterns_shared,
 
   HARDBUG(bassigncstr(barg_shape, arg_shape) == BSTR_ERR)
 
-  BSTRING(b)
+  BSTRING(bseparators)
 
-  bassigncstr(b, ",:;");
+  bassigncstr(bseparators, ",:;");
 
   struct bstrList *btokens;
 
-  HARDBUG((btokens = bsplits(barg_shape, b)) == NULL)
+  HARDBUG((btokens = bsplits(barg_shape, bseparators)) == NULL)
 
   BSTRING(string)
 
@@ -342,7 +342,7 @@ void construct_patterns_shared(patterns_shared_t *arg_with_patterns_shared,
 
   HARDBUG(bstrListDestroy(btokens) == BSTR_ERR)
 
-  BDESTROY(b)
+  BDESTROY(bseparators)
 
   BDESTROY(barg_shape)
 
@@ -365,13 +365,13 @@ void construct_patterns_shared(patterns_shared_t *arg_with_patterns_shared,
            with_pattern_shared->PS_nlinear,
            with_pattern_shared->PS_nstates);
 
-    ui64_t bb = with_pattern_shared->PS_bb;
+    ui64_t fields_bb = with_pattern_shared->PS_bb;
 
-    while (bb != 0)
+    while (fields_bb != 0)
     {
-      int ifield = BIT_CTZ(bb);
+      int ifield = BIT_CTZ(fields_bb);
 
-      bb &= ~BITULL(ifield);
+      fields_bb &= ~BITULL(ifield);
 
       PRINTF(" %s", nota[ifield]);
     }

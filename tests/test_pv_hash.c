@@ -4,14 +4,14 @@
 #include <assert.h>
 
 int zzzzzz_invocation;
-void zzzzzz(const char *file,
-            const char *func,
-            long line,
-            const char *message,
-            int code)
+void zzzzzz(const char *arg_file,
+            const char *arg_func,
+            long arg_line,
+            const char *arg_message,
+            int arg_code)
 {
-  fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
-  exit(code);
+  fprintf(stderr, "%s:%ld %s: %s\n", arg_file, arg_line, arg_func, arg_message);
+  exit(arg_code);
 }
 
 int main(int argc, char **argv)
@@ -31,29 +31,29 @@ int main(int argc, char **argv)
 
   for (int first_colour = 0; first_colour < 2; ++first_colour)
   {
-    for (int i = 0; i < NPV_ENTRIES; ++i)
-      for (int j = 0; j < NPV_SLOTS; ++j)
-        pv.PVE_entries[i].PVE_slots[j] = PV_SLOT_MOVES_MASK;
+    for (int ientry = 0; ientry < NPV_ENTRIES; ++ientry)
+      for (int jslot = 0; jslot < NPV_SLOTS; ++jslot)
+        pv.PVE_entries[ientry].PVE_slots[jslot] = PV_SLOT_MOVES_MASK;
 
-    for (int i = 0; i < NPV_SLOTS; ++i)
+    for (int islot = 0; islot < NPV_SLOTS; ++islot)
     {
-      search.S_board.B_key = keys[i];
+      search.S_board.B_key = keys[islot];
       search.S_board.B_colour2move = first_colour;
-      update_pv(&pv, &search, 7 + i);
+      update_pv(&pv, &search, 7 + islot);
 
-      assert(probe_pv(&pv, &search) == 7 + i);
+      assert(probe_pv(&pv, &search) == 7 + islot);
 
       search.S_board.B_colour2move = 1 - first_colour;
 
       assert(probe_pv(&pv, &search) == INVALID);
 
-      update_pv(&pv, &search, 20 + i);
+      update_pv(&pv, &search, 20 + islot);
 
-      assert(probe_pv(&pv, &search) == 20 + i);
+      assert(probe_pv(&pv, &search) == 20 + islot);
 
       search.S_board.B_colour2move = first_colour;
 
-      assert(probe_pv(&pv, &search) == 7 + i);
+      assert(probe_pv(&pv, &search) == 7 + islot);
     }
     /* A matching-key update must not reset the other colour's move. */
     search.S_board.B_key = keys[0];

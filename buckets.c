@@ -245,30 +245,30 @@ void test_buckets(void)
 
   PRINTF("test_bucket_class\n");
 
-  bucket_t a;
+  bucket_t linear_bucket;
 
-  construct_bucket(&a, "a", 0.1, -1.0, 1.0, BUCKET_LINEAR);
+  construct_bucket(&linear_bucket, "a", 0.1, -1.0, 1.0, BUCKET_LINEAR);
 
-  for (int i = 0; i < ntest; i++)
+  for (int ivalue = 0; ivalue < ntest; ivalue++)
   {
     double value =
       (2.0 * (return_my_random(&test_random) % ntest)) / ntest - 1.0;
 
-    update_bucket(&a, value);
+    update_bucket(&linear_bucket, value);
   }
 
-  printf_bucket(&a);
+  printf_bucket(&linear_bucket);
 
-  bucket_t b;
+  bucket_t geometric_bucket;
 
-  construct_bucket(&b, "b", 10, 0, ntest, BUCKET_LOG);
+  construct_bucket(&geometric_bucket, "b", 10, 0, ntest, BUCKET_LOG);
 
-  for (int i = 0; i < ntest; i++)
+  for (int ivalue = 0; ivalue < ntest; ivalue++)
   {
     double value = (int)(return_my_random(&test_random) % (2 * ntest)) - ntest;
 
-    update_bucket(&b, value);
+    update_bucket(&geometric_bucket, value);
   }
 
-  printf_bucket(&b);
+  printf_bucket(&geometric_bucket);
 }

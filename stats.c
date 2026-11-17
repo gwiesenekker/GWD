@@ -94,32 +94,32 @@ void my_stats_aggregate(stats_t *arg_with_stats, MPI_Comm arg_comm)
 
 void test_stats(void)
 {
-  stats_t a;
+  stats_t stats;
 
-  construct_stats(&a, "a");
+  construct_stats(&stats, "a");
 
-  update_stats(&a, 1.0);
-  mean_sigma(&a);
-  printf_stats(&a);
+  update_stats(&stats, 1.0);
+  mean_sigma(&stats);
+  printf_stats(&stats);
 
-  clear_stats(&a);
-  update_stats(&a, 1.0);
-  update_stats(&a, 2.0);
-  mean_sigma(&a);
-  printf_stats(&a);
+  clear_stats(&stats);
+  update_stats(&stats, 1.0);
+  update_stats(&stats, 2.0);
+  mean_sigma(&stats);
+  printf_stats(&stats);
 
-  clear_stats(&a);
-  update_stats(&a, 1.0);
-  update_stats(&a, 2.0);
-  update_stats(&a, 3.0);
-  mean_sigma(&a);
-  printf_stats(&a);
+  clear_stats(&stats);
+  update_stats(&stats, 1.0);
+  update_stats(&stats, 2.0);
+  update_stats(&stats, 3.0);
+  mean_sigma(&stats);
+  printf_stats(&stats);
 
-  clear_stats(&a);
+  clear_stats(&stats);
 
-  for (i64_t i = 0; i < N; i++)
-    update_stats(&a, i);
+  for (i64_t isample = 0; isample < N; isample++)
+    update_stats(&stats, isample);
 
-  mean_sigma(&a);
-  printf_stats(&a);
+  mean_sigma(&stats);
+  printf_stats(&stats);
 }

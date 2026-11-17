@@ -32,25 +32,32 @@ _Static_assert(sizeof(score_cache_shared_slot_t) == sizeof(score_cache_slot_t),
                "atomic score-cache storage must preserve cache capacity");
 
 /* Each word is atomic, not the complete record. Keep checksum validation. */
-local inline void load_score_cache_slot(score_cache_slot_t *to,
-                                        const score_cache_shared_slot_t *from)
+local inline void
+load_score_cache_slot(score_cache_slot_t *arg_target,
+                      const score_cache_shared_slot_t *arg_source)
 {
-  to->SCS_key = atomic_load_explicit(&from->SCS_key, memory_order_relaxed);
-  to->SCS_data = atomic_load_explicit(&from->SCS_data, memory_order_relaxed);
+  arg_target->SCS_key =
+    atomic_load_explicit(&arg_source->SCS_key, memory_order_relaxed);
+  arg_target->SCS_data =
+    atomic_load_explicit(&arg_source->SCS_data, memory_order_relaxed);
 }
 
-local inline void store_score_cache_slot(score_cache_shared_slot_t *to,
-                                         const score_cache_slot_t *from)
+local inline void store_score_cache_slot(score_cache_shared_slot_t *arg_target,
+                                         const score_cache_slot_t *arg_source)
 {
-  atomic_store_explicit(&to->SCS_key, from->SCS_key, memory_order_relaxed);
-  atomic_store_explicit(&to->SCS_data, from->SCS_data, memory_order_relaxed);
+  atomic_store_explicit(&arg_target->SCS_key,
+                        arg_source->SCS_key,
+                        memory_order_relaxed);
+  atomic_store_explicit(&arg_target->SCS_data,
+                        arg_source->SCS_data,
+                        memory_order_relaxed);
 }
 
-local inline void init_score_cache_slot(score_cache_shared_slot_t *to,
-                                        const score_cache_slot_t *from)
+local inline void init_score_cache_slot(score_cache_shared_slot_t *arg_target,
+                                        const score_cache_slot_t *arg_source)
 {
-  atomic_init(&to->SCS_key, from->SCS_key);
-  atomic_init(&to->SCS_data, from->SCS_data);
+  atomic_init(&arg_target->SCS_key, arg_source->SCS_key);
+  atomic_init(&arg_target->SCS_data, arg_source->SCS_data);
 }
 
 local i64_t nscore_cache_entries;
@@ -98,11 +105,11 @@ local void update_score_cache(search_t *arg_with_search,
 
 #undef GEN_CSV
 
-static inline uint64_t mirror_bb(uint64_t bb)
+static inline uint64_t mirror_bb(uint64_t arg_bb)
 {
   ui64_t result;
 
-  result = (bb >> 6);
+  result = (arg_bb >> 6);
 
   result = BIT_REVERSE(result) >> (64 - 54);
 
@@ -111,11 +118,11 @@ static inline uint64_t mirror_bb(uint64_t bb)
 #ifdef DEBUG
   ui64_t debug = 0;
 
-  while (bb)
+  while (arg_bb)
   {
-    int ifield = BIT_CTZ(bb);
+    int ifield = BIT_CTZ(arg_bb);
 
-    bb &= ~BITULL(ifield);
+    arg_bb &= ~BITULL(ifield);
 
     debug |= 1ULL << (65 - ifield);
   }
@@ -178,8 +185,8 @@ score_t return_score_from_board(board_t *arg_with_board,
   __m256 sum64[8];
 
   if (with_network->N_pattern_dense_network_64x16_kernel)
-    for (int i = 0; i < 8; i++)
-      sum64[i] = _mm256_setzero_ps();
+    for (int ichunk = 0; ichunk < 8; ichunk++)
+      sum64[ichunk] = _mm256_setzero_ps();
 
   if (with_network->N_pattern_dense_network_16x8_kernel)
   {
@@ -224,8 +231,9 @@ score_t return_score_from_board(board_t *arg_with_board,
                                (size_t)istate * with_pattern_shared->PS_nembed;
 
         // Preserve pattern order and allow unaligned shared-memory rows.
-        for (int i = 0; i < 8; i++)
-          sum64[i] = _mm256_add_ps(sum64[i], _mm256_loadu_ps(weights + 8 * i));
+        for (int ichunk = 0; ichunk < 8; ichunk++)
+          sum64[ichunk] =
+            _mm256_add_ps(sum64[ichunk], _mm256_loadu_ps(weights + 8 * ichunk));
       }
       else
 #endif
@@ -261,10 +269,10 @@ score_t return_score_from_board(board_t *arg_with_board,
   }
   else if (with_network->N_pattern_dense_network_64x16_kernel)
   {
-    for (int i = 0; i < 8; i++)
+    for (int ichunk = 0; ichunk < 8; ichunk++)
       _mm256_store_ps(network_state->NS_pattern_dense_network_state.DNS_inputs +
-                        8 * i,
-                      sum64[i]);
+                        8 * ichunk,
+                      sum64[ichunk]);
   }
 #endif
 
@@ -322,15 +330,15 @@ score_t return_score_from_board(board_t *arg_with_board,
     *arg_network_score_scaled = network_score_scaled;
 
 #ifdef DEBUG
-  static int n = 0;
+  static int nevaluations = 0;
 
   double network_score_double = return_dense_network_score_double(
     &(with_network->N_shared_dense_network),
     &(arg_with_board->B_network_state.NS_dense_network_state));
 
-  n++;
+  nevaluations++;
 
-  if (n < 99)
+  if (nevaluations < 99)
     PRINTF("network_score_scaled=%.6f network_score_double=%.6f\n",
            network_score_scaled,
            network_score_double);

@@ -7,14 +7,14 @@
 #include <assert.h>
 
 int zzzzzz_invocation;
-_Noreturn void zzzzzz(const char *file,
-                      const char *func,
-                      long line,
-                      const char *message,
-                      int code)
+_Noreturn void zzzzzz(const char *arg_file,
+                      const char *arg_func,
+                      long arg_line,
+                      const char *arg_message,
+                      int arg_code)
 {
-  fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
-  exit(code);
+  fprintf(stderr, "%s:%ld %s: %s\n", arg_file, arg_line, arg_func, arg_message);
+  exit(arg_code);
 }
 
 static uint32_t rng = 1;
@@ -25,16 +25,16 @@ static float sample(void)
   return ldexpf((float)((int)(rng >> 16) - 32768), -(int)(rng % 20));
 }
 
-static void select_kernel(dense_network_shared_t *dense, int enabled)
+static void select_kernel(dense_network_shared_t *arg_dense, int arg_enabled)
 {
-  int ninputs = dense->DNS_layers[0].LS_ninputs;
-  int noutputs = dense->DNS_layers[0].LS_noutputs;
+  int ninputs = arg_dense->DNS_layers[0].LS_ninputs;
+  int noutputs = arg_dense->DNS_layers[0].LS_noutputs;
 
-  dense->DNS_16x8_kernel = enabled && ninputs == 16 && noutputs == 8;
-  dense->DNS_32x8_kernel = enabled && ninputs == 32 && noutputs == 8;
+  arg_dense->DNS_16x8_kernel = arg_enabled && ninputs == 16 && noutputs == 8;
+  arg_dense->DNS_32x8_kernel = arg_enabled && ninputs == 32 && noutputs == 8;
 }
 
-static void test_shape(int ninputs, int noutputs)
+static void test_shape(int arg_ninputs, int arg_noutputs)
 {
   dense_network_shared_t dense = {0};
   network_state_t state = {0};
@@ -48,10 +48,10 @@ static void test_shape(int ninputs, int noutputs)
   ALIGN64(float bias[16]);
 
   float reference[16];
-  size_t output_bytes = noutputs * sizeof(float);
+  size_t output_bytes = arg_noutputs * sizeof(float);
 
-  dense.DNS_layers[0].LS_ninputs = ninputs;
-  dense.DNS_layers[0].LS_noutputs = noutputs;
+  dense.DNS_layers[0].LS_ninputs = arg_ninputs;
+  dense.DNS_layers[0].LS_noutputs = arg_noutputs;
   dense.DNS_layers[0].LS_bias = bias;
   dense.DNS_nlayers = 1;
   dense.DNS_activation = NETWORK_ACTIVATION_LINEAR;
@@ -67,14 +67,14 @@ static void test_shape(int ninputs, int noutputs)
 
     dense.DNS_layers[0].LS_weights_noutputsxninputs = weights;
 
-    for (int i = 0; i < ninputs; i++)
-      inputs[i] = sample();
+    for (int iinput = 0; iinput < arg_ninputs; iinput++)
+      inputs[iinput] = sample();
 
-    for (int o = 0; o < noutputs; o++)
+    for (int ioutput = 0; ioutput < arg_noutputs; ioutput++)
     {
-      for (int i = 0; i < ninputs; i++)
-        weights[o * ninputs + i] = sample();
-      bias[o] = sample();
+      for (int iinput = 0; iinput < arg_ninputs; iinput++)
+        weights[ioutput * arg_ninputs + iinput] = sample();
+      bias[ioutput] = sample();
     }
     select_kernel(&dense, FALSE);
     dense_layer0_dot(&dense, inputs, reference);
@@ -83,7 +83,7 @@ static void test_shape(int ninputs, int noutputs)
 
     assert(memcmp(reference, dot, output_bytes) == 0);
 
-    memcpy(thread->DNS_inputs, inputs, ninputs * sizeof(float));
+    memcpy(thread->DNS_inputs, inputs, arg_ninputs * sizeof(float));
 
     for (int activate = 0; activate <= 1; activate++)
     {
@@ -102,16 +102,16 @@ static void test_shape(int ninputs, int noutputs)
     dense.DNS_activate_layer0 = FALSE;
     dense.DNS_compute_layer0 = FALSE;
 
-    for (int o = 0; o < noutputs; o++)
-      reference[o] = dot[o] = sample();
+    for (int ioutput = 0; ioutput < arg_noutputs; ioutput++)
+      reference[ioutput] = dot[ioutput] = sample();
     (void)return_dense_network_score_scaled(&dense, thread);
 
     assert(memcmp(reference, dot, output_bytes) == 0);
   }
   printf("%dx%d: 10000 bitwise comparisons, activated/plain dispatch and "
          "precomputed dots PASS\n",
-         ninputs,
-         noutputs);
+         arg_ninputs,
+         arg_noutputs);
 }
 
 int main(int argc, char **argv)

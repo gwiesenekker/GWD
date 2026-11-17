@@ -5,29 +5,29 @@
 #include <assert.h>
 
 int zzzzzz_invocation;
-_Noreturn void zzzzzz(const char *file,
-                      const char *func,
-                      long line,
-                      const char *message,
-                      int code)
+_Noreturn void zzzzzz(const char *arg_file,
+                      const char *arg_func,
+                      long arg_line,
+                      const char *arg_message,
+                      int arg_code)
 {
-  fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
-  exit(code);
+  fprintf(stderr, "%s:%ld %s: %s\n", arg_file, arg_line, arg_func, arg_message);
+  exit(arg_code);
 }
 
 static alpha_beta_cache_entry_t tt;
 static score_cache_shared_slot_t sc;
 static thread_t publication_threads[4];
 
-static score_cache_slot_t make_score(uint64_t key, score_t score)
+static score_cache_slot_t make_score(uint64_t arg_key, score_t arg_score)
 {
-  score_cache_slot_t value = {.SCS_key = key,
-                              .SCS_score = score,
+  score_cache_slot_t value = {.SCS_key = arg_key,
+                              .SCS_score = arg_score,
                               .SCS_crc32 = 0};
 
-  uint32_t crc = HW_CRC32_U64(UINT32_MAX, key);
+  uint32_t crc = HW_CRC32_U64(UINT32_MAX, arg_key);
 
-  value.SCS_crc32 = ~HW_CRC32_U32(crc, score);
+  value.SCS_crc32 = ~HW_CRC32_U32(crc, arg_score);
 
   return value;
 }
@@ -43,9 +43,9 @@ static search_t *new_search(void)
   return search;
 }
 
-static void *worker(void *argument)
+static void *worker(void *arg_argument)
 {
-  uint64_t key = *(unsigned *)argument;
+  uint64_t key = *(unsigned *)arg_argument;
   search_t *search = new_search();
 
   search->S_thread = &publication_threads[key - 1];
@@ -53,11 +53,11 @@ static void *worker(void *argument)
 
   score_cache_slot_t score = make_score(key, (score_t)(key * 100));
 
-  for (unsigned i = 0; i < 50000; ++i)
+  for (unsigned iiteration = 0; iiteration < 50000; ++iiteration)
   {
-    search->S_ntotal_nodes = i + 1;
+    search->S_ntotal_nodes = iiteration + 1;
 
-    if (i % 1000 == 0)
+    if (iiteration % 1000 == 0)
       publish_nodes(search);
 
     alpha_beta_cache_slot_t value = {0}, found;
@@ -70,7 +70,7 @@ static void *worker(void *argument)
     value.ABCS_moves[1] = 7;
     update_alpha_beta_cache(search, &tt, &value);
 
-    if (probe_alpha_beta_cache(search, &tt, &found, i % 17 == 0))
+    if (probe_alpha_beta_cache(search, &tt, &found, iiteration % 17 == 0))
     {
       assert(found.ABCS_key == key);
       assert(found.ABCS_score == (score_t)(key * 100));
@@ -96,8 +96,8 @@ int main(int argc, char **argv)
   nalpha_beta_cache_entries = nscore_cache_entries = 1;
   alpha_beta_cache_slot_default.ABCS_key = abcs2crc64(0, 0);
 
-  for (int i = 0; i < NABCS_SLOTS; ++i)
-    init_alpha_beta_cache_slot(&tt.ABCE_slots[i],
+  for (int islot = 0; islot < NABCS_SLOTS; ++islot)
+    init_alpha_beta_cache_slot(&tt.ABCE_slots[islot],
                                &alpha_beta_cache_slot_default);
   score_cache_slot_default = make_score(0, 0);
   init_score_cache_slot(&sc, &score_cache_slot_default);
@@ -159,36 +159,38 @@ int main(int argc, char **argv)
 
   /* Clear using the concurrent-safe stores, then stress all writers/readers
    * on the same entry. Per-worker search counters are never shared. */
-  for (int i = 0; i < NABCS_SLOTS; ++i)
-    store_alpha_beta_cache_slot(&tt.ABCE_slots[i],
+  for (int islot = 0; islot < NABCS_SLOTS; ++islot)
+    store_alpha_beta_cache_slot(&tt.ABCE_slots[islot],
                                 &alpha_beta_cache_slot_default);
   store_score_cache_slot(&sc, &score_cache_slot_default);
 
   my_thread_t threads[4];
   unsigned keys[4] = {1, 2, 3, 4};
 
-  for (int i = 0; i < 4; ++i)
-    atomic_init(&publication_threads[i].T_npublished_nodes, 0);
+  for (int ithread = 0; ithread < 4; ++ithread)
+    atomic_init(&publication_threads[ithread].T_npublished_nodes, 0);
 
-  for (int i = 0; i < 4; ++i)
-    assert(compat_thread_create(&threads[i], worker, &keys[i]) == 0);
+  for (int ithread = 0; ithread < 4; ++ithread)
+    assert(compat_thread_create(&threads[ithread], worker, &keys[ithread]) ==
+           0);
 
-  for (int sample = 0; sample < 50000; ++sample)
-    for (int i = 0; i < 4; ++i)
+  for (int isample = 0; isample < 50000; ++isample)
+    for (int ithread = 0; ithread < 4; ++ithread)
     {
       i64_t nodes =
-        atomic_load_explicit(&publication_threads[i].T_npublished_nodes,
+        atomic_load_explicit(&publication_threads[ithread].T_npublished_nodes,
                              memory_order_relaxed);
 
       assert(nodes >= 0 && nodes <= 50000);
     }
 
-  for (int i = 0; i < 4; ++i)
-    assert(compat_thread_join(threads[i]) == 0);
+  for (int ithread = 0; ithread < 4; ++ithread)
+    assert(compat_thread_join(threads[ithread]) == 0);
 
-  for (int i = 0; i < 4; ++i)
-    assert(atomic_load_explicit(&publication_threads[i].T_npublished_nodes,
-                                memory_order_relaxed) == 50000);
+  for (int ithread = 0; ithread < 4; ++ithread)
+    assert(
+      atomic_load_explicit(&publication_threads[ithread].T_npublished_nodes,
+                           memory_order_relaxed) == 50000);
 
   puts("atomic cache tests passed");
 

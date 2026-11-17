@@ -27,12 +27,12 @@ typedef struct
   i8_t *CF_data_compressed;
 } compressed_file_t;
 
-local ui32_t return_crc32_data(ui64_t *a)
+local ui32_t return_crc32_data(ui64_t *arg_words)
 {
   ui32_t crc32 = 0xFFFFFFFF;
 
-  for (int i = 0; i < (BLOCK_LENGTH / 8); i++)
-    crc32 = HW_CRC32_U64(crc32, a[i]);
+  for (int iword = 0; iword < (BLOCK_LENGTH / 8); iword++)
+    crc32 = HW_CRC32_U64(crc32, arg_words[iword]);
 
   crc32 = ~crc32;
 
@@ -66,14 +66,14 @@ construct_compressed_file(compressed_file_t *arg_with_compressed_file,
 }
 
 local void add_block(compressed_file_t *arg_with_compressed_file,
-                     i64_t iblock,
+                     i64_t arg_iblock,
                      i8_t *arg_data)
 {
-  HARDBUG(iblock < 0)
-  HARDBUG(iblock >= arg_with_compressed_file->CF_nblocks)
+  HARDBUG(arg_iblock < 0)
+  HARDBUG(arg_iblock >= arg_with_compressed_file->CF_nblocks)
 
   compressed_block_t *with_compressed_block =
-    arg_with_compressed_file->CF_blocks + iblock;
+    arg_with_compressed_file->CF_blocks + arg_iblock;
 
   HARDBUG(with_compressed_block->CB_ldata_compressed != 0)
   HARDBUG(with_compressed_block->CB_data_compressed != NULL)
@@ -106,13 +106,13 @@ local void add_block(compressed_file_t *arg_with_compressed_file,
 }
 
 local void save_compressed_file(compressed_file_t *arg_with_compressed_file,
-                                bstring bname)
+                                bstring arg_bname)
 {
   HARDBUG(arg_with_compressed_file->CF_nblocks < 1)
 
   FILE *fcompressed;
 
-  HARDBUG((fcompressed = fopen(bdata(bname), "wb")) == NULL)
+  HARDBUG((fcompressed = fopen(bdata(arg_bname), "wb")) == NULL)
 
   // offsets
 
@@ -168,11 +168,11 @@ local void save_compressed_file(compressed_file_t *arg_with_compressed_file,
 }
 
 local void load_compressed_file(compressed_file_t *arg_with_compressed_file,
-                                bstring bname)
+                                bstring arg_bname)
 {
   FILE *fcompressed;
 
-  HARDBUG((fcompressed = fopen(bdata(bname), "rb")) == NULL)
+  HARDBUG((fcompressed = fopen(bdata(arg_bname), "rb")) == NULL)
 
   // header
 
@@ -244,9 +244,9 @@ local void load_compressed_file(compressed_file_t *arg_with_compressed_file,
 }
 
 local i8_t read_compressed_file(compressed_file_t *arg_with_compressed_file,
-                                i64_t where)
+                                i64_t arg_where)
 {
-  i64_t iblock = where / BLOCK_LENGTH;
+  i64_t iblock = arg_where / BLOCK_LENGTH;
 
   // uncompress iblock
 
@@ -266,22 +266,22 @@ local i8_t read_compressed_file(compressed_file_t *arg_with_compressed_file,
   HARDBUG(return_crc32_data((ui64_t *)data_uncompressed) !=
           arg_with_compressed_file->CF_blocks[iblock].CB_crc32_data)
 
-  return (data_uncompressed[where % BLOCK_LENGTH]);
+  return (data_uncompressed[arg_where % BLOCK_LENGTH]);
 }
 
-local void compress_file(bstring bwdl)
+local void compress_file(bstring arg_bwdl)
 {
   // get file stats
 
   i64_t size;
 
-  HARDBUG((size = compat_size(bdata(bwdl))) == -1)
+  HARDBUG((size = compat_size(bdata(arg_bwdl))) == -1)
 
   PRINTF("size=%lld\n", size);
 
   FILE *fwdl;
 
-  HARDBUG((fwdl = fopen(bdata(bwdl), "rb")) == NULL)
+  HARDBUG((fwdl = fopen(bdata(arg_bwdl), "rb")) == NULL)
 
   i8_t wdl_version;
 
@@ -304,9 +304,9 @@ local void compress_file(bstring bwdl)
 
   PRINTF("nblocks=%lld\n", nblocks);
 
-  compressed_file_t cf;
+  compressed_file_t compressed_file;
 
-  construct_compressed_file(&cf, nblocks);
+  construct_compressed_file(&compressed_file, nblocks);
 
   i8_t data[BLOCK_LENGTH];
 
@@ -326,7 +326,7 @@ local void compress_file(bstring bwdl)
         data[idata] = 0;
     }
 
-    add_block(&cf, iblock, data);
+    add_block(&compressed_file, iblock, data);
 
     iblock++;
   }
@@ -337,11 +337,11 @@ local void compress_file(bstring bwdl)
 
   BSTRING(bname_zstd)
 
-  bformata(bname_zstd, "%s.zstd", bdata(bwdl));
+  bformata(bname_zstd, "%s.zstd", bdata(arg_bwdl));
 
   PRINTF("bname_zstd=%s\n", bdata(bname_zstd));
 
-  save_compressed_file(&cf, bname_zstd);
+  save_compressed_file(&compressed_file, bname_zstd);
 
   BDESTROY(bname_zstd)
 }
@@ -354,11 +354,11 @@ void test_compress(void)
 
   compress_file(bname);
 
-  compressed_file_t cf;
+  compressed_file_t compressed_file;
 
   HARDBUG(bassigncstr(bname, "test.wdl.zstd") == BSTR_ERR)
 
-  load_compressed_file(&cf, bname);
+  load_compressed_file(&compressed_file, bname);
 
   BDESTROY(bname)
 }

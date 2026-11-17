@@ -422,7 +422,7 @@ local void solve_problems_multi_threaded(const char *arg_name)
   }
 }
 
-local char *secs2string(int arg_t, bstring string)
+local char *secs2string(int arg_t, bstring arg_string)
 {
   int hours;
   int minutes;
@@ -434,10 +434,11 @@ local char *secs2string(int arg_t, bstring string)
 
   HARDBUG((hours * 3600 + minutes * 60 + seconds) != arg_t)
 
-  HARDBUG(bassignformat(string, "%02d:%02d:%02d", hours, minutes, seconds) ==
-          BSTR_ERR)
+  HARDBUG(
+    bassignformat(arg_string, "%02d:%02d:%02d", hours, minutes, seconds) ==
+    BSTR_ERR)
 
-  return (bdata(string));
+  return (bdata(arg_string));
 }
 
 #define GAME_MOVES 40
@@ -547,18 +548,18 @@ void play_game(const char *arg_name,
         if (!my_breadline(line, stdin))
           goto label_return;
 
-        int t;
+        int remaining_minutes;
 
-        if (my_sscanf(bdata(line), "%d", &t) == 1)
+        if (my_sscanf(bdata(line), "%d", &remaining_minutes) == 1)
         {
-          game_time_used = game_time - t * 60.0;
+          game_time_used = game_time - remaining_minutes * 60.0;
 
           PRINTF("remaining %s minutes\n",
                  secs2string(round(game_time - game_time_used), btime));
         }
       }
 
-      double t1 = compat_time();
+      double start_time = compat_time();
 
       while (TRUE)
       {
@@ -670,9 +671,9 @@ void play_game(const char *arg_name,
         break;
       }
 
-      double t2 = compat_time();
+      double end_time = compat_time();
 
-      double wait_time = t2 - t1;
+      double wait_time = end_time - start_time;
 
       PRINTF("waited %s\n", secs2string(round(wait_time), btime));
 
@@ -715,7 +716,7 @@ void play_game(const char *arg_name,
 
       int best_score;
 
-      double t1 = compat_time();
+      double start_time = compat_time();
 
       if (moves_list.ML_nmoves == 1)
       {
@@ -802,13 +803,13 @@ void play_game(const char *arg_name,
         HARDBUG(compat_sleep(CENTI_SECOND) != 0)
       }
 
-      double t2;
+      double end_time;
 
     label_break:
 
-      t2 = compat_time();
+      end_time = compat_time();
 
-      double move_time = t2 - t1;
+      double move_time = end_time - start_time;
 
       game_time_used += move_time;
 
@@ -847,23 +848,23 @@ label_return:
 
 double weibull_shape(int arg_npieces)
 {
-  double a = 0.66;
-  double mu = 7.65;
+  double amplitude = 0.66;
+  double mean = 7.65;
   double sigma = 3.57;
   double offset = 1.87;
 
-  return (
-    a * exp(-((arg_npieces - mu) * (arg_npieces - mu)) / (2 * sigma * sigma)) +
-    offset);
+  return (amplitude * exp(-((arg_npieces - mean) * (arg_npieces - mean)) /
+                          (2 * sigma * sigma)) +
+          offset);
 }
 
 double weibull_scale(int arg_npieces)
 {
-  double a = 3.66;
-  double b = 0.12;
+  double amplitude = 3.66;
+  double decay = 0.12;
   double offset = 2.74;
 
-  return (a * exp(-b * arg_npieces) + offset);
+  return (amplitude * exp(-decay * arg_npieces) + offset);
 }
 
 int weibull_sample_row(double arg_probability,
@@ -910,10 +911,10 @@ local void test_weibull(void)
 // 10 pieces 25%
 local double probability_one_king(int arg_npieces)
 {
-  double a = 0.83;
-  double b = -0.12;
+  double amplitude = 0.83;
+  double exponent = -0.12;
 
-  return (a * exp(b * arg_npieces));
+  return (amplitude * exp(exponent * arg_npieces));
 }
 
 local int add_man_random(int arg_nwhite_men,
@@ -939,12 +940,12 @@ local int add_man_random(int arg_nwhite_men,
   {
     ++ntry;
 
-    for (int i = 1; i <= 50; ++i)
-      arg_s[i] = *nn;
+    for (int isquare = 1; isquare <= 50; ++isquare)
+      arg_s[isquare] = *nn;
 
     for (int iwhite_man = 1; iwhite_man <= arg_nwhite_men; ++iwhite_man)
     {
-      int i = INVALID;
+      int isquare = INVALID;
 
       while (TRUE)
       {
@@ -953,22 +954,22 @@ local int add_man_random(int arg_nwhite_men,
         int irow = 9 - weibull_sample_row(probability, arg_shape, arg_scale);
         int icol = return_my_random(arg_random) % 5;
 
-        i = irow * 5 + icol + 1;
+        isquare = irow * 5 + icol + 1;
 
-        HARDBUG(i > 50)
+        HARDBUG(isquare > 50)
 
-        if (arg_s[i] == *nn)
+        if (arg_s[isquare] == *nn)
           break;
       }
 
-      HARDBUG(i == INVALID)
+      HARDBUG(isquare == INVALID)
 
-      arg_s[i] = *wO;
+      arg_s[isquare] = *wO;
     }
 
     for (int iblack_man = 1; iblack_man <= arg_nblack_men; ++iblack_man)
     {
-      int i = INVALID;
+      int isquare = INVALID;
 
       while (TRUE)
       {
@@ -977,17 +978,17 @@ local int add_man_random(int arg_nwhite_men,
         int irow = weibull_sample_row(probability, arg_shape, arg_scale);
         int icol = return_my_random(arg_random) % 5;
 
-        i = irow * 5 + icol + 1;
+        isquare = irow * 5 + icol + 1;
 
-        HARDBUG(i > 50)
+        HARDBUG(isquare > 50)
 
-        if (arg_s[i] == *nn)
+        if (arg_s[isquare] == *nn)
           break;
       }
 
-      HARDBUG(i == INVALID)
+      HARDBUG(isquare == INVALID)
 
-      arg_s[i] = *bO;
+      arg_s[isquare] = *bO;
     }
 
     arg_s[51] = '\0';
@@ -1358,10 +1359,10 @@ local void gen_random(const char *arg_fen_name,
 
   reset_my_timer(&timer);
 
-  BSTRING(s)
+  BSTRING(position)
 
-  HARDBUG(bassigncstr(s, "?") == BSTR_ERR)
-  HARDBUG(bpattern(s, 51) == BSTR_ERR)
+  HARDBUG(bassigncstr(position, "?") == BSTR_ERR)
+  HARDBUG(bpattern(position, 51) == BSTR_ERR)
 
   BSTRING(bfen_name)
 
@@ -1606,9 +1607,9 @@ local void gen_random(const char *arg_fen_name,
     PRINTF("shape=%.2f scale=%.2f\n", shape, scale);
 
     if ((return_my_random(&temp_random) % 2) == 0)
-      bdata(s)[0] = 'w';
+      bdata(position)[0] = 'w';
     else
-      bdata(s)[0] = 'b';
+      bdata(position)[0] = 'b';
 
     score_t best_score = SCORE_PLUS_INFINITY;
 
@@ -1622,7 +1623,7 @@ local void gen_random(const char *arg_fen_name,
                               scale,
                               &temp_random,
                               with_search,
-                              bdata(s),
+                              bdata(position),
                               &best_score);
     }
     else
@@ -1633,7 +1634,7 @@ local void gen_random(const char *arg_fen_name,
                               scale,
                               &temp_random,
                               with_search,
-                              bdata(s),
+                              bdata(position),
                               NULL);
     }
 
@@ -1659,7 +1660,7 @@ local void gen_random(const char *arg_fen_name,
                               with_search,
                               &white_kings_mask,
                               &black_kings_mask,
-                              bdata(s),
+                              bdata(position),
                               &best_score))
         {
           PRINTF("add_kings_random failed nsame=%d\n", nsame);
@@ -1803,7 +1804,7 @@ local void gen_random(const char *arg_fen_name,
 
   BDESTROY(bfen_name)
 
-  BDESTROY(s)
+  BDESTROY(position)
 }
 
 local void test_cJSON(void)
@@ -2545,9 +2546,9 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
     {
       PRINTF("header has changed!\n");
 
-      time_t t = time(NULL);
+      time_t current_time = time(NULL);
 
-      my_bstrftime(stamp, "%d%b%Y-%H%M%S", t);
+      my_bstrftime(stamp, "%d%b%Y-%H%M%S", current_time);
 
       HARDBUG(bassignformat(newpath, "%s-%s", path, bdata(stamp)) == BSTR_ERR)
 
@@ -2563,9 +2564,9 @@ void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown)
 
   HARDBUG(fcsv == NULL)
 
-  time_t t = time(NULL);
+  time_t current_time = time(NULL);
 
-  my_bstrftime(stamp, "%d%b%Y-%H%M%S", t);
+  my_bstrftime(stamp, "%d%b%Y-%H%M%S", current_time);
 
   HARDBUG(fprintf(fcsv, "\"%s\",\"%s\"", REVISION, bdata(stamp)) < 0)
 

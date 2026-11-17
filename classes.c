@@ -14,17 +14,17 @@
 // at most nobject_max objects
 // you should call the class constructor from the object constructor
 
-local int register_object(class_t *self, void *object)
+local int register_object(class_t *arg_self, void *arg_object)
 {
-  HARDBUG(compat_mutex_lock(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(arg_self->objects_mutex)) != 0)
 
-  HARDBUG(self->nobjects >= self->nobjects_max)
+  HARDBUG(arg_self->nobjects >= arg_self->nobjects_max)
 
-  self->objects[self->nobjects++] = object;
+  arg_self->objects[arg_self->nobjects++] = arg_object;
 
-  int object_id = self->object_id++;
+  int object_id = arg_self->object_id++;
 
-  HARDBUG(compat_mutex_unlock(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(arg_self->objects_mutex)) != 0)
 
   return (object_id);
 }
@@ -32,28 +32,28 @@ local int register_object(class_t *self, void *object)
 // the class 'destructor' deregister_object deregisters an object
 // in the class
 
-local void deregister_object(class_t *self, void *object)
+local void deregister_object(class_t *arg_self, void *arg_object)
 {
-  HARDBUG(compat_mutex_lock(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_lock(&(arg_self->objects_mutex)) != 0)
 
-  HARDBUG(self->nobjects < 1)
+  HARDBUG(arg_self->nobjects < 1)
 
   int iobject;
 
-  for (iobject = 0; iobject < self->nobjects; iobject++)
-    if (self->objects[iobject] == object)
+  for (iobject = 0; iobject < arg_self->nobjects; iobject++)
+    if (arg_self->objects[iobject] == arg_object)
       break;
 
-  HARDBUG(iobject >= self->nobjects)
+  HARDBUG(iobject >= arg_self->nobjects)
 
-  for (int jobject = iobject; jobject < self->nobjects - 1; jobject++)
-    self->objects[jobject] = self->objects[jobject + 1];
+  for (int jobject = iobject; jobject < arg_self->nobjects - 1; jobject++)
+    arg_self->objects[jobject] = arg_self->objects[jobject + 1];
 
-  self->objects[self->nobjects - 1] = NULL;
+  arg_self->objects[arg_self->nobjects - 1] = NULL;
 
-  self->nobjects--;
+  arg_self->nobjects--;
 
-  HARDBUG(compat_mutex_unlock(&(self->objects_mutex)) != 0)
+  HARDBUG(compat_mutex_unlock(&(arg_self->objects_mutex)) != 0)
 }
 
 // you initialize a class by calling init_class
@@ -63,8 +63,10 @@ local void deregister_object(class_t *self, void *object)
 // init_class registers the class constructor register_object
 // and the class destructor deregister_object
 
-class_t *
-init_class(int nobjects_max, ctor_t arg_ctor, dtor_t arg_dtor, iter_t arg_iter)
+class_t *init_class(int arg_nobjects_max,
+                    ctor_t arg_ctor,
+                    dtor_t arg_dtor,
+                    iter_t arg_iter)
 {
   class_t *self;
 
@@ -72,15 +74,15 @@ init_class(int nobjects_max, ctor_t arg_ctor, dtor_t arg_dtor, iter_t arg_iter)
 
   // the class keeps track of the (number of) created objects
 
-  self->nobjects_max = nobjects_max;
+  self->nobjects_max = arg_nobjects_max;
 
   self->nobjects = 0;
 
   self->object_id = 0;
 
-  MY_MALLOC_BY_TYPE(self->objects, void *, nobjects_max)
+  MY_MALLOC_BY_TYPE(self->objects, void *, arg_nobjects_max)
 
-  for (int iobject = 0; iobject < nobjects_max; iobject++)
+  for (int iobject = 0; iobject < arg_nobjects_max; iobject++)
     self->objects[iobject] = NULL;
 
   // register the class 'constructor' and 'destructor'
@@ -110,17 +112,17 @@ init_class(int nobjects_max, ctor_t arg_ctor, dtor_t arg_dtor, iter_t arg_iter)
 
 // the object iterator can return an error value
 
-void iterate_class(class_t *self)
+void iterate_class(class_t *arg_self)
 {
-  HARDBUG(self->objects_iter == NULL)
+  HARDBUG(arg_self->objects_iter == NULL)
 
   int nerrors = 0;
 
-  for (int iobject = 0; iobject < self->nobjects; iobject++)
+  for (int iobject = 0; iobject < arg_self->nobjects; iobject++)
   {
-    HARDBUG(self->objects[iobject] == NULL)
+    HARDBUG(arg_self->objects[iobject] == NULL)
 
-    nerrors += self->objects_iter(self->objects[iobject]);
+    nerrors += arg_self->objects_iter(arg_self->objects[iobject]);
   }
 
   HARDBUG(nerrors > 0)
@@ -150,9 +152,9 @@ typedef struct
 
 // the object printer
 
-local void printf_my_object(void *self)
+local void printf_my_object(void *arg_self)
 {
-  my_object_t *object = self;
+  my_object_t *object = arg_self;
 
   PRINTF("printing my_object object_id=%d\n", object->object_id);
 
@@ -173,11 +175,11 @@ local void *construct_my_object(void)
 
   // construct other parts of the object
 
-  time_t t = time(NULL);
+  time_t current_time = time(NULL);
 
   HARDBUG((object->object_stamp = bfromcstr("")) == NULL)
 
-  my_bstrftime(object->object_stamp, "%H:%M:%S-%d/%m/%Y", t);
+  my_bstrftime(object->object_stamp, "%H:%M:%S-%d/%m/%Y", current_time);
 
   // register object methods
 
@@ -188,9 +190,9 @@ local void *construct_my_object(void)
 
 // the object destructor
 
-local void destroy_my_object(void *self)
+local void destroy_my_object(void *arg_self)
 {
-  my_object_t *object = self;
+  my_object_t *object = arg_self;
 
   PRINTF("destroying my_object object_id=%d\n", object->object_id);
 
@@ -203,9 +205,9 @@ local void destroy_my_object(void *self)
 
 // the object iterator
 
-local int iterate_my_object(void *self)
+local int iterate_my_object(void *arg_self)
 {
-  my_object_t *object = self;
+  my_object_t *object = arg_self;
 
   PRINTF("iterate object_id=%d\n", object->object_id);
 
@@ -219,45 +221,45 @@ void test_my_object_class(void)
   my_object_class =
     init_class(3, construct_my_object, destroy_my_object, iterate_my_object);
 
-  my_object_t *a = my_object_class->objects_ctor();
+  my_object_t *object_a = my_object_class->objects_ctor();
 
-  a->printf_object(a);
+  object_a->printf_object(object_a);
 
-  my_object_t *b = my_object_class->objects_ctor();
+  my_object_t *object_b = my_object_class->objects_ctor();
 
-  b->printf_object(b);
+  object_b->printf_object(object_b);
 
-  my_object_t *c = my_object_class->objects_ctor();
+  my_object_t *object_c = my_object_class->objects_ctor();
 
-  c->printf_object(c);
+  object_c->printf_object(object_c);
 
   PRINTF("iterate from a to c\n");
 
   iterate_class(my_object_class);
 
-  my_object_class->objects_dtor(a);
+  my_object_class->objects_dtor(object_a);
 
   PRINTF("a has been destroyed, b and c should be left\n");
 
   iterate_class(my_object_class);
 
-  my_object_t *d = my_object_class->objects_ctor();
+  my_object_t *object_d = my_object_class->objects_ctor();
 
-  d->printf_object(d);
+  object_d->printf_object(object_d);
 
   PRINTF("d has been added, iterate from b to d\n");
 
   iterate_class(my_object_class);
 
-  my_object_class->objects_dtor(c);
+  my_object_class->objects_dtor(object_c);
 
   PRINTF("c has been destroyed, b and d should be left\n");
 
   iterate_class(my_object_class);
 
-  my_object_t *e = my_object_class->objects_ctor();
+  my_object_t *object_e = my_object_class->objects_ctor();
 
-  e->printf_object(e);
+  object_e->printf_object(object_e);
 
   PRINTF("e has been added\n");
 

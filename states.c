@@ -130,12 +130,12 @@ local int pop_move(game_state_t *arg_with_game_state)
 
   HARDBUG(!cJSON_IsArray(cjson_item))
 
-  int n = cJSON_GetArraySize(cjson_item);
+  int nmoves = cJSON_GetArraySize(cjson_item);
 
-  if (n > 0)
-    cJSON_DeleteItemFromArray(cjson_item, n - 1);
+  if (nmoves > 0)
+    cJSON_DeleteItemFromArray(cjson_item, nmoves - 1);
 
-  return (n);
+  return (nmoves);
 }
 
 local void clear_moves(game_state_t *arg_with_game_state)
@@ -394,9 +394,9 @@ void construct_game_state(game_state_t *arg_with_game_state)
 
   BSTRING(event)
 
-  time_t t = time(NULL);
+  time_t current_time = time(NULL);
 
-  my_bstrftime(event, "%Y.%m.%d %H:%M:%S", t);
+  my_bstrftime(event, "%Y.%m.%d %H:%M:%S", current_time);
 
   HARDBUG(cJSON_AddStringToObject(arg_with_game_state->cjson_object,
                                   CJSON_EVENT_ID,
@@ -406,7 +406,7 @@ void construct_game_state(game_state_t *arg_with_game_state)
 
   BSTRING(date)
 
-  my_bstrftime(date, "%Y.%m.%d", t);
+  my_bstrftime(date, "%Y.%m.%d", current_time);
 
   HARDBUG(cJSON_AddStringToObject(arg_with_game_state->cjson_object,
                                   CJSON_DATE_ID,
@@ -539,79 +539,80 @@ void *reset_state(state_t *arg_with_state)
 
 void test_states(void)
 {
-  game_state_t a;
+  game_state_t game_state;
 
-  construct_game_state(&a);
+  construct_game_state(&game_state);
 
   PRINTF("a after init:\n");
-  a.printf_game_state(&a);
+  game_state.printf_game_state(&game_state);
 
-  a.clear_moves(&a);
+  game_state.clear_moves(&game_state);
 
   PRINTF("a after clear_moves:\n");
-  a.printf_game_state(&a);
+  game_state.printf_game_state(&game_state);
 
-  a.set_starting_position(&a,
-                          "W:W28,31,32,35,36,37,38,39,40,42,43,45,47:B3,7,8,11,"
-                          "12,13,15,19,20,21,23,26,29.");
+  game_state.set_starting_position(
+    &game_state,
+    "W:W28,31,32,35,36,37,38,39,40,42,43,45,47:B3,7,8,11,"
+    "12,13,15,19,20,21,23,26,29.");
 
-  a.push_move(&a, "31-26", NULL);
+  game_state.push_move(&game_state, "31-26", NULL);
 
-  a.push_move(&a, "17-22", "{only move}");
+  game_state.push_move(&game_state, "17-22", "{only move}");
 
-  a.set_depth(&a, 32);
+  game_state.set_depth(&game_state, 32);
 
-  a.set_time(&a, 10);
+  game_state.set_time(&game_state, 10);
 
   PRINTF("a after config:\n");
-  a.printf_game_state(&a);
+  game_state.printf_game_state(&game_state);
 
-  a.pop_move(&a);
+  game_state.pop_move(&game_state);
 
   PRINTF("a after pop_move:\n");
-  a.printf_game_state(&a);
+  game_state.printf_game_state(&game_state);
 
-  a.clear_moves(&a);
+  game_state.clear_moves(&game_state);
 
   PRINTF("a after clear_moves\n");
-  a.printf_game_state(&a);
+  game_state.printf_game_state(&game_state);
 
-  a.push_move(&a, "31-26", NULL);
+  game_state.push_move(&game_state, "31-26", NULL);
 
   PRINTF("a after push_move\n");
-  a.printf_game_state(&a);
+  game_state.printf_game_state(&game_state);
 
-  state_t f;
+  state_t state;
 
-  int *g;
+  int *value;
 
-  g = construct_state(&f, sizeof(int), NTEST);
+  value = construct_state(&state, sizeof(int), NTEST);
 
-  for (int i = 0; i <= NTEST - 2; ++i)
+  for (int istate = 0; istate <= NTEST - 2; ++istate)
   {
-    *g = i;
+    *value = istate;
 
-    g = push_state(&f);
+    value = push_state(&state);
 
-    HARDBUG(f.S_icurrent != (i + 1))
+    HARDBUG(state.S_icurrent != (istate + 1))
 
-    HARDBUG(*g != i)
+    HARDBUG(*value != istate)
   }
 
-  HARDBUG(f.S_icurrent != (NTEST - 1))
+  HARDBUG(state.S_icurrent != (NTEST - 1))
 
-  HARDBUG(*g != (NTEST - 2))
+  HARDBUG(*value != (NTEST - 2))
 
-  for (int i = NTEST - 2; i >= 0; --i)
+  for (int istate = NTEST - 2; istate >= 0; --istate)
   {
-    g = pop_state(&f);
+    value = pop_state(&state);
 
-    HARDBUG(f.S_icurrent != i);
+    HARDBUG(state.S_icurrent != istate);
 
-    HARDBUG(*g != i)
+    HARDBUG(*value != istate)
   }
 
-  HARDBUG(f.S_icurrent != 0)
+  HARDBUG(state.S_icurrent != 0)
 
-  HARDBUG(*g != 0)
+  HARDBUG(*value != 0)
 }

@@ -327,111 +327,111 @@ void test_caches(void)
 
   construct_my_random(&test_random, NULL);
 
-  i64_t d = -1;
+  i64_t signed_empty = -1;
 
-  cache_t a;
+  cache_t signed_cache;
 
-  construct_cache(&a,
+  construct_cache(&signed_cache,
                   "a",
                   MBYTE,
                   CACHE_ENTRY_KEY_TYPE_I64_T,
-                  &d,
+                  &signed_empty,
                   sizeof(i64_t),
-                  &d);
+                  &signed_empty);
 
-  for (i64_t i = 0; i < 100000; i++)
+  for (i64_t ientry = 0; ientry < 100000; ientry++)
   {
-    i64_t j;
+    i64_t missing_value;
 
-    HARDBUG(check_entry_in_cache(&a, &i, &j))
+    HARDBUG(check_entry_in_cache(&signed_cache, &ientry, &missing_value))
 
-    i64_t v = 2 * i;
+    i64_t expected_value = 2 * ientry;
 
-    if (store_entry_in_cache(&a, &i, &v))
+    if (store_entry_in_cache(&signed_cache, &ientry, &expected_value))
     {
-      PRINTF("overwrite i=%lld\n", i);
+      PRINTF("overwrite i=%lld\n", ientry);
 
       break;
     }
 
-    i64_t w;
+    i64_t stored_value;
 
-    HARDBUG(!check_entry_in_cache(&a, &i, &w))
+    HARDBUG(!check_entry_in_cache(&signed_cache, &ientry, &stored_value))
 
-    HARDBUG(w != v)
+    HARDBUG(stored_value != expected_value)
   }
 
-  printf_cache(&a);
+  printf_cache(&signed_cache);
 
-  for (i64_t i = 0; i < 100000; i++)
+  for (i64_t ientry = 0; ientry < 100000; ientry++)
   {
-    i64_t j = return_my_random(&test_random) % 100000000;
+    i64_t entry_key = return_my_random(&test_random) % 100000000;
 
-    i64_t v = 2 * j;
+    i64_t expected_value = 2 * entry_key;
 
-    store_entry_in_cache(&a, &j, &v);
+    store_entry_in_cache(&signed_cache, &entry_key, &expected_value);
 
-    i64_t w;
+    i64_t stored_value;
 
-    HARDBUG(!check_entry_in_cache(&a, &j, &w))
+    HARDBUG(!check_entry_in_cache(&signed_cache, &entry_key, &stored_value))
 
-    HARDBUG(w != v)
+    HARDBUG(stored_value != expected_value)
   }
 
-  printf_cache(&a);
+  printf_cache(&signed_cache);
 
-  ui64_t e = 0;
+  ui64_t unsigned_empty = 0;
 
-  cache_t b;
+  cache_t unsigned_cache;
 
-  construct_cache(&b,
+  construct_cache(&unsigned_cache,
                   "b",
                   MBYTE,
                   CACHE_ENTRY_KEY_TYPE_UI64_T,
-                  &e,
+                  &unsigned_empty,
                   sizeof(ui64_t),
-                  &e);
+                  &unsigned_empty);
 
   // for ui64_t the key 0 is not allowed
 
-  for (ui64_t i = 1; i < 100000; i++)
+  for (ui64_t ientry = 1; ientry < 100000; ientry++)
   {
-    ui64_t j;
+    ui64_t missing_value;
 
-    HARDBUG(check_entry_in_cache(&b, &i, &j))
+    HARDBUG(check_entry_in_cache(&unsigned_cache, &ientry, &missing_value))
 
-    ui64_t v = 2 * i;
+    ui64_t expected_value = 2 * ientry;
 
-    if (store_entry_in_cache(&b, &i, &v))
+    if (store_entry_in_cache(&unsigned_cache, &ientry, &expected_value))
     {
-      PRINTF("overwrite i=%lld\n", i);
+      PRINTF("overwrite i=%lld\n", ientry);
 
       break;
     }
 
-    ui64_t w;
+    ui64_t stored_value;
 
-    HARDBUG(!check_entry_in_cache(&b, &i, &w))
+    HARDBUG(!check_entry_in_cache(&unsigned_cache, &ientry, &stored_value))
 
-    HARDBUG(w != v)
+    HARDBUG(stored_value != expected_value)
   }
 
-  printf_cache(&b);
+  printf_cache(&unsigned_cache);
 
-  for (i64_t i = 0; i < 100000; i++)
+  for (i64_t ientry = 0; ientry < 100000; ientry++)
   {
-    ui64_t j = return_my_random(&test_random) % 100000000;
+    ui64_t entry_key = return_my_random(&test_random) % 100000000;
 
-    ui64_t v = 2 * j;
+    ui64_t expected_value = 2 * entry_key;
 
-    store_entry_in_cache(&b, &j, &v);
+    store_entry_in_cache(&unsigned_cache, &entry_key, &expected_value);
 
-    ui64_t w;
+    ui64_t stored_value;
 
-    HARDBUG(!check_entry_in_cache(&b, &j, &w))
+    HARDBUG(!check_entry_in_cache(&unsigned_cache, &entry_key, &stored_value))
 
-    HARDBUG(w != v)
+    HARDBUG(stored_value != expected_value)
   }
 
-  printf_cache(&b);
+  printf_cache(&unsigned_cache);
 }

@@ -6,67 +6,71 @@
 int zzzzzz_invocation;
 my_mpi_globals_t my_mpi_globals;
 
-_Noreturn void zzzzzz(const char *file,
-                      const char *func,
-                      long line,
-                      const char *message,
-                      int code)
+_Noreturn void zzzzzz(const char *arg_file,
+                      const char *arg_func,
+                      long arg_line,
+                      const char *arg_message,
+                      int arg_code)
 {
-  fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
-  exit(code);
+  fprintf(stderr, "%s:%ld %s: %s\n", arg_file, arg_line, arg_func, arg_message);
+  exit(arg_code);
 }
 
-void *my_malloc(const char *name,
-                const char *file,
-                const char *func,
-                int line,
-                size_t size)
+void *my_malloc(const char *arg_name,
+                const char *arg_file,
+                const char *arg_func,
+                int arg_line,
+                size_t arg_size)
 {
-  (void)name;
-  (void)file;
-  (void)func;
-  (void)line;
+  (void)arg_name;
+  (void)arg_file;
+  (void)arg_func;
+  (void)arg_line;
 
-  return malloc(size);
+  return malloc(arg_size);
 }
-void my_free(void *pointer) { free(pointer); }
-void register_heap(const char *name,
-                   const char *file,
-                   const char *func,
-                   int line,
-                   void *pointer,
-                   size_t size,
-                   int allocated,
-                   int readonly)
+void my_free(void *arg_pointer) { free(arg_pointer); }
+void register_heap(const char *arg_name,
+                   const char *arg_file,
+                   const char *arg_func,
+                   int arg_line,
+                   void *arg_pointer,
+                   size_t arg_size,
+                   int arg_allocated,
+                   int arg_readonly)
 {
-  (void)name;
-  (void)file;
-  (void)func;
-  (void)line;
-  (void)pointer;
-  (void)size;
-  (void)allocated;
-  (void)readonly;
+  (void)arg_name;
+  (void)arg_file;
+  (void)arg_func;
+  (void)arg_line;
+  (void)arg_pointer;
+  (void)arg_size;
+  (void)arg_allocated;
+  (void)arg_readonly;
 }
-void my_mpi_allocate_shared(MPI_Comm comm,
-                            size_t size,
-                            size_t count,
-                            void **pointer,
-                            MPI_Win *win)
+void my_mpi_allocate_shared(MPI_Comm arg_comm,
+                            size_t arg_size,
+                            size_t arg_count,
+                            void **arg_pointer,
+                            MPI_Win *arg_win)
 {
-  (void)comm;
-  *pointer = malloc(size * count);
+  (void)arg_comm;
+  *arg_pointer = malloc(arg_size * arg_count);
 
-  assert(*pointer != NULL);
+  assert(*arg_pointer != NULL);
 
-  memset(*pointer, 0xa5, size * count); /* Detect missing zero filling. */
-  *win = 0;
+  memset(*arg_pointer,
+         0xa5,
+         arg_size * arg_count); /* Detect missing zero filling. */
+  *arg_win = 0;
 }
-void my_mpi_sync_shared(MPI_Comm comm, MPI_Win win, const char *name)
+void my_mpi_sync_shared(MPI_Comm arg_comm,
+                        MPI_Win arg_win,
+                        const char *arg_name)
 {
-  (void)comm;
-  (void)win;
-  (void)name;
+  (void)arg_comm;
+  (void)arg_win;
+  (void)arg_name;
 }
 
 int main(int argc, char **argv)

@@ -67,7 +67,7 @@ local my_mutex_t my_names_mutex;
 #include "xxhash.h"
 
 // Function to hash an array using XXH3_64bits
-ui64_t return_XXH3_64(const void *data, size_t len)
+ui64_t return_XXH3_64(const void *arg_data, size_t arg_nbytes)
 {
   // Allocate a state struct
 
@@ -81,19 +81,21 @@ ui64_t return_XXH3_64(const void *data, size_t len)
 
   // Process input in chunks (if needed)
 
-  size_t chunkSize = 4096; // Process in 4KB chunks like the file example
+  size_t chunk_size = 4096; // Process in 4KB chunks like the file example
 
-  const char *ptr = (const char *)data;
-  size_t processed = 0;
+  const char *bytes = (const char *)arg_data;
+  size_t nprocessed_bytes = 0;
 
-  while (processed < len)
+  while (nprocessed_bytes < arg_nbytes)
   {
-    size_t toProcess =
-      (len - processed < chunkSize) ? (len - processed) : chunkSize;
+    size_t chunk_nbytes = (arg_nbytes - nprocessed_bytes < chunk_size)
+                            ? (arg_nbytes - nprocessed_bytes)
+                            : chunk_size;
 
-    HARDBUG(XXH3_64bits_update(state, ptr + processed, toProcess) == XXH_ERROR)
+    HARDBUG(XXH3_64bits_update(state, bytes + nprocessed_bytes, chunk_nbytes) ==
+            XXH_ERROR)
 
-    processed += toProcess;
+    nprocessed_bytes += chunk_nbytes;
   }
 
   // Finalize and retrieve the hash
@@ -196,8 +198,9 @@ void register_heap(const char *arg_name,
   {
     with_my_malloc->MM_prefix = arg_heap;
 
-    for (int i = 0; i < NPAD; i++)
-      with_my_malloc->MM_prefix[i] = return_my_random(&my_malloc_random) % 256;
+    for (int ibyte = 0; ibyte < NPAD; ibyte++)
+      with_my_malloc->MM_prefix[ibyte] =
+        return_my_random(&my_malloc_random) % 256;
 
     with_my_malloc->MM_prefix_crc64 =
       return_XXH3_64(with_my_malloc->MM_prefix, NPAD);
@@ -207,8 +210,9 @@ void register_heap(const char *arg_name,
     with_my_malloc->MM_postfix =
       (ui8_t *)((char *)arg_heap + NPAD + with_my_malloc->MM_size);
 
-    for (int i = 0; i < NPAD; i++)
-      with_my_malloc->MM_postfix[i] = return_my_random(&my_malloc_random) % 256;
+    for (int ibyte = 0; ibyte < NPAD; ibyte++)
+      with_my_malloc->MM_postfix[ibyte] =
+        return_my_random(&my_malloc_random) % 256;
 
     with_my_malloc->MM_postfix_crc64 =
       return_XXH3_64(with_my_malloc->MM_postfix, NPAD);
@@ -425,27 +429,27 @@ local my_name_stack_t *return_name_stack(void)
   return name_stack;
 }
 
-local int print_name_stack(my_name_stack_t *stack)
+local int print_name_stack(my_name_stack_t *arg_stack)
 {
   my_name_t snapshot[NMY_NAMES_MAX];
 
-  HARDBUG(compat_mutex_lock(&stack->mutex) != 0)
+  HARDBUG(compat_mutex_lock(&arg_stack->mutex) != 0)
 
-  int nnames = stack->nnames;
+  int nnames = arg_stack->nnames;
 
-  memcpy(snapshot, stack->names, (size_t)nnames * sizeof(*snapshot));
+  memcpy(snapshot, arg_stack->names, (size_t)nnames * sizeof(*snapshot));
 
-  HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
+  HARDBUG(compat_mutex_unlock(&arg_stack->mutex) != 0)
 
   /* Never hold a stack lock while printing or invoking fatal diagnostics. */
-  for (int i = nnames - 1; i >= 0; --i)
+  for (int iname = nnames - 1; iname >= 0; --iname)
     PRINTF("iname=%d name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
-           i,
-           snapshot[i].MN_name,
-           snapshot[i].MN_file,
-           snapshot[i].MN_func,
-           snapshot[i].MN_line,
-           snapshot[i].MN_pthread_self);
+           iname,
+           snapshot[iname].MN_name,
+           snapshot[iname].MN_file,
+           snapshot[iname].MN_func,
+           snapshot[iname].MN_line,
+           snapshot[iname].MN_pthread_self);
 
   return nnames;
 }
@@ -544,87 +548,88 @@ void init_my_malloc(void)
 
   HARDBUG(compat_mutex_init(&my_names_mutex) != 0)
 
-  char *f = "The quick brown fox jumps over the lazy dog";
-  BSTRING(s)
+  char *text = "The quick brown fox jumps over the lazy dog";
+  BSTRING(bchecksum)
 
-  ui64_t c = return_XXH3_64(f, strlen(f));
+  ui64_t checksum = return_XXH3_64(text, strlen(text));
 
-  HARDBUG(bassignformat(s, "%#llX", c) == BSTR_ERR)
+  HARDBUG(bassignformat(bchecksum, "%#llX", checksum) == BSTR_ERR)
 
   // PRINTF("the XXH3_64 of '%s' is %s hex\n", f, bdata(s));
 
-  HARDBUG(strcmp(bdata(s), "0XCE7D19A5418FB365") != 0)
+  HARDBUG(strcmp(bdata(bchecksum), "0XCE7D19A5418FB365") != 0)
 
-  BDESTROY(s)
+  BDESTROY(bchecksum)
 }
 
-local void heap_sort_i64(i64_t n, i64_t *p, i64_t *a)
+local void heap_sort_i64(i64_t arg_nvalues, i64_t *arg_order, i64_t *arg_values)
 {
-  i64_t m = n;
-  i64_t i, j, k, t;
+  i64_t nvalues = arg_nvalues;
+  i64_t iparent, ichild, iroot, saved_index;
 
-  if (n < 2)
+  if (arg_nvalues < 2)
     return;
 
-  for (i = 0; i < n; i++)
-    p[i] = i;
+  for (iparent = 0; iparent < arg_nvalues; iparent++)
+    arg_order[iparent] = iparent;
 
-  k = n / 2;
-  --n;
+  iroot = arg_nvalues / 2;
+  --arg_nvalues;
 
   while (TRUE)
   {
-    if (k > 0)
+    if (iroot > 0)
     {
-      t = p[--k];
+      saved_index = arg_order[--iroot];
     }
     else
     {
-      t = p[n];
-      p[n] = p[0];
+      saved_index = arg_order[arg_nvalues];
+      arg_order[arg_nvalues] = arg_order[0];
 
-      if (--n == 0)
+      if (--arg_nvalues == 0)
       {
-        p[0] = t;
+        arg_order[0] = saved_index;
 
         break;
       }
     }
-    i = k;
-    j = 2 * k + 1;
+    iparent = iroot;
+    ichild = 2 * iroot + 1;
 
-    while (j <= n)
+    while (ichild <= arg_nvalues)
     {
-      if ((j < n) and (a[p[j]] > a[p[j + 1]]))
-        j++;
+      if ((ichild < arg_nvalues) and
+          (arg_values[arg_order[ichild]] > arg_values[arg_order[ichild + 1]]))
+        ichild++;
 
-      if (a[t] > a[p[j]])
+      if (arg_values[saved_index] > arg_values[arg_order[ichild]])
       {
-        p[i] = p[j];
-        i = j;
-        j = 2 * j + 1;
+        arg_order[iparent] = arg_order[ichild];
+        iparent = ichild;
+        ichild = 2 * ichild + 1;
       }
       else
       {
-        j = n + 1;
+        ichild = arg_nvalues + 1;
       }
     }
-    p[i] = t;
+    arg_order[iparent] = saved_index;
   }
 
-  for (i = 0; i < m - 1; i++)
-    HARDBUG(a[p[i]] < a[p[i + 1]])
+  for (iparent = 0; iparent < nvalues - 1; iparent++)
+    HARDBUG(arg_values[arg_order[iparent]] < arg_values[arg_order[iparent + 1]])
 }
 
-local void printf_imalloc(int imalloc)
+local void printf_imalloc(int arg_imalloc)
 {
-  HARDBUG(imalloc < 0)
-  HARDBUG(imalloc >= nmy_mallocs)
+  HARDBUG(arg_imalloc < 0)
+  HARDBUG(arg_imalloc >= nmy_mallocs)
 
-  my_malloc_t *with_my_malloc = my_mallocs + imalloc;
+  my_malloc_t *with_my_malloc = my_mallocs + arg_imalloc;
 
   PRINTF("imalloc=%d name=%s file=%s func=%s line=%d size=%lld\n",
-         imalloc,
+         arg_imalloc,
          bdata(with_my_malloc->MM_name),
          bdata(with_my_malloc->MM_file),
          bdata(with_my_malloc->MM_func),

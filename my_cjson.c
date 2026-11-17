@@ -111,18 +111,18 @@ void test_my_cjson(void)
 
   PRINTF("test=%s\n", my_cjson2cstring(&test));
 
-  char *c = my_cjson_get_cstring(&test, CJSON_ID_NAME);
-  int n = my_cjson_get_int(&test, CJSON_ID_INT);
+  char *string_value = my_cjson_get_cstring(&test, CJSON_ID_NAME);
+  int integer_value = my_cjson_get_int(&test, CJSON_ID_INT);
 
-  PRINTF("c=%s n=%d\n", c, n);
+  PRINTF("c=%s n=%d\n", string_value, integer_value);
 
   my_cjson_set_cstring(&test, CJSON_ID_NAME, "n updated");
   my_cjson_set_int(&test, CJSON_ID_INT, 130);
 
   PRINTF("test=%s\n", my_cjson2cstring(&test));
 
-  c = my_cjson_get_cstring(&test, CJSON_ID_NAME);
-  n = my_cjson_get_int(&test, CJSON_ID_INT);
+  string_value = my_cjson_get_cstring(&test, CJSON_ID_NAME);
+  integer_value = my_cjson_get_int(&test, CJSON_ID_INT);
 
-  PRINTF("c=%s n=%d\n", c, n);
+  PRINTF("c=%s n=%d\n", string_value, integer_value);
 }

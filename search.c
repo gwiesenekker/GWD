@@ -199,26 +199,32 @@ _Static_assert(sizeof(alpha_beta_cache_shared_slot_t) ==
  * mixed snapshots and competing writers are deliberately treated as misses.
  * No unrelated objects are published through these relaxed operations. */
 local inline void
-load_alpha_beta_cache_slot(alpha_beta_cache_slot_t *to,
-                           const alpha_beta_cache_shared_slot_t *from)
+load_alpha_beta_cache_slot(alpha_beta_cache_slot_t *arg_target,
+                           const alpha_beta_cache_shared_slot_t *arg_source)
 {
-  to->ABCS_key = atomic_load_explicit(&from->ABCS_key, memory_order_relaxed);
-  to->ABCS_data = atomic_load_explicit(&from->ABCS_data, memory_order_relaxed);
+  arg_target->ABCS_key =
+    atomic_load_explicit(&arg_source->ABCS_key, memory_order_relaxed);
+  arg_target->ABCS_data =
+    atomic_load_explicit(&arg_source->ABCS_data, memory_order_relaxed);
 #ifdef DEBUG
-  to->ABCS_debug =
-    atomic_load_explicit(&from->ABCS_debug, memory_order_relaxed);
+  arg_target->ABCS_debug =
+    atomic_load_explicit(&arg_source->ABCS_debug, memory_order_relaxed);
 #endif
 }
 
 local inline void
-store_alpha_beta_cache_slot(alpha_beta_cache_shared_slot_t *to,
-                            const alpha_beta_cache_slot_t *from)
+store_alpha_beta_cache_slot(alpha_beta_cache_shared_slot_t *arg_target,
+                            const alpha_beta_cache_slot_t *arg_source)
 {
-  atomic_store_explicit(&to->ABCS_key, from->ABCS_key, memory_order_relaxed);
-  atomic_store_explicit(&to->ABCS_data, from->ABCS_data, memory_order_relaxed);
+  atomic_store_explicit(&arg_target->ABCS_key,
+                        arg_source->ABCS_key,
+                        memory_order_relaxed);
+  atomic_store_explicit(&arg_target->ABCS_data,
+                        arg_source->ABCS_data,
+                        memory_order_relaxed);
 #ifdef DEBUG
-  atomic_store_explicit(&to->ABCS_debug,
-                        from->ABCS_debug,
+  atomic_store_explicit(&arg_target->ABCS_debug,
+                        arg_source->ABCS_debug,
                         memory_order_relaxed);
 #endif
 }
@@ -226,13 +232,13 @@ store_alpha_beta_cache_slot(alpha_beta_cache_shared_slot_t *to,
 /* Only before workers can access this slot. Later erasure uses atomic stores.
  */
 local inline void
-init_alpha_beta_cache_slot(alpha_beta_cache_shared_slot_t *to,
-                           const alpha_beta_cache_slot_t *from)
+init_alpha_beta_cache_slot(alpha_beta_cache_shared_slot_t *arg_target,
+                           const alpha_beta_cache_slot_t *arg_source)
 {
-  atomic_init(&to->ABCS_key, from->ABCS_key);
-  atomic_init(&to->ABCS_data, from->ABCS_data);
+  atomic_init(&arg_target->ABCS_key, arg_source->ABCS_key);
+  atomic_init(&arg_target->ABCS_data, arg_source->ABCS_data);
 #ifdef DEBUG
-  atomic_init(&to->ABCS_debug, from->ABCS_debug);
+  atomic_init(&arg_target->ABCS_debug, arg_source->ABCS_debug);
 #endif
 }
 
@@ -250,27 +256,27 @@ local compat_large_allocation_t
 local pv_entry_t pv_entry_default;
 local pv_entries_t pv_entries_default;
 
-local inline void publish_nodes(search_t *search)
+local inline void publish_nodes(search_t *arg_with_search)
 {
-  thread_t *thread = search->S_thread;
+  thread_t *thread = arg_with_search->S_thread;
 
   if (thread != NULL)
     atomic_store_explicit(&thread->T_npublished_nodes,
-                          search->S_ntotal_nodes,
+                          arg_with_search->S_ntotal_nodes,
                           memory_order_relaxed);
 }
 
-local i64_t published_global_nodes(search_t *search)
+local i64_t published_global_nodes(search_t *arg_with_search)
 {
-  if (search->S_thread == NULL)
-    return search->S_ntotal_nodes;
+  if (arg_with_search->S_thread == NULL)
+    return arg_with_search->S_ntotal_nodes;
 
-  publish_nodes(search);
+  publish_nodes(arg_with_search);
 
   i64_t nodes = 0;
 
-  for (int i = 0; i < options.nthreads; i++)
-    nodes += atomic_load_explicit(&threads[i].T_npublished_nodes,
+  for (int ithread = 0; ithread < options.nthreads; ithread++)
+    nodes += atomic_load_explicit(&threads[ithread].T_npublished_nodes,
                                   memory_order_relaxed);
 
   return nodes;
@@ -306,7 +312,7 @@ int draw_by_repetition(board_t *arg_with_board, int arg_strict)
 
   int npieces = return_npieces(arg_with_board);
 
-  int n = 1;
+  int nrepetitions = 1;
 
   for (int istate = arg_with_board->B_inode - 2; istate >= 0; istate -= 2)
   {
@@ -318,9 +324,9 @@ int draw_by_repetition(board_t *arg_with_board, int arg_strict)
 
     if (arg_with_board->B_states[istate].BS_key == arg_with_board->B_key)
     {
-      ++n;
+      ++nrepetitions;
 
-      if (!arg_strict or (n >= 3))
+      if (!arg_strict or (nrepetitions >= 3))
       {
         result = TRUE;
 
@@ -371,16 +377,16 @@ int move_repetition(board_t *arg_with_board)
   // we look two inodes back for 45-40, and then two more inodes back
   // as Zobrist hashing will return the same key for 50-45 and 45-50
 
-  int n = 0;
+  int nrepetitions = 0;
 
   for (int jnode = arg_with_board->B_inode - 4; jnode >= 0; jnode -= 2)
   {
     if (arg_with_board->B_nodes[arg_with_board->B_inode - 2].node_move_key ==
         arg_with_board->B_nodes[jnode].node_move_key)
     {
-      ++n;
+      ++nrepetitions;
 
-      if (n >= 3)
+      if (nrepetitions >= 3)
       {
         return (TRUE);
       }
@@ -394,24 +400,24 @@ int move_repetition(board_t *arg_with_board)
   return (FALSE);
 }
 
-local inline ui32_t abcs2crc32(ui64_t abcs_key, ui64_t abcs_data)
+local inline ui32_t abcs2crc32(ui64_t arg_abcs_key, ui64_t arg_abcs_data)
 {
   ui32_t crc32 = 0xFFFFFFFF;
 
-  crc32 = HW_CRC32_U64(crc32, abcs_key);
-  crc32 = HW_CRC32_U64(crc32, abcs_data);
+  crc32 = HW_CRC32_U64(crc32, arg_abcs_key);
+  crc32 = HW_CRC32_U64(crc32, arg_abcs_data);
 
   return (~crc32);
 }
 
-local inline ui64_t abcs2crc64(ui64_t abcs_key, ui64_t abcs_data)
+local inline ui64_t abcs2crc64(ui64_t arg_abcs_key, ui64_t arg_abcs_data)
 {
   ui64_t crc64;
 
 #ifdef USE_SPLITMIX64
-  crc64 = abcs_key;
+  crc64 = arg_abcs_key;
 
-  crc64 ^= abcs_data + 0x9e3779b97f4a7c15ULL + (crc64 << 6) + (crc64 >> 2);
+  crc64 ^= arg_abcs_data + 0x9e3779b97f4a7c15ULL + (crc64 << 6) + (crc64 >> 2);
 
   crc64 ^= crc64 >> 30;
   crc64 *= 0xbf58476d1ce4e5b9ULL;
@@ -421,13 +427,13 @@ local inline ui64_t abcs2crc64(ui64_t abcs_key, ui64_t abcs_data)
 #else
   ui32_t crc32 = 0xFFFFFFFF;
 
-  crc32 = HW_CRC32_U64(crc32, abcs_key);
-  crc32 = HW_CRC32_U64(crc32, abcs_data);
+  crc32 = HW_CRC32_U64(crc32, arg_abcs_key);
+  crc32 = HW_CRC32_U64(crc32, arg_abcs_data);
   crc64 = ~crc32;
 
   crc32 = 0x0;
-  crc32 = HW_CRC32_U64(crc32, abcs_data);
-  crc32 = HW_CRC32_U64(crc32, abcs_key);
+  crc32 = HW_CRC32_U64(crc32, arg_abcs_data);
+  crc32 = HW_CRC32_U64(crc32, arg_abcs_key);
   crc64 = (crc64 << 32) | ~crc32;
 #endif
   return (crc64);
@@ -1050,41 +1056,42 @@ local void flip_search_result(search_result_t *arg_search_result)
   }
 }
 
-local int compare_search_results(search_result_t *a,
-                                 search_result_operator_enum op,
-                                 search_result_t *b)
+local int compare_search_results(search_result_t *arg_a,
+                                 search_result_operator_enum arg_operator,
+                                 search_result_t *arg_b)
 {
   int result = INVALID;
 
-  if (op == SR_OPERATOR_LT)
-    result = a->SR_score < b->SR_score;
-  else if (op == SR_OPERATOR_LE)
-    result = a->SR_score <= b->SR_score;
-  else if (op == SR_OPERATOR_EQ)
-    result = a->SR_score == b->SR_score;
-  else if (op == SR_OPERATOR_GE)
-    result = a->SR_score >= b->SR_score;
-  else if (op == SR_OPERATOR_GT)
-    result = a->SR_score > b->SR_score;
+  if (arg_operator == SR_OPERATOR_LT)
+    result = arg_a->SR_score < arg_b->SR_score;
+  else if (arg_operator == SR_OPERATOR_LE)
+    result = arg_a->SR_score <= arg_b->SR_score;
+  else if (arg_operator == SR_OPERATOR_EQ)
+    result = arg_a->SR_score == arg_b->SR_score;
+  else if (arg_operator == SR_OPERATOR_GE)
+    result = arg_a->SR_score >= arg_b->SR_score;
+  else if (arg_operator == SR_OPERATOR_GT)
+    result = arg_a->SR_score > arg_b->SR_score;
   else
     FATAL("unknown op", EXIT_FAILURE)
 
   return (result);
 }
 
-local void assign_search_result_b2a(search_result_t *a, search_result_t *b)
+local void assign_search_result_b2a(search_result_t *arg_a,
+                                    search_result_t *arg_b)
 {
-  a->SR_raw_score = b->SR_raw_score;
-  a->SR_score = b->SR_score;
-  a->SR_flags = b->SR_flags;
+  arg_a->SR_raw_score = arg_b->SR_raw_score;
+  arg_a->SR_score = arg_b->SR_score;
+  arg_a->SR_flags = arg_b->SR_flags;
 
   // HARDBUG((a->SR_score != 0) and IS_SR_DRAW_BY_REP(a->SR_flags))
 }
 
 local void trace_ab_entry(search_t *arg_with_search,
-                          char *file,
-                          const char *func,
-                          int line,
+                          char *arg_file,
+                          const char *arg_func,
+                          int arg_line,
                           score_t arg_my_alpha,
                           score_t arg_my_beta,
                           ui32_t arg_node_type,
@@ -1108,9 +1115,9 @@ local void trace_ab_entry(search_t *arg_with_search,
          ++trace_line,
          bdata(trace_bpv_string),
          colour2move,
-         file,
-         func,
-         line,
+         arg_file,
+         arg_func,
+         arg_line,
          arg_with_search->S_board.B_key,
          SCORE2PRINTF(arg_my_alpha),
          SCORE2PRINTF(arg_my_beta),
@@ -1119,9 +1126,9 @@ local void trace_ab_entry(search_t *arg_with_search,
 }
 
 local void trace_ab_cache(search_t *arg_with_search,
-                          char *file,
-                          const char *func,
-                          int line,
+                          char *arg_file,
+                          const char *arg_func,
+                          int arg_line,
                           const char *arg_info,
                           alpha_beta_cache_slot_t *arg_cache_slot)
 {
@@ -1159,9 +1166,9 @@ local void trace_ab_cache(search_t *arg_with_search,
          " ABCS_move=%s\n",
          ++trace_line,
          bdata(trace_bpv_string),
-         file,
-         func,
-         line,
+         arg_file,
+         arg_func,
+         arg_line,
          arg_with_search->S_board.B_key,
          arg_info,
          SCORE2PRINTF(ABCS_score),
@@ -1175,9 +1182,9 @@ local void trace_ab_cache(search_t *arg_with_search,
 }
 
 local void trace_ab_window(ui64_t arg_trace_key,
-                           char *file,
-                           const char *func,
-                           int line,
+                           char *arg_file,
+                           const char *arg_func,
+                           int arg_line,
                            const char *arg_info,
                            int arg_alpha,
                            int arg_beta,
@@ -1203,9 +1210,9 @@ local void trace_ab_window(ui64_t arg_trace_key,
          " arg_jmove=%s\n",
          ++trace_line,
          bdata(trace_bpv_string),
-         file,
-         func,
-         line,
+         arg_file,
+         arg_func,
+         arg_line,
          arg_trace_key,
          arg_info,
          arg_alpha,
@@ -1244,9 +1251,9 @@ local void trace_dedent(void)
 }
 
 local void trace_ab_result(ui64_t arg_trace_key,
-                           char *file,
-                           const char *func,
-                           int line,
+                           char *arg_file,
+                           const char *arg_func,
+                           int arg_line,
                            const char *arg_info,
                            score_t arg_alpha,
                            score_t arg_beta,
@@ -1282,9 +1289,9 @@ local void trace_ab_result(ui64_t arg_trace_key,
     " arg_result->SR_depth=%d\n",
     ++trace_line,
     bdata(trace_bpv_string),
-    file,
-    func,
-    line,
+    arg_file,
+    arg_func,
+    arg_line,
     arg_trace_key,
     arg_info,
     SCORE2PRINTF(arg_alpha),
@@ -1301,9 +1308,9 @@ local void trace_ab_result(ui64_t arg_trace_key,
 }
 
 local void trace_ab_exit(search_t *arg_with_search,
-                         char *file,
-                         const char *func,
-                         int line,
+                         char *arg_file,
+                         const char *arg_func,
+                         int arg_line,
                          score_t arg_my_alpha,
                          score_t arg_my_beta,
                          ui32_t arg_node_type,
@@ -1354,9 +1361,9 @@ local void trace_ab_exit(search_t *arg_with_search,
          bdata(trace_bpv_string),
          colour2move,
          bdata(bmove_string),
-         file,
-         func,
-         line,
+         arg_file,
+         arg_func,
+         arg_line,
          arg_with_search->S_board.B_key,
          SCORE2PRINTF(arg_my_alpha),
          SCORE2PRINTF(arg_my_beta),
@@ -4504,9 +4511,9 @@ label_limit:
 
       BSTRING(stamp)
 
-      time_t t = time(NULL);
+      time_t current_time = time(NULL);
 
-      my_bstrftime(stamp, "%d%b%Y-%H%M%S", t);
+      my_bstrftime(stamp, "%d%b%Y-%H%M%S", current_time);
 
       FILE *fbugs;
 

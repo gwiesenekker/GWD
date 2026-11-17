@@ -70,7 +70,7 @@ int main(void)
 #if defined(__SIZEOF_INT128__)
   uint64_t value = UINT64_C(0x123456789abcdef0);
 
-  for (int i = 0; i < 10000; ++i)
+  for (int iiteration = 0; iiteration < 10000; ++iiteration)
   {
     value = value * UINT64_C(6364136223846793005) + 1;
 
@@ -103,7 +103,7 @@ int main(void)
   FREE(heap)
 
   /* Repeating the test also checks cleanup/reinitialization. */
-  for (int i = 0; i < 3; ++i)
+  for (int iinit = 0; iinit < 3; ++iinit)
     if (compat_init() != 0)
       return 1;
   puts("compat initialization tests passed");

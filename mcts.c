@@ -571,18 +571,20 @@ label_return:;
 
 #define z 1.96
 
-local double return_wilson_lcb(int nsucc, int ntotal)
+local double return_wilson_lcb(int arg_nsuccesses, int arg_ntotal)
 {
-  if (ntotal == 0)
+  if (arg_ntotal == 0)
     return (0.0);
 
-  double n = (double)ntotal;
-  double p = (double)nsucc / n;
-  double z2 = z * z;
+  double nsamples = (double)arg_ntotal;
+  double success_fraction = (double)arg_nsuccesses / nsamples;
+  double squared_z = z * z;
 
-  double denom = 1.0 + z2 / n;
-  double center = p + z2 / (2.0 * n);
-  double margin = z * sqrt((p * (1.0 - p) + z2 / (4.0 * n)) / n);
+  double denom = 1.0 + squared_z / nsamples;
+  double center = success_fraction + squared_z / (2.0 * nsamples);
+  double margin = z * sqrt((success_fraction * (1.0 - success_fraction) +
+                            squared_z / (4.0 * nsamples)) /
+                           nsamples);
 
   double lcb = (center - margin) / denom;
 
@@ -595,18 +597,20 @@ local double return_wilson_lcb(int nsucc, int ntotal)
   return (lcb);
 }
 
-static double return_wilson_ucb(int nsucc, int ntotal)
+static double return_wilson_ucb(int arg_nsuccesses, int arg_ntotal)
 {
-  if (ntotal == 0)
+  if (arg_ntotal == 0)
     return (1.0);
 
-  double n = (double)ntotal;
-  double p = (double)nsucc / n;
-  double z2 = z * z;
+  double nsamples = (double)arg_ntotal;
+  double success_fraction = (double)arg_nsuccesses / nsamples;
+  double squared_z = z * z;
 
-  double denom = 1.0 + z2 / n;
-  double center = p + z2 / (2.0 * n);
-  double margin = z * sqrt((p * (1.0 - p) + z2 / (4.0 * n)) / n);
+  double denom = 1.0 + squared_z / nsamples;
+  double center = success_fraction + squared_z / (2.0 * nsamples);
+  double margin = z * sqrt((success_fraction * (1.0 - success_fraction) +
+                            squared_z / (4.0 * nsamples)) /
+                           nsamples);
 
   double ucb = (center + margin) / denom;
 

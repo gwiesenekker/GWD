@@ -201,11 +201,11 @@ void construct_progress(progress_t *arg_progress,
   }
 }
 
-int make_progress(progress_t *arg_progress, i64_t idone)
+int make_progress(progress_t *arg_progress, i64_t arg_idone)
 {
-  if ((arg_progress->P_ntotal > 0) and (idone > 0) and
+  if ((arg_progress->P_ntotal > 0) and (arg_idone > 0) and
       (my_mpi_globals.MMG_is_slave) and
-      ((idone % my_mpi_globals.MMG_nslaves) != my_mpi_globals.MMG_slave_id))
+      ((arg_idone % my_mpi_globals.MMG_nslaves) != my_mpi_globals.MMG_slave_id))
     return (FALSE);
 
   arg_progress->P_ndone++;
@@ -702,24 +702,24 @@ void set_time_limit(const time_control_t *arg_with_time_control,
   options.time_ntrouble = ntrouble;
 }
 
-local double burn_cpu(double t)
+local double burn_cpu(double arg_duration)
 {
-  double t1 = time(NULL);
+  double start_time = time(NULL);
 
-  double s = 0.0;
+  double sum = 0.0;
 
   while (TRUE)
   {
-    double t2 = time(NULL);
-    double d = t2 - t1;
+    double current_time = time(NULL);
+    double elapsed = current_time - start_time;
 
-    s += d;
+    sum += elapsed;
 
-    if (d >= t)
+    if (elapsed >= arg_duration)
       break;
   }
 
-  return (s);
+  return (sum);
 }
 
 #define NTEST 4

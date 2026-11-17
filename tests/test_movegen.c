@@ -57,24 +57,24 @@ const int black_row[BOARD_MAX] =
 
 // clang-format on
 
-void print_board(const board_t *board)
+void print_board(const board_t *arg_board)
 {
   fprintf(stderr,
           "side=%d men=%llx/%llx kings=%llx/%llx\n",
-          board->B_colour2move,
-          board->B_white_men_bb,
-          board->B_black_men_bb,
-          board->B_white_kings_bb,
-          board->B_black_kings_bb);
+          arg_board->B_colour2move,
+          arg_board->B_white_men_bb,
+          arg_board->B_black_men_bb,
+          arg_board->B_white_kings_bb,
+          arg_board->B_black_kings_bb);
 }
-void zzzzzz(const char *file,
-            const char *func,
-            long line,
-            const char *message,
-            int code)
+void zzzzzz(const char *arg_file,
+            const char *arg_func,
+            long arg_line,
+            const char *arg_message,
+            int arg_code)
 {
-  fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
-  exit(code);
+  fprintf(stderr, "%s:%ld %s: %s\n", arg_file, arg_line, arg_func, arg_message);
+  exit(arg_code);
 }
 
 static ui64_t rng = 0x123456789abcdefULL;
@@ -90,14 +90,14 @@ static ui64_t random64(void)
 static unsigned long long tested, roundtrips;
 static int benchmark;
 static void play(board_t *, const move_t *);
-static void compare(board_t *board, moves_list_t *moves)
+static void compare(board_t *arg_board, moves_list_t *arg_moves)
 {
   if (benchmark)
   {
     if (benchmark == 1)
-      gen_moves_legacy(board, moves);
+      gen_moves_legacy(arg_board, arg_moves);
     else
-      gen_moves(board, moves);
+      gen_moves(arg_board, arg_moves);
     ++tested;
 
     return;
@@ -105,44 +105,45 @@ static void compare(board_t *board, moves_list_t *moves)
 
   moves_list_t legacy;
 
-  gen_moves_legacy(board, &legacy);
+  gen_moves_legacy(arg_board, &legacy);
 
-  int ncapt = board->B_nodes[board->B_inode].node_ncaptx;
+  int ncapt = arg_board->B_nodes[arg_board->B_inode].node_ncaptx;
 
-  gen_moves(board, moves);
+  gen_moves(arg_board, arg_moves);
 
-  assert(ncapt == board->B_nodes[board->B_inode].node_ncaptx);
-  assert(moves->ML_nmoves == legacy.ML_nmoves);
-  assert(moves->ML_ncaptx == legacy.ML_ncaptx);
+  assert(ncapt == arg_board->B_nodes[arg_board->B_inode].node_ncaptx);
+  assert(arg_moves->ML_nmoves == legacy.ML_nmoves);
+  assert(arg_moves->ML_ncaptx == legacy.ML_ncaptx);
 
-  for (int i = 0; i < moves->ML_nmoves; ++i)
+  for (int imove = 0; imove < arg_moves->ML_nmoves; ++imove)
   {
-    const move_t *a = &moves->ML_moves[i], *b = &legacy.ML_moves[i];
+    const move_t *generated_move = &arg_moves->ML_moves[imove],
+                 *legacy_move = &legacy.ML_moves[imove];
 
-    assert(a->M_move_from == b->M_move_from);
-    assert(a->M_move_to == b->M_move_to);
-    assert(a->M_captures_bb == b->M_captures_bb);
-    assert(moves->ML_move_flags[i] == legacy.ML_move_flags[i]);
+    assert(generated_move->M_move_from == legacy_move->M_move_from);
+    assert(generated_move->M_move_to == legacy_move->M_move_to);
+    assert(generated_move->M_captures_bb == legacy_move->M_captures_bb);
+    assert(arg_moves->ML_move_flags[imove] == legacy.ML_move_flags[imove]);
 
-    roundtrips += a->M_move_from == a->M_move_to;
+    roundtrips += generated_move->M_move_from == generated_move->M_move_to;
   }
   ++tested;
 }
 
-static void play(board_t *board, const move_t *move)
+static void play(board_t *arg_board, const move_t *arg_move)
 {
-  int side = board->B_colour2move;
-  ui64_t from = BITULL(move->M_move_from), to = BITULL(move->M_move_to);
-  int king = (board->B_bit_boards[side][KING_ENUM] & from) != 0;
+  int side = arg_board->B_colour2move;
+  ui64_t from = BITULL(arg_move->M_move_from), to = BITULL(arg_move->M_move_to);
+  int king = (arg_board->B_bit_boards[side][KING_ENUM] & from) != 0;
 
-  board->B_bit_boards[side][king ? KING_ENUM : MAN_ENUM] &= ~from;
+  arg_board->B_bit_boards[side][king ? KING_ENUM : MAN_ENUM] &= ~from;
 
-  if ((side == WHITE_ENUM ? white_row : black_row)[move->M_move_to] == 10)
+  if ((side == WHITE_ENUM ? white_row : black_row)[arg_move->M_move_to] == 10)
     king = 1;
-  board->B_bit_boards[side][king ? KING_ENUM : MAN_ENUM] |= to;
-  board->B_bit_boards[1 - side][MAN_ENUM] &= ~move->M_captures_bb;
-  board->B_bit_boards[1 - side][KING_ENUM] &= ~move->M_captures_bb;
-  board->B_colour2move = 1 - side;
+  arg_board->B_bit_boards[side][king ? KING_ENUM : MAN_ENUM] |= to;
+  arg_board->B_bit_boards[1 - side][MAN_ENUM] &= ~arg_move->M_captures_bb;
+  arg_board->B_bit_boards[1 - side][KING_ENUM] &= ~arg_move->M_captures_bb;
+  arg_board->B_colour2move = 1 - side;
 }
 
 int main(int argc, char **argv)
@@ -154,26 +155,26 @@ int main(int argc, char **argv)
   static board_t board;
   moves_list_t moves;
 
-  for (int i = 1; i <= 50; ++i)
+  for (int isquare = 1; isquare <= 50; ++isquare)
   {
-    assert(square2field[i] == i + 5 + (i - 1) / 10);
-    assert(white_row[square2field[i]] == 10 - (i - 1) / 5);
-    assert(black_row[square2field[i]] == 1 + (i - 1) / 5);
-    board.B_valid_bb |= BITULL(square2field[i]);
+    assert(square2field[isquare] == isquare + 5 + (isquare - 1) / 10);
+    assert(white_row[square2field[isquare]] == 10 - (isquare - 1) / 5);
+    assert(black_row[square2field[isquare]] == 1 + (isquare - 1) / 5);
+    board.B_valid_bb |= BITULL(square2field[isquare]);
   }
   /* Random legal playouts from the initial position and varied material,
    * plus both sides of each synthetic position (including king loops). */
-  for (int game = 0; game < 20000; ++game)
+  for (int igame = 0; igame < 20000; ++igame)
   {
     memset(board.B_bit_boards, 0, sizeof(board.B_bit_boards));
-    board.B_colour2move = game & 1;
+    board.B_colour2move = igame & 1;
 
-    if (game < 5000)
+    if (igame < 5000)
     {
-      for (int i = 1; i <= 20; ++i)
+      for (int isquare = 1; isquare <= 20; ++isquare)
       {
-        board.B_black_men_bb |= BITULL(square2field[i]);
-        board.B_white_men_bb |= BITULL(square2field[51 - i]);
+        board.B_black_men_bb |= BITULL(square2field[isquare]);
+        board.B_white_men_bb |= BITULL(square2field[51 - isquare]);
       }
     }
     else
@@ -181,7 +182,8 @@ int main(int argc, char **argv)
       ui64_t occupied = 0;
 
       for (int side = 0; side < 2; ++side)
-        for (int i = 0, n = 1 + random64() % 15; i < n; ++i)
+        for (int ipiece = 0, npieces = 1 + random64() % 15; ipiece < npieces;
+             ++ipiece)
         {
           int square;
 
@@ -200,7 +202,7 @@ int main(int argc, char **argv)
         }
     }
 
-    for (int ply = 0; ply < 150; ++ply)
+    for (int iply = 0; iply < 150; ++iply)
     {
       compare(&board, &moves);
       board.B_colour2move = 1 - board.B_colour2move;

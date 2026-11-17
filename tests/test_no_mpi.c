@@ -6,29 +6,29 @@
 #endif
 
 int zzzzzz_invocation;
-_Noreturn void zzzzzz(const char *file,
-                      const char *func,
-                      long line,
-                      const char *message,
-                      int code)
+_Noreturn void zzzzzz(const char *arg_file,
+                      const char *arg_func,
+                      long arg_line,
+                      const char *arg_message,
+                      int arg_code)
 {
-  fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
-  exit(code);
+  fprintf(stderr, "%s:%ld %s: %s\n", arg_file, arg_line, arg_func, arg_message);
+  exit(arg_code);
 }
 
 /* Isolate the wrapper from the tracked allocator; engine smoke tests use it. */
-void *my_malloc(const char *name,
-                const char *file,
-                const char *func,
-                int line,
-                size_t size)
+void *my_malloc(const char *arg_name,
+                const char *arg_file,
+                const char *arg_func,
+                int arg_line,
+                size_t arg_size)
 {
-  (void)name;
-  (void)file;
-  (void)func;
-  (void)line;
+  (void)arg_name;
+  (void)arg_file;
+  (void)arg_func;
+  (void)arg_line;
 
-  return compat_aligned_alloc(64, size);
+  return compat_aligned_alloc(64, arg_size);
 }
 
 int main(int argc, char **argv)
@@ -55,8 +55,8 @@ int main(int argc, char **argv)
 
   int *cells = data;
 
-  for (int i = 0; i < 257; ++i)
-    cells[i] = i;
+  for (int ivalue = 0; ivalue < 257; ++ivalue)
+    cells[ivalue] = ivalue;
   my_mpi_sync_shared(MPI_COMM_WORLD, win, "test");
 
   assert(my_mpi_allreduce(MPI_IN_PLACE,
@@ -66,8 +66,8 @@ int main(int argc, char **argv)
                           MPI_SUM,
                           MPI_COMM_WORLD) == MPI_SUCCESS);
 
-  for (int i = 0; i < 257; ++i)
-    assert(cells[i] == i);
+  for (int ivalue = 0; ivalue < 257; ++ivalue)
+    assert(cells[ivalue] == ivalue);
 
   compat_aligned_free(data);
   test_my_mpi(); /* Must safely do nothing without MPI. */

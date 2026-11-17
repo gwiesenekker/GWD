@@ -573,9 +573,9 @@ void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name)
 #endif
 }
 
-void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int nsql_buffer)
+void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int arg_nsql_buffer)
 {
-  if (blength(arg_with_my_sqlite3->MSQL_bbuffer) > nsql_buffer)
+  if (blength(arg_with_my_sqlite3->MSQL_bbuffer) > arg_nsql_buffer)
   {
     if (arg_with_my_sqlite3->MSQL_verbose > 0)
       PRINTF("blength(arg_with_my_sqlite3->MSQL_bbuffer)=%d\n$",
@@ -597,13 +597,14 @@ void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int nsql_buffer)
                         FALSE) != SQLITE_OK)
 
 #ifdef SPLIT_SQL_BUFFER
-    BSTRING(b)
+    BSTRING(bseparator)
 
-    bassigncstr(b, ";");
+    bassigncstr(bseparator, ";");
 
     struct bstrList *bsql;
 
-    HARDBUG((bsql = bsplits(arg_with_my_sqlite3->MSQL_bbuffer, b)) == NULL)
+    HARDBUG((bsql = bsplits(arg_with_my_sqlite3->MSQL_bbuffer, bseparator)) ==
+            NULL)
 
     for (int isql = 0; isql < bsql->qty; isql++)
     {
@@ -614,7 +615,7 @@ void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int nsql_buffer)
 
     HARDBUG(bstrListDestroy(bsql) == BSTR_ERR)
 
-    BDESTROY(b)
+    BDESTROY(bseparator)
 #else
     PRINTF("executing SQL\n$");
 
@@ -648,11 +649,11 @@ void append_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3,
                        const char *arg_fmt,
                        ...)
 {
-  int ret;
+  int result;
 
-  bvformata(ret, arg_with_my_sqlite3->MSQL_bbuffer, arg_fmt, arg_fmt);
+  bvformata(result, arg_with_my_sqlite3->MSQL_bbuffer, arg_fmt, arg_fmt);
 
-  HARDBUG(ret == BSTR_ERR)
+  HARDBUG(result == BSTR_ERR)
 
   flush_sql_buffer(arg_with_my_sqlite3, NSQL_BUFFER);
 }

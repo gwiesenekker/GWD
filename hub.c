@@ -53,27 +53,27 @@ local void line2command(char *arg_line, command_t *arg_with_command)
   arg_with_command->command = NULL;
   arg_with_command->command_nargs = 0;
 
-  char *c = arg_line;
+  char *character = arg_line;
 
   // command
 
-  while (isspace(*c))
-    c++;
+  while (isspace(*character))
+    character++;
 
-  if (*c == '\0')
+  if (*character == '\0')
     return;
 
-  arg_with_command->command = c;
+  arg_with_command->command = character;
 
-  while (isgraph(*c))
-    c++;
+  while (isgraph(*character))
+    character++;
 
-  if (*c == '\0')
+  if (*character == '\0')
     return;
 
-  *c = '\0';
+  *character = '\0';
 
-  c++;
+  character++;
 
   PRINTF("command=%s\n", arg_with_command->command);
 
@@ -81,10 +81,10 @@ local void line2command(char *arg_line, command_t *arg_with_command)
 
   while (TRUE)
   {
-    while (isspace(*c))
-      c++;
+    while (isspace(*character))
+      character++;
 
-    if (*c == '\0')
+    if (*character == '\0')
       return;
 
     HARDBUG(arg_with_command->command_nargs >= NARGS_MAX)
@@ -92,64 +92,64 @@ local void line2command(char *arg_line, command_t *arg_with_command)
     arg_t *with_param =
       arg_with_command->command_args + arg_with_command->command_nargs;
 
-    with_param->arg_name = c;
+    with_param->arg_name = character;
     with_param->arg_value = NULL;
 
-    while (isgraph(*c) and (*c != '='))
-      c++;
+    while (isgraph(*character) and (*character != '='))
+      character++;
 
-    if (isspace(*c))
+    if (isspace(*character))
     {
-      *c = '\0';
-      c++;
+      *character = '\0';
+      character++;
 
-      while (isspace(*c))
-        c++;
+      while (isspace(*character))
+        character++;
     }
 
-    if (*c != '=')
+    if (*character != '=')
     {
       PRINTF("arg_name=%s\n", with_param->arg_name);
     }
     else
     {
-      *c = '\0';
-      c++;
+      *character = '\0';
+      character++;
 
       PRINTF("arg_name=%s\n", with_param->arg_name);
 
-      while (isspace(*c))
-        c++;
+      while (isspace(*character))
+        character++;
 
-      HARDBUG(*c == '\0')
+      HARDBUG(*character == '\0')
 
-      if (*c == '"')
+      if (*character == '"')
       {
-        c++;
+        character++;
 
-        with_param->arg_value = c;
+        with_param->arg_value = character;
 
-        while ((*c != '\0') and (*c != '"'))
-          c++;
+        while ((*character != '\0') and (*character != '"'))
+          character++;
 
-        HARDBUG(*c == '\0');
+        HARDBUG(*character == '\0');
 
-        *c = '\0';
-        c++;
+        *character = '\0';
+        character++;
       }
       else
       {
-        with_param->arg_value = c;
+        with_param->arg_value = character;
 
-        while (isgraph(*c))
-          c++;
+        while (isgraph(*character))
+          character++;
 
-        if (*c == '\0')
+        if (*character == '\0')
           return;
 
-        *c = '\0';
+        *character = '\0';
 
-        c++;
+        character++;
       }
       PRINTF("arg_value=%s\n", with_param->arg_value);
     }
@@ -173,18 +173,18 @@ local int read_hub_line(bstring arg_line, bstring arg_input, int arg_wait)
 {
   while (arg_wait or compat_poll())
   {
-    char c;
+    char character;
 
-    if (compat_read(0, &c, 1) <= 0)
+    if (compat_read(0, &character, 1) <= 0)
     {
       HARDBUG(btrunc(arg_input, 0) == BSTR_ERR)
 
       return INVALID;
     }
 
-    HARDBUG(bconchar(arg_input, c) == BSTR_ERR)
+    HARDBUG(bconchar(arg_input, character) == BSTR_ERR)
 
-    if (c == '\n')
+    if (character == '\n')
     {
       HARDBUG(bassign(arg_line, arg_input) == BSTR_ERR)
       HARDBUG(btrunc(arg_input, 0) == BSTR_ERR)
@@ -348,9 +348,9 @@ void hub(void)
 
         HARDBUG(compat_strcasecmp(name, "moves") != 0)
 
-        BSTRING(b)
+        BSTRING(bseparator)
 
-        bassigncstr(b, " ");
+        bassigncstr(bseparator, " ");
 
         BSTRING(bmoves)
 
@@ -359,7 +359,7 @@ void hub(void)
 
         struct bstrList *btokens;
 
-        HARDBUG((btokens = bsplits(bmoves, b)) == NULL)
+        HARDBUG((btokens = bsplits(bmoves, bseparator)) == NULL)
 
         PRINTF("got %d moves\n", btokens->qty);
 
@@ -389,7 +389,7 @@ void hub(void)
 
         BDESTROY(bmoves)
 
-        BDESTROY(b)
+        BDESTROY(bseparator)
 
         PRINTF("current position\n");
 
@@ -415,16 +415,16 @@ void hub(void)
 
           HARDBUG(value == NULL)
 
-          int d;
+          int depth;
 
-          HARDBUG(my_sscanf(value, "%d", &d) != 1)
+          HARDBUG(my_sscanf(value, "%d", &depth) != 1)
 
-          HARDBUG(d < 1)
-          HARDBUG(d >= DEPTH_MAX)
+          HARDBUG(depth < 1)
+          HARDBUG(depth >= DEPTH_MAX)
 
-          PRINTF("got depth %d\n", d);
+          PRINTF("got depth %d\n", depth);
 
-          level_depth = d;
+          level_depth = depth;
           options.time_limit = 10000.0;
           options.time_ntrouble = 0;
         }
@@ -435,16 +435,16 @@ void hub(void)
 
           HARDBUG(value == NULL)
 
-          double t;
+          double move_time;
 
-          HARDBUG(my_sscanf(value, "%lf", &t) != 1)
+          HARDBUG(my_sscanf(value, "%lf", &move_time) != 1)
 
-          HARDBUG((!isfinite(t)) or (t <= 0.0))
+          HARDBUG((!isfinite(move_time)) or (move_time <= 0.0))
 
-          PRINTF("got move-time %g\n", t);
+          PRINTF("got move-time %g\n", move_time);
 
           level_depth = INVALID;
-          options.time_limit = t;
+          options.time_limit = move_time;
 
           options.time_trouble[0] = options.time_limit / 2.0;
           options.time_trouble[1] = options.time_limit / 4.0;
@@ -898,9 +898,9 @@ void init_hub(void)
 
     HARDBUG(!cJSON_IsString(cjson_ui))
 
-    char *ui = cJSON_GetStringValue(cjson_ui);
+    char *ui_setting = cJSON_GetStringValue(cjson_ui);
 
-    if (compat_strcasecmp(ui, "false") == 0)
+    if (compat_strcasecmp(ui_setting, "false") == 0)
       continue;
 
     cJSON *cjson_name = cJSON_GetObjectItem(parameter, "name");
@@ -923,9 +923,10 @@ void init_hub(void)
 
       int value = round(cJSON_GetNumberValue(cjson_value));
 
-      HARDBUG(
-        bassignformat(line, "param name=%s type=int value=%d\n", ui, value) ==
-        BSTR_ERR)
+      HARDBUG(bassignformat(line,
+                            "param name=%s type=int value=%d\n",
+                            ui_setting,
+                            value) == BSTR_ERR)
     }
     else if (compat_strcasecmp(parameter_type, "double") == 0)
     {
@@ -937,7 +938,7 @@ void init_hub(void)
 
       HARDBUG(bassignformat(line,
                             "param name=%s type=real value=%.2f\n",
-                            ui,
+                            ui_setting,
                             value) == BSTR_ERR)
     }
     else if (compat_strcasecmp(parameter_type, "string") == 0)
@@ -950,7 +951,7 @@ void init_hub(void)
 
       HARDBUG(bassignformat(line,
                             "param name=%s type=string value=\"%s\"\n",
-                            ui,
+                            ui_setting,
                             string) == BSTR_ERR)
     }
     else if (compat_strcasecmp(parameter_type, "bool") == 0)
@@ -962,11 +963,11 @@ void init_hub(void)
       if (cJSON_IsFalse(cjson_value))
         HARDBUG(bassignformat(line,
                               "param name=%s type=bool value=false\n",
-                              ui) == BSTR_ERR)
+                              ui_setting) == BSTR_ERR)
       else
         HARDBUG(bassignformat(line,
                               "param name=%s type=bool value=true\n",
-                              ui) == BSTR_ERR)
+                              ui_setting) == BSTR_ERR)
     }
     else
       FATAL("unknown parameter_type", EXIT_FAILURE)
@@ -1014,9 +1015,9 @@ void init_hub(void)
 
       HARDBUG(!cJSON_IsString(cjson_ui))
 
-      char *ui = cJSON_GetStringValue(cjson_ui);
+      char *ui_setting = cJSON_GetStringValue(cjson_ui);
 
-      if (compat_strcasecmp(ui, name) != 0)
+      if (compat_strcasecmp(ui_setting, name) != 0)
         continue;
 
       cJSON *cjson_name = cJSON_GetObjectItem(parameter, "name");
@@ -1025,7 +1026,7 @@ void init_hub(void)
 
       HARDBUG(parameter_name == NULL)
 
-      PRINTF("ui=%s parameter_name=%s\n", ui, parameter_name);
+      PRINTF("ui=%s parameter_name=%s\n", ui_setting, parameter_name);
 
       cJSON *cjson_type = cJSON_GetObjectItem(parameter, "type");
 

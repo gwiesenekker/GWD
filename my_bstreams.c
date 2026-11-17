@@ -25,7 +25,7 @@ void construct_my_bstream(my_bstream_t *arg_with_my_bstream,
   HARDBUG((arg_with_my_bstream->BS_empty = bfromcstr("")) == NULL)
 }
 
-int my_bstream_readln(my_bstream_t *arg_with_my_bstream, int remove_newline)
+int my_bstream_readln(my_bstream_t *arg_with_my_bstream, int arg_remove_newline)
 {
   int result = bsreadln(arg_with_my_bstream->BS_bline,
                         arg_with_my_bstream->BS_bfile,
@@ -36,7 +36,7 @@ int my_bstream_readln(my_bstream_t *arg_with_my_bstream, int remove_newline)
   if (result != BSTR_OK)
     return (result);
 
-  if (remove_newline)
+  if (arg_remove_newline)
     HARDBUG(bfindreplace(arg_with_my_bstream->BS_bline,
                          arg_with_my_bstream->BS_newline,
                          arg_with_my_bstream->BS_empty,

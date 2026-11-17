@@ -60,34 +60,34 @@ local void init_base64_table(void)
   const char *base64_chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-  for (int i = 0; i < 256; i++)
-    base64_table[i] = INVALID;
+  for (int ichar = 0; ichar < 256; ichar++)
+    base64_table[ichar] = INVALID;
 
-  for (int i = 0; base64_chars[i]; i++)
-    base64_table[(unsigned char)base64_chars[i]] = i;
+  for (int ichar = 0; base64_chars[ichar]; ichar++)
+    base64_table[(unsigned char)base64_chars[ichar]] = ichar;
 }
 
 local void init_base3_table(void)
 {
-  for (int wm = 0; wm < 256; wm++)
+  for (int white_mask = 0; white_mask < 256; white_mask++)
   {
-    for (int bm = 0; bm < 256; bm++)
+    for (int black_mask = 0; black_mask < 256; black_mask++)
     {
       int index = 0;
       int power = 1;
 
-      for (int k = 0; k < 8; k++)
+      for (int ibit = 0; ibit < 8; ibit++)
       {
-        int w = (wm >> k) & 1;
-        int b = (bm >> k) & 1;
+        int white_bit = (white_mask >> ibit) & 1;
+        int black_bit = (black_mask >> ibit) & 1;
 
-        int digit = w + 2 * b;
+        int digit = white_bit + 2 * black_bit;
 
         index += digit * power;
         power *= 3;
       }
 
-      base3_table[wm | (bm << 8)] = (uint16_t)index;
+      base3_table[white_mask | (black_mask << 8)] = (uint16_t)index;
     }
   }
 }
@@ -104,9 +104,9 @@ local void init_base3_mask_table(void)
     uint32_t index = 0;
     uint32_t power = 1;
 
-    for (int k = 0; k < BASE3_PATTERN_BITS; k++)
+    for (int ibit = 0; ibit < BASE3_PATTERN_BITS; ibit++)
     {
-      if ((mask >> k) & 1u)
+      if ((mask >> ibit) & 1u)
       {
         index += power;
       }
@@ -118,37 +118,39 @@ local void init_base3_mask_table(void)
   }
 }
 
-void decode_base64(size_t ns,
-                   const unsigned char *s,
-                   size_t nt,
-                   unsigned char *t)
+void decode_base64(size_t arg_nsource,
+                   const unsigned char *arg_source,
+                   size_t arg_ntarget,
+                   unsigned char *arg_target)
 {
-  ui32_t v = 0;
-  int nb = -8;
+  ui32_t bits = 0;
+  int nbits = -8;
 
-  size_t j = 0;
+  size_t itarget = 0;
 
-  for (size_t i = 0; (i < ns) and (s[i] != '='); i++)
+  for (size_t isource = 0;
+       (isource < arg_nsource) and (arg_source[isource] != '=');
+       isource++)
   {
-    i8_t c = base64_table[(unsigned char)s[i]];
+    i8_t digit = base64_table[(unsigned char)arg_source[isource]];
 
-    HARDBUG(c == INVALID)
+    HARDBUG(digit == INVALID)
 
-    v = (v << 6) | c;
+    bits = (bits << 6) | digit;
 
-    nb += 6;
+    nbits += 6;
 
-    if (nb >= 0)
+    if (nbits >= 0)
     {
-      HARDBUG(j >= nt)
+      HARDBUG(itarget >= arg_ntarget)
 
-      t[j++] = (v >> nb) & 0xFF;
+      arg_target[itarget++] = (bits >> nbits) & 0xFF;
 
-      nb -= 8;
+      nbits -= 8;
     }
   }
 
-  HARDBUG(j != nt)
+  HARDBUG(itarget != arg_ntarget)
 }
 
 local cJSON *open_cjson_file(const cJSON *arg_directory, const char *arg_name)
@@ -359,52 +361,55 @@ local void read_2d_csv_base64(const cJSON *arg_csv,
     *arg_ncols = ncols;
 }
 
-local scaled_double_t dot_scaled(int n,
-                                 const scaled_double_t *restrict a,
-                                 const scaled_double_t *restrict b)
+local scaled_double_t dot_scaled(int arg_nvalues,
+                                 const scaled_double_t *restrict arg_a,
+                                 const scaled_double_t *restrict arg_b)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  scaled_double_t s = 0;
+  scaled_double_t sum = 0;
 
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
-      s += a[i] * b[i];
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      sum += arg_a[ivalue] * arg_b[ivalue];
   }
 
 #ifdef USE_AVX2_INTRINSICS
   else
   {
-    SOFTBUG((n % 8) != 0)
+    SOFTBUG((arg_nvalues % 8) != 0)
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    __m256 vs = _mm256_setzero_ps();
+    __m256 vector_sum = _mm256_setzero_ps();
 
-    for (const float *z = a + n; a < z; a += 8, b += 8)
+    for (const float *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
-      __m256 vb = MM256_LOAD_PS(b);
+      __m256 vector_a = MM256_LOAD_PS(arg_a);
+      __m256 vector_b = MM256_LOAD_PS(arg_b);
 
-      vs = MM256_MADD_PS(va, vb, vs);
+      vector_sum = MM256_MADD_PS(vector_a, vector_b, vector_sum);
     }
 
-    ALIGN64(float t[8]);
+    ALIGN64(float lanes[8]);
 
-    _mm256_store_ps(t, vs);
+    _mm256_store_ps(lanes, vector_sum);
 
-    s = t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7];
+    sum = lanes[0] + lanes[1] + lanes[2] + lanes[3] + lanes[4] + lanes[5] +
+          lanes[6] + lanes[7];
 #else
 
     __m256i s64_lo = _mm256_setzero_si256();
     __m256i s64_hi = _mm256_setzero_si256();
 
-    for (const i32_t *z = a + n; a < z; a += 8, b += 8)
+    for (const i32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8)
     {
-      __m256i ta = _mm256_load_si256((const __m256i *)a);
-      __m256i tb = _mm256_load_si256((const __m256i *)b);
+      __m256i ta = _mm256_load_si256((const __m256i *)arg_a);
+      __m256i tb = _mm256_load_si256((const __m256i *)arg_b);
 
       __m256i ta_lo = _mm256_cvtepi32_epi64(_mm256_castsi256_si128(ta));
       __m256i ta_hi = _mm256_cvtepi32_epi64(_mm256_extracti128_si256(ta, 1));
@@ -425,14 +430,14 @@ local scaled_double_t dot_scaled(int n,
     i64_t s64 = r64_lo[0] + r64_lo[1] + r64_lo[2] + r64_lo[3] + r64_hi[0] +
                 r64_hi[1] + r64_hi[2] + r64_hi[3];
 
-    s = s64 / SCALED_DOUBLE_FACTOR;
+    sum = s64 / SCALED_DOUBLE_FACTOR;
 #endif
   }
 #endif
 
   END_BLOCK
 
-  return (s);
+  return (sum);
 }
 
 #if defined(USE_AVX2_INTRINSICS) && SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
@@ -457,21 +462,22 @@ local inline void dense_fixed_x8(const float *arg_inputs,
 
     for (int ichunk = 0; ichunk < arg_nchunks; ichunk++)
     {
-      for (int j = 0; j < 4; j++)
+      for (int joutput = 0; joutput < 4; joutput++)
       {
         // Shared MPI allocations need not be 32-byte aligned.
         __m256 weights = _mm256_loadu_ps(
-          arg_weights + (size_t)(ioutput + j) * (8 * arg_nchunks) + 8 * ichunk);
-        sums[j] = MM256_MADD_PS(inputs[ichunk], weights, sums[j]);
+          arg_weights + (size_t)(ioutput + joutput) * (8 * arg_nchunks) +
+          8 * ichunk);
+        sums[joutput] = MM256_MADD_PS(inputs[ichunk], weights, sums[joutput]);
       }
     }
 
-    for (int j = 0; j < 4; j++)
+    for (int joutput = 0; joutput < 4; joutput++)
     {
-      ALIGN64(float t[8]);
-      _mm256_store_ps(t, sums[j]);
-      arg_dot[ioutput + j] =
-        t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7];
+      ALIGN64(float lanes[8]);
+      _mm256_store_ps(lanes, sums[joutput]);
+      arg_dot[ioutput + joutput] = lanes[0] + lanes[1] + lanes[2] + lanes[3] +
+                                   lanes[4] + lanes[5] + lanes[6] + lanes[7];
     }
   }
 }
@@ -495,33 +501,33 @@ local void dense_layer0_dot(const dense_network_shared_t *arg_dense,
                             const scaled_double_t *arg_inputs,
                             scaled_double_t *arg_dot)
 {
-  const layer_shared_t *layer = arg_dense->DNS_layers;
+  const layer_shared_t *with_layer = arg_dense->DNS_layers;
 
 #if defined(USE_AVX2_INTRINSICS) && SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
   if (arg_dense->DNS_16x8_kernel)
   {
-    HARDBUG(layer->LS_ninputs != 16 || layer->LS_noutputs != 8)
+    HARDBUG(with_layer->LS_ninputs != 16 || with_layer->LS_noutputs != 8)
 
-    dense_16x8(arg_inputs, layer->LS_weights_noutputsxninputs, arg_dot);
+    dense_16x8(arg_inputs, with_layer->LS_weights_noutputsxninputs, arg_dot);
 
     return;
   }
 
   if (arg_dense->DNS_32x8_kernel)
   {
-    HARDBUG(layer->LS_ninputs != 32 || layer->LS_noutputs != 8)
+    HARDBUG(with_layer->LS_ninputs != 32 || with_layer->LS_noutputs != 8)
 
-    dense_32x8(arg_inputs, layer->LS_weights_noutputsxninputs, arg_dot);
+    dense_32x8(arg_inputs, with_layer->LS_weights_noutputsxninputs, arg_dot);
 
     return;
   }
 #endif
 
-  for (int i = 0; i < layer->LS_noutputs; i++)
-    arg_dot[i] = dot_scaled(layer->LS_ninputs,
-                            arg_inputs,
-                            layer->LS_weights_noutputsxninputs +
-                              (size_t)i * layer->LS_ninputs);
+  for (int ioutput = 0; ioutput < with_layer->LS_noutputs; ioutput++)
+    arg_dot[ioutput] = dot_scaled(with_layer->LS_ninputs,
+                                  arg_inputs,
+                                  with_layer->LS_weights_noutputsxninputs +
+                                    (size_t)ioutput * with_layer->LS_ninputs);
 }
 
 local void construct_dense_network_shared(network_t *arg_network,
@@ -1517,16 +1523,17 @@ local void construct_network_shared(const char *arg_network_name,
 }
 
 local void construct_dense_network_state(
-  const dense_network_shared_t *with_dense_network_shared,
-  dense_network_state_t *with_dense_network_state)
+  const dense_network_shared_t *arg_with_dense_network_shared,
+  dense_network_state_t *arg_with_dense_network_state)
 {
-  for (int ilayer = 0; ilayer < with_dense_network_shared->DNS_nlayers;
+  for (int ilayer = 0; ilayer < arg_with_dense_network_shared->DNS_nlayers;
        ilayer++)
   {
     const layer_shared_t *with_layer_shared =
-      with_dense_network_shared->DNS_layers + ilayer;
+      arg_with_dense_network_shared->DNS_layers + ilayer;
 
-    layer_thread_t *with_thread = with_dense_network_state->DNS_layers + ilayer;
+    layer_thread_t *with_thread =
+      arg_with_dense_network_state->DNS_layers + ilayer;
 
     MY_MALLOC_BY_TYPE(with_thread->LT_dot,
                       scaled_double_t,
@@ -1563,93 +1570,97 @@ void construct_network_state(network_state_t *arg_with_network_state,
     &(arg_with_network_state->NS_dense_network_state));
 }
 
-local scaled_double_t dot_double(int n,
-                                 const scaled_double_t *restrict a,
-                                 const scaled_double_t *restrict b)
+local scaled_double_t dot_double(int arg_nvalues,
+                                 const scaled_double_t *restrict arg_a,
+                                 const scaled_double_t *restrict arg_b)
 {
-  double s = 0;
+  double sum = 0;
 
-  for (int i = 0; i < n; i++)
-    s += SCALED2DOUBLE(a[i]) * SCALED2DOUBLE(b[i]);
+  for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+    sum += SCALED2DOUBLE(arg_a[ivalue]) * SCALED2DOUBLE(arg_b[ivalue]);
 
-  return (DOUBLE2SCALED(s));
+  return (DOUBLE2SCALED(sum));
 }
 
-void vcopy_a2b(int n,
-               const scaled_double_t *restrict a,
-               scaled_double_t *restrict b)
+void vcopy_a2b(int arg_nvalues,
+               const scaled_double_t *restrict arg_a,
+               scaled_double_t *restrict arg_b)
 {
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
-      b[i] = a[i];
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      arg_b[ivalue] = arg_a[ivalue];
   }
 
 #ifdef USE_AVX2_INTRINSICS
   else
   {
-    SOFTBUG((n % 8) != 0)
+    SOFTBUG((arg_nvalues % 8) != 0)
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    for (const scaled_double_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
+      __m256 vector_a = MM256_LOAD_PS(arg_a);
 
-      _mm256_store_ps(b, va);
+      _mm256_store_ps(arg_b, vector_a);
     }
 #else
-    for (const i32_t *z = a + n; a < z; a += 8, b += 8)
+    for (const i32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8)
     {
-      __m256i va = _mm256_load_si256((const __m256i *)a);
+      __m256i vector_a = _mm256_load_si256((const __m256i *)arg_a);
 
-      _mm256_store_si256((__m256i *)b, va);
+      _mm256_store_si256((__m256i *)arg_b, vector_a);
     }
 #endif
   }
 #endif
 }
 
-local void vadd_ab2c(int n,
-                     const scaled_double_t *restrict a,
-                     const scaled_double_t *restrict b,
-                     scaled_double_t *restrict c)
+local void vadd_ab2c(int arg_nvalues,
+                     const scaled_double_t *restrict arg_a,
+                     const scaled_double_t *restrict arg_b,
+                     scaled_double_t *restrict arg_c)
 {
   BEGIN_BLOCK(__FUNC__)
 
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
-      c[i] = a[i] + b[i];
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      arg_c[ivalue] = arg_a[ivalue] + arg_b[ivalue];
   }
 
 #ifdef USE_AVX2_INTRINSICS
   else
   {
-    SOFTBUG((n % 8) != 0)
+    SOFTBUG((arg_nvalues % 8) != 0)
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
+    for (const scaled_double_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8, arg_c += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
-      __m256 vb = MM256_LOAD_PS(b);
+      __m256 vector_a = MM256_LOAD_PS(arg_a);
+      __m256 vector_b = MM256_LOAD_PS(arg_b);
 
-      __m256 vc = _mm256_add_ps(va, vb);
+      __m256 vector_result = _mm256_add_ps(vector_a, vector_b);
 
-      _mm256_store_ps(c, vc);
+      _mm256_store_ps(arg_c, vector_result);
     }
 #else
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
+    for (const scaled_double_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8, arg_c += 8)
     {
-      __m256i va = _mm256_load_si256((const __m256i *)a);
-      __m256i vb = _mm256_load_si256((const __m256i *)b);
+      __m256i vector_a = _mm256_load_si256((const __m256i *)arg_a);
+      __m256i vector_b = _mm256_load_si256((const __m256i *)arg_b);
 
-      __m256i vc = _mm256_add_epi32(va, vb);
+      __m256i vector_result = _mm256_add_epi32(vector_a, vector_b);
 
-      _mm256_store_si256((__m256i *)c, vc);
+      _mm256_store_si256((__m256i *)arg_c, vector_result);
     }
 #endif
   }
@@ -1658,45 +1669,47 @@ local void vadd_ab2c(int n,
   END_BLOCK
 }
 
-void vmul_ab2c(int n,
-               const scaled_double_t *restrict a,
-               const scaled_double_t *restrict b,
-               scaled_double_t *restrict c)
+void vmul_ab2c(int arg_nvalues,
+               const scaled_double_t *restrict arg_a,
+               const scaled_double_t *restrict arg_b,
+               scaled_double_t *restrict arg_c)
 {
   BEGIN_BLOCK(__FUNC__)
 
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
-      c[i] = a[i] * b[i];
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      arg_c[ivalue] = arg_a[ivalue] * arg_b[ivalue];
   }
 
 #ifdef USE_AVX2_INTRINSICS
   else
   {
-    SOFTBUG((n % 8) != 0)
+    SOFTBUG((arg_nvalues % 8) != 0)
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
+    for (const scaled_double_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8, arg_c += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
-      __m256 vb = MM256_LOAD_PS(b);
+      __m256 vector_a = MM256_LOAD_PS(arg_a);
+      __m256 vector_b = MM256_LOAD_PS(arg_b);
 
-      __m256 vc = _mm256_mul_ps(va, vb);
+      __m256 vector_result = _mm256_mul_ps(vector_a, vector_b);
 
-      _mm256_store_ps(c, vc);
+      _mm256_store_ps(arg_c, vector_result);
     }
 #else
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8, c += 8)
+    for (const scaled_double_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8, arg_c += 8)
     {
-      __m256i va = _mm256_load_si256((const __m256i *)a);
-      __m256i vb = _mm256_load_si256((const __m256i *)b);
+      __m256i vector_a = _mm256_load_si256((const __m256i *)arg_a);
+      __m256i vector_b = _mm256_load_si256((const __m256i *)arg_b);
 
-      __m256i vc = _mm256_mullo_epi32(va, vb);
+      __m256i vector_result = _mm256_mullo_epi32(vector_a, vector_b);
 
-      _mm256_store_si256((__m256i *)c, vc);
+      _mm256_store_si256((__m256i *)arg_c, vector_result);
     }
 #endif
   }
@@ -1705,44 +1718,46 @@ void vmul_ab2c(int n,
   END_BLOCK
 }
 
-void vadd_ab2a(int n,
-               scaled_double_t *restrict a,
-               const scaled_double_t *restrict b)
+void vadd_ab2a(int arg_nvalues,
+               scaled_double_t *restrict arg_a,
+               const scaled_double_t *restrict arg_b)
 {
   BEGIN_BLOCK(__FUNC__)
 
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
-      a[i] += b[i];
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      arg_a[ivalue] += arg_b[ivalue];
   }
 
 #ifdef USE_AVX2_INTRINSICS
   else
   {
-    SOFTBUG((n % 8) != 0)
+    SOFTBUG((arg_nvalues % 8) != 0)
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    for (const scaled_double_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8)
     {
-      const __m256 va = MM256_LOAD_PS(a);
-      const __m256 vb = MM256_LOAD_PS(b);
+      const __m256 vector_a = MM256_LOAD_PS(arg_a);
+      const __m256 vector_b = MM256_LOAD_PS(arg_b);
 
-      const __m256 vs = _mm256_add_ps(va, vb);
+      const __m256 vector_sum = _mm256_add_ps(vector_a, vector_b);
 
-      _mm256_store_ps(a, vs);
+      _mm256_store_ps(arg_a, vector_sum);
     }
 #else
-    for (const i32_t *z = a + n; a < z; a += 8, b += 8)
+    for (const i32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8)
     {
-      const __m256i va = _mm256_load_si256((const __m256i *)a);
-      const __m256i vb = _mm256_load_si256((const __m256i *)b);
+      const __m256i vector_a = _mm256_load_si256((const __m256i *)arg_a);
+      const __m256i vector_b = _mm256_load_si256((const __m256i *)arg_b);
 
-      const __m256i vs = _mm256_add_epi32(va, vb);
+      const __m256i vector_sum = _mm256_add_epi32(vector_a, vector_b);
 
-      _mm256_store_si256((__m256i *)a, vs);
+      _mm256_store_si256((__m256i *)arg_a, vector_sum);
     }
 #endif
   }
@@ -1751,44 +1766,46 @@ void vadd_ab2a(int n,
   END_BLOCK
 }
 
-void vmul_ab2a(int n,
-               scaled_double_t *restrict a,
-               const scaled_double_t *restrict b)
+void vmul_ab2a(int arg_nvalues,
+               scaled_double_t *restrict arg_a,
+               const scaled_double_t *restrict arg_b)
 {
   BEGIN_BLOCK(__FUNC__)
 
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
-      a[i] *= b[i];
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      arg_a[ivalue] *= arg_b[ivalue];
   }
 
 #ifdef USE_AVX2_INTRINSICS
   else
   {
-    SOFTBUG((n % 8) != 0)
+    SOFTBUG((arg_nvalues % 8) != 0)
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    for (const scaled_double_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8)
     {
-      const __m256 va = MM256_LOAD_PS(a);
-      const __m256 vb = MM256_LOAD_PS(b);
+      const __m256 vector_a = MM256_LOAD_PS(arg_a);
+      const __m256 vector_b = MM256_LOAD_PS(arg_b);
 
-      const __m256 vs = _mm256_mul_ps(va, vb);
+      const __m256 vector_sum = _mm256_mul_ps(vector_a, vector_b);
 
-      _mm256_store_ps(a, vs);
+      _mm256_store_ps(arg_a, vector_sum);
     }
 #else
-    for (const i32_t *z = a + n; a < z; a += 8, b += 8)
+    for (const i32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+         arg_a += 8, arg_b += 8)
     {
-      const __m256i va = _mm256_load_si256((const __m256i *)a);
-      const __m256i vb = _mm256_load_si256((const __m256i *)b);
+      const __m256i vector_a = _mm256_load_si256((const __m256i *)arg_a);
+      const __m256i vector_b = _mm256_load_si256((const __m256i *)arg_b);
 
-      const __m256i vs = _mm256_mullo_epi32(va, vb);
+      const __m256i vector_sum = _mm256_mullo_epi32(vector_a, vector_b);
 
-      _mm256_store_si256((__m256i *)a, vs);
+      _mm256_store_si256((__m256i *)arg_a, vector_sum);
     }
 #endif
   }
@@ -1797,77 +1814,81 @@ void vmul_ab2a(int n,
   END_BLOCK
 }
 
-local void activation_relu_scaled(int n,
-                                  const scaled_double_t *restrict a,
-                                  scaled_double_t *restrict b)
+local void activation_relu_scaled(int arg_nvalues,
+                                  const scaled_double_t *restrict arg_inputs,
+                                  scaled_double_t *restrict arg_outputs)
 {
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
     {
-      if (a[i] <= 0)
-        b[i] = 0;
+      if (arg_inputs[ivalue] <= 0)
+        arg_outputs[ivalue] = 0;
       else
-        b[i] = a[i];
+        arg_outputs[ivalue] = arg_inputs[ivalue];
     }
   }
 #ifdef USE_AVX2_INTRINSICS
   else
   {
-    SOFTBUG((n % 8) != 0)
+    SOFTBUG((arg_nvalues % 8) != 0)
 
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
-    const __m256 vz = _mm256_setzero_ps();
+    const __m256 vector_zero = _mm256_setzero_ps();
 
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    for (const scaled_double_t *inputs_end = arg_inputs + arg_nvalues;
+         arg_inputs < inputs_end;
+         arg_inputs += 8, arg_outputs += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
+      __m256 vector_input = MM256_LOAD_PS(arg_inputs);
 
-      va = _mm256_max_ps(va, vz);
+      vector_input = _mm256_max_ps(vector_input, vector_zero);
 
-      _mm256_store_ps(b, va);
+      _mm256_store_ps(arg_outputs, vector_input);
     }
 #else
     __m256i zero = _mm256_setzero_si256();
 
-    for (const int32_t *z = a + n; a < z; a += 8, b += 8)
+    for (const int32_t *inputs_end = arg_inputs + arg_nvalues;
+         arg_inputs < inputs_end;
+         arg_inputs += 8, arg_outputs += 8)
     {
-      __m256i va = _mm256_load_si256((const __m256i *)a);
+      __m256i vector_input = _mm256_load_si256((const __m256i *)arg_inputs);
 
-      va = _mm256_max_epi32(va, zero);
+      vector_input = _mm256_max_epi32(vector_input, zero);
 
-      _mm256_store_si256((__m256i *)b, va);
+      _mm256_store_si256((__m256i *)arg_outputs, vector_input);
     }
 #endif
   }
 #endif
 }
 
-local void activation_relu_double(int n,
-                                  const scaled_double_t *restrict a,
-                                  scaled_double_t *restrict b)
+local void activation_relu_double(int arg_nvalues,
+                                  const scaled_double_t *restrict arg_inputs,
+                                  scaled_double_t *restrict arg_outputs)
 {
-  for (int i = 0; i < n; i++)
+  for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
   {
-    if (a[i] <= 0.0)
-      b[i] = 0.0;
+    if (arg_inputs[ivalue] <= 0.0)
+      arg_outputs[ivalue] = 0.0;
     else
-      b[i] = a[i];
+      arg_outputs[ivalue] = arg_inputs[ivalue];
   }
 }
 
-local void activation_tanh_scaled(int n,
-                                  const scaled_double_t *restrict a,
-                                  scaled_double_t *restrict b)
+local void activation_tanh_scaled(int arg_nvalues,
+                                  const scaled_double_t *restrict arg_inputs,
+                                  scaled_double_t *restrict arg_outputs)
 {
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
-      b[i] = tanhf(a[i]);
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      arg_outputs[ivalue] = tanhf(arg_inputs[ivalue]);
   }
 #ifdef USE_AVX2_INTRINSICS
   else
@@ -1879,11 +1900,13 @@ local void activation_tanh_scaled(int n,
     const __m256 p = _mm256_set1_ps(2.425f);
     const __m256 q = _mm256_set1_ps(1.400f);
 
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    for (const scaled_double_t *inputs_end = arg_inputs + arg_nvalues;
+         arg_inputs < inputs_end;
+         arg_inputs += 8, arg_outputs += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
+      __m256 vector_input = MM256_LOAD_PS(arg_inputs);
 
-      __m256 va2p = _mm256_add_ps(p, _mm256_mul_ps(va, va));
+      __m256 va2p = _mm256_add_ps(p, _mm256_mul_ps(vector_input, vector_input));
 
       __m256 rsqrt = _mm256_rsqrt_ps(va2p);
 
@@ -1902,34 +1925,39 @@ local void activation_tanh_scaled(int n,
 
       __m256 vq = _mm256_add_ps(one, _mm256_mul_ps(q, rsqrt2));
 
-      _mm256_store_ps(b, _mm256_mul_ps(va, _mm256_mul_ps(rsqrt, vq)));
+      _mm256_store_ps(arg_outputs,
+                      _mm256_mul_ps(vector_input, _mm256_mul_ps(rsqrt, vq)));
     }
 #else
-    for (int i = 0; i < n; i++)
-      b[i] = FLOAT2SCALED(tanhf(SCALED2FLOAT(a[i])));
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      arg_outputs[ivalue] =
+        FLOAT2SCALED(tanhf(SCALED2FLOAT(arg_inputs[ivalue])));
 #endif
   }
 #endif
 }
 
-local void activation_tanh_double(int n,
-                                  const scaled_double_t *restrict a,
-                                  scaled_double_t *restrict b)
+local void activation_tanh_double(int arg_nvalues,
+                                  const scaled_double_t *restrict arg_inputs,
+                                  scaled_double_t *restrict arg_outputs)
 {
-  for (int i = 0; i < n; i++)
-    b[i] = DOUBLE2SCALED(tanh(SCALED2DOUBLE(a[i])));
+  for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+    arg_outputs[ivalue] =
+      DOUBLE2SCALED(tanh(SCALED2DOUBLE(arg_inputs[ivalue])));
 }
 
-local void activation_rsqrt_scaled(int n,
-                                   const scaled_double_t *restrict a,
-                                   scaled_double_t *restrict b)
+local void activation_rsqrt_scaled(int arg_nvalues,
+                                   const scaled_double_t *restrict arg_inputs,
+                                   scaled_double_t *restrict arg_outputs)
 {
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
-    for (int i = 0; i < n; i++)
-      b[i] = a[i] / sqrtf(1.0f + a[i] * a[i]);
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+      arg_outputs[ivalue] =
+        arg_inputs[ivalue] /
+        sqrtf(1.0f + arg_inputs[ivalue] * arg_inputs[ivalue]);
   }
 #ifdef USE_AVX2_INTRINSICS
   else
@@ -1939,11 +1967,14 @@ local void activation_rsqrt_scaled(int n,
     const __m256 half = _mm256_set1_ps(0.5f);
     const __m256 three_halfs = _mm256_set1_ps(1.5f);
 
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    for (const scaled_double_t *inputs_end = arg_inputs + arg_nvalues;
+         arg_inputs < inputs_end;
+         arg_inputs += 8, arg_outputs += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
+      __m256 vector_input = MM256_LOAD_PS(arg_inputs);
 
-      __m256 va2p1 = _mm256_add_ps(one, _mm256_mul_ps(va, va));
+      __m256 va2p1 =
+        _mm256_add_ps(one, _mm256_mul_ps(vector_input, vector_input));
 
       __m256 rsqrt = _mm256_rsqrt_ps(va2p1);
 
@@ -1954,32 +1985,33 @@ local void activation_rsqrt_scaled(int n,
         _mm256_sub_ps(three_halfs,
                       _mm256_mul_ps(half, _mm256_mul_ps(va2p1, rsqrt2))));
 
-      _mm256_store_ps(b, _mm256_mul_ps(va, rsqrt));
+      _mm256_store_ps(arg_outputs, _mm256_mul_ps(vector_input, rsqrt));
     }
 #else
-    for (int i = 0; i < n; i++)
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
     {
-      float af = SCALED2FLOAT(a[i]);
+      float input = SCALED2FLOAT(arg_inputs[ivalue]);
 
-      b[i] = af / sqrtf(1.0f + af * af);
+      arg_outputs[ivalue] = input / sqrtf(1.0f + input * input);
     }
 #endif
   }
 #endif
 }
 
-local void activation_rsqrt_double(int n,
-                                   const scaled_double_t *restrict a,
-                                   scaled_double_t *restrict b)
+local void activation_rsqrt_double(int arg_nvalues,
+                                   const scaled_double_t *restrict arg_inputs,
+                                   scaled_double_t *restrict arg_outputs)
 {
-  for (int i = 0; i < n; i++)
-    b[i] = DOUBLE2SCALED(a[i]) /
-           sqrt(1.0 + SCALED2DOUBLE(a[i]) * SCALED2DOUBLE(a[i]));
+  for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
+    arg_outputs[ivalue] = DOUBLE2SCALED(arg_inputs[ivalue]) /
+                          sqrt(1.0 + SCALED2DOUBLE(arg_inputs[ivalue]) *
+                                       SCALED2DOUBLE(arg_inputs[ivalue]));
 }
 
-local void activation_gelu_scaled(int n,
-                                  const scaled_double_t *restrict a,
-                                  scaled_double_t *restrict b)
+local void activation_gelu_scaled(int arg_nvalues,
+                                  const scaled_double_t *restrict arg_inputs,
+                                  scaled_double_t *restrict arg_outputs)
 {
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
 #ifdef USE_ERF
@@ -1989,16 +2021,17 @@ local void activation_gelu_scaled(int n,
   const float c = 0.044715f;
 #endif
 
-  for (int i = 0; i < n; i++)
+  for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
   {
-    float af = a[i];
+    float input = arg_inputs[ivalue];
 
 #ifdef USE_ERF
-    b[i] = 0.5f * af * (1.0f + erff(c * af));
+    arg_outputs[ivalue] = 0.5f * input * (1.0f + erff(c * input));
 #else
-    float af2 = af * af;
+    float af2 = input * input;
 
-    b[i] = 0.5f * af * (1.0f + tanhf(k * (af + c * af * af2)));
+    arg_outputs[ivalue] =
+      0.5f * input * (1.0f + tanhf(k * (input + c * input * af2)));
 #endif
   }
 #else
@@ -2006,9 +2039,9 @@ local void activation_gelu_scaled(int n,
 #endif
 }
 
-local void activation_gelu_double(int n,
-                                  const scaled_double_t *restrict a,
-                                  scaled_double_t *restrict b)
+local void activation_gelu_double(int arg_nvalues,
+                                  const scaled_double_t *restrict arg_inputs,
+                                  scaled_double_t *restrict arg_outputs)
 {
 #ifdef USE_ERF
   const float c = 0.707107f;
@@ -2017,35 +2050,36 @@ local void activation_gelu_double(int n,
   const double c = 0.044715;
 #endif
 
-  for (int i = 0; i < n; i++)
+  for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
   {
-    double ad = a[i];
+    double input = arg_inputs[ivalue];
 #ifdef USE_ERF
-    b[i] = 0.5f * ad * (1.0f + erf(c * ad));
+    arg_outputs[ivalue] = 0.5f * input * (1.0f + erf(c * input));
 #else
-    double ad2 = ad * ad;
+    double ad2 = input * input;
 
-    b[i] = DOUBLE2SCALED(0.5 * ad * (1.0 + tanhf(k * (ad + c * ad * ad2))));
+    arg_outputs[ivalue] =
+      DOUBLE2SCALED(0.5 * input * (1.0 + tanhf(k * (input + c * input * ad2))));
 #endif
   }
 }
 
-local void activation_geluv2_scaled(int n,
-                                    const scaled_double_t *restrict a,
-                                    scaled_double_t *restrict b)
+local void activation_geluv2_scaled(int arg_nvalues,
+                                    const scaled_double_t *restrict arg_inputs,
+                                    scaled_double_t *restrict arg_outputs)
 {
 #ifdef USE_AVX2_INTRINSICS
-  if ((n < 8) or ((n % 8) != 0))
+  if ((arg_nvalues < 8) or ((arg_nvalues % 8) != 0))
 #endif
   {
     const float p = 0.544790f;
 
-    for (int i = 0; i < n; i++)
+    for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
     {
-      float af = a[i];
-      float af2 = af * af;
+      float input = arg_inputs[ivalue];
+      float af2 = input * input;
 
-      b[i] = 0.5f * af * (1.0f + af / sqrtf(p + af2));
+      arg_outputs[ivalue] = 0.5f * input * (1.0f + input / sqrtf(p + af2));
     }
   }
 #ifdef USE_AVX2_INTRINSICS
@@ -2085,11 +2119,13 @@ local void activation_geluv2_scaled(int n,
     const __m256 half = _mm256_set1_ps(0.5f);
     const __m256 three_halfs = _mm256_set1_ps(1.5f);
 
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    for (const scaled_double_t *inputs_end = arg_inputs + arg_nvalues;
+         arg_inputs < inputs_end;
+         arg_inputs += 8, arg_outputs += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
+      __m256 vector_input = MM256_LOAD_PS(arg_inputs);
 
-      __m256 vy = _mm256_mul_ps(half, va);
+      __m256 vy = _mm256_mul_ps(half, vector_input);
 
       __m256 vy2 = _mm256_mul_ps(vy, vy);
 
@@ -2114,26 +2150,28 @@ local void activation_geluv2_scaled(int n,
 
       __m256 vg = MM256_MADD_PS(vy2, rsqrt, vy);
 
-      _mm256_store_ps(b, vg);
+      _mm256_store_ps(arg_outputs, vg);
     }
 #else
     const __m256 p = _mm256_set1_ps(0.544790f);
     const __m256 half = _mm256_set1_ps(0.5f);
     const __m256 one = _mm256_set1_ps(1.0f);
 
-    for (const scaled_double_t *z = a + n; a < z; a += 8, b += 8)
+    for (const scaled_double_t *inputs_end = arg_inputs + arg_nvalues;
+         arg_inputs < inputs_end;
+         arg_inputs += 8, arg_outputs += 8)
     {
-      __m256 va = MM256_LOAD_PS(a);
+      __m256 vector_input = MM256_LOAD_PS(arg_inputs);
 
-      __m256 va2 = _mm256_mul_ps(va, va);
+      __m256 va2 = _mm256_mul_ps(vector_input, vector_input);
 
       __m256 vsqrt = _mm256_sqrt_ps(_mm256_add_ps(p, va2));
 
-      __m256 rsqrt = _mm256_add_ps(one, _mm256_div_ps(va, vsqrt));
+      __m256 rsqrt = _mm256_add_ps(one, _mm256_div_ps(vector_input, vsqrt));
 
-      __m256 vg = _mm256_mul_ps(_mm256_mul_ps(half, va), rsqrt);
+      __m256 vg = _mm256_mul_ps(_mm256_mul_ps(half, vector_input), rsqrt);
 
-      _mm256_store_ps(b, vg);
+      _mm256_store_ps(arg_outputs, vg);
     }
 #endif
 #else
@@ -2143,88 +2181,92 @@ local void activation_geluv2_scaled(int n,
 #endif
 }
 
-local void activation_geluv2_double(int n,
-                                    const scaled_double_t *restrict a,
-                                    scaled_double_t *restrict b)
+local void activation_geluv2_double(int arg_nvalues,
+                                    const scaled_double_t *restrict arg_inputs,
+                                    scaled_double_t *restrict arg_outputs)
 {
   const double p = 0.544790;
 
-  for (int i = 0; i < n; i++)
+  for (int ivalue = 0; ivalue < arg_nvalues; ivalue++)
   {
-    double ad = a[i];
-    double ad2 = ad * ad;
+    double input = arg_inputs[ivalue];
+    double ad2 = input * input;
 
-    b[i] = DOUBLE2SCALED(0.5 * ad * (1.0 + ad / sqrt(p + ad2)));
+    arg_outputs[ivalue] =
+      DOUBLE2SCALED(0.5 * input * (1.0 + input / sqrt(p + ad2)));
   }
 }
 
 local void activation_scaled(int arg_activation,
-                             int n,
-                             const scaled_double_t *restrict a,
-                             scaled_double_t *restrict b)
+                             int arg_nvalues,
+                             const scaled_double_t *restrict arg_inputs,
+                             scaled_double_t *restrict arg_outputs)
 {
   if (arg_activation == NETWORK_ACTIVATION_RELU)
   {
-    activation_relu_scaled(n, a, b);
+    activation_relu_scaled(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_TANH)
   {
-    activation_tanh_scaled(n, a, b);
+    activation_tanh_scaled(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_RSQRT)
   {
-    activation_rsqrt_scaled(n, a, b);
+    activation_rsqrt_scaled(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_GELU)
   {
-    activation_gelu_scaled(n, a, b);
+    activation_gelu_scaled(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_GELUV2)
   {
-    activation_geluv2_scaled(n, a, b);
+    activation_geluv2_scaled(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_LINEAR)
   {
-    vcopy_a2b(n, a, b);
+    vcopy_a2b(arg_nvalues, arg_inputs, arg_outputs);
   }
   else
     FATAL("unknown activation option", EXIT_FAILURE)
 }
 
 local void activation_double(int arg_activation,
-                             int n,
-                             const scaled_double_t *restrict a,
-                             scaled_double_t *restrict b)
+                             int arg_nvalues,
+                             const scaled_double_t *restrict arg_inputs,
+                             scaled_double_t *restrict arg_outputs)
 {
   if (arg_activation == NETWORK_ACTIVATION_RELU)
   {
-    activation_relu_double(n, a, b);
+    activation_relu_double(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_TANH)
   {
-    activation_tanh_double(n, a, b);
+    activation_tanh_double(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_RSQRT)
   {
-    activation_rsqrt_double(n, a, b);
+    activation_rsqrt_double(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_GELU)
   {
-    activation_gelu_double(n, a, b);
+    activation_gelu_double(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_GELUV2)
   {
-    activation_geluv2_double(n, a, b);
+    activation_geluv2_double(arg_nvalues, arg_inputs, arg_outputs);
   }
   else if (arg_activation == NETWORK_ACTIVATION_LINEAR)
   {
-    vcopy_a2b(n, a, b);
+    vcopy_a2b(arg_nvalues, arg_inputs, arg_outputs);
   }
   else
     FATAL("unknown activation option", EXIT_FAILURE)
 }
 
-local double return_sigmoid(double x) { return (2.0 / (1.0 + exp(-x)) - 1.0); }
+local double return_sigmoid(double arg_input)
+{
+  return (2.0 / (1.0 + exp(-arg_input)) - 1.0);
+}
 
 int base3_index_v2(const board_t *arg_board, ui64_t arg_pattern_bb)
 {
@@ -2255,22 +2297,25 @@ int base3_index_v2(const board_t *arg_board, ui64_t arg_pattern_bb)
 
 int base3_index_v3(const board_t *arg_board, ui64_t arg_pattern_bb)
 {
-  uint64_t wm = _pext_u64(arg_board->B_white_men_bb, arg_pattern_bb);
-  uint64_t bm = _pext_u64(arg_board->B_black_men_bb, arg_pattern_bb);
+  uint64_t white_mask = _pext_u64(arg_board->B_white_men_bb, arg_pattern_bb);
+  uint64_t black_mask = _pext_u64(arg_board->B_black_men_bb, arg_pattern_bb);
 
-  return base3_table[wm | (bm << 8)];
+  return base3_table[white_mask | (black_mask << 8)];
 }
 
 int base3_index_v4(const board_t *arg_board, ui64_t arg_pattern_bb)
 {
   // HARDBUG(BIT_COUNT(arg_pattern_bb) > BASE3_PATTERN_BITS)
 
-  uint32_t wm = (uint32_t)_pext_u64(arg_board->B_white_men_bb, arg_pattern_bb);
-  uint32_t bm = (uint32_t)_pext_u64(arg_board->B_black_men_bb, arg_pattern_bb);
+  uint32_t white_mask =
+    (uint32_t)_pext_u64(arg_board->B_white_men_bb, arg_pattern_bb);
+  uint32_t black_mask =
+    (uint32_t)_pext_u64(arg_board->B_black_men_bb, arg_pattern_bb);
 
-  HARDBUG((wm & bm) != 0)
+  HARDBUG((white_mask & black_mask) != 0)
 
-  return (int)(base3_mask_table[wm] + 2u * base3_mask_table[bm]);
+  return (int)(base3_mask_table[white_mask] +
+               2u * base3_mask_table[black_mask]);
 }
 
 // assumes inputs have been set
@@ -2341,13 +2386,13 @@ double return_dense_network_score_scaled(
 
     BEGIN_BLOCK("Ax+b-and-activation-other-layers")
 
-    for (int i = 0; i < with_current->LS_noutputs; i++)
+    for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
     {
-      with_current_thread->LT_dot[i] =
+      with_current_thread->LT_dot[ioutput] =
         dot_scaled(with_current->LS_ninputs,
                    with_previous_thread->LT_outputs,
                    with_current->LS_weights_noutputsxninputs +
-                     (size_t)i * with_current->LS_ninputs);
+                     (size_t)ioutput * with_current->LS_ninputs);
     }
 
     vadd_ab2c(with_current->LS_noutputs,
@@ -2498,31 +2543,31 @@ double return_dense_network_score_double(
 
     // always compute layer0
 
-    for (int i = 0; i < with_current->LS_noutputs; i++)
+    for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
     {
-      with_current_thread->LT_dot[i] =
+      with_current_thread->LT_dot[ioutput] =
         dot_double(with_current->LS_ninputs,
                    activated_inputs,
                    with_current->LS_weights_noutputsxninputs +
-                     (size_t)i * with_current->LS_ninputs);
+                     (size_t)ioutput * with_current->LS_ninputs);
     }
   }
   else
   {
-    for (int i = 0; i < with_current->LS_noutputs; i++)
+    for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
     {
-      with_current_thread->LT_dot[i] =
+      with_current_thread->LT_dot[ioutput] =
         dot_double(with_current->LS_ninputs,
                    arg_dense_network_state->DNS_inputs,
                    with_current->LS_weights_noutputsxninputs +
-                     (size_t)i * with_current->LS_ninputs);
+                     (size_t)ioutput * with_current->LS_ninputs);
     }
   }
 
-  for (int i = 0; i < with_current->LS_noutputs; i++)
+  for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
   {
-    with_current_thread->LT_sum[i] =
-      with_current_thread->LT_dot[i] + with_current->LS_bias[i];
+    with_current_thread->LT_sum[ioutput] =
+      with_current_thread->LT_dot[ioutput] + with_current->LS_bias[ioutput];
   }
 
   activation_double(arg_dense_network_shared->DNS_activation,
@@ -2539,14 +2584,14 @@ double return_dense_network_score_double(
     layer_thread_t *with_previous_thread =
       arg_dense_network_state->DNS_layers + ilayer - 1;
 
-    for (int i = 0; i < with_current->LS_noutputs; i++)
+    for (int ioutput = 0; ioutput < with_current->LS_noutputs; ioutput++)
     {
-      with_current_thread->LT_sum[i] =
+      with_current_thread->LT_sum[ioutput] =
         dot_double(with_current->LS_ninputs,
                    with_previous_thread->LT_outputs,
                    with_current->LS_weights_noutputsxninputs +
-                     (size_t)i * with_current->LS_ninputs) +
-        with_current->LS_bias[i];
+                     (size_t)ioutput * with_current->LS_ninputs) +
+        with_current->LS_bias[ioutput];
     }
 
     if (with_current->LS_noutputs > 1)
@@ -2590,82 +2635,89 @@ double return_dense_network_score_double(
   return (SCALED2DOUBLE(with_thread->LT_outputs[0]));
 }
 
-local void heap_sort_double(i64_t n, i64_t *p, double *a)
+local void
+heap_sort_double(i64_t arg_nvalues, i64_t *arg_order, double *arg_values)
 {
-  i64_t i, j, k, t;
+  i64_t iparent, ichild, iroot, saved_index;
 
-  if (n < 2)
+  if (arg_nvalues < 2)
     return;
 
-  for (i = 0; i < n; i++)
-    p[i] = i;
+  for (iparent = 0; iparent < arg_nvalues; iparent++)
+    arg_order[iparent] = iparent;
 
-  k = n / 2;
-  --n;
+  iroot = arg_nvalues / 2;
+  --arg_nvalues;
 
   while (TRUE)
   {
-    if (k > 0)
+    if (iroot > 0)
     {
-      t = p[--k];
+      saved_index = arg_order[--iroot];
     }
     else
     {
-      t = p[n];
-      p[n] = p[0];
+      saved_index = arg_order[arg_nvalues];
+      arg_order[arg_nvalues] = arg_order[0];
 
-      if (--n == 0)
+      if (--arg_nvalues == 0)
       {
-        p[0] = t;
+        arg_order[0] = saved_index;
 
         break;
       }
     }
-    i = k;
-    j = 2 * k + 1;
+    iparent = iroot;
+    ichild = 2 * iroot + 1;
 
-    while (j <= n)
+    while (ichild <= arg_nvalues)
     {
-      if ((j < n) and (a[p[j]] < a[p[j + 1]]))
-        j++;
+      if ((ichild < arg_nvalues) and
+          (arg_values[arg_order[ichild]] < arg_values[arg_order[ichild + 1]]))
+        ichild++;
 
-      if (a[t] < a[p[j]])
+      if (arg_values[saved_index] < arg_values[arg_order[ichild]])
       {
-        p[i] = p[j];
-        i = j;
-        j = 2 * j + 1;
+        arg_order[iparent] = arg_order[ichild];
+        iparent = ichild;
+        ichild = 2 * ichild + 1;
       }
       else
       {
-        j = n + 1;
+        ichild = arg_nvalues + 1;
       }
     }
-    p[i] = t;
+    arg_order[iparent] = saved_index;
   }
 
-  for (i = 0; i < n; i++)
-    HARDBUG(a[p[i]] > a[p[i + 1]])
+  for (iparent = 0; iparent < arg_nvalues; iparent++)
+    HARDBUG(arg_values[arg_order[iparent]] > arg_values[arg_order[iparent + 1]])
 }
 
-local void
-update_mean_sigma(long long n, double x, double *xmax, double *mn, double *sn)
+local void update_mean_sigma(long long arg_nsamples,
+                             double arg_sample,
+                             double *arg_maximum,
+                             double *arg_mean,
+                             double *arg_squared_deviations)
 {
-  double mnm1 = *mn;
-  double snm1 = *sn;
+  double previous_mean = *arg_mean;
+  double previous_squared_deviations = *arg_squared_deviations;
 
-  if (x > *xmax)
-    *xmax = x;
+  if (arg_sample > *arg_maximum)
+    *arg_maximum = arg_sample;
 
-  *mn = mnm1 + (x - mnm1) / n;
+  *arg_mean = previous_mean + (arg_sample - previous_mean) / arg_nsamples;
 
-  *sn = snm1 + (x - mnm1) * (x - *mn);
+  *arg_squared_deviations =
+    previous_squared_deviations +
+    (arg_sample - previous_mean) * (arg_sample - *arg_mean);
 }
 
-static inline uint64_t mirror_bb(uint64_t bb)
+static inline uint64_t mirror_bb(uint64_t arg_bb)
 {
   ui64_t result;
 
-  result = (bb >> 6);
+  result = (arg_bb >> 6);
 
   result = BIT_REVERSE(result) >> (64 - 54);
 
@@ -2673,11 +2725,11 @@ static inline uint64_t mirror_bb(uint64_t bb)
 
   ui64_t debug = 0;
 
-  while (bb)
+  while (arg_bb)
   {
-    int ifield = BIT_CTZ(bb);
+    int ifield = BIT_CTZ(arg_bb);
 
-    bb &= ~BITULL(ifield);
+    arg_bb &= ~BITULL(ifield);
 
     debug |= 1ULL << (65 - ifield);
   }
@@ -3818,16 +3870,16 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
   BDESTROY(barg_name)
 }
 
-void evaluate_material_network(const network_t *with_network,
+void evaluate_material_network(const network_t *arg_with_network,
                                dense_network_state_t *arg_state,
-                               int nwhite_men,
-                               int nblack_men,
-                               int nwhite_kings,
-                               int nblack_kings,
+                               int arg_nwhite_men,
+                               int arg_nblack_men,
+                               int arg_nwhite_kings,
+                               int arg_nblack_kings,
                                int arg_inputs)
 {
   const dense_network_shared_t *dense =
-    &with_network->N_shared_material_dense_network;
+    &arg_with_network->N_shared_material_dense_network;
 
   int ilast = dense->DNS_nlayers - 1;
 
@@ -3835,21 +3887,21 @@ void evaluate_material_network(const network_t *with_network,
 
   int noutputs = dense->DNS_layers[ilast].LS_noutputs;
 
-  HARDBUG((nwhite_men < 0) or (nblack_men < 0) or (nwhite_kings < 0) or
-          (nblack_kings < 0))
+  HARDBUG((arg_nwhite_men < 0) or (arg_nblack_men < 0) or
+          (arg_nwhite_kings < 0) or (arg_nblack_kings < 0))
 
   // Diagnostics need the intermediate inputs as well as the final outputs.
-  if (!arg_inputs and (with_network->N_material_cache != NULL) and
-      (nwhite_men <= NPIECES_MAX) and (nblack_men <= NPIECES_MAX) and
-      (nwhite_kings <= NPIECES_MAX) and (nblack_kings <= NPIECES_MAX))
+  if (!arg_inputs and (arg_with_network->N_material_cache != NULL) and
+      (arg_nwhite_men <= NPIECES_MAX) and (arg_nblack_men <= NPIECES_MAX) and
+      (arg_nwhite_kings <= NPIECES_MAX) and (arg_nblack_kings <= NPIECES_MAX))
   {
-    size_t index =
-      ((nwhite_men * (NPIECES_MAX + 1) + nblack_men) * (NPIECES_MAX + 1) +
-       nwhite_kings) *
-        (NPIECES_MAX + 1) +
-      nblack_kings;
+    size_t index = ((arg_nwhite_men * (NPIECES_MAX + 1) + arg_nblack_men) *
+                      (NPIECES_MAX + 1) +
+                    arg_nwhite_kings) *
+                     (NPIECES_MAX + 1) +
+                   arg_nblack_kings;
     memcpy(arg_state->DNS_layers[ilast].LT_outputs,
-           with_network->N_material_cache + index * noutputs,
+           arg_with_network->N_material_cache + index * noutputs,
            noutputs * sizeof(scaled_double_t));
 
     return;
@@ -3860,12 +3912,12 @@ void evaluate_material_network(const network_t *with_network,
 #endif
 
   for (int iinput = 0;
-       iinput < with_network->N_shared_material_dense_network.DNS_ninputs;
+       iinput < arg_with_network->N_shared_material_dense_network.DNS_ninputs;
        iinput++)
     arg_state->DNS_inputs[iinput] = 0;
 
   const layer_shared_t *with_current =
-    with_network->N_shared_material_dense_network.DNS_layers;
+    arg_with_network->N_shared_material_dense_network.DNS_layers;
 
   layer_thread_t *with_current_thread = arg_state->DNS_layers;
 
@@ -3873,38 +3925,38 @@ void evaluate_material_network(const network_t *with_network,
     with_current_thread->LT_dot[ioutput] = 0;
 
 #ifdef USE_AVX2_INTRINSICS
-  if (with_network->N_material_dense_network_16x8_kernel)
+  if (arg_with_network->N_material_dense_network_16x8_kernel)
   {
     sum0 = _mm256_setzero_ps();
     sum1 = _mm256_setzero_ps();
   }
 
-  if (with_network->N_material_dense_network_64x16_kernel)
+  if (arg_with_network->N_material_dense_network_64x16_kernel)
     for (int ichunk = 0; ichunk < 8; ichunk++)
       sum64[ichunk] = _mm256_setzero_ps();
 #endif
 
   for (int imaterial = 0;
-       imaterial < with_network->N_shared_materials.MSS_nmaterials;
+       imaterial < arg_with_network->N_shared_materials.MSS_nmaterials;
        imaterial++)
   {
     const material_shared_t *with_material_shared =
-      with_network->N_shared_materials.MSS_materials + imaterial;
+      arg_with_network->N_shared_materials.MSS_materials + imaterial;
 
     int istate = INVALID;
 
     if (with_material_shared->MS_id == MATERIAL_NWHITE_MEN_ID)
     {
-      istate = nwhite_men;
+      istate = arg_nwhite_men;
     }
     else if (with_material_shared->MS_id == MATERIAL_NBLACK_MEN_ID)
     {
-      istate = nblack_men;
+      istate = arg_nblack_men;
     }
     else if ((with_material_shared->MS_id == MATERIAL_NWHITE_KINGS_ID) or
              (with_material_shared->MS_id == MATERIAL_NWHITE_KINGS20_ID))
     {
-      istate = nwhite_kings;
+      istate = arg_nwhite_kings;
 
       if (istate >= with_material_shared->MS_nstates)
         istate = with_material_shared->MS_nstates - 1;
@@ -3912,15 +3964,15 @@ void evaluate_material_network(const network_t *with_network,
     else if ((with_material_shared->MS_id == MATERIAL_NBLACK_KINGS_ID) or
              (with_material_shared->MS_id == MATERIAL_NBLACK_KINGS20_ID))
     {
-      istate = nblack_kings;
+      istate = arg_nblack_kings;
 
       if (istate >= with_material_shared->MS_nstates)
         istate = with_material_shared->MS_nstates - 1;
     }
     else if (with_material_shared->MS_id == MATERIAL_MAN_KING_ID)
     {
-      int ncapped_white_kings = nwhite_kings;
-      int ncapped_black_kings = nblack_kings;
+      int ncapped_white_kings = arg_nwhite_kings;
+      int ncapped_black_kings = arg_nblack_kings;
 
       if (ncapped_white_kings > MATERIAL_KING_MAX)
         ncapped_white_kings = MATERIAL_KING_MAX;
@@ -3928,17 +3980,18 @@ void evaluate_material_network(const network_t *with_network,
       if (ncapped_black_kings > MATERIAL_KING_MAX)
         ncapped_black_kings = MATERIAL_KING_MAX;
 
-      istate = (nwhite_men * (MATERIAL_KING_MAX + 1) + ncapped_white_kings) *
-                 (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
-               nblack_men * (MATERIAL_KING_MAX + 1) + ncapped_black_kings;
+      istate =
+        (arg_nwhite_men * (MATERIAL_KING_MAX + 1) + ncapped_white_kings) *
+          (NPIECES_MAX + 1) * (MATERIAL_KING_MAX + 1) +
+        arg_nblack_men * (MATERIAL_KING_MAX + 1) + ncapped_black_kings;
     }
 
     HARDBUG((istate < 0) or (istate >= with_material_shared->MS_nstates))
 
-    if (with_network->N_material_architecture == NETWORK_ARCHITECTURE_ADD)
+    if (arg_with_network->N_material_architecture == NETWORK_ARCHITECTURE_ADD)
     {
 #ifdef USE_AVX2_INTRINSICS
-      if (with_network->N_material_dense_network_16x8_kernel)
+      if (arg_with_network->N_material_dense_network_16x8_kernel)
       {
         const float *weights = with_material_shared->MS_weights_nstatesxnembed +
                                (size_t)istate * with_material_shared->MS_nembed;
@@ -3947,7 +4000,7 @@ void evaluate_material_network(const network_t *with_network,
         sum0 = _mm256_add_ps(sum0, _mm256_loadu_ps(weights));
         sum1 = _mm256_add_ps(sum1, _mm256_loadu_ps(weights + 8));
       }
-      else if (with_network->N_material_dense_network_64x16_kernel)
+      else if (arg_with_network->N_material_dense_network_64x16_kernel)
       {
         const float *weights = with_material_shared->MS_weights_nstatesxnembed +
                                (size_t)istate * with_material_shared->MS_nembed;
@@ -3963,7 +4016,7 @@ void evaluate_material_network(const network_t *with_network,
                   with_material_shared->MS_weights_nstatesxnembed +
                     (size_t)istate * with_material_shared->MS_nembed);
     }
-    else if (with_network->N_material_architecture ==
+    else if (arg_with_network->N_material_architecture ==
              NETWORK_ARCHITECTURE_CONCAT)
     {
       if (arg_inputs)
@@ -3980,12 +4033,12 @@ void evaluate_material_network(const network_t *with_network,
       FATAL("unknown with_network->N_architecture_maerial", EXIT_FAILURE)
   }
 #ifdef USE_AVX2_INTRINSICS
-  if (with_network->N_material_dense_network_16x8_kernel)
+  if (arg_with_network->N_material_dense_network_16x8_kernel)
   {
     _mm256_store_ps(arg_state->DNS_inputs, sum0);
     _mm256_store_ps(arg_state->DNS_inputs + 8, sum1);
   }
-  else if (with_network->N_material_dense_network_64x16_kernel)
+  else if (arg_with_network->N_material_dense_network_64x16_kernel)
   {
     for (int ichunk = 0; ichunk < 8; ichunk++)
       _mm256_store_ps(arg_state->DNS_inputs + 8 * ichunk, sum64[ichunk]);
@@ -3993,7 +4046,7 @@ void evaluate_material_network(const network_t *with_network,
 #endif
 
   (void)return_dense_network_score_scaled(
-    &(with_network->N_shared_material_dense_network),
+    &(arg_with_network->N_shared_material_dense_network),
     arg_state);
 }
 
@@ -4088,7 +4141,10 @@ void init_networks(void)
     construct_material_cache(networks + inetwork);
 }
 
-local double gelu(double x) { return (0.5 * x * (1.0 + erf(x / sqrt(2.0)))); }
+local double gelu(double arg_input)
+{
+  return (0.5 * arg_input * (1.0 + erf(arg_input / sqrt(2.0))));
+}
 
 #define SCALE 1000
 #define XMAX 5
@@ -4096,48 +4152,48 @@ local double gelu(double x) { return (0.5 * x * (1.0 + erf(x / sqrt(2.0)))); }
 
 void test_networks(void)
 {
-  ALIGN64(float a[N]);
-  ALIGN64(float b[N]);
-  ALIGN64(double e[N]);
+  ALIGN64(float inputs[N]);
+  ALIGN64(float outputs[N]);
+  ALIGN64(double errors[N]);
 
-  for (int i = 0; i < N; i++)
-    a[i] = 0.0f;
+  for (int ivalue = 0; ivalue < N; ivalue++)
+    inputs[ivalue] = 0.0f;
 
-  double ex = 0.0;
+  double maximum_error = 0.0;
 
-  for (int ix = -XMAX * SCALE; ix <= XMAX * SCALE; ++ix)
+  for (int isample = -XMAX * SCALE; isample <= XMAX * SCALE; ++isample)
   {
-    float x = (float)ix / (float)SCALE;
+    float input = (float)isample / (float)SCALE;
 
-    a[0] = x;
+    inputs[0] = input;
 
-    activation_geluv2_scaled(N, a, b);
+    activation_geluv2_scaled(N, inputs, outputs);
 
-    double g = gelu((double)x);
+    double expected = gelu((double)input);
 
-    e[0] = fabs((double)b[0] - g);
+    errors[0] = fabs((double)outputs[0] - expected);
 
-    if (e[0] > ex)
+    if (errors[0] > maximum_error)
     {
-      ex = e[0];
+      maximum_error = errors[0];
 
-      for (int i = N - 1; i > 0; --i)
+      for (int ivalue = N - 1; ivalue > 0; --ivalue)
       {
-        a[i] = a[i - 1];
-        b[i] = b[i - 1];
-        e[i] = e[i - 1];
+        inputs[ivalue] = inputs[ivalue - 1];
+        outputs[ivalue] = outputs[ivalue - 1];
+        errors[ivalue] = errors[ivalue - 1];
       }
     }
   }
 
-  for (int i = 1; i < N; i++)
+  for (int ivalue = 1; ivalue < N; ivalue++)
   {
     PRINTF("i=%d a[i]=%.6f gelu(a[i])=%.6f b[i]=%.6f e[i]=%.6f\n",
-           i,
-           a[i],
-           gelu((double)a[i]),
-           b[i],
-           e[i]);
+           ivalue,
+           inputs[ivalue],
+           gelu((double)inputs[ivalue]),
+           outputs[ivalue],
+           errors[ivalue]);
   }
-  PRINTF("ex=%.6f\n", ex);
+  PRINTF("ex=%.6f\n", maximum_error);
 }

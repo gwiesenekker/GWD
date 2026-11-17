@@ -36,47 +36,51 @@ uint64_t rotl(const uint64_t x, int k) {
 }
 */
 
-local ui64_t rotl(ui64_t x, int k)
+local ui64_t rotl(ui64_t arg_value, int arg_nbits)
 {
-  HARDBUG((k < 0) or (k > 63))
+  HARDBUG((arg_nbits < 0) or (arg_nbits > 63))
 
-  return (x << k) | (x >> (64 - k));
+  return (arg_value << arg_nbits) | (arg_value >> (64 - arg_nbits));
 }
 
-void shuffle(int *s, int n, my_random_t *r, int k)
+void shuffle(int *arg_array,
+             int arg_narray,
+             my_random_t *arg_my_random,
+             int arg_isort0)
 {
-  for (int i = 0; i < n; i++)
-    s[i] = i;
+  for (int isort = 0; isort < arg_narray; isort++)
+    arg_array[isort] = isort;
 
-  if (r != NULL)
+  if (arg_my_random != NULL)
   {
-    for (int i = n - 1; i >= 1; --i)
+    for (int isort = arg_narray - 1; isort >= 1; --isort)
     {
       // int j = return_my_random(r) % (i + 1);
-      int j = (int)compat_mulhi_u64(return_my_random(r), (ui64_t)(i + 1));
+      int jsort = (int)compat_mulhi_u64(return_my_random(arg_my_random),
+                                        (ui64_t)(isort + 1));
 
-      HARDBUG(j > i)
+      HARDBUG(jsort > isort)
 
-      if (j != i)
+      if (jsort != isort)
       {
-        int t = s[i];
+        int saved_value = arg_array[isort];
 
-        s[i] = s[j];
+        arg_array[isort] = arg_array[jsort];
 
-        s[j] = t;
+        arg_array[jsort] = saved_value;
       }
     }
   }
 
-  if (k != INVALID)
+  if (arg_isort0 != INVALID)
   {
-    for (int i = 0; i < n; i++)
+    for (int isort = 0; isort < arg_narray; isort++)
     {
-      if (s[i] == k)
+      if (arg_array[isort] == arg_isort0)
       {
-        s[i] = s[0];
+        arg_array[isort] = arg_array[0];
 
-        s[0] = k;
+        arg_array[0] = arg_isort0;
 
         break;
       }
@@ -84,34 +88,34 @@ void shuffle(int *s, int n, my_random_t *r, int k)
   }
 
 #ifdef DEBUG
-  if (n <= NMOVES_MAX)
+  if (arg_narray <= NMOVES_MAX)
   {
-    int t[NMOVES_MAX];
+    int found[NMOVES_MAX];
 
-    for (int i = 0; i < n; i++)
-      t[i] = FALSE;
+    for (int isort = 0; isort < arg_narray; isort++)
+      found[isort] = FALSE;
 
-    for (int i = 0; i < n; i++)
+    for (int isort = 0; isort < arg_narray; isort++)
     {
-      int j = s[i];
+      int jsort = arg_array[isort];
 
-      HARDBUG((j < 0) or (j >= n))
-      HARDBUG(t[j])
+      HARDBUG((jsort < 0) or (jsort >= arg_narray))
+      HARDBUG(found[jsort])
 
-      t[j] = TRUE;
+      found[jsort] = TRUE;
     }
   }
   else
   {
-    for (int i = 0; i < n; i++)
+    for (int isort = 0; isort < arg_narray; isort++)
     {
-      int t = 0;
+      int nfound = 0;
 
-      for (int j = 0; j < n; j++)
-        if (s[j] == i)
-          ++t;
+      for (int jsort = 0; jsort < arg_narray; jsort++)
+        if (arg_array[jsort] == isort)
+          ++nfound;
 
-      HARDBUG(t != 1)
+      HARDBUG(nfound != 1)
     }
   }
 #endif
@@ -214,11 +218,11 @@ void test_my_random(void)
 
     for (i64_t isample = 0; isample < nsamples; isample++)
     {
-      int r = (return_my_random(&test_random) >> ishift) & TEST_MASK;
+      int random_value = (return_my_random(&test_random) >> ishift) & TEST_MASK;
 
-      buckets[r]++;
+      buckets[random_value]++;
 
-      update_stats(&stats, r);
+      update_stats(&stats, random_value);
     }
 
     i64_t min = buckets[0];

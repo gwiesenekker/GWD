@@ -38,15 +38,15 @@ int my_sscanf_s(const char *arg_src, size_t arg_limit, char *arg_dst)
 
 #undef sscanf
 
-int my_sscanf(const char *str, const char *format, ...)
+int my_sscanf(const char *arg_string, const char *arg_format, ...)
 {
-  va_list ap;
+  va_list arguments;
 
-  va_start(ap, format);
+  va_start(arguments, arg_format);
 
-  int rc = vsscanf(str, format, ap);
+  int result = vsscanf(arg_string, arg_format, arguments);
 
-  va_end(ap);
+  va_end(arguments);
 
-  return (rc);
+  return (result);
 }

@@ -24,23 +24,24 @@ void flush_fbuffer(fbuffer_t *arg_with_fbuffer, int arg_nfbuffer)
 
 void append_fbuffer_fmt(fbuffer_t *arg_with_fbuffer, const char *arg_fmt, ...)
 {
-  int ret;
+  int result;
 
-  bvformata(ret, arg_with_fbuffer->FB_bstring, arg_fmt, arg_fmt);
+  bvformata(result, arg_with_fbuffer->FB_bstring, arg_fmt, arg_fmt);
 
-  HARDBUG(ret == BSTR_ERR)
+  HARDBUG(result == BSTR_ERR)
 
-  bstring b = arg_with_fbuffer->FB_bstring;
+  bstring bbuffer = arg_with_fbuffer->FB_bstring;
 
-  if (bchar(b, blength(b) - 1) == '\n')
+  if (bchar(bbuffer, blength(bbuffer) - 1) == '\n')
   {
-    HARDBUG((arg_with_fbuffer->FB_nfbuffer + blength(b)) >= (2 * NFBUFFER))
+    HARDBUG((arg_with_fbuffer->FB_nfbuffer + blength(bbuffer)) >=
+            (2 * NFBUFFER))
 
     memcpy((i8_t *)arg_with_fbuffer->FB_fbuffer + arg_with_fbuffer->FB_nfbuffer,
-           bdata(b),
-           blength(b));
+           bdata(bbuffer),
+           blength(bbuffer));
 
-    arg_with_fbuffer->FB_nfbuffer += blength(b);
+    arg_with_fbuffer->FB_nfbuffer += blength(bbuffer);
 
     HARDBUG(bassigncstr(arg_with_fbuffer->FB_bstring, "") == BSTR_ERR)
 
@@ -50,7 +51,7 @@ void append_fbuffer_fmt(fbuffer_t *arg_with_fbuffer, const char *arg_fmt, ...)
 
 void append_fbuffer_bin(fbuffer_t *arg_with_fbuffer,
                         const void *arg_data,
-                        size_t ldata)
+                        size_t arg_nbytes)
 {
   if (arg_data == NULL)
   {
@@ -59,13 +60,13 @@ void append_fbuffer_bin(fbuffer_t *arg_with_fbuffer,
     return;
   }
 
-  HARDBUG((arg_with_fbuffer->FB_nfbuffer + ldata) >= (2 * NFBUFFER))
+  HARDBUG((arg_with_fbuffer->FB_nfbuffer + arg_nbytes) >= (2 * NFBUFFER))
 
   memcpy((i8_t *)arg_with_fbuffer->FB_fbuffer + arg_with_fbuffer->FB_nfbuffer,
          arg_data,
-         ldata);
+         arg_nbytes);
 
-  arg_with_fbuffer->FB_nfbuffer += ldata;
+  arg_with_fbuffer->FB_nfbuffer += arg_nbytes;
 }
 
 bstring return_fbuffer_bname(const fbuffer_t *arg_with_fbuffer)

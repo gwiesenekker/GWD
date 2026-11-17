@@ -27,18 +27,18 @@ void my_printf(my_printf_t *arg_with_my_printf, const char *arg_format, ...)
   {
     // stdout
 
-    va_list ap;
+    va_list arguments;
 
-    va_start(ap, arg_format);
+    va_start(arguments, arg_format);
 
-    if (vprintf(arg_format, ap) < 0)
+    if (vprintf(arg_format, arguments) < 0)
     {
       fprintf(stderr, "vfprintf(arg_format, ap) > 0\n");
 
       exit(EXIT_FAILURE);
     }
 
-    va_end(ap);
+    va_end(arguments);
 
     return;
   }
@@ -64,14 +64,14 @@ void my_printf(my_printf_t *arg_with_my_printf, const char *arg_format, ...)
                     1) == BSTR_ERR)
   }
 
-  int ret;
+  int result;
 
-  bvformata(ret,
+  bvformata(result,
             arg_with_my_printf->MP_bbuffer,
             bdata(arg_with_my_printf->MP_bformat),
             arg_format);
 
-  HARDBUG(ret == BSTR_ERR)
+  HARDBUG(result == BSTR_ERR)
 
   HARDBUG(bassigncstr(arg_with_my_printf->MP_bline, "") == BSTR_ERR)
 
@@ -88,9 +88,9 @@ void my_printf(my_printf_t *arg_with_my_printf, const char *arg_format, ...)
 
     bstring time_stamp = arg_with_my_printf->MP_btime_stamp;
 
-    time_t t = time(NULL);
+    time_t current_time = time(NULL);
 
-    my_bstrftime(time_stamp, "%H:%M:%S-%d/%m/%Y", t);
+    my_bstrftime(time_stamp, "%H:%M:%S-%d/%m/%Y", current_time);
 
     i64_t pid = compat_getpid();
 
@@ -260,9 +260,9 @@ void my_printf(my_printf_t *arg_with_my_printf, const char *arg_format, ...)
 
 void construct_my_printf(my_printf_t *arg_with_my_printf,
                          const char *arg_prefix,
-                         int arg2stdout)
+                         int arg_to_stdout)
 {
-  arg_with_my_printf->MP2stdout = arg2stdout;
+  arg_with_my_printf->MP2stdout = arg_to_stdout;
 
   // Logging also serves allocation diagnostics; reuse an owned timestamp
   // string.
@@ -334,9 +334,9 @@ void construct_my_printf(my_printf_t *arg_with_my_printf,
 
   bstring time_stamp = arg_with_my_printf->MP_btime_stamp;
 
-  time_t t = time(NULL);
+  time_t current_time = time(NULL);
 
-  my_bstrftime(time_stamp, "%H:%M:%S-%d/%m/%Y", t);
+  my_bstrftime(time_stamp, "%H:%M:%S-%d/%m/%Y", current_time);
 
   i64_t pid = compat_getpid();
 

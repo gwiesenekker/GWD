@@ -6,107 +6,113 @@
 int zzzzzz_invocation;
 my_mpi_globals_t my_mpi_globals;
 
-_Noreturn void zzzzzz(const char *file,
-                      const char *func,
-                      long line,
-                      const char *message,
-                      int code)
+_Noreturn void zzzzzz(const char *arg_file,
+                      const char *arg_func,
+                      long arg_line,
+                      const char *arg_message,
+                      int arg_code)
 {
-  fprintf(stderr, "%s:%ld %s: %s\n", file, line, func, message);
-  exit(code);
+  fprintf(stderr, "%s:%ld %s: %s\n", arg_file, arg_line, arg_func, arg_message);
+  exit(arg_code);
 }
 
-void *my_malloc(const char *name,
-                const char *file,
-                const char *func,
-                int line,
-                size_t size)
+void *my_malloc(const char *arg_name,
+                const char *arg_file,
+                const char *arg_func,
+                int arg_line,
+                size_t arg_size)
 {
-  (void)name;
-  (void)file;
-  (void)func;
-  (void)line;
+  (void)arg_name;
+  (void)arg_file;
+  (void)arg_func;
+  (void)arg_line;
 
   void *pointer = NULL;
 
-  assert(posix_memalign(&pointer, 64, size) == 0);
+  assert(posix_memalign(&pointer, 64, arg_size) == 0);
 
   return pointer;
 }
-void my_free(void *pointer) { free(pointer); }
-void register_heap(const char *name,
-                   const char *file,
-                   const char *func,
-                   int line,
-                   void *pointer,
-                   size_t size,
-                   int allocated,
-                   int readonly)
+void my_free(void *arg_pointer) { free(arg_pointer); }
+void register_heap(const char *arg_name,
+                   const char *arg_file,
+                   const char *arg_func,
+                   int arg_line,
+                   void *arg_pointer,
+                   size_t arg_size,
+                   int arg_allocated,
+                   int arg_readonly)
 {
-  (void)name;
-  (void)file;
-  (void)func;
-  (void)line;
-  (void)pointer;
-  (void)size;
-  (void)allocated;
-  (void)readonly;
+  (void)arg_name;
+  (void)arg_file;
+  (void)arg_func;
+  (void)arg_line;
+  (void)arg_pointer;
+  (void)arg_size;
+  (void)arg_allocated;
+  (void)arg_readonly;
 }
-void my_mpi_allocate_shared(MPI_Comm comm,
-                            size_t size,
-                            size_t count,
-                            void **pointer,
-                            MPI_Win *win)
+void my_mpi_allocate_shared(MPI_Comm arg_comm,
+                            size_t arg_size,
+                            size_t arg_count,
+                            void **arg_pointer,
+                            MPI_Win *arg_win)
 {
-  (void)comm;
-  *pointer = malloc(size * count);
+  (void)arg_comm;
+  *arg_pointer = malloc(arg_size * arg_count);
 
-  assert(*pointer != NULL);
+  assert(*arg_pointer != NULL);
 
-  memset(*pointer, 0xa5, size * count); /* Detect missing zero filling. */
-  *win = 0;
+  memset(*arg_pointer,
+         0xa5,
+         arg_size * arg_count); /* Detect missing zero filling. */
+  *arg_win = 0;
 }
-void my_mpi_sync_shared(MPI_Comm comm, MPI_Win win, const char *name)
+void my_mpi_sync_shared(MPI_Comm arg_comm,
+                        MPI_Win arg_win,
+                        const char *arg_name)
 {
-  (void)comm;
-  (void)win;
-  (void)name;
+  (void)arg_comm;
+  (void)arg_win;
+  (void)arg_name;
 }
 
 void *STDOUT;
-void my_printf(my_printf_t *out, const char *format, ...)
+void my_printf(my_printf_t *arg_out, const char *arg_format, ...)
 {
-  (void)out;
-  (void)format;
+  (void)arg_out;
+  (void)arg_format;
 }
 
-static float *make_values(size_t count, int seed)
+static float *make_values(size_t arg_count, int arg_seed)
 {
-  float *values = my_malloc(NULL, NULL, NULL, 0, count * sizeof(float));
+  float *values = my_malloc(NULL, NULL, NULL, 0, arg_count * sizeof(float));
 
-  for (size_t icell = 0; icell < count; icell++)
-    values[icell] = (float)((int)((icell * 13 + seed) % 31) - 15) / 64.0f;
+  for (size_t icell = 0; icell < arg_count; icell++)
+    values[icell] = (float)((int)((icell * 13 + arg_seed) % 31) - 15) / 64.0f;
 
   return values;
 }
 
-static void test_cache(int nembed, int concat)
+static void test_cache(int arg_nembed, int arg_concat)
 {
   network_t network = {0};
 
   network.N_network_id = NETWORK0_ID;
   network.N_material_architecture =
-    concat ? NETWORK_ARCHITECTURE_CONCAT : NETWORK_ARCHITECTURE_ADD;
-  network.N_material_dense_network_16x8_kernel = !concat && nembed == 16;
-  network.N_material_dense_network_64x16_kernel = !concat && nembed == 64;
-  network.N_shared_materials.MSS_nmaterials = concat ? 4 : 5;
+    arg_concat ? NETWORK_ARCHITECTURE_CONCAT : NETWORK_ARCHITECTURE_ADD;
+  network.N_material_dense_network_16x8_kernel =
+    !arg_concat && arg_nembed == 16;
+  network.N_material_dense_network_64x16_kernel =
+    !arg_concat && arg_nembed == 64;
+  network.N_shared_materials.MSS_nmaterials = arg_concat ? 4 : 5;
 
   dense_network_shared_t *dense = &network.N_shared_material_dense_network;
 
-  dense->DNS_ninputs = concat ? 4 * nembed : nembed;
+  dense->DNS_ninputs = arg_concat ? 4 * arg_nembed : arg_nembed;
   dense->DNS_nlayers = 2;
-  dense->DNS_compute_layer0 = !concat;
-  dense->DNS_activate_layer0 = !concat;
+  dense->DNS_compute_layer0 = !arg_concat;
+  dense->DNS_activate_layer0 = !arg_concat;
   dense->DNS_input_activation = NETWORK_ACTIVATION_GELUV2;
   dense->DNS_activation = NETWORK_ACTIVATION_GELUV2;
   dense->DNS_final_activation = NETWORK_ACTIVATION_LINEAR;
@@ -131,7 +137,8 @@ static void test_cache(int nembed, int concat)
 
     layer->LS_ninputs =
       ilayer == 0 ? dense->DNS_ninputs : dense->DNS_layers[0].LS_noutputs;
-    layer->LS_noutputs = ilayer == 0 && nembed == 64 && !concat ? 16 : 8;
+    layer->LS_noutputs =
+      ilayer == 0 && arg_nembed == 64 && !arg_concat ? 16 : 8;
     layer->LS_weights_noutputsxninputs =
       make_values(layer->LS_ninputs * layer->LS_noutputs, 3);
     layer->LS_bias = make_values(layer->LS_noutputs, 1);
@@ -144,12 +151,12 @@ static void test_cache(int nembed, int concat)
       network.N_shared_materials.MSS_materials + imaterial;
     material->MS_id = ids[imaterial];
     material->MS_nstates = counts[imaterial];
-    material->MS_nembed = nembed;
-    material->MS_offset = concat ? imaterial * nembed : 0;
+    material->MS_nembed = arg_nembed;
+    material->MS_offset = arg_concat ? imaterial * arg_nembed : 0;
     material->MS_weights_nstatesxnembed =
-      make_values(counts[imaterial] * nembed, imaterial);
+      make_values(counts[imaterial] * arg_nembed, imaterial);
 
-    if (concat)
+    if (arg_concat)
     {
       material->MS_sum_nstatesxnoutputs =
         malloc(counts[imaterial] * sizeof(float *));
@@ -159,11 +166,11 @@ static void test_cache(int nembed, int concat)
         material->MS_sum_nstatesxnoutputs[istate] = make_values(8, 0);
 
         for (int ioutput = 0; ioutput < 8; ioutput++)
-          material->MS_sum_nstatesxnoutputs[istate][ioutput] =
-            dot_scaled(nembed,
-                       material->MS_weights_nstatesxnembed + istate * nembed,
-                       dense->DNS_layers[0].LS_weights_noutputsxninputs +
-                         ioutput * dense->DNS_ninputs + material->MS_offset);
+          material->MS_sum_nstatesxnoutputs[istate][ioutput] = dot_scaled(
+            arg_nembed,
+            material->MS_weights_nstatesxnembed + istate * arg_nembed,
+            dense->DNS_layers[0].LS_weights_noutputsxninputs +
+              ioutput * dense->DNS_ninputs + material->MS_offset);
       }
     }
   }
@@ -226,7 +233,7 @@ static void test_cache(int nembed, int concat)
     material_shared_t *material =
       network.N_shared_materials.MSS_materials + imaterial;
 
-    if (concat)
+    if (arg_concat)
     {
       for (int istate = 0; istate < material->MS_nstates; istate++)
         free(material->MS_sum_nstatesxnoutputs[istate]);
@@ -236,8 +243,8 @@ static void test_cache(int nembed, int concat)
   }
   free(network.N_material_cache);
   printf("%s embedding width %d: all 194481 tuples bit-identical PASS\n",
-         concat ? "CONCAT" : "ADD",
-         nembed);
+         arg_concat ? "CONCAT" : "ADD",
+         arg_nembed);
 }
 
 int main(int argc, char **argv)

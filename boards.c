@@ -149,60 +149,60 @@ hash_key_t return_key_from_bb(const board_t *arg_with_board)
 {
   hash_key_t result = 0;
 
-  ui64_t bb = arg_with_board->B_white_men_bb;
+  ui64_t pieces_bb = arg_with_board->B_white_men_bb;
 
-  while (bb != 0)
+  while (pieces_bb != 0)
   {
-    int ifield = BIT_CTZ(bb);
+    int ifield = BIT_CTZ(pieces_bb);
 
     result ^= hash_keys[WHITE_ENUM][MAN_ENUM][ifield];
 
-    bb &= ~BITULL(ifield);
+    pieces_bb &= ~BITULL(ifield);
   }
 
-  bb = arg_with_board->B_white_kings_bb;
+  pieces_bb = arg_with_board->B_white_kings_bb;
 
-  while (bb != 0)
+  while (pieces_bb != 0)
   {
-    int ifield = BIT_CTZ(bb);
+    int ifield = BIT_CTZ(pieces_bb);
 
     result ^= hash_keys[WHITE_ENUM][KING_ENUM][ifield];
 
-    bb &= ~BITULL(ifield);
+    pieces_bb &= ~BITULL(ifield);
   }
 
-  bb = arg_with_board->B_black_men_bb;
+  pieces_bb = arg_with_board->B_black_men_bb;
 
-  while (bb != 0)
+  while (pieces_bb != 0)
   {
-    int ifield = BIT_CTZ(bb);
+    int ifield = BIT_CTZ(pieces_bb);
 
     result ^= hash_keys[BLACK_ENUM][MAN_ENUM][ifield];
 
-    bb &= ~BITULL(ifield);
+    pieces_bb &= ~BITULL(ifield);
   }
 
-  bb = arg_with_board->B_black_kings_bb;
+  pieces_bb = arg_with_board->B_black_kings_bb;
 
-  while (bb != 0)
+  while (pieces_bb != 0)
   {
-    int ifield = BIT_CTZ(bb);
+    int ifield = BIT_CTZ(pieces_bb);
 
     result ^= hash_keys[BLACK_ENUM][KING_ENUM][ifield];
 
-    bb &= ~BITULL(ifield);
+    pieces_bb &= ~BITULL(ifield);
   }
 
   return (result);
 }
 
-void string2board(board_t *arg_with_board, const char *arg_s)
+void string2board(board_t *arg_with_board, const char *arg_position)
 {
   arg_with_board->B_valid_bb = 0;
 
-  for (int i = 1; i <= 50; ++i)
+  for (int isquare = 1; isquare <= 50; ++isquare)
   {
-    int ifield = square2field[i];
+    int ifield = square2field[isquare];
 
     arg_with_board->B_valid_bb |= BITULL(ifield);
   }
@@ -218,9 +218,10 @@ void string2board(board_t *arg_with_board, const char *arg_s)
   char bX_local = *bX;
   char nn_local = *nn;
 
-  for (int i = 1; i <= 50; ++i)
+  for (int isquare = 1; isquare <= 50; ++isquare)
   {
-    if ((arg_s[i] == *wO_hub) or (arg_s[i] == *wX_hub))
+    if ((arg_position[isquare] == *wO_hub) or
+        (arg_position[isquare] == *wX_hub))
     {
       wO_local = *wO_hub;
       wX_local = *wX_hub;
@@ -232,33 +233,33 @@ void string2board(board_t *arg_with_board, const char *arg_s)
     }
   }
 
-  for (int i = 1; i <= 50; ++i)
+  for (int isquare = 1; isquare <= 50; ++isquare)
   {
     int ifield;
 
-    ifield = square2field[i];
+    ifield = square2field[isquare];
 
-    if (arg_s[i] == wO_local)
+    if (arg_position[isquare] == wO_local)
     {
-      HARDBUG(i <= 5)
+      HARDBUG(isquare <= 5)
 
       arg_with_board->B_white_men_bb |= BITULL(ifield);
     }
-    else if (arg_s[i] == wX_local)
+    else if (arg_position[isquare] == wX_local)
     {
       arg_with_board->B_white_kings_bb |= BITULL(ifield);
     }
-    else if (arg_s[i] == bO_local)
+    else if (arg_position[isquare] == bO_local)
     {
-      HARDBUG(i >= 46)
+      HARDBUG(isquare >= 46)
 
       arg_with_board->B_black_men_bb |= BITULL(ifield);
     }
-    else if (arg_s[i] == bX_local)
+    else if (arg_position[isquare] == bX_local)
     {
       arg_with_board->B_black_kings_bb |= BITULL(ifield);
     }
-    else if (arg_s[i] == nn_local)
+    else if (arg_position[isquare] == nn_local)
     {
       // do nothing
     }
@@ -277,9 +278,9 @@ void string2board(board_t *arg_with_board, const char *arg_s)
   node->node_ncaptx = INVALID;
   node->node_move_key = 0;
 
-  if ((*arg_s == 'w') or (*arg_s == 'W'))
+  if ((*arg_position == 'w') or (*arg_position == 'W'))
     arg_with_board->B_colour2move = WHITE_ENUM;
-  else if ((*arg_s == 'b') or (*arg_s == 'B'))
+  else if ((*arg_position == 'b') or (*arg_position == 'B'))
     arg_with_board->B_colour2move = BLACK_ENUM;
   else
     FATAL("colour2move error", EXIT_FAILURE)
@@ -287,130 +288,130 @@ void string2board(board_t *arg_with_board, const char *arg_s)
 
 void fen2board(board_t *arg_with_board, const char *arg_fen)
 {
-  char s[51];
+  char position[51];
 
-  for (int i = 1; i <= 50; ++i)
-    s[i] = *nn;
+  for (int isquare = 1; isquare <= 50; ++isquare)
+    position[isquare] = *nn;
 
-  const char *f = arg_fen;
+  const char *fen_cursor = arg_fen;
 
   // W or B
 
-  if (*f == 'W')
-    s[0] = 'w';
-  else if (*f == 'B')
-    s[0] = 'b';
+  if (*fen_cursor == 'W')
+    position[0] = 'w';
+  else if (*fen_cursor == 'B')
+    position[0] = 'b';
   else
     FATAL("s[0] error", EXIT_FAILURE)
 
-  f++;
+  fen_cursor++;
 
   //:
 
-  HARDBUG(*f != ':')
+  HARDBUG(*fen_cursor != ':')
 
-  f++;
+  fen_cursor++;
 
   // W or B
 
-  HARDBUG((*f != 'W') and (*f != 'B'))
+  HARDBUG((*fen_cursor != 'W') and (*fen_cursor != 'B'))
 
-  char c = *f++;
+  char colour = *fen_cursor++;
 
-  char k = 'M';
+  char piece = 'M';
 
   while (TRUE)
   {
-    if ((*f == '.') or (*f == '\0'))
+    if ((*fen_cursor == '.') or (*fen_cursor == '\0'))
       break;
 
-    if (*f == '"')
+    if (*fen_cursor == '"')
       break;
 
-    if ((*f == 'W') or (*f == 'B'))
+    if ((*fen_cursor == 'W') or (*fen_cursor == 'B'))
     {
-      c = *f++;
+      colour = *fen_cursor++;
 
       continue;
     }
 
-    if (*f == 'K')
+    if (*fen_cursor == 'K')
     {
-      k = *f++;
+      piece = *fen_cursor++;
 
       continue;
     }
 
-    if (isdigit(*f))
+    if (isdigit(*fen_cursor))
     {
-      int i = 0;
+      int isquare = 0;
 
-      while (isdigit(*f))
+      while (isdigit(*fen_cursor))
       {
-        i = i * 10 + (*f - '0');
-        f++;
+        isquare = isquare * 10 + (*fen_cursor - '0');
+        fen_cursor++;
       }
 
-      HARDBUG(i < 1)
-      HARDBUG(i > 50)
+      HARDBUG(isquare < 1)
+      HARDBUG(isquare > 50)
 
-      int j = i;
+      int last_square = isquare;
 
-      if (*f == '-')
+      if (*fen_cursor == '-')
       {
-        f++;
+        fen_cursor++;
 
-        HARDBUG(!isdigit(*f))
+        HARDBUG(!isdigit(*fen_cursor))
 
-        j = 0;
+        last_square = 0;
 
-        while (isdigit(*f))
+        while (isdigit(*fen_cursor))
         {
-          j = j * 10 + (*f - '0');
-          f++;
+          last_square = last_square * 10 + (*fen_cursor - '0');
+          fen_cursor++;
         }
 
-        HARDBUG(j < 1)
-        HARDBUG(j > 50)
+        HARDBUG(last_square < 1)
+        HARDBUG(last_square > 50)
       }
 
-      while (i <= j)
+      while (isquare <= last_square)
       {
-        if (k == 'M')
+        if (piece == 'M')
         {
-          if (c == 'W')
-            s[i] = *wO;
-          else if (c == 'B')
-            s[i] = *bO;
+          if (colour == 'W')
+            position[isquare] = *wO;
+          else if (colour == 'B')
+            position[isquare] = *bO;
           else
             FATAL("c error", EXIT_FAILURE)
         }
-        else if (k == 'K')
+        else if (piece == 'K')
         {
-          if (c == 'W')
-            s[i] = *wX;
-          else if (c == 'B')
-            s[i] = *bX;
+          if (colour == 'W')
+            position[isquare] = *wX;
+          else if (colour == 'B')
+            position[isquare] = *bX;
           else
             FATAL("c error", EXIT_FAILURE)
         }
         else
           FATAL("k error", EXIT_FAILURE)
 
-        i++;
+        isquare++;
       }
 
-      k = 'M';
+      piece = 'M';
 
       continue;
     }
 
-    HARDBUG((*f != ',') and (*f != ':'))
+    HARDBUG((*fen_cursor != ',') and (*fen_cursor != ':'))
 
-    f++;
+    fen_cursor++;
   }
 
-  string2board(arg_with_board, s);
+  string2board(arg_with_board, position);
 }
 
 void board2fen(const board_t *arg_with_board,
@@ -444,9 +445,9 @@ void board2fen(const board_t *arg_with_board,
   ui64_t black_bb =
     arg_with_board->B_black_men_bb | arg_with_board->B_black_kings_bb;
 
-  for (int i = 1; i <= 50; ++i)
+  for (int isquare = 1; isquare <= 50; ++isquare)
   {
-    int ifield = square2field[i];
+    int ifield = square2field[isquare];
 
     if (white_bb & BITULL(ifield))
     {
@@ -487,7 +488,7 @@ void board2fen(const board_t *arg_with_board,
 
 void print_board(const board_t *arg_with_board)
 {
-  int i = 0;
+  int isquare = 0;
 
   for (int irow = 10; irow >= 1; --irow)
   {
@@ -496,9 +497,9 @@ void print_board(const board_t *arg_with_board)
 
     for (int icol = 1; icol <= 5; ++icol)
     {
-      ++i;
+      ++isquare;
 
-      int ifield = square2field[i];
+      int ifield = square2field[isquare];
 
       if (arg_with_board->B_white_men_bb & BITULL(ifield))
         my_printf(arg_with_board->B_my_printf, "  wO");
@@ -561,44 +562,44 @@ board2string(const board_t *arg_with_board, int arg_hub, bstring arg_string)
       bdata(arg_string)[0] = 'B';
   }
 
-  for (int i = 1; i <= 50; ++i)
+  for (int isquare = 1; isquare <= 50; ++isquare)
   {
-    int ifield = square2field[i];
+    int ifield = square2field[isquare];
 
     if (arg_with_board->B_white_men_bb & BITULL(ifield))
     {
       if (!arg_hub)
-        bdata(arg_string)[i] = *wO;
+        bdata(arg_string)[isquare] = *wO;
       else
-        bdata(arg_string)[i] = *wO_hub;
+        bdata(arg_string)[isquare] = *wO_hub;
     }
     else if (arg_with_board->B_white_kings_bb & BITULL(ifield))
     {
       if (!arg_hub)
-        bdata(arg_string)[i] = *wX;
+        bdata(arg_string)[isquare] = *wX;
       else
-        bdata(arg_string)[i] = *wX_hub;
+        bdata(arg_string)[isquare] = *wX_hub;
     }
     else if (arg_with_board->B_black_men_bb & BITULL(ifield))
     {
       if (!arg_hub)
-        bdata(arg_string)[i] = *bO;
+        bdata(arg_string)[isquare] = *bO;
       else
-        bdata(arg_string)[i] = *bO_hub;
+        bdata(arg_string)[isquare] = *bO_hub;
     }
     else if (arg_with_board->B_black_kings_bb & BITULL(ifield))
     {
       if (!arg_hub)
-        bdata(arg_string)[i] = *bX;
+        bdata(arg_string)[isquare] = *bX;
       else
-        bdata(arg_string)[i] = *bX_hub;
+        bdata(arg_string)[isquare] = *bX_hub;
     }
     else
     {
       if (!arg_hub)
-        bdata(arg_string)[i] = *nn;
+        bdata(arg_string)[isquare] = *nn;
       else
-        bdata(arg_string)[i] = *nn_hub;
+        bdata(arg_string)[isquare] = *nn_hub;
     }
   }
   bdata(arg_string)[51] = '\0';
@@ -610,17 +611,17 @@ void init_boards(void)
 {
   construct_my_random(&boards_random, NULL);
 
-  for (int i = 0; i < BOARD_MAX; i++)
-    hash_keys[WHITE_ENUM][MAN_ENUM][i] = return_my_random(&boards_random);
+  for (int ifield = 0; ifield < BOARD_MAX; ifield++)
+    hash_keys[WHITE_ENUM][MAN_ENUM][ifield] = return_my_random(&boards_random);
 
-  for (int i = 0; i < BOARD_MAX; i++)
-    hash_keys[WHITE_ENUM][KING_ENUM][i] = return_my_random(&boards_random);
+  for (int ifield = 0; ifield < BOARD_MAX; ifield++)
+    hash_keys[WHITE_ENUM][KING_ENUM][ifield] = return_my_random(&boards_random);
 
-  for (int i = 0; i < BOARD_MAX; i++)
-    hash_keys[BLACK_ENUM][MAN_ENUM][i] = return_my_random(&boards_random);
+  for (int ifield = 0; ifield < BOARD_MAX; ifield++)
+    hash_keys[BLACK_ENUM][MAN_ENUM][ifield] = return_my_random(&boards_random);
 
-  for (int i = 0; i < BOARD_MAX; i++)
-    hash_keys[BLACK_ENUM][KING_ENUM][i] = return_my_random(&boards_random);
+  for (int ifield = 0; ifield < BOARD_MAX; ifield++)
+    hash_keys[BLACK_ENUM][KING_ENUM][ifield] = return_my_random(&boards_random);
 
   MARK_ARRAY_READ_ONLY(hash_keys, sizeof(hash_keys))
 }

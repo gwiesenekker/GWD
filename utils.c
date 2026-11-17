@@ -94,79 +94,79 @@ int fexists(const char *arg_name)
     return (FALSE);
 }
 
-local int is_prime(i64_t n)
+local int is_prime(i64_t arg_number)
 {
-  if (n < 4)
+  if (arg_number < 4)
     return (TRUE);
 
-  if ((n % 2) == 0)
+  if ((arg_number % 2) == 0)
     return (FALSE);
 
-  for (i64_t i = 3; (i * i) <= n; i += 2)
-    if ((n % i) == 0)
+  for (i64_t divisor = 3; (divisor * divisor) <= arg_number; divisor += 2)
+    if ((arg_number % divisor) == 0)
       return (FALSE);
 
   return (TRUE);
 }
 
-i64_t first_prime_below(i64_t n)
+i64_t first_prime_below(i64_t arg_number)
 {
-  if (n < 4)
-    return (n);
+  if (arg_number < 4)
+    return (arg_number);
 
-  if ((n % 2) == 0)
-    --n;
+  if ((arg_number % 2) == 0)
+    --arg_number;
 
-  i64_t i;
+  i64_t candidate;
 
-  for (i = n; i > 3; i -= 2)
-    if (is_prime(i))
-      return (i);
+  for (candidate = arg_number; candidate > 3; candidate -= 2)
+    if (is_prime(candidate))
+      return (candidate);
 
-  return (i);
+  return (candidate);
 }
 
 static ui32_t crc_table32[256];
 static ui64_t crc_table64[256];
 
-void init_crc32(ui32_t *crc) { *crc = 0xFFFFFFFF; }
+void init_crc32(ui32_t *arg_crc) { *arg_crc = 0xFFFFFFFF; }
 
-void update_crc32(ui32_t *crc, const void *p, ui32_t n)
+void update_crc32(ui32_t *arg_crc, const void *arg_data, ui32_t arg_nbytes)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  const i8_t *a = (const i8_t *)p;
+  const i8_t *bytes = (const i8_t *)arg_data;
 
-  for (ui32_t i = 0; i < n; i++)
-    *crc = crc_table32[(*crc ^ a[i]) & 0xFF] ^ (*crc >> 8);
+  for (ui32_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
+    *arg_crc = crc_table32[(*arg_crc ^ bytes[ibyte]) & 0xFF] ^ (*arg_crc >> 8);
 
   END_BLOCK
 }
 
-ui32_t return_crc32(const void *a, ui32_t n)
+ui32_t return_crc32(const void *arg_data, ui32_t arg_nbytes)
 {
-  const i8_t *b = (const i8_t *)a;
+  const i8_t *bytes = (const i8_t *)arg_data;
 
   ui32_t crc = 0xFFFFFFFF;
 
-  for (ui32_t i = 0; i < n; i++)
-    crc = crc_table32[(crc ^ b[i]) & 0xFF] ^ (crc >> 8);
+  for (ui32_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
+    crc = crc_table32[(crc ^ bytes[ibyte]) & 0xFF] ^ (crc >> 8);
 
   return (~crc);
 }
 
-ui64_t return_crc64(const void *p, ui64_t n, int flip)
+ui64_t return_crc64(const void *arg_data, ui64_t arg_nbytes, int arg_flip)
 {
   ui64_t crc = 0xFFFFFFFFFFFFFFFFULL;
 
-  const i8_t *b = (const i8_t *)p;
+  const i8_t *bytes = (const i8_t *)arg_data;
 
-  for (ui64_t i = 0; i < n; i++)
-    crc = crc_table64[(crc ^ b[i]) & 0xFF] ^ (crc >> 8);
+  for (ui64_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
+    crc = crc_table64[(crc ^ bytes[ibyte]) & 0xFF] ^ (crc >> 8);
 
   // unfortanely all database checksums have used crc
 
-  if (flip)
+  if (arg_flip)
     return (~crc);
   else
     return (crc);
@@ -174,59 +174,59 @@ ui64_t return_crc64(const void *p, ui64_t n, int flip)
 
 void init_utils(void)
 {
-  for (ui32_t i = 0; i < 256; i++)
+  for (ui32_t ibyte = 0; ibyte < 256; ibyte++)
   {
-    ui32_t part = i;
+    ui32_t part = ibyte;
 
-    for (ui32_t j = 0; j < 8; j++)
+    for (ui32_t ibit = 0; ibit < 8; ibit++)
     {
       if (part & 1)
         part = (part >> 1) ^ POLYNOMIAL_CRC32;
       else
         part >>= 1;
     }
-    crc_table32[i] = part;
+    crc_table32[ibyte] = part;
   }
 
-  for (ui32_t i = 0; i < 256; i++)
+  for (ui32_t ibyte = 0; ibyte < 256; ibyte++)
   {
-    ui64_t part = i;
+    ui64_t part = ibyte;
 
-    for (ui32_t j = 0; j < 8; j++)
+    for (ui32_t ibit = 0; ibit < 8; ibit++)
     {
       if (part & 1)
         part = (part >> 1) ^ 0xC96C5795D7870F42ULL;
       else
         part >>= 1;
     }
-    crc_table64[i] = part;
+    crc_table64[ibyte] = part;
   }
 }
 
 void test_utils(void)
 {
-  ui32_t c;
-  char *f = "The quick brown fox jumps over the lazy dog";
-  BSTRING(s)
+  ui32_t checksum;
+  char *text = "The quick brown fox jumps over the lazy dog";
+  BSTRING(bchecksum)
 
-  init_crc32(&c);
+  init_crc32(&checksum);
 
-  update_crc32(&c, (i8_t *)f, strlen(f));
+  update_crc32(&checksum, (i8_t *)text, strlen(text));
 
-  c = ~c;
+  checksum = ~checksum;
 
-  HARDBUG(c != return_crc32(f, strlen(f)))
+  HARDBUG(checksum != return_crc32(text, strlen(text)))
 
-  HARDBUG(bassignformat(s, "%#X", c) == BSTR_ERR)
+  HARDBUG(bassignformat(bchecksum, "%#X", checksum) == BSTR_ERR)
 
-  PRINTF("the crc32 of '%s' is %s hex\n", f, bdata(s));
+  PRINTF("the crc32 of '%s' is %s hex\n", text, bdata(bchecksum));
 
 #if POLYNOMIAL_CRC32 == 0x82F63B78UL
-  HARDBUG(strcmp(bdata(s), "0X22620404") != 0)
+  HARDBUG(strcmp(bdata(bchecksum), "0X22620404") != 0)
 #else
-  HARDBUG(strcmp(bdata(s), "0X414FA339") != 0)
+  HARDBUG(strcmp(bdata(bchecksum), "0X414FA339") != 0)
 #endif
-  BDESTROY(s)
+  BDESTROY(bchecksum)
 }
 
 void file2bstring(const char *arg_name, bstring arg_bstring)

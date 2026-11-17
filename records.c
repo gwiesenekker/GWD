@@ -6,15 +6,15 @@
 #define CJSON_FIELD_TYPE_ID "field_type"
 #define CJSON_FIELD_VALUE_ID "field_value"
 
-local cJSON *find_field(cJSON *fields, const char *arg_field_name)
+local cJSON *find_field(cJSON *arg_fields, const char *arg_field_name)
 {
-  HARDBUG(!cJSON_IsArray(fields))
+  HARDBUG(!cJSON_IsArray(arg_fields))
 
   cJSON *result = NULL;
 
   cJSON *field;
 
-  cJSON_ArrayForEach(field, fields)
+  cJSON_ArrayForEach(field, arg_fields)
   {
     cJSON *field_name = cJSON_GetObjectItem(field, CJSON_FIELD_NAME_ID);
 
@@ -208,50 +208,50 @@ bstring get_record(record_t *arg_with_record)
 
 void test_records(void)
 {
-  record_t a;
+  record_t record;
 
-  construct_record(&a);
+  construct_record(&record);
 
   BSTRING(string)
 
-  PRINTF("empty record: %s\n", bdata(get_record(&a)));
+  PRINTF("empty record: %s\n", bdata(get_record(&record)));
 
-  add_field(&a, "name", FIELD_TYPE_STRING, "GW");
+  add_field(&record, "name", FIELD_TYPE_STRING, "GW");
 
-  get_field(&a, "name", string);
+  get_field(&record, "name", string);
 
   PRINTF("added name: %s\n", bdata(string));
-  PRINTF("added name: %s\n", bdata(get_record(&a)));
+  PRINTF("added name: %s\n", bdata(get_record(&record)));
 
-  set_field(&a, "name", "GWIESENEKKER");
-  get_field(&a, "name", string);
+  set_field(&record, "name", "GWIESENEKKER");
+  get_field(&record, "name", string);
 
   PRINTF("changed name: %s\n", bdata(string));
-  PRINTF("changed name: %s\n", bdata(get_record(&a)));
+  PRINTF("changed name: %s\n", bdata(get_record(&record)));
 
   int value = 59;
 
-  add_field(&a, "age", FIELD_TYPE_INT, &value);
-  get_field(&a, "age", &value);
+  add_field(&record, "age", FIELD_TYPE_INT, &value);
+  get_field(&record, "age", &value);
 
   PRINTF("added age: %d\n", value);
-  PRINTF("added age: %s\n", bdata(get_record(&a)));
+  PRINTF("added age: %s\n", bdata(get_record(&record)));
 
   value = 60;
 
-  set_field(&a, "age", &value);
-  get_field(&a, "age", &value);
+  set_field(&record, "age", &value);
+  get_field(&record, "age", &value);
 
   PRINTF("changed age: %d\n", value);
-  PRINTF("changed age: %s\n", bdata(get_record(&a)));
+  PRINTF("changed age: %s\n", bdata(get_record(&record)));
 
-  record_t b;
+  record_t copied_record;
 
-  construct_record(&b);
+  construct_record(&copied_record);
 
-  set_record(&b, get_record(&a));
+  set_record(&copied_record, get_record(&record));
 
-  PRINTF("copied record: %s\n", bdata(get_record(&b)));
+  PRINTF("copied record: %s\n", bdata(get_record(&copied_record)));
 
   BDESTROY(string)
 }

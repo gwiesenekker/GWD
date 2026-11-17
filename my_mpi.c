@@ -232,13 +232,13 @@ local void my_create_semaphore(int arg_semkey)
 #endif
 }
 
-void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
+void my_mpi_init(int *arg_nargs, char ***arg_argv, int arg_physical_memory)
 {
   my_mpi_globals_t *with_my_mpi_globals = &my_mpi_globals;
 
 #ifdef USE_OPENMPI
 
-  MPI_Init(narg, argv);
+  MPI_Init(arg_nargs, arg_argv);
 
   with_my_mpi_globals->MMG_init = TRUE;
 
@@ -434,23 +434,23 @@ void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
     (with_my_mpi_globals->MMG_slave_id == 0);
 }
 
-int my_mpi_comm_size(MPI_Comm comm, int *size)
+int my_mpi_comm_size(MPI_Comm arg_comm, int *arg_size)
 {
 #ifdef USE_OPENMPI
-  return (MPI_Comm_size(comm, size));
+  return (MPI_Comm_size(arg_comm, arg_size));
 #else
-  *size = 1;
+  *arg_size = 1;
 
   return (MPI_SUCCESS);
 #endif
 }
 
-int my_mpi_comm_rank(MPI_Comm comm, int *rank)
+int my_mpi_comm_rank(MPI_Comm arg_comm, int *arg_rank)
 {
 #ifdef USE_OPENMPI
-  return (MPI_Comm_rank(comm, rank));
+  return (MPI_Comm_rank(arg_comm, arg_rank));
 #else
-  *rank = 0;
+  *arg_rank = 0;
 
   return (MPI_SUCCESS);
 #endif
@@ -478,28 +478,37 @@ int my_mpi_allreduce(const void *arg_sendbuf,
 #endif
 }
 
-int my_mpi_win_allocate_shared(MPI_Aint size,
-                               int disp_unit,
-                               MPI_Info info,
-                               MPI_Comm comm,
-                               void *baseptr,
-                               MPI_Win *win)
+int my_mpi_win_allocate_shared(MPI_Aint arg_size,
+                               int arg_disp_unit,
+                               MPI_Info arg_info,
+                               MPI_Comm arg_comm,
+                               void *arg_baseptr,
+                               MPI_Win *arg_win)
 {
 #ifdef USE_OPENMPI
-  return (MPI_Win_allocate_shared(size, disp_unit, info, comm, baseptr, win));
+  return (MPI_Win_allocate_shared(arg_size,
+                                  arg_disp_unit,
+                                  arg_info,
+                                  arg_comm,
+                                  arg_baseptr,
+                                  arg_win));
 #else
   return (MPI_SUCCESS);
 #endif
 }
 
-int my_mpi_win_shared_query(MPI_Win win,
-                            int rank,
-                            MPI_Aint *size,
-                            int *disp_unit,
-                            void *baseptr)
+int my_mpi_win_shared_query(MPI_Win arg_win,
+                            int arg_rank,
+                            MPI_Aint *arg_size,
+                            int *arg_disp_unit,
+                            void *arg_baseptr)
 {
 #ifdef USE_OPENMPI
-  return (MPI_Win_shared_query(win, rank, size, disp_unit, baseptr));
+  return (MPI_Win_shared_query(arg_win,
+                               arg_rank,
+                               arg_size,
+                               arg_disp_unit,
+                               arg_baseptr));
 #else
   return (MPI_SUCCESS);
 #endif
@@ -616,10 +625,10 @@ void my_mpi_sync_shared(MPI_Comm arg_comm,
 #endif
 }
 
-int my_mpi_win_free(MPI_Win *win)
+int my_mpi_win_free(MPI_Win *arg_win)
 {
 #ifdef USE_OPENMPI
-  return (MPI_Win_free(win));
+  return (MPI_Win_free(arg_win));
 #else
   return (MPI_SUCCESS);
 #endif
@@ -634,10 +643,10 @@ int my_mpi_finalize(void)
 #endif
 }
 
-int my_mpi_abort(MPI_Comm comm, int errorcode)
+int my_mpi_abort(MPI_Comm arg_comm, int arg_errorcode)
 {
 #ifdef USE_OPENMPI
-  return (MPI_Abort(comm, errorcode));
+  return (MPI_Abort(arg_comm, arg_errorcode));
 #else
   return (MPI_SUCCESS);
 #endif
@@ -668,7 +677,7 @@ void my_mpi_barrier(const char *arg_info, MPI_Comm arg_comm, int arg_verbose)
            ncomm,
            comm_id);
 
-  double t0 = compat_time();
+  double start_time = compat_time();
 
   MPI_Request request;
 
@@ -676,9 +685,9 @@ void my_mpi_barrier(const char *arg_info, MPI_Comm arg_comm, int arg_verbose)
 
   MPI_Wait(&request, MPI_STATUS_IGNORE);
 
-  double t1 = compat_time();
+  double end_time = compat_time();
 
-  double wall = t1 - t0;
+  double wall = end_time - start_time;
 
   if (arg_verbose)
     PRINTF("leaving my_mpi_barrier %s wall=%.0f\n$", arg_info, wall);
@@ -1351,7 +1360,7 @@ void my_mpi_barrier_v3(const char *arg_info,
            arg_semkey,
            semid);
 
-  double t0 = compat_time();
+  double start_time = compat_time();
 
   // arrival
 
@@ -1411,9 +1420,9 @@ void my_mpi_barrier_v3(const char *arg_info,
 
   HARDBUG(my_semop(semid, SEM_EXIT_GATE, +1, 0) != 0)
 
-  double t1 = compat_time();
+  double end_time = compat_time();
 
-  double wall = t1 - t0;
+  double wall = end_time - start_time;
 
   if (arg_verbose)
     PRINTF("%s::..leaving barrier %s wall=%.0f seconds\n$",
@@ -1466,14 +1475,14 @@ void test_my_mpi(void)
 
   if (my_mpi_globals.MMG_global_id == 0)
   {
-    for (int i = 0; i < SIZE; i++)
-      shared_data[i] = i;
+    for (int ivalue = 0; ivalue < SIZE; ivalue++)
+      shared_data[ivalue] = ivalue;
   }
 
   my_mpi_win_fence(my_mpi_globals.MMG_global_comm, 0, win);
 
-  for (int i = 0; i < SIZE; i++)
-    HARDBUG(shared_data[i] != i)
+  for (int ivalue = 0; ivalue < SIZE; ivalue++)
+    HARDBUG(shared_data[ivalue] != ivalue)
 
   my_mpi_win_free(&win);
 
