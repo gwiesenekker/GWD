@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
 #define THREAD_ALPHA_BETA_MASTER 0

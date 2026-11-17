@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 /*
   Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
 

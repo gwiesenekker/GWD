@@ -6,7 +6,57 @@
 #undef clock
 
 int zzzzzz_invocation;
-int square2field[51], white_row[BOARD_MAX], black_row[BOARD_MAX];
+// clang-format off
+
+const int square2field[1 + 50] =
+{
+  0,
+    6, 7, 8, 9,10,
+  11,12,13,14,15,
+    17,18,19,20,21,
+  22,23,24,25,26,
+    28,29,30,31,32,
+  33,34,35,36,37,
+    39,40,41,42,43,
+  44,45,46,47,48,
+    50,51,52,53,54,
+  55,56,57,58,59
+};
+
+const int white_row[BOARD_MAX] =
+{
+  -1, -1, -1, -1, -1, -1,
+    10, 10, 10, 10, 10,
+   9,  9,  9,  9,  9, -1,
+     8,  8,  8,  8,  8,
+   7,  7,  7,  7,  7, -1,
+     6,  6,  6,  6,  6,
+   5,  5,  5,  5,  5, -1,
+     4,  4,  4,  4,  4,
+   3,  3,  3,  3,  3, -1,
+     2,  2,  2,  2,  2,
+   1,  1,  1,  1,  1, -1,
+    -1, -1, -1, -1, -1
+};
+
+const int black_row[BOARD_MAX] =
+{
+  -1, -1, -1, -1, -1, -1,
+     1,  1,  1,  1,  1,
+   2,  2,  2,  2,  2, -1,
+     3,  3,  3,  3,  3,
+   4,  4,  4,  4,  4, -1,
+     5,  5,  5,  5,  5,
+   6,  6,  6,  6,  6, -1,
+     7,  7,  7,  7,  7,
+   8,  8,  8,  8,  8, -1,
+     9,  9,  9,  9,  9,
+  10, 10, 10, 10, 10, -1,
+    -1, -1, -1, -1, -1
+};
+
+// clang-format on
+
 void print_board(const board_t *board)
 {
   fprintf(stderr,
@@ -106,9 +156,9 @@ int main(int argc, char **argv)
 
   for (int i = 1; i <= 50; ++i)
   {
-    square2field[i] = i + 5 + (i - 1) / 10;
-    white_row[square2field[i]] = 10 - (i - 1) / 5;
-    black_row[square2field[i]] = 1 + (i - 1) / 5;
+    assert(square2field[i] == i + 5 + (i - 1) / 10);
+    assert(white_row[square2field[i]] == 10 - (i - 1) / 5);
+    assert(black_row[square2field[i]] == 1 + (i - 1) / 5);
     board.B_valid_bb |= BITULL(square2field[i]);
   }
   /* Random legal playouts from the initial position and varied material,

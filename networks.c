@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 #include <float.h>
 
@@ -491,11 +491,11 @@ local void dense_32x8(const float *arg_inputs,
 }
 #endif
 
-local void dense_layer0_dot(dense_network_shared_t *arg_dense,
-                            scaled_double_t *arg_inputs,
+local void dense_layer0_dot(const dense_network_shared_t *arg_dense,
+                            const scaled_double_t *arg_inputs,
                             scaled_double_t *arg_dot)
 {
-  layer_shared_t *layer = arg_dense->DNS_layers;
+  const layer_shared_t *layer = arg_dense->DNS_layers;
 
 #if defined(USE_AVX2_INTRINSICS) && SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
   if (arg_dense->DNS_16x8_kernel)
@@ -1516,14 +1516,14 @@ local void construct_network_shared(const char *arg_network_name,
   }
 }
 
-local void
-construct_dense_network_state(dense_network_shared_t *with_dense_network_shared,
-                              dense_network_state_t *with_dense_network_state)
+local void construct_dense_network_state(
+  const dense_network_shared_t *with_dense_network_shared,
+  dense_network_state_t *with_dense_network_state)
 {
   for (int ilayer = 0; ilayer < with_dense_network_shared->DNS_nlayers;
        ilayer++)
   {
-    layer_shared_t *with_layer_shared =
+    const layer_shared_t *with_layer_shared =
       with_dense_network_shared->DNS_layers + ilayer;
 
     layer_thread_t *with_thread = with_dense_network_state->DNS_layers + ilayer;
@@ -2276,12 +2276,12 @@ int base3_index_v4(const board_t *arg_board, ui64_t arg_pattern_bb)
 // assumes inputs have been set
 
 double return_dense_network_score_scaled(
-  dense_network_shared_t *arg_dense_network_shared,
+  const dense_network_shared_t *arg_dense_network_shared,
   dense_network_state_t *arg_dense_network_state)
 {
   BEGIN_BLOCK(__func__)
 
-  layer_shared_t *with_current = arg_dense_network_shared->DNS_layers;
+  const layer_shared_t *with_current = arg_dense_network_shared->DNS_layers;
   layer_thread_t *with_current_thread = arg_dense_network_state->DNS_layers;
 
   if (arg_dense_network_shared->DNS_activate_layer0)
@@ -2479,10 +2479,10 @@ double return_dense_network_score_scaled(
 }
 
 double return_dense_network_score_double(
-  dense_network_shared_t *arg_dense_network_shared,
+  const dense_network_shared_t *arg_dense_network_shared,
   dense_network_state_t *arg_dense_network_state)
 {
-  layer_shared_t *with_current = arg_dense_network_shared->DNS_layers;
+  const layer_shared_t *with_current = arg_dense_network_shared->DNS_layers;
   layer_thread_t *with_current_thread = arg_dense_network_state->DNS_layers;
 
   if (arg_dense_network_shared->DNS_activate_layer0)
@@ -3817,7 +3817,7 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
   BDESTROY(barg_name)
 }
 
-void evaluate_material_network(network_t *with_network,
+void evaluate_material_network(const network_t *with_network,
                                dense_network_state_t *arg_state,
                                int nwhite_man,
                                int nblack_man,
@@ -3825,7 +3825,7 @@ void evaluate_material_network(network_t *with_network,
                                int nblack_king,
                                int arg_inputs)
 {
-  dense_network_shared_t *dense =
+  const dense_network_shared_t *dense =
     &with_network->N_material_dense_network_shared;
 
   int ilast = dense->DNS_nlayers - 1;
@@ -3863,7 +3863,7 @@ void evaluate_material_network(network_t *with_network,
        iinput++)
     arg_state->DNS_inputs[iinput] = 0;
 
-  layer_shared_t *with_current =
+  const layer_shared_t *with_current =
     with_network->N_material_dense_network_shared.DNS_layers;
 
   layer_thread_t *with_current_thread = arg_state->DNS_layers;
@@ -3887,7 +3887,7 @@ void evaluate_material_network(network_t *with_network,
        imaterial < with_network->N_materials_shared.MSS_nmaterials;
        imaterial++)
   {
-    material_shared_t *with_material_shared =
+    const material_shared_t *with_material_shared =
       with_network->N_materials_shared.MSS_materials + imaterial;
 
     int istate = INVALID;

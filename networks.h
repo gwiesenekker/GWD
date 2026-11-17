@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #ifndef NetworksH
 #define NetworksH
 
@@ -120,11 +120,11 @@ void vmul_ab2c(int,
                const scaled_double_t *restrict,
                const scaled_double_t *restrict,
                scaled_double_t *restrict);
-double return_dense_network_score_scaled(dense_network_shared_t *,
+double return_dense_network_score_scaled(const dense_network_shared_t *,
                                          dense_network_state_t *);
-double return_dense_network_score_double(dense_network_shared_t *,
+double return_dense_network_score_double(const dense_network_shared_t *,
                                          dense_network_state_t *);
-void evaluate_material_network(network_t *,
+void evaluate_material_network(const network_t *,
                                dense_network_state_t *,
                                int,
                                int,

@@ -1,8 +1,8 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-local int white_dir[4] = {-6, -5, 5, 6};
-local int black_dir[4] = {5, 6, -6, -5};
+local const int white_dir[4] = {-6, -5, 5, 6};
+local const int black_dir[4] = {5, 6, -6, -5};
 
 void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 {
@@ -12,8 +12,8 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
   colour_enum my_colour;
   colour_enum your_colour;
-  int *my_dir;
-  int *my_row;
+  const int *my_dir;
+  const int *my_row;
 
   if (IS_WHITE(arg_with_board->B_colour2move))
   {
@@ -640,7 +640,7 @@ void do_move(board_t *arg_with_board,
 
   colour_enum my_colour;
   colour_enum your_colour;
-  int *my_row;
+  const int *my_row;
 
   if (IS_WHITE(arg_with_board->B_colour2move))
   {

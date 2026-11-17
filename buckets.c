@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
 #undef WEIBULL
@@ -58,7 +58,7 @@ void update_bucket(bucket_t *arg_with_bucket, double arg_value)
   }
 }
 
-void printf_bucket(bucket_t *arg_with_bucket)
+void printf_bucket(const bucket_t *arg_with_bucket)
 {
   PRINTF("bucket_name=%s\n", bdata(arg_with_bucket->bucket_name));
   PRINTF("bucket_size=%.2f\n", arg_with_bucket->bucket_size);

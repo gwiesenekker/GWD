@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 #include <float.h>
 
@@ -39,7 +39,7 @@ void mean_sigma(stats_t *arg_with_stats)
   arg_with_stats->S_sigma = sqrt(variance);
 }
 
-void printf_stats(stats_t *arg_with_stats)
+void printf_stats(const stats_t *arg_with_stats)
 {
   PRINTF("name=%s\n", bdata(arg_with_stats->S_name));
   PRINTF("n=%lld\n", arg_with_stats->S_n);

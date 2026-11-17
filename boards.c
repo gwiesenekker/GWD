@@ -1,9 +1,9 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
 // clang-format off
 
-int square2field[1 + 50] =
+const int square2field[1 + 50] =
 {
   0,
     6, 7, 8, 9,10,
@@ -18,7 +18,7 @@ int square2field[1 + 50] =
   55,56,57,58,59
 };
 
-int field2square[BOARD_MAX] =
+const int field2square[BOARD_MAX] =
 {
   -1, -1, -1, -1, -1, -1,
      0,  1,  2,  3,  4,
@@ -34,7 +34,7 @@ int field2square[BOARD_MAX] =
     -1, -1, -1, -1, -1
 };
 
-char *nota[BOARD_MAX] =
+const char *const nota[BOARD_MAX] =
 {
   "??","??","??","??","??","??",
     "01","02","03","04","05",
@@ -50,7 +50,7 @@ char *nota[BOARD_MAX] =
     "??","??","??","??","??"
 };
 
-int white_row[BOARD_MAX] = 
+const int white_row[BOARD_MAX] =
 {
   -1, -1, -1, -1, -1, -1,
     10, 10, 10, 10, 10,
@@ -66,7 +66,7 @@ int white_row[BOARD_MAX] =
     -1, -1, -1, -1, -1
 };
 
-int black_row[BOARD_MAX] = 
+const int black_row[BOARD_MAX] =
 {
   -1, -1, -1, -1, -1, -1,
      1,  1,  1,  1,  1,
@@ -609,14 +609,6 @@ void init_boards(void)
 {
   construct_my_random(&boards_random, NULL);
 
-  MARK_ARRAY_READ_ONLY(square2field, sizeof(square2field))
-
-  MARK_ARRAY_READ_ONLY(field2square, sizeof(field2square))
-
-  MARK_ARRAY_READ_ONLY(white_row, sizeof(field2square))
-
-  MARK_ARRAY_READ_ONLY(black_row, sizeof(field2square))
-
   for (int i = 0; i < BOARD_MAX; i++)
     hash_keys[WHITE_ENUM][MAN_ENUM][i] = return_my_random(&boards_random);
 
@@ -632,7 +624,7 @@ void init_boards(void)
   MARK_ARRAY_READ_ONLY(hash_keys, sizeof(hash_keys))
 }
 
-void state2board(board_t *arg_with_board, game_state_t *arg_game)
+void state2board(board_t *arg_with_board, const game_state_t *arg_game)
 {
   fen2board(arg_with_board, arg_game->get_starting_position(arg_game));
 

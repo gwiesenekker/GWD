@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #ifndef StatsH
 #define StatsH
 
@@ -45,7 +45,7 @@ inline local void update_stats(stats_t *arg_with_stats, double x)
 
 void construct_stats(stats_t *, const char *);
 void mean_sigma(stats_t *);
-void printf_stats(stats_t *);
+void printf_stats(const stats_t *);
 void my_stats_aggregate(stats_t *, MPI_Comm);
 
 void test_stats();

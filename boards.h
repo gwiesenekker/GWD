@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #ifndef BoardsH
 #define BoardsH
 
@@ -99,14 +99,14 @@ typedef struct board
   board_state_t B_states[NODE_MAX];
 } board_t;
 
-extern int square2field[1 + 50];
+extern const int square2field[1 + 50];
 
-extern int field2square[BOARD_MAX];
+extern const int field2square[BOARD_MAX];
 
-extern char *nota[BOARD_MAX];
+extern const char *const nota[BOARD_MAX];
 
-extern int white_row[BOARD_MAX];
-extern int black_row[BOARD_MAX];
+extern const int white_row[BOARD_MAX];
+extern const int black_row[BOARD_MAX];
 
 extern hash_key_t hash_keys[NCOLOUR_ENUM][NPIECE_ENUM][BOARD_MAX];
 
@@ -120,7 +120,7 @@ void fen2board(board_t *, const char *);
 void board2fen(const board_t *, bstring, int);
 void print_board(const board_t *);
 void init_boards();
-void state2board(board_t *, game_state_t *);
+void state2board(board_t *, const game_state_t *);
 char *board2string(const board_t *, int, bstring);
 
 #endif

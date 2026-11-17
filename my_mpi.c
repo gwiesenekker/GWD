@@ -1,4 +1,4 @@
-// SCU REVISION 8.1285 di 17 nov 2026 23:14:01 CET
+// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
 #undef SEMS_USE_SHM
@@ -37,11 +37,11 @@ typedef struct
 #define TAG_RELEASE_LOCK 3
 #define TAG_FLUSH_LOCK 4
 
-const char *tag2string[] = {"TAG_INVALID",
-                            "TAG_REQUEST_LOCK",
-                            "TAG_LOCK_GRANTED",
-                            "TAG_RELEASE_LOCK",
-                            "TAG_FLUSH_LOCK"};
+const char *const tag2string[] = {"TAG_INVALID",
+                                  "TAG_REQUEST_LOCK",
+                                  "TAG_LOCK_GRANTED",
+                                  "TAG_RELEASE_LOCK",
+                                  "TAG_FLUSH_LOCK"};
 
 #ifndef SEMS_USE_SHM
 local my_semkey_t my_semkeys[NMY_SEMKEYS];
