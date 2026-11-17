@@ -154,12 +154,12 @@ score_t return_score_from_board(board_t *arg_with_board,
   network_state_t *network_state = &(arg_with_board->B_network_state);
 
   for (int input = 0;
-       input < with_network->N_pattern_dense_network_shared.DNS_ninputs;
+       input < with_network->N_shared_pattern_dense_network.DNS_ninputs;
        input++)
     network_state->NS_pattern_dense_network_state.DNS_inputs[input] = 0;
 
   layer_shared_t *with_current =
-    with_network->N_pattern_dense_network_shared.DNS_layers;
+    with_network->N_shared_pattern_dense_network.DNS_layers;
 
   layer_thread_t *with_current_thread =
     network_state->NS_pattern_dense_network_state.DNS_layers;
@@ -189,11 +189,11 @@ score_t return_score_from_board(board_t *arg_with_board,
 #endif
 
   for (int ipattern = 0;
-       ipattern < with_network->N_patterns_shared.PSS_npatterns;
+       ipattern < with_network->N_shared_patterns.PSS_npatterns;
        ipattern++)
   {
     pattern_shared_t *with_pattern_shared =
-      with_network->N_patterns_shared.PSS_patterns + ipattern;
+      with_network->N_shared_patterns.PSS_patterns + ipattern;
 
     int istate = INVALID;
 
@@ -206,7 +206,7 @@ score_t return_score_from_board(board_t *arg_with_board,
 
     HARDBUG(istate < 0)
 
-    if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
+    if (with_network->N_pattern_architecture == NETWORK_ARCHITECTURE_ADD)
     {
 #ifdef USE_AVX2_INTRINSICS
       if (with_network->N_pattern_dense_network_16x8_kernel)
@@ -269,10 +269,10 @@ score_t return_score_from_board(board_t *arg_with_board,
 #endif
 
   double network_score_scaled = return_dense_network_score_scaled(
-    &(with_network->N_pattern_dense_network_shared),
+    &(with_network->N_shared_pattern_dense_network),
     &(arg_with_board->B_network_state.NS_pattern_dense_network_state));
 
-  if (with_network->N_architecture_material != NETWORK_ARCHITECTURE_NULL)
+  if (with_network->N_material_architecture != NETWORK_ARCHITECTURE_NULL)
     evaluate_material_network(with_network,
                               &network_state->NS_material_dense_network_state,
                               nwhite_man,
@@ -284,7 +284,7 @@ score_t return_score_from_board(board_t *arg_with_board,
   // prepare inputs
 
   dense_network_shared_t *with_pattern_shared =
-    &(with_network->N_pattern_dense_network_shared);
+    &(with_network->N_shared_pattern_dense_network);
 
   dense_network_state_t *with_pattern_thread =
     &(arg_with_board->B_network_state.NS_pattern_dense_network_state);
@@ -296,10 +296,10 @@ score_t return_score_from_board(board_t *arg_with_board,
       .LT_outputs,
     network_state->NS_dense_network_state.DNS_inputs);
 
-  if (with_network->N_architecture_material != NETWORK_ARCHITECTURE_NULL)
+  if (with_network->N_material_architecture != NETWORK_ARCHITECTURE_NULL)
   {
     dense_network_shared_t *with_material_shared =
-      &(with_network->N_material_dense_network_shared);
+      &(with_network->N_shared_material_dense_network);
 
     dense_network_state_t *with_material_thread =
       &(arg_with_board->B_network_state.NS_material_dense_network_state);
@@ -315,7 +315,7 @@ score_t return_score_from_board(board_t *arg_with_board,
   }
 
   network_score_scaled = return_dense_network_score_scaled(
-    &(with_network->N_dense_network_shared),
+    &(with_network->N_shared_dense_network),
     &(arg_with_board->B_network_state.NS_dense_network_state));
 
   if (arg_network_score_scaled != NULL)
@@ -325,7 +325,7 @@ score_t return_score_from_board(board_t *arg_with_board,
   static int n = 0;
 
   double network_score_double = return_dense_network_score_double(
-    &(with_network->N_dense_network_shared),
+    &(with_network->N_shared_dense_network),
     &(arg_with_board->B_network_state.NS_dense_network_state));
 
   n++;

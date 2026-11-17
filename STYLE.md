@@ -56,17 +56,31 @@ int my_breadline(bstring arg_line, FILE *arg_file)
 ## Names
 
 - Use descriptive names consistent with the surrounding code.
+- Put the specific qualifier before the generic noun, following natural English:
+  `white_men`, `black_kings`, `remaining_moves`, and `material_score`.
+  Prefer `white_men` over `men_white`.
+- Apply that word order within the descriptive part of the name, retaining
+  parameter and member prefixes. For example, use `arg_nwhite_men` for an
+  input count and `B_white_men_bb` for a board member representing a set.
+- Use plural nouns for collections and singular nouns for individual objects
+  or categories: `white_men_bb` represents a set, while `white_man_key`
+  identifies a key for one piece. Put representation suffixes such as `_bb`
+  after the descriptive name.
 - Prefix function parameters with `arg_`, for example `arg_nrows`, `arg_file`,
   and `arg_with_search`.
 - Prefer descriptive loop indices such as `irow`, `jcolumn`, `ioutput`,
   `imove`, and `isort` over generic `i`, `j`, or `k`.
 - Follow the existing `n...` convention for counts, such as `nrows` and `nmoves`.
+  For qualified counts, use names such as `nwhite_men`, retaining `arg_` or a
+  member prefix where applicable. Do not introduce a competing `_count` style.
 - Use `with_...` for local pointers to the object currently being handled where
   that matches the surrounding code.
 - Preserve type-specific struct-member prefixes, such as `S_`, `B_`, `TC_`,
   and `MP_`. Follow the existing prefix when extending a struct.
 - Use the established `construct_`, `configure_`, `return_`, and `destroy_`
   naming conventions when extending those interfaces.
+- Apply these conventions to new names. Keep broad renaming passes separate
+  from functional changes so their diffs remain easy to review.
 
 ## Expressions, checks, and control flow
 

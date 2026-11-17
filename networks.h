@@ -43,9 +43,9 @@ typedef struct
 
 typedef struct
 {
-  int DNS_activation_inputs;
+  int DNS_input_activation;
   int DNS_activation;
-  int DNS_activation_last;
+  int DNS_final_activation;
   int DNS_ninputs;
   int DNS_nlayers;
   int DNS_activate_layer0;
@@ -73,25 +73,25 @@ typedef struct
   bstring N_bshape;
 
   int N_network2material_score;
-  int N_architecture_patterns;
-  int N_architecture_material;
-  int N_activation_inputs;
+  int N_pattern_architecture;
+  int N_material_architecture;
+  int N_input_activation;
   int N_activation;
-  int N_activation_last;
+  int N_final_activation;
   int N_nman_min;
   int N_nman_max;
 
-  patterns_shared_t N_patterns_shared;
-  materials_shared_t N_materials_shared;
+  patterns_shared_t N_shared_patterns;
+  materials_shared_t N_shared_materials;
 
-  dense_network_shared_t N_pattern_dense_network_shared;
+  dense_network_shared_t N_shared_pattern_dense_network;
   int N_pattern_dense_network_16x8_kernel;
   int N_pattern_dense_network_64x16_kernel; // embedding summation only
-  dense_network_shared_t N_material_dense_network_shared;
+  dense_network_shared_t N_shared_material_dense_network;
   int N_material_dense_network_16x8_kernel;
   int N_material_dense_network_64x16_kernel; // embedding summation only
   scaled_double_t *N_material_cache; // immutable final material output vectors
-  dense_network_shared_t N_dense_network_shared;
+  dense_network_shared_t N_shared_dense_network;
 } network_t;
 
 typedef struct

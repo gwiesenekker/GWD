@@ -893,8 +893,8 @@ void add_evaluations2book(my_sqlite3_t *arg_db,
     }
 
     my_mpi_barrier_v3("after adding or updating moves",
-                      my_mpi_globals.MMG_comm_slaves,
-                      my_mpi_globals.MMG_semkey_gen_book_barrier,
+                      my_mpi_globals.MMG_slave_comm,
+                      my_mpi_globals.MMG_gen_book_barrier_semkey,
                       FALSE);
   }
 
@@ -1159,8 +1159,8 @@ void expand_book(my_sqlite3_t *arg_db,
   }
 
   my_mpi_barrier_v3("after adding positions",
-                    my_mpi_globals.MMG_comm_slaves,
-                    my_mpi_globals.MMG_semkey_add_positions_barrier,
+                    my_mpi_globals.MMG_slave_comm,
+                    my_mpi_globals.MMG_add_positions_barrier_semkey,
                     FALSE);
 
   // all slaves gather the positions
@@ -1168,8 +1168,8 @@ void expand_book(my_sqlite3_t *arg_db,
   query_positions(arg_db->MSQL_db);
 
   my_mpi_barrier_v3("after querying positions",
-                    my_mpi_globals.MMG_comm_slaves,
-                    my_mpi_globals.MMG_semkey_query_positions_barrier,
+                    my_mpi_globals.MMG_slave_comm,
+                    my_mpi_globals.MMG_query_positions_barrier_semkey,
                     FALSE);
 
   // now we analyze the positions in parallel

@@ -319,7 +319,7 @@ void construct_my_printf(my_printf_t *arg_with_my_printf,
                      bdata(my_printf_logs_dir),
                      arg_prefix,
                      object_id,
-                     my_mpi_globals.MMG_id_global,
+                     my_mpi_globals.MMG_global_id,
                      my_mpi_globals.MMG_nglobal) == BSTR_ERR)
 
   if ((arg_with_my_printf->MP_flog =

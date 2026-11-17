@@ -95,21 +95,21 @@ static void test_cache(int nembed, int concat)
   network_t network = {0};
 
   network.N_network_id = NETWORK0_ID;
-  network.N_architecture_material =
+  network.N_material_architecture =
     concat ? NETWORK_ARCHITECTURE_CONCAT : NETWORK_ARCHITECTURE_ADD;
   network.N_material_dense_network_16x8_kernel = !concat && nembed == 16;
   network.N_material_dense_network_64x16_kernel = !concat && nembed == 64;
-  network.N_materials_shared.MSS_nmaterials = concat ? 4 : 5;
+  network.N_shared_materials.MSS_nmaterials = concat ? 4 : 5;
 
-  dense_network_shared_t *dense = &network.N_material_dense_network_shared;
+  dense_network_shared_t *dense = &network.N_shared_material_dense_network;
 
   dense->DNS_ninputs = concat ? 4 * nembed : nembed;
   dense->DNS_nlayers = 2;
   dense->DNS_compute_layer0 = !concat;
   dense->DNS_activate_layer0 = !concat;
-  dense->DNS_activation_inputs = NETWORK_ACTIVATION_GELUV2;
+  dense->DNS_input_activation = NETWORK_ACTIVATION_GELUV2;
   dense->DNS_activation = NETWORK_ACTIVATION_GELUV2;
-  dense->DNS_activation_last = NETWORK_ACTIVATION_LINEAR;
+  dense->DNS_final_activation = NETWORK_ACTIVATION_LINEAR;
   dense->DNS_16x8_kernel = dense->DNS_ninputs == 16;
 
   const int ids[] = {MATERIAL_NWHITE_MAN_ID,
@@ -137,11 +137,11 @@ static void test_cache(int nembed, int concat)
     layer->LS_bias = make_values(layer->LS_noutputs, 1);
   }
 
-  for (int imaterial = 0; imaterial < network.N_materials_shared.MSS_nmaterials;
+  for (int imaterial = 0; imaterial < network.N_shared_materials.MSS_nmaterials;
        imaterial++)
   {
     material_shared_t *material =
-      network.N_materials_shared.MSS_materials + imaterial;
+      network.N_shared_materials.MSS_materials + imaterial;
     material->MS_id = ids[imaterial];
     material->MS_nstates = counts[imaterial];
     material->MS_nembed = nembed;
@@ -220,11 +220,11 @@ static void test_cache(int nembed, int concat)
     free(dense->DNS_layers[ilayer].LS_bias);
   }
 
-  for (int imaterial = 0; imaterial < network.N_materials_shared.MSS_nmaterials;
+  for (int imaterial = 0; imaterial < network.N_shared_materials.MSS_nmaterials;
        imaterial++)
   {
     material_shared_t *material =
-      network.N_materials_shared.MSS_materials + imaterial;
+      network.N_shared_materials.MSS_materials + imaterial;
 
     if (concat)
     {

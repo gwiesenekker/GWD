@@ -275,7 +275,7 @@ local void read_2d_csv_base64(const cJSON *arg_csv,
 
     MPI_Win win_cells_nrowsxncols;
 
-    my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
+    my_mpi_allocate_shared(my_mpi_globals.MMG_global_comm,
                            sizeof(scaled_double_t),
                            nrows * ncols,
                            &void_cells_nrowsxncols,
@@ -300,7 +300,7 @@ local void read_2d_csv_base64(const cJSON *arg_csv,
       }
     }
 
-    my_mpi_sync_shared(my_mpi_globals.MMG_comm_global,
+    my_mpi_sync_shared(my_mpi_globals.MMG_global_comm,
                        win_cells_nrowsxncols,
                        "win_cells_nrowsxncols");
 
@@ -315,7 +315,7 @@ local void read_2d_csv_base64(const cJSON *arg_csv,
 
     MPI_Win win_cells_ncolsxnrows;
 
-    my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
+    my_mpi_allocate_shared(my_mpi_globals.MMG_global_comm,
                            sizeof(scaled_double_t),
                            ncols * nrows,
                            &void_cells_ncolsxnrows,
@@ -339,7 +339,7 @@ local void read_2d_csv_base64(const cJSON *arg_csv,
       }
     }
 
-    my_mpi_sync_shared(my_mpi_globals.MMG_comm_global,
+    my_mpi_sync_shared(my_mpi_globals.MMG_global_comm,
                        win_cells_ncolsxnrows,
                        "win_cells_ncolsxnrows");
 
@@ -532,21 +532,21 @@ local void construct_dense_network_shared(network_t *arg_network,
   dense_network_shared_t *with_dense_network_shared = NULL;
 
   if (compat_strcasecmp(arg_prefix, "pattern") == 0)
-    with_dense_network_shared = &(arg_network->N_pattern_dense_network_shared);
+    with_dense_network_shared = &(arg_network->N_shared_pattern_dense_network);
   else if (compat_strcasecmp(arg_prefix, "material") == 0)
-    with_dense_network_shared = &(arg_network->N_material_dense_network_shared);
+    with_dense_network_shared = &(arg_network->N_shared_material_dense_network);
   else if (compat_strcasecmp(arg_prefix, "final") == 0)
-    with_dense_network_shared = &(arg_network->N_dense_network_shared);
+    with_dense_network_shared = &(arg_network->N_shared_dense_network);
   else
     FATAL("unknown arg_prefix", EXIT_FAILURE)
 
   HARDBUG(with_dense_network_shared == NULL)
 
-  with_dense_network_shared->DNS_activation_inputs =
-    arg_network->N_activation_inputs;
+  with_dense_network_shared->DNS_input_activation =
+    arg_network->N_input_activation;
   with_dense_network_shared->DNS_activation = arg_network->N_activation;
-  with_dense_network_shared->DNS_activation_last =
-    arg_network->N_activation_last;
+  with_dense_network_shared->DNS_final_activation =
+    arg_network->N_final_activation;
 
   if (arg_verbose)
     PRINTF("arg_prefix=%s\n", arg_prefix);
@@ -728,7 +728,7 @@ local void construct_network_shared(const char *arg_network_name,
   if (arg_verbose)
     PRINTF("shape=%s\n", bdata(with_network->N_bshape));
 
-  construct_patterns_shared(&(with_network->N_patterns_shared),
+  construct_patterns_shared(&(with_network->N_shared_patterns),
                             bdata(with_network->N_bshape));
 
   // network2material_score
@@ -749,21 +749,21 @@ local void construct_network_shared(const char *arg_network_name,
   cJSON *cjson_materials = cJSON_GetObjectItem(directory, CJSON_MATERIALS_ID);
 
   if (!cJSON_IsArray(cjson_materials))
-    with_network->N_materials_shared.MSS_nmaterials = 0;
+    with_network->N_shared_materials.MSS_nmaterials = 0;
   else
-    with_network->N_materials_shared.MSS_nmaterials =
+    with_network->N_shared_materials.MSS_nmaterials =
       cJSON_GetArraySize(cjson_materials);
 
-  HARDBUG(with_network->N_materials_shared.MSS_nmaterials > NMATERIAL_MAX)
+  HARDBUG(with_network->N_shared_materials.MSS_nmaterials > NMATERIAL_MAX)
 
   BSTRING(bmaterial_name)
 
   for (int imaterial = 0;
-       imaterial < with_network->N_materials_shared.MSS_nmaterials;
+       imaterial < with_network->N_shared_materials.MSS_nmaterials;
        imaterial++)
   {
     material_shared_t *with_material_shared =
-      with_network->N_materials_shared.MSS_materials + imaterial;
+      with_network->N_shared_materials.MSS_materials + imaterial;
 
     cJSON *cjson_material = cJSON_GetArrayItem(cjson_materials, imaterial);
 
@@ -853,14 +853,14 @@ local void construct_network_shared(const char *arg_network_name,
   if (arg_verbose)
   {
     PRINTF("with_network->N_materials_shared.MSS_nmaterials=%d\n",
-           with_network->N_materials_shared.MSS_nmaterials);
+           with_network->N_shared_materials.MSS_nmaterials);
 
     for (int imaterial = 0;
-         imaterial < with_network->N_materials_shared.MSS_nmaterials;
+         imaterial < with_network->N_shared_materials.MSS_nmaterials;
          imaterial++)
     {
       material_shared_t *with_material_shared =
-        with_network->N_materials_shared.MSS_materials + imaterial;
+        with_network->N_shared_materials.MSS_materials + imaterial;
 
       PRINTF("imaterial=%d"
              " with_material_shared->MS_bname=%s"
@@ -882,17 +882,17 @@ local void construct_network_shared(const char *arg_network_name,
   svalue = cJSON_GetStringValue(value_cjson);
 
   if (compat_strcasecmp(svalue, "add") == 0)
-    with_network->N_architecture_patterns = NETWORK_ARCHITECTURE_ADD;
+    with_network->N_pattern_architecture = NETWORK_ARCHITECTURE_ADD;
   else if (compat_strcasecmp(svalue, "concat") == 0)
-    with_network->N_architecture_patterns = NETWORK_ARCHITECTURE_CONCAT;
+    with_network->N_pattern_architecture = NETWORK_ARCHITECTURE_CONCAT;
   else
     FATAL("unknown architecture_patterns option", EXIT_FAILURE)
 
   if (arg_verbose)
   {
-    if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
+    if (with_network->N_pattern_architecture == NETWORK_ARCHITECTURE_ADD)
       PRINTF("architecture_patterns=ADD\n");
-    else if (with_network->N_architecture_patterns ==
+    else if (with_network->N_pattern_architecture ==
              NETWORK_ARCHITECTURE_CONCAT)
       PRINTF("architecture_patterns=CONCAT\n");
     else
@@ -908,21 +908,21 @@ local void construct_network_shared(const char *arg_network_name,
   svalue = cJSON_GetStringValue(value_cjson);
 
   if (compat_strcasecmp(svalue, "NULL") == 0)
-    with_network->N_architecture_material = NETWORK_ARCHITECTURE_NULL;
+    with_network->N_material_architecture = NETWORK_ARCHITECTURE_NULL;
   else if (compat_strcasecmp(svalue, "add") == 0)
-    with_network->N_architecture_material = NETWORK_ARCHITECTURE_ADD;
+    with_network->N_material_architecture = NETWORK_ARCHITECTURE_ADD;
   else if (compat_strcasecmp(svalue, "concat") == 0)
-    with_network->N_architecture_material = NETWORK_ARCHITECTURE_CONCAT;
+    with_network->N_material_architecture = NETWORK_ARCHITECTURE_CONCAT;
   else
     FATAL("unknown architecture_material option", EXIT_FAILURE)
 
   if (arg_verbose)
   {
-    if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_NULL)
+    if (with_network->N_material_architecture == NETWORK_ARCHITECTURE_NULL)
       PRINTF("architecture_material=NULL\n");
-    else if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
+    else if (with_network->N_material_architecture == NETWORK_ARCHITECTURE_ADD)
       PRINTF("architecture_material=ADD\n");
-    else if (with_network->N_architecture_material ==
+    else if (with_network->N_material_architecture ==
              NETWORK_ARCHITECTURE_CONCAT)
       PRINTF("architecture_material=CONCAT\n");
     else
@@ -938,33 +938,33 @@ local void construct_network_shared(const char *arg_network_name,
   svalue = cJSON_GetStringValue(value_cjson);
 
   if (compat_strcasecmp(svalue, "relu") == 0)
-    with_network->N_activation_inputs = NETWORK_ACTIVATION_RELU;
+    with_network->N_input_activation = NETWORK_ACTIVATION_RELU;
   else if (compat_strcasecmp(svalue, "tanh") == 0)
-    with_network->N_activation_inputs = NETWORK_ACTIVATION_TANH;
+    with_network->N_input_activation = NETWORK_ACTIVATION_TANH;
   else if (compat_strcasecmp(svalue, "rsqrt") == 0)
-    with_network->N_activation_inputs = NETWORK_ACTIVATION_RSQRT;
+    with_network->N_input_activation = NETWORK_ACTIVATION_RSQRT;
   else if (compat_strcasecmp(svalue, "gelu") == 0)
-    with_network->N_activation_inputs = NETWORK_ACTIVATION_GELU;
+    with_network->N_input_activation = NETWORK_ACTIVATION_GELU;
   else if (compat_strcasecmp(svalue, "geluv2") == 0)
-    with_network->N_activation_inputs = NETWORK_ACTIVATION_GELUV2;
+    with_network->N_input_activation = NETWORK_ACTIVATION_GELUV2;
   else if (compat_strcasecmp(svalue, "linear") == 0)
-    with_network->N_activation_inputs = NETWORK_ACTIVATION_LINEAR;
+    with_network->N_input_activation = NETWORK_ACTIVATION_LINEAR;
   else
     FATAL("unknown activation_inputs option", EXIT_FAILURE)
 
   if (arg_verbose)
   {
-    if (with_network->N_activation_inputs == NETWORK_ACTIVATION_RELU)
+    if (with_network->N_input_activation == NETWORK_ACTIVATION_RELU)
       PRINTF("activation_inputs=RELU\n");
-    else if (with_network->N_activation_inputs == NETWORK_ACTIVATION_TANH)
+    else if (with_network->N_input_activation == NETWORK_ACTIVATION_TANH)
       PRINTF("activation_inputs=TANH\n");
-    else if (with_network->N_activation_inputs == NETWORK_ACTIVATION_RSQRT)
+    else if (with_network->N_input_activation == NETWORK_ACTIVATION_RSQRT)
       PRINTF("activation_inputs=RSQRT\n");
-    else if (with_network->N_activation_inputs == NETWORK_ACTIVATION_GELU)
+    else if (with_network->N_input_activation == NETWORK_ACTIVATION_GELU)
       PRINTF("activation_inputs=GELU\n");
-    else if (with_network->N_activation_inputs == NETWORK_ACTIVATION_GELUV2)
+    else if (with_network->N_input_activation == NETWORK_ACTIVATION_GELUV2)
       PRINTF("activation_inputs=GELUV2\n");
-    else if (with_network->N_activation_inputs == NETWORK_ACTIVATION_LINEAR)
+    else if (with_network->N_input_activation == NETWORK_ACTIVATION_LINEAR)
       PRINTF("activation_inputs=LINEAR\n");
     else
       FATAL("unknown activation_inputs option", EXIT_FAILURE)
@@ -1016,20 +1016,20 @@ local void construct_network_shared(const char *arg_network_name,
   svalue = cJSON_GetStringValue(value_cjson);
 
   if (compat_strcasecmp(svalue, "linear") == 0)
-    with_network->N_activation_last = NETWORK_ACTIVATION_LINEAR;
+    with_network->N_final_activation = NETWORK_ACTIVATION_LINEAR;
   else if (compat_strcasecmp(svalue, "tanh") == 0)
-    with_network->N_activation_last = NETWORK_ACTIVATION_TANH;
+    with_network->N_final_activation = NETWORK_ACTIVATION_TANH;
   else if (compat_strcasecmp(svalue, "logits") == 0)
-    with_network->N_activation_last = NETWORK_ACTIVATION_LOGITS;
+    with_network->N_final_activation = NETWORK_ACTIVATION_LOGITS;
   else if (compat_strcasecmp(svalue, "2heads") == 0)
-    with_network->N_activation_last = NETWORK_ACTIVATION_2HEADS;
+    with_network->N_final_activation = NETWORK_ACTIVATION_2HEADS;
   else
     FATAL("unknown activation_last option", EXIT_FAILURE)
 
   if (arg_verbose)
   {
     PRINTF("with_network->N_activation_last=%s\n",
-           activation_last2string(with_network->N_activation_last, TRUE));
+           activation_last2string(with_network->N_final_activation, TRUE));
   }
 
   // nman_min
@@ -1086,29 +1086,29 @@ local void construct_network_shared(const char *arg_network_name,
       return;
   }
 
-  with_network->N_pattern_dense_network_shared.DNS_ninputs = 0;
-  with_network->N_pattern_dense_network_shared.DNS_nlayers = 0;
-  with_network->N_pattern_dense_network_shared.DNS_activate_layer0 = FALSE;
-  with_network->N_pattern_dense_network_shared.DNS_compute_layer0 = TRUE;
+  with_network->N_shared_pattern_dense_network.DNS_ninputs = 0;
+  with_network->N_shared_pattern_dense_network.DNS_nlayers = 0;
+  with_network->N_shared_pattern_dense_network.DNS_activate_layer0 = FALSE;
+  with_network->N_shared_pattern_dense_network.DNS_compute_layer0 = TRUE;
 
-  with_network->N_material_dense_network_shared.DNS_ninputs = 0;
-  with_network->N_material_dense_network_shared.DNS_nlayers = 0;
-  with_network->N_material_dense_network_shared.DNS_activate_layer0 = FALSE;
-  with_network->N_material_dense_network_shared.DNS_compute_layer0 = TRUE;
+  with_network->N_shared_material_dense_network.DNS_ninputs = 0;
+  with_network->N_shared_material_dense_network.DNS_nlayers = 0;
+  with_network->N_shared_material_dense_network.DNS_activate_layer0 = FALSE;
+  with_network->N_shared_material_dense_network.DNS_compute_layer0 = TRUE;
 
-  with_network->N_dense_network_shared.DNS_ninputs = 0;
-  with_network->N_dense_network_shared.DNS_nlayers = 0;
-  with_network->N_dense_network_shared.DNS_activate_layer0 = FALSE;
-  with_network->N_dense_network_shared.DNS_compute_layer0 = TRUE;
+  with_network->N_shared_dense_network.DNS_ninputs = 0;
+  with_network->N_shared_dense_network.DNS_nlayers = 0;
+  with_network->N_shared_dense_network.DNS_activate_layer0 = FALSE;
+  with_network->N_shared_dense_network.DNS_compute_layer0 = TRUE;
 
   // load the embedding vectors for the patterns
 
   for (int ipattern = 0;
-       ipattern < with_network->N_patterns_shared.PSS_npatterns;
+       ipattern < with_network->N_shared_patterns.PSS_npatterns;
        ipattern++)
   {
     pattern_shared_t *with_pattern_shared =
-      with_network->N_patterns_shared.PSS_patterns + ipattern;
+      with_network->N_shared_patterns.PSS_patterns + ipattern;
 
     BSTRING(bindex)
 
@@ -1137,25 +1137,25 @@ local void construct_network_shared(const char *arg_network_name,
                        &(with_pattern_shared->PS_weights_nstatesxnembed),
                        NULL);
 
-    if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
+    if (with_network->N_pattern_architecture == NETWORK_ARCHITECTURE_ADD)
     {
       with_pattern_shared->PS_offset = 0;
 
-      if (with_network->N_pattern_dense_network_shared.DNS_ninputs == 0)
+      if (with_network->N_shared_pattern_dense_network.DNS_ninputs == 0)
       {
-        with_network->N_pattern_dense_network_shared.DNS_ninputs =
+        with_network->N_shared_pattern_dense_network.DNS_ninputs =
           with_pattern_shared->PS_nembed; // first
       }
       else
         HARDBUG(with_pattern_shared->PS_nembed !=
-                with_network->N_pattern_dense_network_shared.DNS_ninputs)
+                with_network->N_shared_pattern_dense_network.DNS_ninputs)
     }
     else
     {
       with_pattern_shared->PS_offset =
-        with_network->N_pattern_dense_network_shared.DNS_ninputs;
+        with_network->N_shared_pattern_dense_network.DNS_ninputs;
 
-      with_network->N_pattern_dense_network_shared.DNS_ninputs +=
+      with_network->N_shared_pattern_dense_network.DNS_ninputs +=
         with_pattern_shared->PS_nembed;
     }
 
@@ -1167,20 +1167,20 @@ local void construct_network_shared(const char *arg_network_name,
            with_pattern_shared->PS_nembed,
            with_pattern_shared->PS_offset);
 
-    HARDBUG(with_network->N_pattern_dense_network_shared.DNS_ninputs >=
+    HARDBUG(with_network->N_shared_pattern_dense_network.DNS_ninputs >=
             NINPUTS_MAX)
   }
 
   // load the material embedding vectors
 
-  if (with_network->N_architecture_material != NETWORK_ARCHITECTURE_NULL)
+  if (with_network->N_material_architecture != NETWORK_ARCHITECTURE_NULL)
   {
     for (int imaterial = 0;
-         imaterial < with_network->N_materials_shared.MSS_nmaterials;
+         imaterial < with_network->N_shared_materials.MSS_nmaterials;
          imaterial++)
     {
       material_shared_t *with_material_shared =
-        with_network->N_materials_shared.MSS_materials + imaterial;
+        with_network->N_shared_materials.MSS_materials + imaterial;
 
       BSTRING(bweights)
 
@@ -1200,25 +1200,25 @@ local void construct_network_shared(const char *arg_network_name,
                          &(with_material_shared->MS_weights_nstatesxnembed),
                          NULL);
 
-      if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
+      if (with_network->N_material_architecture == NETWORK_ARCHITECTURE_ADD)
       {
         with_material_shared->MS_offset = 0;
 
-        if (with_network->N_material_dense_network_shared.DNS_ninputs == 0)
+        if (with_network->N_shared_material_dense_network.DNS_ninputs == 0)
         {
-          with_network->N_material_dense_network_shared.DNS_ninputs =
+          with_network->N_shared_material_dense_network.DNS_ninputs =
             with_material_shared->MS_nembed; // first
         }
         else
           HARDBUG(with_material_shared->MS_nembed !=
-                  with_network->N_material_dense_network_shared.DNS_ninputs)
+                  with_network->N_shared_material_dense_network.DNS_ninputs)
       }
       else
       {
         with_material_shared->MS_offset =
-          with_network->N_material_dense_network_shared.DNS_ninputs;
+          with_network->N_shared_material_dense_network.DNS_ninputs;
 
-        with_network->N_material_dense_network_shared.DNS_ninputs +=
+        with_network->N_shared_material_dense_network.DNS_ninputs +=
           with_material_shared->MS_nembed;
       }
 
@@ -1234,7 +1234,7 @@ local void construct_network_shared(const char *arg_network_name,
              with_material_shared->MS_nembed,
              with_material_shared->MS_offset);
 
-      HARDBUG(with_network->N_material_dense_network_shared.DNS_ninputs >=
+      HARDBUG(with_network->N_shared_material_dense_network.DNS_ninputs >=
               NINPUTS_MAX)
     }
   }
@@ -1245,30 +1245,30 @@ local void construct_network_shared(const char *arg_network_name,
 
   // topology check
 
-  HARDBUG(with_network->N_pattern_dense_network_shared.DNS_ninputs !=
-          with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_ninputs)
+  HARDBUG(with_network->N_shared_pattern_dense_network.DNS_ninputs !=
+          with_network->N_shared_pattern_dense_network.DNS_layers[0].LS_ninputs)
 
   // The specialized path sums 16-element embeddings for a 16x8 first layer.
   with_network->N_pattern_dense_network_16x8_kernel =
-    (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD) and
-    (with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_ninputs ==
+    (with_network->N_pattern_architecture == NETWORK_ARCHITECTURE_ADD) and
+    (with_network->N_shared_pattern_dense_network.DNS_layers[0].LS_ninputs ==
      16) and
-    (with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_noutputs ==
+    (with_network->N_shared_pattern_dense_network.DNS_layers[0].LS_noutputs ==
      8);
 
   with_network->N_pattern_dense_network_64x16_kernel =
-    (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD) and
-    (with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_ninputs ==
+    (with_network->N_pattern_architecture == NETWORK_ARCHITECTURE_ADD) and
+    (with_network->N_shared_pattern_dense_network.DNS_layers[0].LS_ninputs ==
      64) and
-    (with_network->N_pattern_dense_network_shared.DNS_layers[0].LS_noutputs ==
+    (with_network->N_shared_pattern_dense_network.DNS_layers[0].LS_noutputs ==
      16);
 
   for (int ipattern = 0;
-       ipattern < with_network->N_patterns_shared.PSS_npatterns;
+       ipattern < with_network->N_shared_patterns.PSS_npatterns;
        ipattern++)
   {
     pattern_shared_t *with_pattern_shared =
-      with_network->N_patterns_shared.PSS_patterns + ipattern;
+      with_network->N_shared_patterns.PSS_patterns + ipattern;
 
     if ((with_pattern_shared->PS_nembed != 16) or
         (with_pattern_shared->PS_offset != 0))
@@ -1282,36 +1282,36 @@ local void construct_network_shared(const char *arg_network_name,
   with_network->N_material_dense_network_16x8_kernel = FALSE;
   with_network->N_material_dense_network_64x16_kernel = FALSE;
 
-  if (with_network->N_architecture_material != NETWORK_ARCHITECTURE_NULL)
+  if (with_network->N_material_architecture != NETWORK_ARCHITECTURE_NULL)
   {
     construct_dense_network_shared(with_network, directory, "material", TRUE);
 
     // topology check
 
     HARDBUG(
-      with_network->N_material_dense_network_shared.DNS_ninputs !=
-      with_network->N_material_dense_network_shared.DNS_layers[0].LS_ninputs)
+      with_network->N_shared_material_dense_network.DNS_ninputs !=
+      with_network->N_shared_material_dense_network.DNS_layers[0].LS_ninputs)
 
     with_network->N_material_dense_network_16x8_kernel =
-      (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD) and
-      (with_network->N_material_dense_network_shared.DNS_layers[0].LS_ninputs ==
+      (with_network->N_material_architecture == NETWORK_ARCHITECTURE_ADD) and
+      (with_network->N_shared_material_dense_network.DNS_layers[0].LS_ninputs ==
        16) and
-      (with_network->N_material_dense_network_shared.DNS_layers[0]
+      (with_network->N_shared_material_dense_network.DNS_layers[0]
          .LS_noutputs == 8);
 
     with_network->N_material_dense_network_64x16_kernel =
-      (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD) and
-      (with_network->N_material_dense_network_shared.DNS_layers[0].LS_ninputs ==
+      (with_network->N_material_architecture == NETWORK_ARCHITECTURE_ADD) and
+      (with_network->N_shared_material_dense_network.DNS_layers[0].LS_ninputs ==
        64) and
-      (with_network->N_material_dense_network_shared.DNS_layers[0]
+      (with_network->N_shared_material_dense_network.DNS_layers[0]
          .LS_noutputs == 16);
 
     for (int imaterial = 0;
-         imaterial < with_network->N_materials_shared.MSS_nmaterials;
+         imaterial < with_network->N_shared_materials.MSS_nmaterials;
          imaterial++)
     {
       material_shared_t *with_material_shared =
-        with_network->N_materials_shared.MSS_materials + imaterial;
+        with_network->N_shared_materials.MSS_materials + imaterial;
 
       if ((with_material_shared->MS_nembed != 16) or
           (with_material_shared->MS_offset != 0))
@@ -1336,76 +1336,76 @@ local void construct_network_shared(const char *arg_network_name,
 
   {
     dense_network_shared_t *with_pattern_dense_network_shared =
-      &(with_network->N_pattern_dense_network_shared);
+      &(with_network->N_shared_pattern_dense_network);
 
-    with_network->N_dense_network_shared.DNS_ninputs =
+    with_network->N_shared_dense_network.DNS_ninputs =
       with_pattern_dense_network_shared
         ->DNS_layers[with_pattern_dense_network_shared->DNS_nlayers - 1]
         .LS_noutputs;
 
     dense_network_shared_t *with_material_dense_network_shared =
-      &(with_network->N_material_dense_network_shared);
+      &(with_network->N_shared_material_dense_network);
 
-    with_network->N_dense_network_shared.DNS_ninputs +=
+    with_network->N_shared_dense_network.DNS_ninputs +=
       with_material_dense_network_shared
         ->DNS_layers[with_material_dense_network_shared->DNS_nlayers - 1]
         .LS_noutputs;
   }
 
   PRINTF("with_network->N_dense_network_shared.DNS_ninputs=%d\n",
-         with_network->N_dense_network_shared.DNS_ninputs);
+         with_network->N_shared_dense_network.DNS_ninputs);
 
-  HARDBUG(with_network->N_dense_network_shared.DNS_ninputs >= NINPUTS_MAX)
+  HARDBUG(with_network->N_shared_dense_network.DNS_ninputs >= NINPUTS_MAX)
 
   construct_dense_network_shared(with_network, directory, "final", TRUE);
 
-  if (with_network->N_dense_network_shared.DNS_ninputs !=
-      with_network->N_dense_network_shared.DNS_layers[0].LS_ninputs)
+  if (with_network->N_shared_dense_network.DNS_ninputs !=
+      with_network->N_shared_dense_network.DNS_layers[0].LS_ninputs)
   {
     PRINTF("with_network->N_dense_network_shared.DNS_ninputs=%d\n",
-           with_network->N_dense_network_shared.DNS_ninputs);
+           with_network->N_shared_dense_network.DNS_ninputs);
     PRINTF("with_network->N_dense_network_shared.DNS_layers[0].LS_ninputs=%d\n",
-           with_network->N_dense_network_shared.DNS_layers[0].LS_ninputs);
+           with_network->N_shared_dense_network.DNS_layers[0].LS_ninputs);
 
     FATAL("topology error", EXIT_FAILURE)
   }
 
-  if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_ADD)
+  if (with_network->N_pattern_architecture == NETWORK_ARCHITECTURE_ADD)
   {
     for (int ipattern = 0;
-         ipattern < with_network->N_patterns_shared.PSS_npatterns;
+         ipattern < with_network->N_shared_patterns.PSS_npatterns;
          ipattern++)
     {
       pattern_shared_t *with_pattern_shared =
-        with_network->N_patterns_shared.PSS_patterns + ipattern;
+        with_network->N_shared_patterns.PSS_patterns + ipattern;
 
       with_pattern_shared->PS_sum_nstatesxnoutputs = NULL;
     }
-    with_network->N_pattern_dense_network_shared.DNS_activate_layer0 = TRUE;
-    with_network->N_pattern_dense_network_shared.DNS_compute_layer0 = TRUE;
+    with_network->N_shared_pattern_dense_network.DNS_activate_layer0 = TRUE;
+    with_network->N_shared_pattern_dense_network.DNS_compute_layer0 = TRUE;
   }
-  else if (with_network->N_architecture_patterns == NETWORK_ARCHITECTURE_CONCAT)
+  else if (with_network->N_pattern_architecture == NETWORK_ARCHITECTURE_CONCAT)
   {
     // precompute layer0 contribution
 
-    with_network->N_pattern_dense_network_shared.DNS_activate_layer0 = FALSE;
-    with_network->N_pattern_dense_network_shared.DNS_compute_layer0 = FALSE;
+    with_network->N_shared_pattern_dense_network.DNS_activate_layer0 = FALSE;
+    with_network->N_shared_pattern_dense_network.DNS_compute_layer0 = FALSE;
 
     layer_shared_t *with_current =
-      with_network->N_pattern_dense_network_shared.DNS_layers;
+      with_network->N_shared_pattern_dense_network.DNS_layers;
 
     for (int ipattern = 0;
-         ipattern < with_network->N_patterns_shared.PSS_npatterns;
+         ipattern < with_network->N_shared_patterns.PSS_npatterns;
          ipattern++)
     {
       pattern_shared_t *with_pattern_shared =
-        with_network->N_patterns_shared.PSS_patterns + ipattern;
+        with_network->N_shared_patterns.PSS_patterns + ipattern;
 
       void *void_sum_nstatesxnoutputs;
 
       MPI_Win win_sum_nstatesxnoutputs;
 
-      my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
+      my_mpi_allocate_shared(my_mpi_globals.MMG_global_comm,
                              sizeof(scaled_double_t),
                              with_pattern_shared->PS_nstates *
                                with_current->LS_noutputs,
@@ -1439,7 +1439,7 @@ local void construct_network_shared(const char *arg_network_name,
         }
       }
 
-      my_mpi_sync_shared(my_mpi_globals.MMG_comm_global,
+      my_mpi_sync_shared(my_mpi_globals.MMG_global_comm,
                          win_sum_nstatesxnoutputs,
                          "sum_nstatesxnoutputs");
 
@@ -1451,37 +1451,37 @@ local void construct_network_shared(const char *arg_network_name,
   else
     FATAL("unknown with_network->N_architecur_pattern", EXIT_FAILURE)
 
-  if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
+  if (with_network->N_material_architecture == NETWORK_ARCHITECTURE_ADD)
   {
     for (int imaterial = 0;
-         imaterial < with_network->N_materials_shared.MSS_nmaterials;
+         imaterial < with_network->N_shared_materials.MSS_nmaterials;
          imaterial++)
     {
       material_shared_t *with_material_shared =
-        with_network->N_materials_shared.MSS_materials + imaterial;
+        with_network->N_shared_materials.MSS_materials + imaterial;
 
       with_material_shared->MS_sum_nstatesxnoutputs = NULL;
     }
 
-    with_network->N_material_dense_network_shared.DNS_activate_layer0 = TRUE;
-    with_network->N_material_dense_network_shared.DNS_compute_layer0 = TRUE;
+    with_network->N_shared_material_dense_network.DNS_activate_layer0 = TRUE;
+    with_network->N_shared_material_dense_network.DNS_compute_layer0 = TRUE;
   }
-  else if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_CONCAT)
+  else if (with_network->N_material_architecture == NETWORK_ARCHITECTURE_CONCAT)
   {
     // precompute layer0 contribution
 
-    with_network->N_material_dense_network_shared.DNS_activate_layer0 = FALSE;
-    with_network->N_material_dense_network_shared.DNS_compute_layer0 = FALSE;
+    with_network->N_shared_material_dense_network.DNS_activate_layer0 = FALSE;
+    with_network->N_shared_material_dense_network.DNS_compute_layer0 = FALSE;
 
     layer_shared_t *with_current =
-      with_network->N_material_dense_network_shared.DNS_layers;
+      with_network->N_shared_material_dense_network.DNS_layers;
 
     for (int imaterial = 0;
-         imaterial < with_network->N_materials_shared.MSS_nmaterials;
+         imaterial < with_network->N_shared_materials.MSS_nmaterials;
          imaterial++)
     {
       material_shared_t *with_material_shared =
-        with_network->N_materials_shared.MSS_materials + imaterial;
+        with_network->N_shared_materials.MSS_materials + imaterial;
 
       scaled_double_t *sum;
 
@@ -1551,15 +1551,15 @@ void construct_network_state(network_state_t *arg_with_network_state,
   network_t *with_network = networks + arg_with_network_state->NS_network_id;
 
   construct_dense_network_state(
-    &(with_network->N_pattern_dense_network_shared),
+    &(with_network->N_shared_pattern_dense_network),
     &(arg_with_network_state->NS_pattern_dense_network_state));
 
   construct_dense_network_state(
-    &(with_network->N_material_dense_network_shared),
+    &(with_network->N_shared_material_dense_network),
     &(arg_with_network_state->NS_material_dense_network_state));
 
   construct_dense_network_state(
-    &(with_network->N_dense_network_shared),
+    &(with_network->N_shared_dense_network),
     &(arg_with_network_state->NS_dense_network_state));
 }
 
@@ -2288,7 +2288,7 @@ double return_dense_network_score_scaled(
   {
     ALIGN64(scaled_double_t activated_inputs[NINPUTS_MAX]);
 
-    activation_scaled(arg_dense_network_shared->DNS_activation_inputs,
+    activation_scaled(arg_dense_network_shared->DNS_input_activation,
                       with_current->LS_ninputs,
                       arg_dense_network_state->DNS_inputs,
                       activated_inputs);
@@ -2370,14 +2370,14 @@ double return_dense_network_score_scaled(
     {
       BEGIN_BLOCK("Ax+b-and-activation-other-layers-last-layer")
 
-      if (arg_dense_network_shared->DNS_activation_last ==
+      if (arg_dense_network_shared->DNS_final_activation ==
           NETWORK_ACTIVATION_LINEAR)
       {
         HARDBUG(with_current->LS_noutputs != 1)
 
         with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
       }
-      else if (arg_dense_network_shared->DNS_activation_last ==
+      else if (arg_dense_network_shared->DNS_final_activation ==
                NETWORK_ACTIVATION_TANH)
       {
         HARDBUG(with_current->LS_noutputs != 1)
@@ -2385,7 +2385,7 @@ double return_dense_network_score_scaled(
         with_current_thread->LT_outputs[0] =
           tanhf(with_current_thread->LT_sum[0]);
       }
-      else if (arg_dense_network_shared->DNS_activation_last ==
+      else if (arg_dense_network_shared->DNS_final_activation ==
                NETWORK_ACTIVATION_LOGITS)
       {
         HARDBUG(with_current->LS_noutputs != 3)
@@ -2394,7 +2394,7 @@ double return_dense_network_score_scaled(
         with_current_thread->LT_outputs[1] = with_current_thread->LT_sum[1];
         with_current_thread->LT_outputs[2] = with_current_thread->LT_sum[2];
       }
-      else if (arg_dense_network_shared->DNS_activation_last ==
+      else if (arg_dense_network_shared->DNS_final_activation ==
                NETWORK_ACTIVATION_2HEADS)
       {
         HARDBUG(with_current->LS_noutputs != 2)
@@ -2489,7 +2489,7 @@ double return_dense_network_score_double(
   {
     scaled_double_t activated_inputs[NINPUTS_MAX];
 
-    activation_double(arg_dense_network_shared->DNS_activation_inputs,
+    activation_double(arg_dense_network_shared->DNS_input_activation,
                       with_current->LS_ninputs,
                       arg_dense_network_state->DNS_inputs,
                       activated_inputs);
@@ -2558,23 +2558,23 @@ double return_dense_network_score_double(
     }
     else
     {
-      if (arg_dense_network_shared->DNS_activation_last ==
+      if (arg_dense_network_shared->DNS_final_activation ==
           NETWORK_ACTIVATION_LINEAR)
       {
         with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
       }
-      else if (arg_dense_network_shared->DNS_activation_last ==
+      else if (arg_dense_network_shared->DNS_final_activation ==
                NETWORK_ACTIVATION_TANH)
       {
         with_current_thread->LT_outputs[0] =
           tanh(with_current_thread->LT_sum[0]);
       }
-      else if (arg_dense_network_shared->DNS_activation_last ==
+      else if (arg_dense_network_shared->DNS_final_activation ==
                NETWORK_ACTIVATION_LOGITS)
       {
         with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
       }
-      else if (arg_dense_network_shared->DNS_activation_last ==
+      else if (arg_dense_network_shared->DNS_final_activation ==
                NETWORK_ACTIVATION_2HEADS)
       {
         with_current_thread->LT_outputs[0] = with_current_thread->LT_sum[0];
@@ -2818,7 +2818,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
     network_t *with_network = networks + with_board->B_network_id;
 
     score_double[ifen] = return_dense_network_score_double(
-      &(with_network->N_dense_network_shared),
+      &(with_network->N_shared_dense_network),
       &(with_board->B_network_state.NS_dense_network_state));
 
     if (ifen <= 100)
@@ -2870,67 +2870,67 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
                    nfen,
                    MPI_LONG_LONG_INT,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE,
                    score_scaled,
                    nfen,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE,
                    score_double,
                    nfen,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE,
                    delta_scaled,
                    nfen,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE,
                    delta_double,
                    nfen,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE,
                    &mse_vs_draw_scaled,
                    1,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
   my_mpi_allreduce(MPI_IN_PLACE,
                    &mse_vs_draw_double,
                    1,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
   my_mpi_allreduce(MPI_IN_PLACE,
                    &mse_scaled,
                    1,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
   my_mpi_allreduce(MPI_IN_PLACE,
                    &mse_double,
                    1,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE,
                    &error_max_scaled_vs_double,
                    1,
                    MPI_DOUBLE,
                    MPI_MAX,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   PRINTF("delta npieces\n");
 
@@ -3121,19 +3121,19 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
                    NPIECES_MAX + 1,
                    MPI_LONG_LONG_INT,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
   my_mpi_allreduce(MPI_IN_PLACE,
                    &factor,
                    NPIECES_MAX + 1,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
   my_mpi_allreduce(MPI_IN_PLACE,
                    &score,
                    NPIECES_MAX + 1,
                    MPI_DOUBLE,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   for (int ipiece = 0; ipiece <= NPIECES_MAX; ++ipiece)
   {
@@ -3191,11 +3191,11 @@ local void append_fen(const board_t *arg_with_board,
   network_t *with_network = networks + arg_with_board->B_network_id;
 
   for (int ipattern = 0;
-       ipattern < with_network->N_patterns_shared.PSS_npatterns;
+       ipattern < with_network->N_shared_patterns.PSS_npatterns;
        ipattern++)
   {
     pattern_shared_t *with_pattern_shared =
-      with_network->N_patterns_shared.PSS_patterns + ipattern;
+      with_network->N_shared_patterns.PSS_patterns + ipattern;
 
     if (with_pattern_shared->PS_id == PATTERN_BASE3_INDEX_ID)
     {
@@ -3210,11 +3210,11 @@ local void append_fen(const board_t *arg_with_board,
   }
 
   for (int imaterial = 0;
-       imaterial < with_network->N_materials_shared.MSS_nmaterials;
+       imaterial < with_network->N_shared_materials.MSS_nmaterials;
        imaterial++)
   {
     material_shared_t *with_material_shared =
-      with_network->N_materials_shared.MSS_materials + imaterial;
+      with_network->N_shared_materials.MSS_materials + imaterial;
 
     if (with_material_shared->MS_id == MATERIAL_NWHITE_MAN_ID)
     {
@@ -3284,13 +3284,13 @@ local void append_fen(const board_t *arg_with_board,
       FATAL("unknown with_material_shared->MS_id", EXIT_FAILURE)
   }
 
-  if (with_network->N_activation_last == NETWORK_ACTIVATION_LINEAR)
+  if (with_network->N_final_activation == NETWORK_ACTIVATION_LINEAR)
   {
     float result = arg_result;
 
     append_fbuffer_bin(arg_fcsv, &result, sizeof(float));
   }
-  else if (with_network->N_activation_last == NETWORK_ACTIVATION_LOGITS)
+  else if (with_network->N_final_activation == NETWORK_ACTIVATION_LOGITS)
   {
     i32_t result = INVALID;
 
@@ -3305,7 +3305,7 @@ local void append_fen(const board_t *arg_with_board,
 
     append_fbuffer_bin(arg_fcsv, &result, sizeof(i32_t));
   }
-  else if (with_network->N_activation_last == NETWORK_ACTIVATION_2HEADS)
+  else if (with_network->N_final_activation == NETWORK_ACTIVATION_2HEADS)
   {
     float result = arg_result;
 
@@ -3359,8 +3359,8 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
     bformata(btag,
              "%s-nm%d-%s-np%d-%d-mirror",
              bdata(with_network->N_bshape),
-             with_network->N_materials_shared.MSS_nmaterials,
-             activation_last2string(with_network->N_activation_last, TRUE),
+             with_network->N_shared_materials.MSS_nmaterials,
+             activation_last2string(with_network->N_final_activation, TRUE),
              arg_npieces_min,
              arg_npieces_max) == BSTR_ERR)
 
@@ -3381,11 +3381,11 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
     construct_fbuffer(&ftraining, barg_name, bdata(bsuffix), TRUE);
 
     for (int ipattern = 0;
-         ipattern < with_network->N_patterns_shared.PSS_npatterns;
+         ipattern < with_network->N_shared_patterns.PSS_npatterns;
          ipattern++)
     {
       pattern_shared_t *with_pattern_shared =
-        with_network->N_patterns_shared.PSS_patterns + ipattern;
+        with_network->N_shared_patterns.PSS_patterns + ipattern;
 
       int nstates = with_pattern_shared->PS_nstates;
 
@@ -3397,11 +3397,11 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
     }
 
     for (int imaterial = 0;
-         imaterial < with_network->N_materials_shared.MSS_nmaterials;
+         imaterial < with_network->N_shared_materials.MSS_nmaterials;
          imaterial++)
     {
       material_shared_t *with_material_shared =
-        with_network->N_materials_shared.MSS_materials + imaterial;
+        with_network->N_shared_materials.MSS_materials + imaterial;
 
       int nstates = with_material_shared->MS_nstates;
 
@@ -3420,8 +3420,8 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
   }
 
   my_mpi_barrier_v3("after adding states",
-                    my_mpi_globals.MMG_comm_slaves,
-                    my_mpi_globals.MMG_semkey_fen2csv_barrier,
+                    my_mpi_globals.MMG_slave_comm,
+                    my_mpi_globals.MMG_fen2csv_barrier_semkey,
                     TRUE);
 
   // validation
@@ -3743,35 +3743,35 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
   BDESTROY(bdata_name)
 
-  my_stats_aggregate(&stats_original_labels, my_mpi_globals.MMG_comm_slaves);
+  my_stats_aggregate(&stats_original_labels, my_mpi_globals.MMG_slave_comm);
 
-  my_stats_aggregate(&stats_training_labels, my_mpi_globals.MMG_comm_slaves);
+  my_stats_aggregate(&stats_training_labels, my_mpi_globals.MMG_slave_comm);
 
-  my_stats_aggregate(&stats_validation_labels, my_mpi_globals.MMG_comm_slaves);
+  my_stats_aggregate(&stats_validation_labels, my_mpi_globals.MMG_slave_comm);
 
   my_mpi_bucket_aggregate(&bucket_original_labels,
-                          my_mpi_globals.MMG_comm_slaves);
+                          my_mpi_globals.MMG_slave_comm);
 
   my_mpi_bucket_aggregate(&bucket_training_labels,
-                          my_mpi_globals.MMG_comm_slaves);
+                          my_mpi_globals.MMG_slave_comm);
 
   my_mpi_bucket_aggregate(&bucket_validation_labels,
-                          my_mpi_globals.MMG_comm_slaves);
+                          my_mpi_globals.MMG_slave_comm);
 
   my_mpi_bucket_aggregate(&bucket_material_score,
-                          my_mpi_globals.MMG_comm_slaves);
+                          my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nwhite_man, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nwhite_man, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nblack_man, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nblack_man, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nwhite_kings, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nwhite_kings, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nblack_kings, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nblack_kings, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nman, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nman, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nkings, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nkings, my_mpi_globals.MMG_slave_comm);
 
   mean_sigma(&stats_original_labels);
   printf_stats(&stats_original_labels);
@@ -3826,7 +3826,7 @@ void evaluate_material_network(const network_t *with_network,
                                int arg_inputs)
 {
   const dense_network_shared_t *dense =
-    &with_network->N_material_dense_network_shared;
+    &with_network->N_shared_material_dense_network;
 
   int ilast = dense->DNS_nlayers - 1;
 
@@ -3859,12 +3859,12 @@ void evaluate_material_network(const network_t *with_network,
 #endif
 
   for (int iinput = 0;
-       iinput < with_network->N_material_dense_network_shared.DNS_ninputs;
+       iinput < with_network->N_shared_material_dense_network.DNS_ninputs;
        iinput++)
     arg_state->DNS_inputs[iinput] = 0;
 
   const layer_shared_t *with_current =
-    with_network->N_material_dense_network_shared.DNS_layers;
+    with_network->N_shared_material_dense_network.DNS_layers;
 
   layer_thread_t *with_current_thread = arg_state->DNS_layers;
 
@@ -3884,11 +3884,11 @@ void evaluate_material_network(const network_t *with_network,
 #endif
 
   for (int imaterial = 0;
-       imaterial < with_network->N_materials_shared.MSS_nmaterials;
+       imaterial < with_network->N_shared_materials.MSS_nmaterials;
        imaterial++)
   {
     const material_shared_t *with_material_shared =
-      with_network->N_materials_shared.MSS_materials + imaterial;
+      with_network->N_shared_materials.MSS_materials + imaterial;
 
     int istate = INVALID;
 
@@ -3934,7 +3934,7 @@ void evaluate_material_network(const network_t *with_network,
 
     HARDBUG((istate < 0) or (istate >= with_material_shared->MS_nstates))
 
-    if (with_network->N_architecture_material == NETWORK_ARCHITECTURE_ADD)
+    if (with_network->N_material_architecture == NETWORK_ARCHITECTURE_ADD)
     {
 #ifdef USE_AVX2_INTRINSICS
       if (with_network->N_material_dense_network_16x8_kernel)
@@ -3962,7 +3962,7 @@ void evaluate_material_network(const network_t *with_network,
                   with_material_shared->MS_weights_nstatesxnembed +
                     (size_t)istate * with_material_shared->MS_nembed);
     }
-    else if (with_network->N_architecture_material ==
+    else if (with_network->N_material_architecture ==
              NETWORK_ARCHITECTURE_CONCAT)
     {
       if (arg_inputs)
@@ -3992,7 +3992,7 @@ void evaluate_material_network(const network_t *with_network,
 #endif
 
   (void)return_dense_network_score_scaled(
-    &(with_network->N_material_dense_network_shared),
+    &(with_network->N_shared_material_dense_network),
     arg_state);
 }
 
@@ -4001,10 +4001,10 @@ local void construct_material_cache(network_t *arg_network)
   arg_network->N_material_cache = NULL;
 
   if ((arg_network->N_network_id == INVALID) or
-      (arg_network->N_architecture_material == NETWORK_ARCHITECTURE_NULL))
+      (arg_network->N_material_architecture == NETWORK_ARCHITECTURE_NULL))
     return;
 
-  dense_network_shared_t *dense = &arg_network->N_material_dense_network_shared;
+  dense_network_shared_t *dense = &arg_network->N_shared_material_dense_network;
 
   if (dense->DNS_nlayers == 0)
     return; // A dummy network has no loaded weights.
@@ -4016,7 +4016,7 @@ local void construct_material_cache(network_t *arg_network)
   void *memory;
   MPI_Win win;
 
-  my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
+  my_mpi_allocate_shared(my_mpi_globals.MMG_global_comm,
                          sizeof(scaled_double_t),
                          nentries * noutputs,
                          &memory,
@@ -4058,7 +4058,7 @@ local void construct_material_cache(network_t *arg_network)
       my_free(state.DNS_layers[ilayer].LT_outputs);
     }
   }
-  my_mpi_sync_shared(my_mpi_globals.MMG_comm_global, win, "material_cache");
+  my_mpi_sync_shared(my_mpi_globals.MMG_global_comm, win, "material_cache");
   MARK_ARRAY_READ_ONLY(cache, nentries * noutputs * sizeof(scaled_double_t));
   // Published only after initialization; search threads never write this table.
   arg_network->N_material_cache = cache;

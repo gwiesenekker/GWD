@@ -586,7 +586,7 @@ void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int nsql_buffer)
       PRINTF("acquiring semaphore..\n$");
 
       my_mpi_acquire_semaphore_v3(arg_with_my_sqlite3->MSQL_comm,
-                                  my_mpi_globals.MMG_semkey_flush_sql_buffer);
+                                  my_mpi_globals.MMG_flush_sql_buffer_semkey);
     }
 
     if (arg_with_my_sqlite3->MSQL_verbose > 0)
@@ -634,7 +634,7 @@ void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int nsql_buffer)
       PRINTF("releasing semaphore..\n$");
 
       my_mpi_release_semaphore_v3(arg_with_my_sqlite3->MSQL_comm,
-                                  my_mpi_globals.MMG_semkey_flush_sql_buffer);
+                                  my_mpi_globals.MMG_flush_sql_buffer_semkey);
     }
 
     if (arg_with_my_sqlite3->MSQL_verbose > 0)
@@ -705,7 +705,7 @@ void construct_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3,
 
   my_mpi_barrier_v3("after open database",
                     arg_comm,
-                    my_mpi_globals.MMG_semkey_construct_my_sqlite3_barrier,
+                    my_mpi_globals.MMG_construct_my_sqlite3_barrier_semkey,
                     TRUE);
 
   if (iproc > 0)
@@ -750,19 +750,19 @@ void close_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3)
     PRINTF("%s::closing db iproc=%d\n$", __FUNC__, iproc);
 
     my_mpi_acquire_semaphore_v3(arg_with_my_sqlite3->MSQL_comm,
-                                my_mpi_globals.MMG_semkey_close_my_sqlite3);
+                                my_mpi_globals.MMG_close_my_sqlite3_semkey);
 
     HARDBUG(my_sqlite3_close(arg_with_my_sqlite3->MSQL_db) != SQLITE_OK)
 
     my_mpi_release_semaphore_v3(arg_with_my_sqlite3->MSQL_comm,
-                                my_mpi_globals.MMG_semkey_close_my_sqlite3);
+                                my_mpi_globals.MMG_close_my_sqlite3_semkey);
 
     PRINTF("%s::closed db iproc=%d\n$", __FUNC__, iproc);
   }
 
   my_mpi_barrier_v3("after my_sqlite3_close",
                     arg_with_my_sqlite3->MSQL_comm,
-                    my_mpi_globals.MMG_semkey_close_my_sqlite3_barrier,
+                    my_mpi_globals.MMG_close_my_sqlite3_barrier_semkey,
                     TRUE);
 
   if (iproc <= 0)

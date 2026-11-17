@@ -42,12 +42,12 @@ typedef struct
 {
   int MMG_init;
   int MMG_nglobal;
-  int MMG_id_global;
+  int MMG_global_id;
   int MMG_nslaves;
-  int MMG_id_slave;
+  int MMG_slave_id;
 
-  MPI_Comm MMG_comm_global;
-  MPI_Comm MMG_comm_slaves;
+  MPI_Comm MMG_global_comm;
+  MPI_Comm MMG_slave_comm;
 
   int MMG_is_master;
   int MMG_is_single;
@@ -57,22 +57,22 @@ typedef struct
 
   int MMG_semkey_offset;
 
-  int MMG_semkey_gen_book_barrier;
-  int MMG_semkey_init_endgame_barrier;
-  int MMG_semkey_gen_random_barrier;
-  int MMG_semkey_main_barrier;
-  int MMG_semkey_test_my_mpi;
-  int MMG_semkey_test_my_mpi_barrier;
-  int MMG_semkey_flush_sql_buffer;
-  int MMG_semkey_construct_my_sqlite3_barrier;
-  int MMG_semkey_close_my_sqlite3;
-  int MMG_semkey_close_my_sqlite3_barrier;
-  int MMG_semkey_auto_play_barrier;
-  int MMG_semkey_gen_db_barrier;
-  int MMG_semkey_update_db_barrier;
-  int MMG_semkey_add_positions_barrier;
-  int MMG_semkey_query_positions_barrier;
-  int MMG_semkey_fen2csv_barrier;
+  int MMG_gen_book_barrier_semkey;
+  int MMG_init_endgame_barrier_semkey;
+  int MMG_gen_random_barrier_semkey;
+  int MMG_main_barrier_semkey;
+  int MMG_test_my_mpi_semkey;
+  int MMG_test_my_mpi_barrier_semkey;
+  int MMG_flush_sql_buffer_semkey;
+  int MMG_construct_my_sqlite3_barrier_semkey;
+  int MMG_close_my_sqlite3_semkey;
+  int MMG_close_my_sqlite3_barrier_semkey;
+  int MMG_auto_play_barrier_semkey;
+  int MMG_gen_db_barrier_semkey;
+  int MMG_update_db_barrier_semkey;
+  int MMG_add_positions_barrier_semkey;
+  int MMG_query_positions_barrier_semkey;
+  int MMG_fen2csv_barrier_semkey;
 } my_mpi_globals_t;
 
 extern my_mpi_globals_t my_mpi_globals;

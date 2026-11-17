@@ -49,11 +49,11 @@ local my_semkey_t my_semkeys[NMY_SEMKEYS];
 
 my_mpi_globals_t my_mpi_globals = {.MMG_init = FALSE,
                                    .MMG_nglobal = 0,
-                                   .MMG_id_global = INVALID,
+                                   .MMG_global_id = INVALID,
                                    .MMG_nslaves = 0,
-                                   .MMG_id_slave = INVALID,
-                                   .MMG_comm_global = MPI_COMM_NULL,
-                                   .MMG_comm_slaves = MPI_COMM_NULL,
+                                   .MMG_slave_id = INVALID,
+                                   .MMG_global_comm = MPI_COMM_NULL,
+                                   .MMG_slave_comm = MPI_COMM_NULL,
 
                                    .MMG_is_master = TRUE,
                                    .MMG_is_single = TRUE,
@@ -63,22 +63,22 @@ my_mpi_globals_t my_mpi_globals = {.MMG_init = FALSE,
 
                                    .MMG_semkey_offset = 0,
 
-                                   .MMG_semkey_gen_book_barrier = 1,
-                                   .MMG_semkey_init_endgame_barrier = 2,
-                                   .MMG_semkey_gen_random_barrier = 3,
-                                   .MMG_semkey_main_barrier = 4,
-                                   .MMG_semkey_test_my_mpi = 5,
-                                   .MMG_semkey_test_my_mpi_barrier = 6,
-                                   .MMG_semkey_flush_sql_buffer = 7,
-                                   .MMG_semkey_construct_my_sqlite3_barrier = 8,
-                                   .MMG_semkey_close_my_sqlite3 = 9,
-                                   .MMG_semkey_close_my_sqlite3_barrier = 10,
-                                   .MMG_semkey_auto_play_barrier = 11,
-                                   .MMG_semkey_gen_db_barrier = 12,
-                                   .MMG_semkey_update_db_barrier = 13,
-                                   .MMG_semkey_add_positions_barrier = 14,
-                                   .MMG_semkey_query_positions_barrier = 15,
-                                   .MMG_semkey_fen2csv_barrier = 16};
+                                   .MMG_gen_book_barrier_semkey = 1,
+                                   .MMG_init_endgame_barrier_semkey = 2,
+                                   .MMG_gen_random_barrier_semkey = 3,
+                                   .MMG_main_barrier_semkey = 4,
+                                   .MMG_test_my_mpi_semkey = 5,
+                                   .MMG_test_my_mpi_barrier_semkey = 6,
+                                   .MMG_flush_sql_buffer_semkey = 7,
+                                   .MMG_construct_my_sqlite3_barrier_semkey = 8,
+                                   .MMG_close_my_sqlite3_semkey = 9,
+                                   .MMG_close_my_sqlite3_barrier_semkey = 10,
+                                   .MMG_auto_play_barrier_semkey = 11,
+                                   .MMG_gen_db_barrier_semkey = 12,
+                                   .MMG_update_db_barrier_semkey = 13,
+                                   .MMG_add_positions_barrier_semkey = 14,
+                                   .MMG_query_positions_barrier_semkey = 15,
+                                   .MMG_fen2csv_barrier_semkey = 16};
 
 local int my_semget(int arg_key, int arg_nsems, int arg_semflg)
 {
@@ -262,33 +262,33 @@ void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
                       &(with_my_mpi_globals->MMG_semkey_offset)) != 1)
   }
 
-  with_my_mpi_globals->MMG_semkey_gen_book_barrier +=
+  with_my_mpi_globals->MMG_gen_book_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_init_endgame_barrier +=
+  with_my_mpi_globals->MMG_init_endgame_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_gen_random_barrier +=
+  with_my_mpi_globals->MMG_gen_random_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_main_barrier +=
+  with_my_mpi_globals->MMG_main_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_test_my_mpi +=
+  with_my_mpi_globals->MMG_test_my_mpi_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_test_my_mpi_barrier +=
+  with_my_mpi_globals->MMG_test_my_mpi_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_flush_sql_buffer +=
+  with_my_mpi_globals->MMG_flush_sql_buffer_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_construct_my_sqlite3_barrier +=
+  with_my_mpi_globals->MMG_construct_my_sqlite3_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_close_my_sqlite3 +=
+  with_my_mpi_globals->MMG_close_my_sqlite3_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_close_my_sqlite3_barrier +=
+  with_my_mpi_globals->MMG_close_my_sqlite3_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_gen_db_barrier +=
+  with_my_mpi_globals->MMG_gen_db_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_update_db_barrier +=
+  with_my_mpi_globals->MMG_update_db_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_add_positions_barrier +=
+  with_my_mpi_globals->MMG_add_positions_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
-  with_my_mpi_globals->MMG_semkey_query_positions_barrier +=
+  with_my_mpi_globals->MMG_query_positions_barrier_semkey +=
     with_my_mpi_globals->MMG_semkey_offset;
 
 #ifndef SEMS_USE_SHM
@@ -330,49 +330,49 @@ void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
       HARDBUG(closedir(dir) != 0)
     }
 
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_gen_book_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_init_endgame_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_gen_random_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_main_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_test_my_mpi);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_test_my_mpi_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_flush_sql_buffer);
+    my_create_semaphore(with_my_mpi_globals->MMG_gen_book_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_init_endgame_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_gen_random_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_main_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_test_my_mpi_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_test_my_mpi_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_flush_sql_buffer_semkey);
     my_create_semaphore(
-      with_my_mpi_globals->MMG_semkey_construct_my_sqlite3_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_close_my_sqlite3);
+      with_my_mpi_globals->MMG_construct_my_sqlite3_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_close_my_sqlite3_semkey);
     my_create_semaphore(
-      with_my_mpi_globals->MMG_semkey_close_my_sqlite3_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_gen_db_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_update_db_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_add_positions_barrier);
+      with_my_mpi_globals->MMG_close_my_sqlite3_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_gen_db_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_update_db_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_add_positions_barrier_semkey);
     my_create_semaphore(
-      with_my_mpi_globals->MMG_semkey_query_positions_barrier);
-    my_create_semaphore(with_my_mpi_globals->MMG_semkey_fen2csv_barrier);
+      with_my_mpi_globals->MMG_query_positions_barrier_semkey);
+    my_create_semaphore(with_my_mpi_globals->MMG_fen2csv_barrier_semkey);
   }
 
   if (mpi_nworld > 1)
     MPI_Barrier(MPI_COMM_WORLD);
 
-  with_my_mpi_globals->MMG_comm_global = MPI_COMM_WORLD;
-  with_my_mpi_globals->MMG_comm_slaves = MPI_COMM_NULL;
+  with_my_mpi_globals->MMG_global_comm = MPI_COMM_WORLD;
+  with_my_mpi_globals->MMG_slave_comm = MPI_COMM_NULL;
 
   int slave = (mpi_id_world == 0) ? 0 : 1;
 
   MPI_Comm_split(MPI_COMM_WORLD,
                  slave,
                  mpi_id_world,
-                 &(with_my_mpi_globals->MMG_comm_slaves));
+                 &(with_my_mpi_globals->MMG_slave_comm));
 
   if (!slave)
   {
-    with_my_mpi_globals->MMG_comm_slaves = MPI_COMM_NULL;
+    with_my_mpi_globals->MMG_slave_comm = MPI_COMM_NULL;
 
-    with_my_mpi_globals->MMG_id_slave = INVALID;
+    with_my_mpi_globals->MMG_slave_id = INVALID;
   }
   else
   {
-    MPI_Comm_rank(with_my_mpi_globals->MMG_comm_slaves,
-                  &(with_my_mpi_globals->MMG_id_slave));
+    MPI_Comm_rank(with_my_mpi_globals->MMG_slave_comm,
+                  &(with_my_mpi_globals->MMG_slave_id));
   }
 
   MPI_Allreduce(&slave,
@@ -384,7 +384,7 @@ void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
 
   HARDBUG(with_my_mpi_globals->MMG_nslaves != (mpi_nworld - 1))
 
-  MPI_Comm_size(with_my_mpi_globals->MMG_comm_global,
+  MPI_Comm_size(with_my_mpi_globals->MMG_global_comm,
                 &(with_my_mpi_globals->MMG_nglobal));
 
   HARDBUG(with_my_mpi_globals->MMG_nglobal > MY_MPI_NGLOBAL_MAX)
@@ -392,46 +392,46 @@ void my_mpi_init(int *narg, char ***argv, int arg_physical_memory)
   HARDBUG(with_my_mpi_globals->MMG_nglobal !=
           (with_my_mpi_globals->MMG_nslaves + 1))
 
-  MPI_Comm_rank(with_my_mpi_globals->MMG_comm_global,
-                &(with_my_mpi_globals->MMG_id_global));
+  MPI_Comm_rank(with_my_mpi_globals->MMG_global_comm,
+                &(with_my_mpi_globals->MMG_global_id));
 
-  if (with_my_mpi_globals->MMG_id_global == 0)
+  if (with_my_mpi_globals->MMG_global_id == 0)
   {
-    HARDBUG(with_my_mpi_globals->MMG_id_slave != INVALID)
+    HARDBUG(with_my_mpi_globals->MMG_slave_id != INVALID)
   }
   else
   {
-    HARDBUG(with_my_mpi_globals->MMG_id_slave == INVALID)
+    HARDBUG(with_my_mpi_globals->MMG_slave_id == INVALID)
   }
 
   MPI_Bcast(&arg_physical_memory,
             1,
             MPI_INT,
             0,
-            with_my_mpi_globals->MMG_comm_global);
+            with_my_mpi_globals->MMG_global_comm);
 #else
   /* One local process, possibly with multiple search threads. */
   with_my_mpi_globals->MMG_init = FALSE;
   with_my_mpi_globals->MMG_nglobal = 1;
-  with_my_mpi_globals->MMG_id_global = 0;
+  with_my_mpi_globals->MMG_global_id = 0;
   with_my_mpi_globals->MMG_nslaves = 0;
-  with_my_mpi_globals->MMG_id_slave = INVALID;
-  with_my_mpi_globals->MMG_comm_global = MPI_COMM_NULL;
-  with_my_mpi_globals->MMG_comm_slaves = MPI_COMM_NULL;
+  with_my_mpi_globals->MMG_slave_id = INVALID;
+  with_my_mpi_globals->MMG_global_comm = MPI_COMM_NULL;
+  with_my_mpi_globals->MMG_slave_comm = MPI_COMM_NULL;
 #endif
 
   with_my_mpi_globals->MMG_is_master =
-    (with_my_mpi_globals->MMG_id_global <= 0);
+    (with_my_mpi_globals->MMG_global_id <= 0);
 
   with_my_mpi_globals->MMG_is_single = (with_my_mpi_globals->MMG_nglobal <= 1);
 
   with_my_mpi_globals->MMG_has_slaves = (with_my_mpi_globals->MMG_nslaves > 0);
 
   with_my_mpi_globals->MMG_is_slave =
-    (with_my_mpi_globals->MMG_id_slave != INVALID);
+    (with_my_mpi_globals->MMG_slave_id != INVALID);
 
   with_my_mpi_globals->MMG_is_lead_slave =
-    (with_my_mpi_globals->MMG_id_slave == 0);
+    (with_my_mpi_globals->MMG_slave_id == 0);
 }
 
 int my_mpi_comm_size(MPI_Comm comm, int *size)
@@ -1443,14 +1443,14 @@ void test_my_mpi(void)
   int *shared_data;
 
   my_mpi_win_allocate_shared(
-    my_mpi_globals.MMG_id_global == 0 ? SIZE * sizeof(int) : 0,
+    my_mpi_globals.MMG_global_id == 0 ? SIZE * sizeof(int) : 0,
     sizeof(int),
     MPI_INFO_NULL,
-    my_mpi_globals.MMG_comm_global,
+    my_mpi_globals.MMG_global_comm,
     &shared_data,
     &win);
 
-  my_mpi_win_fence(my_mpi_globals.MMG_comm_global, 0, win);
+  my_mpi_win_fence(my_mpi_globals.MMG_global_comm, 0, win);
 
   int disp_unit;
 
@@ -1462,47 +1462,47 @@ void test_my_mpi(void)
 
   shared_data = (int *)baseptr;
 
-  my_mpi_win_fence(my_mpi_globals.MMG_comm_global, 0, win);
+  my_mpi_win_fence(my_mpi_globals.MMG_global_comm, 0, win);
 
-  if (my_mpi_globals.MMG_id_global == 0)
+  if (my_mpi_globals.MMG_global_id == 0)
   {
     for (int i = 0; i < SIZE; i++)
       shared_data[i] = i;
   }
 
-  my_mpi_win_fence(my_mpi_globals.MMG_comm_global, 0, win);
+  my_mpi_win_fence(my_mpi_globals.MMG_global_comm, 0, win);
 
   for (int i = 0; i < SIZE; i++)
     HARDBUG(shared_data[i] != i)
 
   my_mpi_win_free(&win);
 
-  my_mpi_barrier("after sharded query", my_mpi_globals.MMG_comm_global, TRUE);
+  my_mpi_barrier("after sharded query", my_mpi_globals.MMG_global_comm, TRUE);
 
-  PRINTF("Process %d is testing semaphores..\n$", my_mpi_globals.MMG_id_global);
+  PRINTF("Process %d is testing semaphores..\n$", my_mpi_globals.MMG_global_id);
 
   for (i64_t imessage = 1; imessage <= NMESSAGES; ++imessage)
   {
     HARDBUG(compat_sleep(MILLI_SECOND) != 0)
 
-    my_mpi_acquire_semaphore_v3(my_mpi_globals.MMG_comm_global,
-                                my_mpi_globals.MMG_semkey_test_my_mpi);
+    my_mpi_acquire_semaphore_v3(my_mpi_globals.MMG_global_comm,
+                                my_mpi_globals.MMG_test_my_mpi_semkey);
 
-    PRINTF("Process %d acquired semaphore\n$", my_mpi_globals.MMG_id_global);
+    PRINTF("Process %d acquired semaphore\n$", my_mpi_globals.MMG_global_id);
 
     HARDBUG(compat_sleep(MILLI_SECOND) != 0)
 
-    my_mpi_release_semaphore_v3(my_mpi_globals.MMG_comm_global,
-                                my_mpi_globals.MMG_semkey_test_my_mpi);
+    my_mpi_release_semaphore_v3(my_mpi_globals.MMG_global_comm,
+                                my_mpi_globals.MMG_test_my_mpi_semkey);
 
-    PRINTF("Process %d released semaphore\n$", my_mpi_globals.MMG_id_global);
+    PRINTF("Process %d released semaphore\n$", my_mpi_globals.MMG_global_id);
   }
 
   // HARDBUG(compat_sleep(my_mpi_globals.MMG_id_global + MILLI_SECOND) != 0)
 
   my_mpi_barrier_v3("after semaphores",
-                    my_mpi_globals.MMG_comm_global,
-                    my_mpi_globals.MMG_semkey_test_my_mpi_barrier,
+                    my_mpi_globals.MMG_global_comm,
+                    my_mpi_globals.MMG_test_my_mpi_barrier_semkey,
                     TRUE);
 #endif
 }

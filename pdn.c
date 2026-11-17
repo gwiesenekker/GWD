@@ -726,8 +726,8 @@ void auto_play(const char *arg_txt_name, i64_t arg_npositions)
   BDESTROY(bmove_string)
 
   my_mpi_barrier_v3("after auto_play",
-                    my_mpi_globals.MMG_comm_slaves,
-                    my_mpi_globals.MMG_semkey_auto_play_barrier,
+                    my_mpi_globals.MMG_slave_comm,
+                    my_mpi_globals.MMG_auto_play_barrier_semkey,
                     TRUE);
 
   my_mpi_allreduce(MPI_IN_PLACE,
@@ -735,19 +735,19 @@ void auto_play(const char *arg_txt_name, i64_t arg_npositions)
                    1,
                    MPI_LONG_LONG_INT,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   my_mpi_allreduce(MPI_IN_PLACE,
                    &ngames_failed,
                    1,
                    MPI_LONG_LONG_INT,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   PRINTF("my_mpi_all_reduce(ngames)=%lld\n", ngames);
   PRINTF("my_mpi_all_reduce(ngames_failed)=%lld\n", ngames_failed);
 
-  my_mpi_bucket_aggregate(&bucket_result0, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_result0, my_mpi_globals.MMG_slave_comm);
 
   printf_bucket(&bucket_result0);
 }
@@ -983,8 +983,8 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
   BDESTROY(bmove_string)
 
   my_mpi_barrier_v3("after gen",
-                    my_mpi_globals.MMG_comm_slaves,
-                    my_mpi_globals.MMG_semkey_gen_db_barrier,
+                    my_mpi_globals.MMG_slave_comm,
+                    my_mpi_globals.MMG_gen_db_barrier_semkey,
                     TRUE);
 }
 
@@ -1029,13 +1029,13 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
   }
 
   my_mpi_barrier_v3("after query ids",
-                    my_mpi_globals.MMG_comm_slaves,
-                    my_mpi_globals.MMG_semkey_update_db_barrier,
+                    my_mpi_globals.MMG_slave_comm,
+                    my_mpi_globals.MMG_update_db_barrier_semkey,
                     FALSE);
 
 #ifdef USE_OPENMPI
-  if (my_mpi_globals.MMG_comm_slaves != MPI_COMM_NULL)
-    MPI_Bcast(&npositions, 1, MPI_INT64_T, 0, my_mpi_globals.MMG_comm_slaves);
+  if (my_mpi_globals.MMG_slave_comm != MPI_COMM_NULL)
+    MPI_Bcast(&npositions, 1, MPI_INT64_T, 0, my_mpi_globals.MMG_slave_comm);
 #endif
 
   PRINTF("npositions=%lld\n", npositions);
@@ -1169,7 +1169,7 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
   BDESTROY(bmove_string)
 
   my_mpi_barrier_v3("after update_db",
-                    my_mpi_globals.MMG_comm_slaves,
-                    my_mpi_globals.MMG_semkey_update_db_barrier,
+                    my_mpi_globals.MMG_slave_comm,
+                    my_mpi_globals.MMG_update_db_barrier_semkey,
                     TRUE);
 }

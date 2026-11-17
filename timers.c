@@ -176,7 +176,7 @@ void construct_progress(progress_t *arg_progress,
   else
   {
     i64_t nslaves = my_mpi_globals.MMG_nslaves;
-    i64_t id_slave = my_mpi_globals.MMG_id_slave;
+    i64_t id_slave = my_mpi_globals.MMG_slave_id;
 
     arg_progress->P_ntodo = (arg_ntotal + nslaves - 1 - id_slave) / nslaves;
 
@@ -205,7 +205,7 @@ int make_progress(progress_t *arg_progress, i64_t idone)
 {
   if ((arg_progress->P_ntotal > 0) and (idone > 0) and
       (my_mpi_globals.MMG_is_slave) and
-      ((idone % my_mpi_globals.MMG_nslaves) != my_mpi_globals.MMG_id_slave))
+      ((idone % my_mpi_globals.MMG_nslaves) != my_mpi_globals.MMG_slave_id))
     return (FALSE);
 
   arg_progress->P_ndone++;
@@ -293,7 +293,7 @@ void finalize_progress(progress_t *arg_progress)
                      1,
                      MPI_LONG_LONG_INT,
                      MPI_SUM,
-                     my_mpi_globals.MMG_comm_slaves);
+                     my_mpi_globals.MMG_slave_comm);
 
     HARDBUG(ntotal_mpi < arg_progress->P_ntotal);
 

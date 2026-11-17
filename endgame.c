@@ -54,7 +54,7 @@ void init_endgame(void)
     void *pendgame;
     MPI_Win wendgame;
 
-    my_mpi_allocate_shared(my_mpi_globals.MMG_comm_global,
+    my_mpi_allocate_shared(my_mpi_globals.MMG_global_comm,
                            sizeof(ui8_t),
                            egtb_size,
                            &pendgame,
@@ -84,7 +84,7 @@ void init_endgame(void)
                       TRUE);
     */
 
-    my_mpi_sync_shared(my_mpi_globals.MMG_comm_global, wendgame, "WDL EGTB");
+    my_mpi_sync_shared(my_mpi_globals.MMG_global_comm, wendgame, "WDL EGTB");
 
 #ifdef USE_COMPRESSED_WDL
     HARDBUG(!gwdegtb_wdl_compressed_attach(endgame_name, pendgame, egtb_size));

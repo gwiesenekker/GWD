@@ -88,7 +88,7 @@ static void test_shape(int ninputs, int noutputs)
     for (int activate = 0; activate <= 1; activate++)
     {
       dense.DNS_activate_layer0 = activate;
-      dense.DNS_activation_inputs = NETWORK_ACTIVATION_GELUV2;
+      dense.DNS_input_activation = NETWORK_ACTIVATION_GELUV2;
       dense.DNS_compute_layer0 = TRUE;
       select_kernel(&dense, FALSE);
       (void)return_dense_network_score_scaled(&dense, thread);

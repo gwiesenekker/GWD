@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
   assert(!my_mpi_globals.MMG_init);
   assert(my_mpi_globals.MMG_nglobal == 1);
-  assert(my_mpi_globals.MMG_id_global == 0);
+  assert(my_mpi_globals.MMG_global_id == 0);
   assert(my_mpi_globals.MMG_is_single && my_mpi_globals.MMG_is_master);
   assert(!my_mpi_globals.MMG_has_slaves && !my_mpi_globals.MMG_is_slave);
 

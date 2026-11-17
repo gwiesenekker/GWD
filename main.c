@@ -1756,8 +1756,8 @@ local void gen_random(const char *arg_fen_name,
   printf_bucket(&bucket_nkings);
 
   my_mpi_barrier_v3("after gen",
-                    my_mpi_globals.MMG_comm_slaves,
-                    my_mpi_globals.MMG_semkey_gen_random_barrier,
+                    my_mpi_globals.MMG_slave_comm,
+                    my_mpi_globals.MMG_gen_random_barrier_semkey,
                     TRUE);
 
   my_mpi_allreduce(MPI_IN_PLACE,
@@ -1765,25 +1765,25 @@ local void gen_random(const char *arg_fen_name,
                    1,
                    MPI_LONG_LONG_INT,
                    MPI_SUM,
-                   my_mpi_globals.MMG_comm_slaves);
+                   my_mpi_globals.MMG_slave_comm);
 
   PRINTF("iposition=%lld\n", iposition);
 
-  my_mpi_bucket_aggregate(&bucket_root_score, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_root_score, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_npieces, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_npieces, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_ndelta, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_ndelta, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nwhite_man, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nwhite_man, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nblack_man, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nblack_man, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nwhite_kings, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nwhite_kings, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nblack_kings, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nblack_kings, my_mpi_globals.MMG_slave_comm);
 
-  my_mpi_bucket_aggregate(&bucket_nkings, my_mpi_globals.MMG_comm_slaves);
+  my_mpi_bucket_aggregate(&bucket_nkings, my_mpi_globals.MMG_slave_comm);
 
   printf_bucket(&bucket_root_score);
 
@@ -3097,12 +3097,12 @@ int main(int argc, char **argv)
   PRINTF("my_mpi_globals.MMG_nslaves=%d"
          " my_mpi_globals.MMG_id_slave=%d\n",
          my_mpi_globals.MMG_nslaves,
-         my_mpi_globals.MMG_id_slave);
+         my_mpi_globals.MMG_slave_id);
 
   PRINTF("my_mpi_globals.MMG_nglobal=%d"
          " my_mpi_globals.MMG_id_global=%d\n",
          my_mpi_globals.MMG_nglobal,
-         my_mpi_globals.MMG_id_global);
+         my_mpi_globals.MMG_global_id);
 
   if ((my_mpi_globals.MMG_is_master and my_mpi_globals.MMG_has_slaves) or
       RUNNING_ON_VALGRIND)
@@ -3437,7 +3437,7 @@ int main(int argc, char **argv)
 
     my_sqlite3_t db;
 
-    construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+    construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_slave_comm);
 
     db.MSQL_verbose = 0;
 
@@ -3471,7 +3471,7 @@ int main(int argc, char **argv)
     {
       my_sqlite3_t db;
 
-      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_slave_comm);
 
       add_evaluations2book(&db, centi_seconds, arg_add_moves);
 
@@ -3506,7 +3506,7 @@ int main(int argc, char **argv)
 
     if (my_mpi_globals.MMG_is_single or my_mpi_globals.MMG_is_slave)
     {
-      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_slave_comm);
 
       expand_book(&db, fen, centi_seconds);
 
@@ -3596,7 +3596,7 @@ int main(int argc, char **argv)
     {
       my_sqlite3_t db;
 
-      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_slave_comm);
 
       gen_db(&db, mcts_depth, npositions);
 
@@ -3641,7 +3641,7 @@ int main(int argc, char **argv)
     {
       my_sqlite3_t db;
 
-      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_comm_slaves);
+      construct_my_sqlite3(&db, db_name, my_mpi_globals.MMG_slave_comm);
 
       update_db(&db, mcts_depth, frequency);
 
@@ -3940,8 +3940,8 @@ label_hub:
 
   if (my_mpi_globals.MMG_init > 0)
     my_mpi_barrier_v3("main",
-                      my_mpi_globals.MMG_comm_global,
-                      my_mpi_globals.MMG_semkey_main_barrier,
+                      my_mpi_globals.MMG_global_comm,
+                      my_mpi_globals.MMG_main_barrier_semkey,
                       TRUE);
 
   END_BLOCK

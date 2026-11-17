@@ -27,7 +27,7 @@ _Noreturn void zzzzzz(const char *arg_file,
           " code=%d\n"
           " version=%s\n",
           arg_code == 0 ? "OK" : "FATAL",
-          my_mpi_globals.MMG_id_global,
+          my_mpi_globals.MMG_global_id,
           my_mpi_globals.MMG_nglobal,
           compat_pthread_self(),
           arg_file,
@@ -56,7 +56,7 @@ _Noreturn void zzzzzz(const char *arg_file,
            " code=%d\n"
            " version=%s\n$",
            arg_code == 0 ? "OK" : "FATAL",
-           my_mpi_globals.MMG_id_global,
+           my_mpi_globals.MMG_global_id,
            my_mpi_globals.MMG_nglobal,
            compat_pthread_self(),
            arg_file,
@@ -80,7 +80,7 @@ _Noreturn void zzzzzz(const char *arg_file,
     {
       // issue when multiple processes call my_mpi_abort
 
-      my_mpi_abort(my_mpi_globals.MMG_comm_global, arg_code);
+      my_mpi_abort(my_mpi_globals.MMG_global_comm, arg_code);
     }
   }
   exit(arg_code);
