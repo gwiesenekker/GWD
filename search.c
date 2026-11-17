@@ -143,6 +143,7 @@
 #undef CHECK_TIME_LIMIT_IN_QUIESCENCE
 
 #define UPDATE_NODES 1000
+#define HUB_WDL_CLOCK_SECONDS 1.0
 
 #define NABCS_MOVES 2
 #define NABCS_SLOTS 4
@@ -3440,7 +3441,9 @@ void do_pv(search_t *arg_with_search,
     return;
   }
 
-  int temp_mate = read_endgame(arg_with_search, NULL);
+  // A displayed PV must not open DTM files on the playing clock.
+  int temp_mate = (hub_search_time_left >= 0.0) ? ENDGAME_UNKNOWN :
+                  read_endgame(arg_with_search, NULL);
 
   if (temp_mate != ENDGAME_UNKNOWN)
   {
@@ -3743,7 +3746,10 @@ void do_search(search_t *arg_with_search,
 
   // check for known endgame
 
-  int egtb_mate = read_endgame(arg_with_search, NULL);
+  // Under a short Hub clock use the ordinary WDL-aware root search.
+  int short_clock = ((hub_search_time_left >= 0.0) and
+                     (hub_search_time_left <= HUB_WDL_CLOCK_SECONDS));
+  int egtb_mate = short_clock ? ENDGAME_UNKNOWN : read_endgame(arg_with_search, NULL);
 
   if (egtb_mate != ENDGAME_UNKNOWN)
   {
@@ -3867,7 +3873,7 @@ void do_search(search_t *arg_with_search,
                          bdata(bmove_string)) == BSTR_ERR)
       }
 
-      if (your_mate != INVALID)
+      if ((your_mate != INVALID) and (hub_search_time_left < 0.0))
       {
         do_move(&(arg_with_search->S_board), sort.S_array[0], arg_moves_list);
 

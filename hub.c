@@ -4,6 +4,9 @@
 #define NARGS_MAX 256
 #define HUB_TIME_RESERVE 0.050 // seconds for getting the move back to the GUI
 
+// A negative value means the current Hub search has no playing clock.
+double hub_search_time_left = -1.0;
+
 // Negative means an ordinary search, zero waits for a hit, positive starts the move clock.
 local _Atomic double ponder_start = -1.0;
 
@@ -247,6 +250,7 @@ void hub(void)
   construct_time_control(&time_control);
   hub_level_t level;
   int clock_active = FALSE;
+  int fixed_move_time = TRUE;
   int level_pending = FALSE;
   int move_played = FALSE;
   hash_key_t last_key = 0;
@@ -283,6 +287,7 @@ void hub(void)
     {
       construct_time_control(&time_control);
       clock_active = FALSE;
+      fixed_move_time = TRUE;
       level_pending = FALSE;
       move_played = FALSE;
       level_depth = INVALID;
@@ -387,6 +392,7 @@ void hub(void)
         if (compat_strcasecmp(name, "depth") == 0)
         {
           clock_active = FALSE;
+          fixed_move_time = FALSE;
           HARDBUG(value == NULL)
 
           int d;
@@ -405,6 +411,7 @@ void hub(void)
         else if (compat_strcasecmp(name, "move-time") == 0)
         {
           clock_active = FALSE;
+          fixed_move_time = TRUE;
           HARDBUG(value == NULL)
 
           double t;
@@ -428,6 +435,7 @@ void hub(void)
         {
           level_depth = INVALID;
           read_clock_level(&command, &level);
+          fixed_move_time = FALSE;
           clock_active = TRUE;
           level_pending = is_configured_time_control(&time_control);
           if (!level_pending)
@@ -438,6 +446,7 @@ void hub(void)
         {
           clock_active = FALSE;
           level_depth = INVALID;
+          fixed_move_time = FALSE;
           PRINTF("found infinite\n");
 
           options.time_limit = 10000.0;
@@ -463,6 +472,9 @@ void hub(void)
 
       int clock_think = (compat_strcasecmp(name, "think") == 0) and clock_active;
       int pondering = (compat_strcasecmp(name, "ponder") == 0);
+      hub_search_time_left = -1.0;
+      if (fixed_move_time and ((compat_strcasecmp(name, "think") == 0) or pondering))
+        hub_search_time_left = options.time_limit;
       time_control_t ponder_control;
       if (clock_think or (pondering and clock_active))
       {
@@ -481,6 +493,7 @@ void hub(void)
           if (!pondering)
             level_pending = FALSE;
         }
+        hub_search_time_left = return_time_left(control);
         set_time_limit(control, HUB_TIME_RESERVE);
         PRINTF("hub clock imove=%d moves_left=%d time=%.3f limit=%.6f\n",
                return_moves_done(control), return_moves_left(control),
