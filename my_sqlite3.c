@@ -1,14 +1,23 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-#define NRETRIES 1000000
+enum
+{
+  NRETRIES = 1000000,
+  NTRIES_MAX = 10
+};
 
-#define NTRIES_MAX 10
+enum
+{
+  NSQL_BUFFER = (MBYTE)
+};
 
-#define NSQL_BUFFER (MBYTE)
 #define SPLIT_SQL_BUFFER
 
-#define SQL_PRINTF_WIDTH 1024
+enum
+{
+  SQL_PRINTF_WIDTH = 1024
+};
 
 const char *my_sqlite3_errmsg(sqlite3 *arg_db)
 {
@@ -812,8 +821,11 @@ void close_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3)
 
 #define TEST_DB "test.db"
 
-#define NTEST_POSITIONS 1000
-#define NTEST_MOVES 100
+enum
+{
+  NTEST_POSITIONS = 1000,
+  NTEST_MOVES = 100
+};
 
 void test_dbase(void)
 {

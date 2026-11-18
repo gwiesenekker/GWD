@@ -1,12 +1,18 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-#define NPAD (4 * 64)
+enum
+{
+  NPAD = (4 * 64)
+};
 
 _Static_assert(NPAD % 64 == 0,
                "allocation prefix must preserve 64-byte alignment");
 
-#define NMY_NAMES_MAX 1024
+enum
+{
+  NMY_NAMES_MAX = 1024
+};
 
 typedef struct
 {

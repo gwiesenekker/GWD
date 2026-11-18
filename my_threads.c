@@ -1,8 +1,11 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-#define THREAD_ALPHA_BETA_MASTER 0
-#define THREAD_ALPHA_BETA_SLAVE 1
+enum
+{
+  THREAD_ALPHA_BETA_MASTER = 0,
+  THREAD_ALPHA_BETA_SLAVE = 1
+};
 
 thread_t threads[NTHREADS_MAX];
 
@@ -841,7 +844,10 @@ void join_threads(void)
   PRINTF("total idle time=%.2f seconds\n", idle);
 }
 
-#define NTEST 4
+enum
+{
+  NTEST = 4
+};
 
 void test_threads(void)
 {

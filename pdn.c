@@ -8,14 +8,20 @@
 #define RESULT_LOST "0-1"
 #define RESULT_UNKNOWN "*"
 
-#define TOKEN_SKIP 0
-#define TOKEN_MOVE 1
-#define TOKEN_WON 2
-#define TOKEN_DRAW 3
-#define TOKEN_LOST 4
-#define TOKEN_UNKNOWN 5
+enum
+{
+  TOKEN_SKIP = 0,
+  TOKEN_MOVE = 1,
+  TOKEN_WON = 2,
+  TOKEN_DRAW = 3,
+  TOKEN_LOST = 4,
+  TOKEN_UNKNOWN = 5
+};
 
-#define NPLY_PAUSE 10
+enum
+{
+  NPLY_PAUSE = 10
+};
 
 local int
 get_next_token(const_bstring arg_bstring, int *arg_ichar, bstring arg_btoken)

@@ -73,7 +73,10 @@ _Static_assert((sizeof(i64_t) == 8) && (sizeof(ui64_t) == 8),
 #define USE_HARDWARE_CRC32
 #define USE_HARDWARE_RAND
 
-#define NODE_MAX 1024
+enum
+{
+  NODE_MAX = 1024
+};
 
 #define CJSON_PRAGMA_ID "pragma"
 #define CJSON_PARAMETERS_ID "parameters"

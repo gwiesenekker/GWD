@@ -5,8 +5,11 @@
 
 #define BLOCK_LENGTH 1024
 
-#define COMPRESSED_VERSION 1
-#define ZSTD_LEVEL 9
+enum
+{
+  COMPRESSED_VERSION = 1,
+  ZSTD_LEVEL = 9
+};
 
 #if ((BLOCK_LENGTH % 8) != 0)
 #error "BLOCK_LENGTH must be a multiple of 8"

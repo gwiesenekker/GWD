@@ -2,7 +2,10 @@
 #ifndef MovesH
 #define MovesH
 
-#define NMOVES_MAX 128
+enum
+{
+  NMOVES_MAX = 128
+};
 
 #define MOVE_DO_NOT_REDUCE_BIT BIT(0)
 #define MOVE_EXTEND_IN_QUIESCENCE_BIT BIT(1)

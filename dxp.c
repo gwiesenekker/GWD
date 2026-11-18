@@ -3,22 +3,33 @@
 
 #define SA struct sockaddr
 
-#define DXP_GAMEREQ 'R'
-#define DXP_FISCHER 'F'
-#define DXP_GAMEACC 'A'
-#define DXP_MOVE 'M'
-#define DXP_GAMEEND 'E'
-#define DXP_CHAT 'C'
-#define DXP_BACKREQ '?'
-#define DXP_BACKACC '?'
+enum
+{
+  DXP_GAMEREQ = 'R',
+  DXP_FISCHER = 'F',
+  DXP_GAMEACC = 'A',
+  DXP_MOVE = 'M',
+  DXP_GAMEEND = 'E',
+  DXP_CHAT = 'C',
+  DXP_BACKREQ = '?',
+  DXP_BACKACC = '?'
+};
 
-#define DXP_UNKNOWN '0'
-#define DXP_IGIVEUP '1'
-#define DXP_DRAW '2'
-#define DXP_IWIN '3'
+enum
+{
+  DXP_UNKNOWN = '0',
+  DXP_IGIVEUP = '1',
+  DXP_DRAW = '2',
+  DXP_IWIN = '3'
+};
 
-#define MARGIN 5
-#define DXP_TIME_RESERVE 0.050 // seconds for returning the move to the opponent
+enum
+{
+  MARGIN = 5
+};
+
+// seconds for returning the move to the opponent
+local const double DXP_TIME_RESERVE = 0.050;
 
 typedef struct
 {

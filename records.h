@@ -2,9 +2,12 @@
 #ifndef RecordsH
 #define RecordsH
 
-#define FIELD_TYPE_INT 0
-#define FIELD_TYPE_STRING 1
-#define FIELD_TYPE_ARRAY 2
+enum
+{
+  FIELD_TYPE_INT = 0,
+  FIELD_TYPE_STRING = 1,
+  FIELD_TYPE_ARRAY = 2
+};
 
 typedef struct record
 {

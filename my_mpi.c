@@ -14,7 +14,10 @@
 
 #define SEMKEYS_DIR "semkeys"
 
-#define NMY_SEMKEYS 20
+enum
+{
+  NMY_SEMKEYS = 20
+};
 
 enum
 {
@@ -32,10 +35,13 @@ typedef struct
   int MS_val[NSEMS];
 } my_semkey_t;
 
-#define TAG_REQUEST_LOCK 1
-#define TAG_LOCK_GRANTED 2
-#define TAG_RELEASE_LOCK 3
-#define TAG_FLUSH_LOCK 4
+enum
+{
+  TAG_REQUEST_LOCK = 1,
+  TAG_LOCK_GRANTED = 2,
+  TAG_RELEASE_LOCK = 3,
+  TAG_FLUSH_LOCK = 4
+};
 
 const char *const tag2string[] = {"TAG_INVALID",
                                   "TAG_REQUEST_LOCK",
@@ -699,7 +705,10 @@ void my_mpi_barrier(const char *arg_info, MPI_Comm arg_comm, int arg_verbose)
 #endif
 }
 
-#define NTRIES_LIMIT 10000
+enum
+{
+  NTRIES_LIMIT = 10000
+};
 
 void my_mpi_acquire_semaphore(MPI_Comm arg_comm, MPI_Win arg_win)
 {
@@ -941,7 +950,10 @@ void my_mpi_flush_semaphore_v2(MPI_Comm arg_comm)
 #endif
 }
 
-#define LENGTH_MAX (2 * MY_MPI_NGLOBAL_MAX)
+enum
+{
+  LENGTH_MAX = (2 * MY_MPI_NGLOBAL_MAX)
+};
 
 void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
 {
@@ -1433,9 +1445,15 @@ void my_mpi_barrier_v3(const char *arg_info,
 #endif
 }
 
-#define SIZE 1024
+enum
+{
+  SIZE = 1024
+};
 
-#define NMESSAGES 10
+enum
+{
+  NMESSAGES = 10
+};
 
 void test_my_mpi(void)
 {

@@ -535,7 +535,10 @@ void *reset_state(state_t *arg_with_state)
   return (arg_with_state->S_current);
 }
 
-#define NTEST 1000
+enum
+{
+  NTEST = 1000
+};
 
 void test_states(void)
 {

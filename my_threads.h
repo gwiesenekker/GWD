@@ -3,7 +3,10 @@
 #define ThreadsH
 #include <stdatomic.h>
 
-#define NTHREADS_MAX 64
+enum
+{
+  NTHREADS_MAX = 64
+};
 
 typedef struct
 {

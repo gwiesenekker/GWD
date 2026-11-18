@@ -145,7 +145,10 @@ int dequeue(queue_t *arg_with_queue, message_t *arg_message)
   return (result);
 }
 
-#define NTEST 4
+enum
+{
+  NTEST = 4
+};
 
 void test_queues(void)
 {

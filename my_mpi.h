@@ -2,7 +2,10 @@
 #ifndef MpiH
 #define MpiH
 
-#define MY_MPI_NGLOBAL_MAX 128
+enum
+{
+  MY_MPI_NGLOBAL_MAX = 128
+};
 
 #ifdef USE_OPENMPI
 

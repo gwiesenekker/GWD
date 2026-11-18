@@ -2,11 +2,14 @@
 #ifndef SortH
 #define SortH
 
-#define HISTORY_NFIELDS 64
-// History scores saturate at +/- HISTORY_MAX.
-#define HISTORY_MAX 16384
-// Cap each depth-based bonus/malus: at most 1/16 towards either limit.
-#define HISTORY_BONUS_MAX 1024
+enum
+{
+  HISTORY_NFIELDS = 64,
+  // History scores saturate at +/- HISTORY_MAX.
+  HISTORY_MAX = 16384,
+  // Cap each depth-based bonus/malus: at most 1/16 towards either limit.
+  HISTORY_BONUS_MAX = 1024
+};
 
 typedef struct
 {

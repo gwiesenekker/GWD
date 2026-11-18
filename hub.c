@@ -1,10 +1,15 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-#define NARGS_MAX 256
-#define HUB_TIME_RESERVE 0.050 // seconds for getting the move back to the GUI
+enum
+{
+  NARGS_MAX = 256
+};
 
-#define HUB_WDL_CLOCK_SECONDS 1.0
+// seconds for getting the move back to the GUI
+local const double HUB_TIME_RESERVE = 0.050;
+
+local const double HUB_WDL_CLOCK_SECONDS = 1.0;
 
 // Negative means an ordinary search, zero waits for a hit, positive starts the
 // move clock.

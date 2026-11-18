@@ -90,7 +90,10 @@ void my_stats_aggregate(stats_t *arg_with_stats, MPI_Comm arg_comm)
                    arg_comm);
 }
 
-#define N 100000
+enum
+{
+  N = 100000
+};
 
 void test_stats(void)
 {

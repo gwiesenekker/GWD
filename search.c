@@ -2,8 +2,11 @@
 #include "globals.h"
 #include <stdatomic.h>
 
-#define NPASS_REDUCED_SEARCH 1
-#define NPASS_PV_SEARCH 1
+enum
+{
+  NPASS_REDUCED_SEARCH = 1,
+  NPASS_PV_SEARCH = 1
+};
 
 #define USE_SPLITMIX64
 
@@ -142,10 +145,16 @@
 
 #undef CHECK_TIME_LIMIT_IN_QUIESCENCE
 
-#define UPDATE_NODES 1000
+enum
+{
+  UPDATE_NODES = 1000
+};
 
-#define NABCS_MOVES 2
-#define NABCS_SLOTS 4
+enum
+{
+  NABCS_MOVES = 2,
+  NABCS_SLOTS = 4
+};
 
 typedef struct
 {

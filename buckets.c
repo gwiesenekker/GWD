@@ -230,7 +230,10 @@ void my_mpi_bucket_aggregate(bucket_t *arg_with_bucket, MPI_Comm arg_comm)
                    arg_comm);
 }
 
-#define NTEST 1000000
+enum
+{
+  NTEST = 1000000
+};
 
 void test_buckets(void)
 {

@@ -2,10 +2,16 @@
 #ifndef SearchH
 #define SearchH
 
-#define DEPTH_MAX 127
+enum
+{
+  DEPTH_MAX = 127
+};
 
-#define NPV_SLOTS 4
-#define NPV_ENTRIES 64
+enum
+{
+  NPV_SLOTS = 4,
+  NPV_ENTRIES = 64
+};
 
 _Static_assert((NPV_ENTRIES > 0) and ((NPV_ENTRIES & (NPV_ENTRIES - 1)) == 0),
                "PV entry count must be a power of two");
@@ -16,8 +22,11 @@ _Static_assert((NPV_ENTRIES > 0) and ((NPV_ENTRIES & (NPV_ENTRIES - 1)) == 0),
 #define IS_MINIMAL_WINDOW(X) ((X) & MINIMAL_WINDOW_BIT)
 #define IS_PV(X) ((X) & PV_BIT)
 
-#define SEARCH_BEST_SCORE_EGTB 0
-#define SEARCH_BEST_SCORE_AB 1
+enum
+{
+  SEARCH_BEST_SCORE_EGTB = 0,
+  SEARCH_BEST_SCORE_AB = 1
+};
 
 #define SR_NULL 0
 #define SR_DRAW_BY_REP_BIT BIT(0)

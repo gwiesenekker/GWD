@@ -5,7 +5,10 @@
 #define MCTS_THRESHOLD_LOST (-2 * SCORE_MAN)
 #define MCTS_THRESHOLD_WON (2 * SCORE_MAN)
 
-#define MCTS_PLY_MAX 150
+enum
+{
+  MCTS_PLY_MAX = 150
+};
 
 typedef struct
 {

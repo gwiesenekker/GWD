@@ -1,10 +1,16 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-#define NPOSITIONS_MAX 100000000
+enum
+{
+  NPOSITIONS_MAX = 100000000
+};
 
-#define EXPANSION_NMOVES 2
-#define EXPANSION_EVALUATION (SCORE_MAN / 4)
+enum
+{
+  EXPANSION_NMOVES = 2,
+  EXPANSION_EVALUATION = (SCORE_MAN / 4)
+};
 
 local my_random_t book_random;
 

@@ -2,8 +2,11 @@
 #ifndef BoardsH
 #define BoardsH
 
-#define BOARD_MAX 66
-#define NPIECES_MAX 20
+enum
+{
+  BOARD_MAX = 66,
+  NPIECES_MAX = 20
+};
 
 #define wO_hub "w"
 #define wX_hub "W"

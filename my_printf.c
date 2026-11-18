@@ -4,11 +4,12 @@
 #define LOG_PREFIX_ID "LOG_prefix_id"
 #define LOG_OBJECT_ID "LOG_object_id"
 
-#define NLOGS 2
-
-#define NROTATE 9
-
-#define MAX_SIZE (4 * MBYTE)
+enum
+{
+  NLOGS = 2,
+  NROTATE = 9,
+  MAX_SIZE = (4 * MBYTE)
+};
 
 #define LOGS_DIR "logs"
 #define WINEPREFIX "WINEPREFIX"
@@ -420,8 +421,11 @@ void init_my_printf(void)
   HARDBUG(compat_mutex_init(&MP_mutex) != 0)
 }
 
-#define NTEST 4
-#define NLINES 1000
+enum
+{
+  NTEST = 4,
+  NLINES = 1000
+};
 
 void test_my_printf(void)
 {

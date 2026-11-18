@@ -4,9 +4,13 @@
 #define GWD_JSON "gwd.json"
 #define OVERRIDES_JSON "overrides.json"
 
-#define NMAN_MIN 4
-#define PROBABILITY_EQUAL 0.5
-#define NPIECES_MIN 7
+enum
+{
+  NMAN_MIN = 4,
+  NPIECES_MIN = 7
+};
+
+local const double PROBABILITY_EQUAL = 0.5;
 
 void *STDOUT;
 
@@ -441,7 +445,10 @@ local char *secs2string(int arg_seconds, bstring arg_string)
   return (bdata(arg_string));
 }
 
-#define GAME_MOVES 40
+enum
+{
+  GAME_MOVES = 40
+};
 
 void play_game(const char *arg_name,
                const char *arg_colour,

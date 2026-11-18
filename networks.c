@@ -93,8 +93,11 @@ local void init_base3_table(void)
   }
 }
 
-#define BASE3_PATTERN_BITS 16
-#define BASE3_MASK_TABLE_SIZE (1u << BASE3_PATTERN_BITS)
+enum
+{
+  BASE3_PATTERN_BITS = 16,
+  BASE3_MASK_TABLE_SIZE = (1u << BASE3_PATTERN_BITS)
+};
 
 local uint32_t base3_mask_table[BASE3_MASK_TABLE_SIZE];
 
@@ -4154,9 +4157,12 @@ local double gelu(double arg_input)
   return (0.5 * arg_input * (1.0 + erf(arg_input / sqrt(2.0))));
 }
 
-#define SCALE 1000
-#define XMAX 5
-#define N 8
+enum
+{
+  SCALE = 1000,
+  XMAX = 5,
+  N = 8
+};
 
 void test_networks(void)
 {

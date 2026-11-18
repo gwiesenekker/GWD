@@ -2,9 +2,12 @@
 #ifndef CachesH
 #define CachesH
 
-#define CACHE_ENTRY_KEY_TYPE_UI32_T 1
-#define CACHE_ENTRY_KEY_TYPE_I64_T 2
-#define CACHE_ENTRY_KEY_TYPE_UI64_T 3
+enum
+{
+  CACHE_ENTRY_KEY_TYPE_UI32_T = 1,
+  CACHE_ENTRY_KEY_TYPE_I64_T = 2,
+  CACHE_ENTRY_KEY_TYPE_UI64_T = 3
+};
 
 typedef struct
 {

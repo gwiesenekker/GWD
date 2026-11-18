@@ -2,8 +2,11 @@
 #ifndef BucketsH
 #define BucketsH
 
-#define BUCKET_LINEAR 1
-#define BUCKET_LOG 2
+enum
+{
+  BUCKET_LINEAR = 1,
+  BUCKET_LOG = 2
+};
 
 typedef struct
 {

@@ -1,8 +1,11 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-#define MY_TIMER_STOPPED 0
-#define MY_TIMER_STARTED 1
+enum
+{
+  MY_TIMER_STOPPED = 0,
+  MY_TIMER_STARTED = 1
+};
 
 void construct_my_timer(my_timer_t *arg_with_my_timer,
                         const char *arg_name,
@@ -443,7 +446,10 @@ geometric_weights(int arg_first_move, int arg_nweights, double *arg_weights)
   return (weight_left);
 }
 
-#define ROLLING_GAME_MOVES 40
+enum
+{
+  ROLLING_GAME_MOVES = 40
+};
 
 local void allocate_game_time(time_control_t *arg_with_time_control)
 {
@@ -722,8 +728,11 @@ local double burn_cpu(double arg_duration)
   return (sum);
 }
 
-#define NTEST 4
-#define NSECONDS 5
+enum
+{
+  NTEST = 4,
+  NSECONDS = 5
+};
 
 void test_my_timers(void)
 {

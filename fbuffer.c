@@ -1,7 +1,10 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-#define NFBUFFER (4 * MBYTE)
+enum
+{
+  NFBUFFER = (4 * MBYTE)
+};
 
 void flush_fbuffer(fbuffer_t *arg_with_fbuffer, int arg_nfbuffer)
 {

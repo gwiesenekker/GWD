@@ -4,7 +4,10 @@
 
 #define USE_COMPRESSED_WDL
 
-#define ENDGAME_UNKNOWN 32767
+enum
+{
+  ENDGAME_UNKNOWN = 32767
+};
 
 extern GwdegtbWdlProbe *wdl_probe_alpha_beta_master;
 

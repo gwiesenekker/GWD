@@ -4,9 +4,15 @@
 
 // options
 
-#define GAME_MODE 1
+enum
+{
+  GAME_MODE = 1
+};
 
-#define NTROUBLE_MAX 1024
+enum
+{
+  NTROUBLE_MAX = 1024
+};
 
 typedef struct
 {
