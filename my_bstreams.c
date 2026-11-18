@@ -34,7 +34,12 @@ int my_bstream_readln(my_bstream_t *arg_with_my_bstream, int arg_remove_newline)
   HARDBUG(ferror(arg_with_my_bstream->BS_file))
 
   if (result != BSTR_OK)
+  {
+    // BSTR_ERR is also the normal end-of-stream result.
+    HARDBUG(bseof(arg_with_my_bstream->BS_bfile) != TRUE)
+
     return (result);
+  }
 
   if (arg_remove_newline)
     HARDBUG(bfindreplace(arg_with_my_bstream->BS_bline,

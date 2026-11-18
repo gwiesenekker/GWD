@@ -426,18 +426,18 @@ void board2fen(const board_t *arg_with_board,
 
   HARDBUG(bassigncstr(bbfen, ":B") == BSTR_ERR)
 
-  btrunc(arg_bfen, 0);
+  HARDBUG(btrunc(arg_bfen, 0) == BSTR_ERR)
 
   int wcomma = FALSE;
   int bcomma = FALSE;
 
   if (arg_brackets)
-    bcatcstr(arg_bfen, "[FEN \"");
+    HARDBUG(bcatcstr(arg_bfen, "[FEN \"") == BSTR_ERR)
 
   if (IS_WHITE(arg_with_board->B_colour2move))
-    bcatcstr(arg_bfen, "W");
+    HARDBUG(bcatcstr(arg_bfen, "W") == BSTR_ERR)
   else
-    bcatcstr(arg_bfen, "B");
+    HARDBUG(bcatcstr(arg_bfen, "B") == BSTR_ERR)
 
   ui64_t white_bb =
     arg_with_board->B_white_men_bb | arg_with_board->B_white_kings_bb;
@@ -452,34 +452,34 @@ void board2fen(const board_t *arg_with_board,
     if (white_bb & BITULL(ifield))
     {
       if (wcomma)
-        bcatcstr(bwfen, ",");
+        HARDBUG(bcatcstr(bwfen, ",") == BSTR_ERR)
 
       if (arg_with_board->B_white_kings_bb & BITULL(ifield))
-        bcatcstr(bwfen, "K");
+        HARDBUG(bcatcstr(bwfen, "K") == BSTR_ERR)
 
-      bcatcstr(bwfen, nota[ifield]);
+      HARDBUG(bcatcstr(bwfen, nota[ifield]) == BSTR_ERR)
 
       wcomma = TRUE;
     }
     else if (black_bb & BITULL(ifield))
     {
       if (bcomma)
-        bcatcstr(bbfen, ",");
+        HARDBUG(bcatcstr(bbfen, ",") == BSTR_ERR)
 
       if (arg_with_board->B_black_kings_bb & BITULL(ifield))
-        bcatcstr(bbfen, "K");
+        HARDBUG(bcatcstr(bbfen, "K") == BSTR_ERR)
 
-      bcatcstr(bbfen, nota[ifield]);
+      HARDBUG(bcatcstr(bbfen, nota[ifield]) == BSTR_ERR)
 
       bcomma = TRUE;
     }
   }
 
-  bconcat(arg_bfen, bwfen);
-  bconcat(arg_bfen, bbfen);
+  HARDBUG(bconcat(arg_bfen, bwfen) == BSTR_ERR)
+  HARDBUG(bconcat(arg_bfen, bbfen) == BSTR_ERR)
 
   if (arg_brackets)
-    bcatcstr(arg_bfen, ".\"]");
+    HARDBUG(bcatcstr(arg_bfen, ".\"]") == BSTR_ERR)
 
   BDESTROY(bbfen)
 

@@ -8,17 +8,23 @@
 #undef secs2string
 #undef play_game
 #include <assert.h>
+#include <sys/wait.h>
 
 void *STDOUT;
 int zzzzzz_invocation;
 options_t options;
 my_mpi_globals_t my_mpi_globals;
+
+static const char *expected_error;
 void zzzzzz(const char *arg_file,
             const char *arg_func,
             long arg_line,
             const char *arg_message,
             int arg_code)
 {
+  if (expected_error != NULL)
+    _exit(strcmp(arg_message, expected_error) == 0 ? 71 : 72);
+
   fprintf(stderr, "%s:%ld %s: %s\n", arg_file, arg_line, arg_func, arg_message);
   exit(arg_code);
 }
@@ -73,6 +79,82 @@ int main(int argc, char **argv)
   assert(bdata(line)[blength(line)] == '\0');
   assert(!ferror(file));
   assert(fclose(file) == 0);
+
+  /* Stream errors must not be mistaken for EOF; a final unterminated line
+   * and repeated EOF reads remain valid. */
+  BSTRING(bpath)
+
+  HARDBUG(bassignformat(bpath, "%s/stream.txt", argv[1]) == BSTR_ERR)
+
+  file = fopen(bdata(bpath), "w");
+
+  assert(file != NULL);
+  assert(fwrite(bdata(expected), 1, blength(expected), file) ==
+         (size_t)blength(expected));
+  assert(fputs("last line", file) >= 0);
+  assert(fclose(file) == 0);
+
+  my_bstream_t stream;
+
+  construct_my_bstream(&stream, bdata(bpath));
+
+  for (int ifailure = 0; ifailure < 2; ifailure++)
+  {
+    pid_t child = fork();
+
+    assert(child >= 0);
+
+    if (child == 0)
+    {
+      if (ifailure == 0)
+      {
+        expected_error = "bseof(arg_with_my_bstream->BS_bfile) != TRUE";
+        bwriteprotect(*stream.BS_bline);
+        my_bstream_readln(&stream, FALSE);
+      }
+      else
+      {
+        board_t board = {0};
+
+        board.B_colour2move = WHITE_ENUM;
+        expected_error = "btrunc(arg_bfen, 0) == BSTR_ERR";
+        bwriteprotect(*line);
+        board2fen(&board, line, FALSE);
+      }
+
+      _exit(0);
+    }
+
+    int status;
+
+    assert(waitpid(child, &status, 0) == child);
+    assert(WIFEXITED(status) and (WEXITSTATUS(status) == 71));
+  }
+
+  assert(my_bstream_readln(&stream, TRUE) == BSTR_OK);
+  assert(blength(stream.BS_bline) == blength(expected) - 1);
+  assert(memcmp(bdata(stream.BS_bline),
+                bdata(expected),
+                blength(stream.BS_bline)) == 0);
+  assert(my_bstream_readln(&stream, FALSE) == BSTR_OK);
+  assert(biseqcstr(stream.BS_bline, "last line"));
+  assert(my_bstream_readln(&stream, FALSE) == BSTR_ERR);
+  assert(my_bstream_readln(&stream, FALSE) == BSTR_ERR);
+
+  destroy_my_bstream(&stream);
+
+  file = fopen(bdata(bpath), "w");
+
+  assert(file != NULL);
+  assert(fclose(file) == 0);
+
+  construct_my_bstream(&stream, bdata(bpath));
+
+  assert(my_bstream_readln(&stream, FALSE) == BSTR_ERR);
+
+  destroy_my_bstream(&stream);
+
+  BDESTROY(bpath)
 
   /* A fragmented Hub line must survive nonblocking polls without truncation. */
   int pipes[2];
@@ -164,7 +246,8 @@ int main(int argc, char **argv)
 
   assert(print_all_name_stacks() == 0);
 
-  puts("Bstring I/O tests passed: long lines, append, EOF, Hub fragments and "
+  puts("Bstring I/O tests passed: long lines, append, EOF, rejected writes, "
+       "Hub fragments and "
        "DXP framing");
 
   return (0);

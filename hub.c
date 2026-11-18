@@ -350,7 +350,7 @@ void hub(void)
 
         BSTRING(bseparator)
 
-        bassigncstr(bseparator, " ");
+        HARDBUG(bassigncstr(bseparator, " ") == BSTR_ERR)
 
         BSTRING(bmoves)
 

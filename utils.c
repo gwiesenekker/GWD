@@ -252,6 +252,7 @@ void file2bstring(const char *arg_name, bstring arg_bstring)
     ;
 
   HARDBUG(ferror(farg_name))
+  HARDBUG(bseof(barg_name) != TRUE)
   HARDBUG(bsclose(barg_name) == NULL)
 
   FCLOSE(farg_name)

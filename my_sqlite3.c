@@ -599,7 +599,7 @@ void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int arg_nsql_buffer)
 #ifdef SPLIT_SQL_BUFFER
     BSTRING(bseparator)
 
-    bassigncstr(bseparator, ";");
+    HARDBUG(bassigncstr(bseparator, ";") == BSTR_ERR)
 
     struct bstrList *bsql;
 

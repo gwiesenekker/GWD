@@ -6,7 +6,7 @@ echo "Test artifacts: $build_dir"
 "${CC:-clang}" -std=c11 -O1 -g -DDEBUG -D_GNU_SOURCE \
   -ffunction-sections -fdata-sections -fno-omit-frame-pointer \
   -I. -I"${COMPAT_DIR:-../compat}" -I"${EGTB_INCLUDE:-../endgame7}" \
-  -fsanitize=address,undefined tests/test_bstring_io.c my_bstreams.c bstrlib.c records.c cJSON.c \
+  -fsanitize=address,undefined tests/test_bstring_io.c my_bstreams.c bstrlib.c boards.c records.c cJSON.c \
   "${COMPAT_DIR:-../compat}/compat.c" \
   -Wl,--gc-sections -lm -pthread -o "$build_dir/test"
 ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 "$build_dir/test" "$build_dir"

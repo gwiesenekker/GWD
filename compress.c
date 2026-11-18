@@ -337,7 +337,7 @@ local void compress_file(bstring arg_bwdl)
 
   BSTRING(bname_zstd)
 
-  bformata(bname_zstd, "%s.zstd", bdata(arg_bwdl));
+  HARDBUG(bformata(bname_zstd, "%s.zstd", bdata(arg_bwdl)) == BSTR_ERR)
 
   PRINTF("bname_zstd=%s\n", bdata(bname_zstd));
 

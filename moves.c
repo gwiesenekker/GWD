@@ -881,7 +881,7 @@ void move2bstring(const moves_list_t *arg_with_moves_list,
   int ifield = move->M_move_from;
   int kfield = move->M_move_to;
 
-  btrunc(arg_bmove_string, 0);
+  HARDBUG(btrunc(arg_bmove_string, 0) == BSTR_ERR)
 
   ui64_t captures_bb = move->M_captures_bb;
 
@@ -915,7 +915,7 @@ local int move2ints(const_bstring arg_bmove, int arg_fields[50])
 {
   BSTRING(bseparators)
 
-  bassigncstr(bseparators, "-x");
+  HARDBUG(bassigncstr(bseparators, "-x") == BSTR_ERR)
 
   struct bstrList *btokens;
 

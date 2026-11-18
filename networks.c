@@ -566,13 +566,16 @@ local void construct_dense_network_shared(network_t *arg_network,
 
     if (arg_prefix == NULL)
     {
-      bformata(bweights, "dense%d_weights.csv", idense);
-      bformata(bbias, "dense%d_bias.csv", idense);
+      HARDBUG(bformata(bweights, "dense%d_weights.csv", idense) == BSTR_ERR)
+      HARDBUG(bformata(bbias, "dense%d_bias.csv", idense) == BSTR_ERR)
     }
     else
     {
-      bformata(bweights, "%s_dense%d_weights.csv", arg_prefix, idense);
-      bformata(bbias, "%s_dense%d_bias.csv", arg_prefix, idense);
+      HARDBUG(
+        bformata(bweights, "%s_dense%d_weights.csv", arg_prefix, idense) ==
+        BSTR_ERR)
+      HARDBUG(bformata(bbias, "%s_dense%d_bias.csv", arg_prefix, idense) ==
+              BSTR_ERR)
     }
 
     cJSON *file = open_cjson_file(arg_directory, bdata(bweights));
@@ -730,7 +733,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   char *svalue = cJSON_GetStringValue(value_cjson);
 
-  with_network->N_bshape = bfromcstr(svalue);
+  HARDBUG((with_network->N_bshape = bfromcstr(svalue)) == NULL)
 
   if (arg_verbose)
     PRINTF("shape=%s\n", bdata(with_network->N_bshape));
@@ -1119,7 +1122,8 @@ local void construct_network_shared(const char *arg_network_name,
 
     BSTRING(bindex)
 
-    bformata(bindex, "pattern_embedding%d_index.csv", ipattern);
+    HARDBUG(bformata(bindex, "pattern_embedding%d_index.csv", ipattern) ==
+            BSTR_ERR)
 
     cJSON *file = open_cjson_file(directory, bdata(bindex));
 
@@ -1130,7 +1134,8 @@ local void construct_network_shared(const char *arg_network_name,
 
     BSTRING(bweights)
 
-    bformata(bweights, "pattern_embedding%d_weights.csv", ipattern);
+    HARDBUG(bformata(bweights, "pattern_embedding%d_weights.csv", ipattern) ==
+            BSTR_ERR)
 
     file = open_cjson_file(directory, bdata(bweights));
 
@@ -1191,7 +1196,9 @@ local void construct_network_shared(const char *arg_network_name,
 
       BSTRING(bweights)
 
-      bformata(bweights, "material_embedding%d_weights.csv", imaterial);
+      HARDBUG(bformata(bweights,
+                       "material_embedding%d_weights.csv",
+                       imaterial) == BSTR_ERR)
 
       cJSON *file = open_cjson_file(directory, bdata(bweights));
 

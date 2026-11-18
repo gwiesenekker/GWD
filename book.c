@@ -989,12 +989,12 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
 
   PRINTF("checking moves..\n");
 
-  bformata(bsql,
-           "SELECT m.id, m.move, e.evaluation "
-           "FROM moves m "
-           "JOIN evaluations e ON m.id = e.move_id "
-           "WHERE m.position_id = ? "
-           "ORDER BY e.evaluation DESC");
+  HARDBUG(bformata(bsql,
+                   "SELECT m.id, m.move, e.evaluation "
+                   "FROM moves m "
+                   "JOIN evaluations e ON m.id = e.move_id "
+                   "WHERE m.position_id = ? "
+                   "ORDER BY e.evaluation DESC") == BSTR_ERR)
 
   sqlite3_stmt *stmt;
 

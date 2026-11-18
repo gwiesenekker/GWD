@@ -149,7 +149,7 @@ void construct_patterns_shared(patterns_shared_t *arg_with_patterns_shared,
 
   BSTRING(bseparators)
 
-  bassigncstr(bseparators, ",:;");
+  HARDBUG(bassigncstr(bseparators, ",:;") == BSTR_ERR)
 
   struct bstrList *btokens;
 

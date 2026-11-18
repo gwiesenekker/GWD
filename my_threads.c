@@ -83,7 +83,7 @@ local void solve_problems(void *arg_self, const char *arg_name)
 
     BSTRING(btext)
 
-    bformata(btext, "problem #%d", nproblems);
+    HARDBUG(bformata(btext, "problem #%d", nproblems) == BSTR_ERR)
 
     enqueue(&main_queue, MESSAGE_INFO, bdata(btext));
 

@@ -234,7 +234,7 @@ void construct_cache(cache_t *arg_with_cache,
                      size_t arg_entry_value_size,
                      const void *arg_entry_value_default)
 {
-  arg_with_cache->C_name = bfromcstr(arg_cache_name);
+  HARDBUG((arg_with_cache->C_name = bfromcstr(arg_cache_name)) == NULL)
 
   arg_with_cache->C_entry_key_type = arg_entry_key_type;
 

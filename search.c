@@ -296,7 +296,7 @@ local void binary(bstring arg_bstring, uint64_t arg_uint64, int arg_nbits)
 {
   HARDBUG((arg_nbits <= 0) or (arg_nbits > 64))
 
-  btrunc(arg_bstring, 0);
+  HARDBUG(btrunc(arg_bstring, 0) == BSTR_ERR)
 
   for (int ibit = arg_nbits - 1; ibit >= 0; --ibit)
   {
@@ -986,7 +986,7 @@ endgame_pv(search_t *arg_with_search, int arg_mate, bstring arg_bpv_string)
 
   move2bstring(&moves_list, ibest_move, bmove_string);
 
-  bconcat(arg_bpv_string, bmove_string);
+  HARDBUG(bconcat(arg_bpv_string, bmove_string) == BSTR_ERR)
 
   BDESTROY(bmove_string)
 
@@ -1197,7 +1197,7 @@ local void trace_ab_window(ui64_t arg_trace_key,
   BSTRING(bmove_string)
 
   if (arg_jmove == INVALID)
-    bassigncstr(bmove_string, "NULL");
+    HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
   else
   {
     HARDBUG(arg_jmove >= arg_moves_list->ML_nmoves)
@@ -1236,7 +1236,7 @@ local void trace_indent(moves_list_t *arg_moves_list, int arg_jmove)
 
   move2bstring(arg_moves_list, arg_jmove, bmove_string);
 
-  bformata(trace_bpv_string, " %s", bdata(bmove_string));
+  HARDBUG(bformata(trace_bpv_string, " %s", bdata(bmove_string)) == BSTR_ERR)
 
   BDESTROY(bmove_string)
 
@@ -1267,7 +1267,7 @@ local void trace_ab_result(ui64_t arg_trace_key,
   BSTRING(bmove_string)
 
   if (arg_jmove == INVALID)
-    bassigncstr(bmove_string, "NULL");
+    HARDBUG(bassigncstr(bmove_string, "NULL") == BSTR_ERR)
   else
   {
     HARDBUG(arg_jmove >= arg_moves_list->ML_nmoves)
@@ -3609,34 +3609,35 @@ local void print_pv(search_t *arg_with_search,
   {
     i64_t nglobal_nodes = published_global_nodes(arg_with_search);
 
-    bformata(bpv_string,
-             "depth=%d score=%.3f time=%.2f nps=%.2f pv=\"%s",
-             arg_my_depth,
-             (float)SCORE2PRINTF(arg_move_score) / (float)SCORE_MAN,
-             return_my_timer(&(arg_with_search->S_timer), FALSE),
-             nglobal_nodes /
-               return_my_timer(&(arg_with_search->S_timer), TRUE) / 1000000.0,
-             bdata(bmove_string));
+    HARDBUG(bformata(bpv_string,
+                     "depth=%d score=%.3f time=%.2f nps=%.2f pv=\"%s",
+                     arg_my_depth,
+                     (float)SCORE2PRINTF(arg_move_score) / (float)SCORE_MAN,
+                     return_my_timer(&(arg_with_search->S_timer), FALSE),
+                     nglobal_nodes /
+                       return_my_timer(&(arg_with_search->S_timer), TRUE) /
+                       1000000.0,
+                     bdata(bmove_string)) == BSTR_ERR)
   }
   else
   {
-    bformata(bpv_string,
-             "d=%d i=%d j=%d m=%s s=" PRINTF_SCORE_T " (%.2f) r=" PRINTF_SCORE_T
-             " t=%.2f n=%lld/%lld/%lld "
-             "x=%s pv=%s",
-             arg_my_depth,
-             arg_imove,
-             arg_jmove,
-             bdata(bmove_string),
-             SCORE2PRINTF(arg_move_score),
-             (float)SCORE2PRINTF(arg_move_score) / (float)SCORE_MAN,
-             SCORE2PRINTF(arg_with_search->S_root_score),
-             return_my_timer(&(arg_with_search->S_timer), FALSE),
-             arg_with_search->S_ntotal_nodes,
-             arg_with_search->S_ntotal_alpha_beta_nodes,
-             arg_with_search->S_ntotal_quiescence_nodes,
-             arg_move_status,
-             bdata(bmove_string));
+    HARDBUG(bformata(bpv_string,
+                     "d=%d i=%d j=%d m=%s s=" PRINTF_SCORE_T
+                     " (%.2f) r=" PRINTF_SCORE_T " t=%.2f n=%lld/%lld/%lld "
+                     "x=%s pv=%s",
+                     arg_my_depth,
+                     arg_imove,
+                     arg_jmove,
+                     bdata(bmove_string),
+                     SCORE2PRINTF(arg_move_score),
+                     (float)SCORE2PRINTF(arg_move_score) / (float)SCORE_MAN,
+                     SCORE2PRINTF(arg_with_search->S_root_score),
+                     return_my_timer(&(arg_with_search->S_timer), FALSE),
+                     arg_with_search->S_ntotal_nodes,
+                     arg_with_search->S_ntotal_alpha_beta_nodes,
+                     arg_with_search->S_ntotal_quiescence_nodes,
+                     arg_move_status,
+                     bdata(bmove_string)) == BSTR_ERR)
   }
 
   do_move(&(arg_with_search->S_board), arg_jmove, arg_moves_list);

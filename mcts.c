@@ -707,15 +707,15 @@ double mcts_shoot_outs(search_t *arg_with_search,
     {
       BSTRING(bline)
 
-      bformata(bline,
-               "nshoot_outs=%d"
-               " nwon=%d"
-               " ndraw=%d"
-               " nlost=%d",
-               *arg_nshoot_outs,
-               *arg_nwon,
-               *arg_ndraw,
-               *arg_nlost);
+      HARDBUG(bformata(bline,
+                       "nshoot_outs=%d"
+                       " nwon=%d"
+                       " ndraw=%d"
+                       " nlost=%d",
+                       *arg_nshoot_outs,
+                       *arg_nwon,
+                       *arg_ndraw,
+                       *arg_nlost) == BSTR_ERR)
 
       PRINTF("%s\n", bdata(bline));
 
