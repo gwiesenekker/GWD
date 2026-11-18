@@ -163,7 +163,6 @@ HEADERS=boards.h\
   dxp.h\
   endgame.h\
   fbuffer.h\
-  globals.h\
   hub.h\
   main.h\
   mcts.h\
