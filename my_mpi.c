@@ -1459,7 +1459,7 @@ void my_mpi_barrier_v3(const char *arg_info,
 
 enum
 {
-  SIZE = 1024
+  MY_MPI_TEST_NVALUES = 1024
 };
 
 enum
@@ -1482,7 +1482,7 @@ void test_my_mpi(void)
   int *shared_data;
 
   my_mpi_win_allocate_shared(
-    my_mpi_globals.MMG_global_id == 0 ? SIZE * sizeof(int) : 0,
+    my_mpi_globals.MMG_global_id == 0 ? MY_MPI_TEST_NVALUES * sizeof(int) : 0,
     sizeof(int),
     MPI_INFO_NULL,
     my_mpi_globals.MMG_global_comm,
@@ -1505,13 +1505,13 @@ void test_my_mpi(void)
 
   if (my_mpi_globals.MMG_global_id == 0)
   {
-    for (int ivalue = 0; ivalue < SIZE; ivalue++)
+    for (int ivalue = 0; ivalue < MY_MPI_TEST_NVALUES; ivalue++)
       shared_data[ivalue] = ivalue;
   }
 
   my_mpi_win_fence(my_mpi_globals.MMG_global_comm, 0, win);
 
-  for (int ivalue = 0; ivalue < SIZE; ivalue++)
+  for (int ivalue = 0; ivalue < MY_MPI_TEST_NVALUES; ivalue++)
     HARDBUG(shared_data[ivalue] != ivalue)
 
   my_mpi_win_free(&win);
