@@ -15,7 +15,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
   const int *my_dir;
   const int *my_row;
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
   {
     my_colour = WHITE_ENUM;
     your_colour = BLACK_ENUM;
@@ -44,7 +44,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
   {
     int ifield1;
 
-    if (IS_WHITE(arg_with_board->B_colour2move))
+    if (is_white(arg_with_board->B_colour2move))
       ifield1 = BIT_CTZ(my_bb);
     else
       ifield1 = 63 - BIT_CLZ(my_bb);
@@ -413,7 +413,7 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   PUSH_NAME(__FUNC__)
   BEGIN_BLOCK(__FUNC__)
 
-  int white = IS_WHITE(arg_with_board->B_colour2move);
+  int white = is_white(arg_with_board->B_colour2move);
   colour_enum my_colour = white ? WHITE_ENUM : BLACK_ENUM;
   colour_enum your_colour = white ? BLACK_ENUM : WHITE_ENUM;
   const int *directions = white ? white_dir : black_dir;
@@ -533,7 +533,7 @@ int can_capture(const board_t *arg_with_board, int arg_kings)
   colour_enum my_colour;
   colour_enum your_colour;
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
   {
     my_colour = WHITE_ENUM;
     your_colour = BLACK_ENUM;
@@ -557,7 +557,7 @@ int can_capture(const board_t *arg_with_board, int arg_kings)
   {
     int ifield;
 
-    if (IS_WHITE(arg_with_board->B_colour2move))
+    if (is_white(arg_with_board->B_colour2move))
       ifield = BIT_CTZ(my_bb);
     else
       ifield = 63 - BIT_CLZ(my_bb);
@@ -662,7 +662,7 @@ void do_move(board_t *arg_with_board,
   colour_enum your_colour;
   const int *my_row;
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
   {
     my_colour = WHITE_ENUM;
     your_colour = BLACK_ENUM;
@@ -770,7 +770,7 @@ label_null:
   node->node_ncaptx = INVALID;
   node->node_move_key = 0;
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
     arg_with_board->B_colour2move = BLACK_ENUM;
   else
     arg_with_board->B_colour2move = WHITE_ENUM;
@@ -801,7 +801,7 @@ void undo_move(board_t *arg_with_board,
   if (arg_moves_list != NULL)
     HARDBUG(arg_imove >= arg_moves_list->ML_nmoves)
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
     arg_with_board->B_colour2move = BLACK_ENUM;
   else
     arg_with_board->B_colour2move = WHITE_ENUM;

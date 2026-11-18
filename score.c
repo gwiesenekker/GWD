@@ -140,7 +140,7 @@ score_t return_score_from_board(board_t *arg_with_board,
 
   int mirror = FALSE;
 
-  if (IS_BLACK(arg_with_board->B_colour2move))
+  if (is_black(arg_with_board->B_colour2move))
   {
     ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_men_bb);
     ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_men_bb);
@@ -378,7 +378,7 @@ score_t return_score_from_board(board_t *arg_with_board,
   }
 
   /*
-    if (IS_BLACK(arg_with_board->B_colour2move))
+    if (is_black(arg_with_board->B_colour2move))
       result = -result;
   */
 
@@ -395,7 +395,7 @@ score_t return_score_from_board(board_t *arg_with_board,
   }
 #endif
 
-  if (IS_SCORE_LOST(result) or IS_SCORE_WON(result))
+  if (is_score_lost(result) or is_score_won(result))
     result = return_material_score(arg_with_board);
 
   return (result);
@@ -405,7 +405,7 @@ score_t return_score(search_t *arg_with_search)
 {
   colour_enum my_colour;
 
-  if (IS_WHITE(arg_with_search->S_board.B_colour2move))
+  if (is_white(arg_with_search->S_board.B_colour2move))
     my_colour = WHITE_ENUM;
   else
     my_colour = BLACK_ENUM;
@@ -461,8 +461,8 @@ score_t return_score(search_t *arg_with_search)
     }
   }
 
-  HARDBUG(IS_SCORE_LOST(result))
-  HARDBUG(IS_SCORE_WON(result))
+  HARDBUG(is_score_lost(result))
+  HARDBUG(is_score_won(result))
 
   return (result);
 }
@@ -485,7 +485,7 @@ score_t return_material_score(const board_t *arg_with_board)
   score_t material_score = SCORE((nwhite_men - nblack_men) * SCORE_MAN +
                                  (nwhite_kings - nblack_kings) * SCORE_KING);
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
     return (material_score);
   else
     return (-material_score);

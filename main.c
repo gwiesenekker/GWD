@@ -319,7 +319,7 @@ local void solve_problems_mcts(const char *arg_name,
 
     CDESTROY(cfen)
 
-    if (IS_BLACK(with_search->S_board.B_colour2move))
+    if (is_black(with_search->S_board.B_colour2move))
       result = -result;
 
     print_board(&(with_search->S_board));

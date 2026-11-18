@@ -93,7 +93,7 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
 
     ibuffer += 32;
 
-    if (IS_WHITE(arg_with_dxp->DXP_game_colour))
+    if (is_white(arg_with_dxp->DXP_game_colour))
     {
       buffer[ibuffer] = 'Z';
     }
@@ -140,7 +140,7 @@ encode(char arg_type, dxp_t *arg_with_dxp, bstring arg_output, int *arg_nbuffer)
     strcpy(buffer + ibuffer, "B");
     ibuffer++;
 
-    if (IS_WHITE(arg_with_dxp->DXP_search.S_board.B_colour2move))
+    if (is_white(arg_with_dxp->DXP_search.S_board.B_colour2move))
     {
       strcpy(buffer + ibuffer, "W");
       ibuffer++;
@@ -730,7 +730,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
 
   game_state.set_event(&game_state, bdata(event));
 
-  if (IS_WHITE(arg_with_dxp->DXP_game_colour))
+  if (is_white(arg_with_dxp->DXP_game_colour))
   {
     game_state.set_white(&game_state, rtrim(bdata(my_name), btrim));
     game_state.set_black(&game_state, rtrim(bdata(your_name), btrim));
@@ -791,7 +791,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
             break;
         }
 
-        if (IS_WHITE(arg_with_dxp->DXP_search.S_board.B_colour2move))
+        if (is_white(arg_with_dxp->DXP_search.S_board.B_colour2move))
           result = 0;
         else
           result = 2;
@@ -878,7 +878,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
 
         if (arg_with_dxp->DXP_game_code == DXP_IGIVEUP)
         {
-          if (IS_WHITE(arg_with_dxp->DXP_search.S_board.B_colour2move))
+          if (is_white(arg_with_dxp->DXP_search.S_board.B_colour2move))
             result = 0;
           else
             result = 2;
@@ -894,7 +894,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
         }
         else if (arg_with_dxp->DXP_game_code == DXP_IWIN)
         {
-          if (IS_WHITE(arg_with_dxp->DXP_search.S_board.B_colour2move))
+          if (is_white(arg_with_dxp->DXP_search.S_board.B_colour2move))
             result = 2;
           else
             result = 0;
@@ -964,7 +964,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
           HARDBUG(type != DXP_GAMEEND)
         }
 
-        if (IS_WHITE(arg_with_dxp->DXP_search.S_board.B_colour2move))
+        if (is_white(arg_with_dxp->DXP_search.S_board.B_colour2move))
           result = 0;
         else
           result = 2;
@@ -999,7 +999,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
 
           arg_with_dxp->DXP_game_code = DXP_IWIN;
 
-          if (IS_WHITE(arg_with_dxp->DXP_search.S_board.B_colour2move))
+          if (is_white(arg_with_dxp->DXP_search.S_board.B_colour2move))
             result = 2;
           else
             result = 0;
@@ -1010,7 +1010,7 @@ local int play_game(dxp_t *arg_with_dxp, compat_socket_t arg_sockfd)
 
           arg_with_dxp->DXP_game_code = DXP_IGIVEUP;
 
-          if (IS_WHITE(arg_with_dxp->DXP_search.S_board.B_colour2move))
+          if (is_white(arg_with_dxp->DXP_search.S_board.B_colour2move))
             result = 0;
           else
             result = 2;
@@ -1435,7 +1435,7 @@ local void dxp_game_initiator(compat_socket_t arg_fd)
 
       if (result == 2)
       {
-        if (IS_WHITE(with_dxp->DXP_game_colour))
+        if (is_white(with_dxp->DXP_game_colour))
           ++nwon;
         else
           ++nlost;
@@ -1446,7 +1446,7 @@ local void dxp_game_initiator(compat_socket_t arg_fd)
       }
       else if (result == 0)
       {
-        if (IS_WHITE(with_dxp->DXP_game_colour))
+        if (is_white(with_dxp->DXP_game_colour))
           ++nlost;
         else
           ++nwon;
@@ -1460,7 +1460,7 @@ local void dxp_game_initiator(compat_socket_t arg_fd)
              nlost,
              nunknown);
 
-      if (IS_WHITE(with_dxp->DXP_game_colour))
+      if (is_white(with_dxp->DXP_game_colour))
         with_dxp->DXP_game_colour = BLACK_ENUM;
       else
         with_dxp->DXP_game_colour = WHITE_ENUM;
@@ -1556,7 +1556,7 @@ local void dxp_game_follower(compat_socket_t arg_fd)
 
     if (result == 2)
     {
-      if (IS_WHITE(with_dxp->DXP_game_colour))
+      if (is_white(with_dxp->DXP_game_colour))
         ++nwon;
       else
         ++nlost;
@@ -1567,7 +1567,7 @@ local void dxp_game_follower(compat_socket_t arg_fd)
     }
     else if (result == 0)
     {
-      if (IS_WHITE(with_dxp->DXP_game_colour))
+      if (is_white(with_dxp->DXP_game_colour))
         ++nlost;
       else
         ++nwon;

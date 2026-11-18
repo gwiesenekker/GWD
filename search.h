@@ -19,8 +19,15 @@ _Static_assert((NPV_ENTRIES > 0) and ((NPV_ENTRIES & (NPV_ENTRIES - 1)) == 0),
 #define MINIMAL_WINDOW_BIT BIT(0)
 #define PV_BIT BIT(1)
 
-#define IS_MINIMAL_WINDOW(X) ((X) & MINIMAL_WINDOW_BIT)
-#define IS_PV(X) ((X) & PV_BIT)
+static inline unsigned int is_minimal_window(unsigned int arg_flags)
+{
+  return (arg_flags & MINIMAL_WINDOW_BIT);
+}
+
+static inline unsigned int is_pv(unsigned int arg_flags)
+{
+  return (arg_flags & PV_BIT);
+}
 
 enum
 {
@@ -37,12 +44,35 @@ enum
 #define SR_WON_BIT BIT(5)
 #define SR_LOST_BIT BIT(6)
 
-#define IS_SR_DRAW_BY_REP(X) ((X) & SR_DRAW_BY_REP_BIT)
-#define IS_SR_LE_ALPHA(X) ((X) & SR_LE_ALPHA_BIT)
-#define IS_SR_GE_BETA(X) ((X) & SR_GE_BETA_BIT)
-#define IS_SR_TRUE_SCORE(X) ((X) & SR_TRUE_SCORE_BIT)
-#define IS_SR_WON(X) ((X) & SR_WON_BIT)
-#define IS_SR_LOST(X) ((X) & SR_LOST_BIT)
+static inline unsigned int is_sr_draw_by_rep(unsigned int arg_flags)
+{
+  return (arg_flags & SR_DRAW_BY_REP_BIT);
+}
+
+static inline unsigned int is_sr_le_alpha(unsigned int arg_flags)
+{
+  return (arg_flags & SR_LE_ALPHA_BIT);
+}
+
+static inline unsigned int is_sr_ge_beta(unsigned int arg_flags)
+{
+  return (arg_flags & SR_GE_BETA_BIT);
+}
+
+static inline unsigned int is_sr_true_score(unsigned int arg_flags)
+{
+  return (arg_flags & SR_TRUE_SCORE_BIT);
+}
+
+static inline unsigned int is_sr_won(unsigned int arg_flags)
+{
+  return (arg_flags & SR_WON_BIT);
+}
+
+static inline unsigned int is_sr_lost(unsigned int arg_flags)
+{
+  return (arg_flags & SR_LOST_BIT);
+}
 
 #define PV_SLOT_WHITE_MOVE_MASK 0xFFULL
 #define PV_SLOT_BLACK_MOVE_MASK 0xFF00ULL

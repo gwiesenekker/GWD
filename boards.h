@@ -27,13 +27,6 @@ enum
   "W:W31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50:B01,02,03," \
   "04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20"
 
-#define IS_WHITE(X) ((X) == WHITE_ENUM)
-#define IS_BLACK(X) ((X) == BLACK_ENUM)
-
-#define IS_EMPTY(X) ((X) == 0)
-#define IS_MAN(X) ((X) == MAN_ENUM)
-#define IS_KING(X) ((X) == KING_ENUM)
-
 #define B_white_men_bb B_bit_boards[WHITE_ENUM][MAN_ENUM]
 #define B_black_men_bb B_bit_boards[BLACK_ENUM][MAN_ENUM]
 #define B_white_kings_bb B_bit_boards[WHITE_ENUM][KING_ENUM]
@@ -63,6 +56,22 @@ typedef enum
   KING_ENUM = 1,
   NPIECE_ENUM
 } piece_enum;
+
+static inline int is_white(int arg_colour)
+{
+  return (arg_colour == WHITE_ENUM);
+}
+
+static inline int is_black(int arg_colour)
+{
+  return (arg_colour == BLACK_ENUM);
+}
+
+static inline int is_empty(int arg_piece) { return (arg_piece == 0); }
+
+static inline int is_man(int arg_piece) { return (arg_piece == MAN_ENUM); }
+
+static inline int is_king(int arg_piece) { return (arg_piece == KING_ENUM); }
 
 typedef struct
 {

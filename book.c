@@ -20,7 +20,7 @@ void init_book(void) { construct_my_random(&book_random, NULL); }
 
 local void inline flip_score(score_t *arg_score)
 {
-  if (!IS_SCORE_NAN(*arg_score))
+  if (!is_score_nan(*arg_score))
     *arg_score = -*arg_score;
 }
 
@@ -103,7 +103,7 @@ local void help_walk_book_alpha_beta(sqlite3 *arg_db,
 
       undo_move(arg_with_board, imove, &moves_list);
 
-      if (!IS_SCORE_NAN(minimax_score))
+      if (!is_score_nan(minimax_score))
       {
         ++nmoves;
 
@@ -131,7 +131,7 @@ local void help_walk_book_alpha_beta(sqlite3 *arg_db,
 
       score_t evaluation = query_evaluation(arg_db, move_id, FLAG_NULL);
 
-      HARDBUG(IS_SCORE_NAN(evaluation))
+      HARDBUG(is_score_nan(evaluation))
 
       temp_score = evaluation;
 
@@ -158,7 +158,7 @@ local void help_walk_book_alpha_beta(sqlite3 *arg_db,
 
         undo_move(arg_with_board, imove, &moves_list);
 
-        if (!IS_SCORE_NAN(minimax_score))
+        if (!is_score_nan(minimax_score))
           temp_score = minimax_score;
       }
     }
@@ -267,7 +267,7 @@ local void help_walk_book(sqlite3 *arg_db,
 
       score_t evaluation = query_evaluation(arg_db, move_id, FLAG_NULL);
 
-      HARDBUG(IS_SCORE_NAN(evaluation))
+      HARDBUG(is_score_nan(evaluation))
 
       ++nmoves;
 
@@ -530,7 +530,7 @@ void return_book_move(board_t *arg_with_board,
 
       undo_move(arg_with_board, jmove, &moves_list);
 
-      if (IS_SCORE_NAN(minimax_score))
+      if (is_score_nan(minimax_score))
         continue;
 
       temp_score = minimax_score;
@@ -554,7 +554,7 @@ void return_book_move(board_t *arg_with_board,
 
       evaluation = query_evaluation(book, move_id, FLAG_NULL);
 
-      HARDBUG(IS_SCORE_NAN(evaluation))
+      HARDBUG(is_score_nan(evaluation))
 
       temp_score = evaluation;
 
@@ -575,7 +575,7 @@ void return_book_move(board_t *arg_with_board,
 
         // the minimax score is always preferred
 
-        if (!IS_SCORE_NAN(minimax_score))
+        if (!is_score_nan(minimax_score))
           temp_score = minimax_score;
       }
     }
@@ -758,7 +758,7 @@ local void add_evaluations(my_sqlite3_t *arg_db,
       evaluation = -arg_search->S_best_score;
     }
 
-    HARDBUG(IS_SCORE_NAN(evaluation))
+    HARDBUG(is_score_nan(evaluation))
     HARDBUG(evaluation == SCORE(SCORE_MINUS_INFINITY))
     HARDBUG(evaluation == SCORE(SCORE_PLUS_INFINITY))
 

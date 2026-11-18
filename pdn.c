@@ -298,7 +298,7 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
       update_bucket(bucket_kings + BIT_COUNT(with_board->B_black_men_bb),
                     BIT_COUNT(with_board->B_black_kings_bb));
 
-      if (IS_WHITE(with_board->B_colour2move))
+      if (is_white(with_board->B_colour2move))
       {
         update_bucket(bucket_nmoves + BIT_COUNT(with_board->B_white_men_bb),
                       moves_list.ML_nmoves);
@@ -343,14 +343,14 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
 
         char *column;
 
-        if ((IS_WHITE(with_board->B_colour2move) and (itoken == TOKEN_WON)) or
-            (IS_BLACK(with_board->B_colour2move) and (itoken == TOKEN_LOST)))
+        if ((is_white(with_board->B_colour2move) and (itoken == TOKEN_WON)) or
+            (is_black(with_board->B_colour2move) and (itoken == TOKEN_LOST)))
         {
           column = "nwon";
         }
-        else if ((IS_WHITE(with_board->B_colour2move) and
+        else if ((is_white(with_board->B_colour2move) and
                   (itoken == TOKEN_LOST)) or
-                 (IS_BLACK(with_board->B_colour2move) and
+                 (is_black(with_board->B_colour2move) and
                   (itoken == TOKEN_WON)))
         {
           column = "nlost";
@@ -673,7 +673,7 @@ void auto_play(const char *arg_txt_name, i64_t arg_npositions)
 
     // result as seen from white
 
-    if (IS_BLACK(with_search->S_board.B_colour2move))
+    if (is_black(with_search->S_board.B_colour2move))
       result = -result;
 
     // loop over all moves
@@ -896,7 +896,7 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
 
     // result as seen from white
 
-    if (IS_BLACK(with_search->S_board.B_colour2move))
+    if (is_black(with_search->S_board.B_colour2move))
       result = 2 - result;
 
     PRINTF("replay\n");
@@ -920,8 +920,8 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
       {
         board2fen(&(with_search->S_board), bfen, FALSE);
 
-        if ((IS_WHITE(with_search->S_board.B_colour2move) and (result == 2)) or
-            (IS_BLACK(with_search->S_board.B_colour2move) and (result == 0)))
+        if ((is_white(with_search->S_board.B_colour2move) and (result == 2)) or
+            (is_black(with_search->S_board.B_colour2move) and (result == 0)))
         {
           append_sql_buffer(arg_db,
                             "INSERT INTO positions (fen, frequency, nwon) "
@@ -930,9 +930,9 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
                             "frequency = frequency + 1, nwon = nwon + 1;",
                             bdata(bfen));
         }
-        else if ((IS_WHITE(with_search->S_board.B_colour2move) and
+        else if ((is_white(with_search->S_board.B_colour2move) and
                   (result == 0)) or
-                 (IS_BLACK(with_search->S_board.B_colour2move) and
+                 (is_black(with_search->S_board.B_colour2move) and
                   (result == 2)))
         {
           append_sql_buffer(arg_db,

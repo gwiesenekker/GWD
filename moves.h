@@ -10,8 +10,15 @@ enum
 #define MOVE_DO_NOT_REDUCE_BIT BIT(0)
 #define MOVE_EXTEND_IN_QUIESCENCE_BIT BIT(1)
 
-#define MOVE_DO_NOT_REDUCE(F) ((F) & MOVE_DO_NOT_REDUCE_BIT)
-#define MOVE_EXTEND_IN_QUIESCENCE(F) ((F) & MOVE_EXTEND_IN_QUIESCENCE_BIT)
+static inline ui32_t move_do_not_reduce(ui32_t arg_flags)
+{
+  return (arg_flags & MOVE_DO_NOT_REDUCE_BIT);
+}
+
+static inline ui32_t move_extend_in_quiescence(ui32_t arg_flags)
+{
+  return (arg_flags & MOVE_EXTEND_IN_QUIESCENCE_BIT);
+}
 
 typedef struct
 {

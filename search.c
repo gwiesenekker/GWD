@@ -14,7 +14,10 @@ enum
 #define ABCS_SCORE_LE_ALPHA_BIT BIT(1)
 #define ABCS_SCORE_TRUE_SCORE_BIT BIT(2)
 
-#define FAST_MODULO64(H, N) compat_mulhi_u64((H), (N))
+local inline ui64_t return_fast_modulo64(ui64_t arg_hash, ui64_t arg_nentries)
+{
+  return (compat_mulhi_u64(arg_hash, arg_nentries));
+}
 
 #define TWEAK_MOVE_REDUCED_BIT BIT(0)
 #define TWEAK_MOVE_EXTENDED_BIT BIT(1)
@@ -356,7 +359,7 @@ int move_repetition(board_t *arg_with_board)
 
   int npieces;
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
   {
     npieces = BIT_COUNT(arg_with_board->B_white_men_bb |
                         arg_with_board->B_white_kings_bb);
@@ -533,7 +536,7 @@ local void update_history(search_t *arg_with_search,
 
   int(*history)[HISTORY_NFIELDS] =
     arg_with_search
-      ->S_history[IS_WHITE(arg_with_search->S_board.B_colour2move) ? 0 : 1];
+      ->S_history[is_white(arg_with_search->S_board.B_colour2move) ? 0 : 1];
 
   int bonus = arg_my_depth * arg_my_depth + arg_my_depth;
 
@@ -637,8 +640,8 @@ local
   int result = FALSE;
 
   alpha_beta_cache_entry_t *with_alpha_beta_cache_entry =
-    arg_alpha_beta_cache +
-    FAST_MODULO64(arg_with_search->S_board.B_key, nalpha_beta_cache_entries);
+    arg_alpha_beta_cache + return_fast_modulo64(arg_with_search->S_board.B_key,
+                                                nalpha_beta_cache_entries);
 
   for (int islot = 0; islot < NABCS_SLOTS; islot++)
   {
@@ -693,8 +696,8 @@ update_alpha_beta_cache(search_t *arg_with_search,
   HARDBUG(arg_alpha_beta_cache_slot->ABCS_key != arg_with_search->S_board.B_key)
 
   alpha_beta_cache_entry_t *with_alpha_beta_cache_entry =
-    arg_alpha_beta_cache +
-    FAST_MODULO64(arg_with_search->S_board.B_key, nalpha_beta_cache_entries);
+    arg_alpha_beta_cache + return_fast_modulo64(arg_with_search->S_board.B_key,
+                                                nalpha_beta_cache_entries);
 
   int islot = INVALID;
 
@@ -777,7 +780,7 @@ int probe_pv(pv_entries_t *arg_pv, search_t *arg_with_search)
   {
     if ((pve_slots[islot] & ~PV_SLOT_MOVES_MASK) == (key & ~PV_SLOT_MOVES_MASK))
     {
-      if (IS_WHITE(arg_with_search->S_board.B_colour2move))
+      if (is_white(arg_with_search->S_board.B_colour2move))
         result = pve_slots[islot] & PV_SLOT_WHITE_MOVE_MASK;
       else
         result = (pve_slots[islot] & PV_SLOT_BLACK_MOVE_MASK) >> 8;
@@ -822,7 +825,7 @@ update_pv(pv_entries_t *arg_pv, search_t *arg_with_search, int arg_imove)
     pve_slots[islot] = key | PV_SLOT_MOVES_MASK;
   }
 
-  if (IS_WHITE(arg_with_search->S_board.B_colour2move))
+  if (is_white(arg_with_search->S_board.B_colour2move))
     pve_slots[islot] =
       (pve_slots[islot] & ~PV_SLOT_WHITE_MOVE_MASK) | (ui64_t)arg_imove;
   else
@@ -1015,7 +1018,7 @@ endgame_pv(search_t *arg_with_search, int arg_mate, bstring arg_bpv_string)
 
 local void inline flip_score(score_t *arg_score)
 {
-  if (!IS_SCORE_NAN(*arg_score))
+  if (!is_score_nan(*arg_score))
     *arg_score = -*arg_score;
 }
 
@@ -1032,32 +1035,32 @@ local void construct_search_result(search_result_t *arg_with_search_result,
 
 local void flip_search_result(search_result_t *arg_search_result)
 {
-  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+  if (!is_score_nan(arg_search_result->SR_score))
   {
     arg_search_result->SR_raw_score = -arg_search_result->SR_raw_score;
     arg_search_result->SR_score = -arg_search_result->SR_score;
 
-    if (IS_SR_GE_BETA(arg_search_result->SR_flags))
+    if (is_sr_ge_beta(arg_search_result->SR_flags))
     {
       arg_search_result->SR_flags &= ~SR_GE_BETA_BIT;
       arg_search_result->SR_flags |= SR_LE_ALPHA_BIT;
     }
-    else if (IS_SR_LE_ALPHA(arg_search_result->SR_flags))
+    else if (is_sr_le_alpha(arg_search_result->SR_flags))
     {
       arg_search_result->SR_flags &= ~SR_LE_ALPHA_BIT;
       arg_search_result->SR_flags |= SR_GE_BETA_BIT;
     }
     else
     {
-      HARDBUG(!IS_SR_TRUE_SCORE(arg_search_result->SR_flags))
+      HARDBUG(!is_sr_true_score(arg_search_result->SR_flags))
     }
 
-    if (IS_SR_WON(arg_search_result->SR_flags))
+    if (is_sr_won(arg_search_result->SR_flags))
     {
       arg_search_result->SR_flags &= ~SR_WON_BIT;
       arg_search_result->SR_flags |= SR_LOST_BIT;
     }
-    else if (IS_SR_LOST(arg_search_result->SR_flags))
+    else if (is_sr_lost(arg_search_result->SR_flags))
     {
       arg_search_result->SR_flags &= ~SR_LOST_BIT;
       arg_search_result->SR_flags |= SR_WON_BIT;
@@ -1094,7 +1097,7 @@ local void assign_search_result_b2a(search_result_t *arg_a,
   arg_a->SR_score = arg_b->SR_score;
   arg_a->SR_flags = arg_b->SR_flags;
 
-  // HARDBUG((a->SR_score != 0) and IS_SR_DRAW_BY_REP(a->SR_flags))
+  // HARDBUG((a->SR_score != 0) and is_sr_draw_by_rep(a->SR_flags))
 }
 
 local void trace_ab_entry(search_t *arg_with_search,
@@ -1111,7 +1114,7 @@ local void trace_ab_entry(search_t *arg_with_search,
 
   char *colour2move;
 
-  if (IS_WHITE(arg_with_search->S_board.B_colour2move))
+  if (is_white(arg_with_search->S_board.B_colour2move))
     colour2move = "WTM";
   else
     colour2move = "BTM";
@@ -1331,7 +1334,7 @@ local void trace_ab_exit(search_t *arg_with_search,
 
   char *colour2move;
 
-  if (IS_WHITE(arg_with_search->S_board.B_colour2move))
+  if (is_white(arg_with_search->S_board.B_colour2move))
     colour2move = "WTM";
   else
     colour2move = "BTM";
@@ -1393,7 +1396,7 @@ local void inline fail_hard(score_t arg_my_alpha,
                             score_t arg_my_beta,
                             search_result_t *arg_search_result)
 {
-  if (IS_SCORE_NAN(arg_search_result->SR_score))
+  if (is_score_nan(arg_search_result->SR_score))
     return;
 
   if (arg_search_result->SR_score >= arg_my_beta)
@@ -1418,7 +1421,7 @@ local void inline check_search_result(score_t arg_my_alpha,
 {
   int err = 0;
 
-  if (IS_SR_GE_BETA(arg_search_result->SR_flags))
+  if (is_sr_ge_beta(arg_search_result->SR_flags))
   {
     if (arg_search_result->SR_score < arg_my_beta)
       err = 1;
@@ -1428,7 +1431,7 @@ local void inline check_search_result(score_t arg_my_alpha,
 
   // not else if because arg_search_result can be NOT_A_NUMBER
 
-  if (IS_SR_LE_ALPHA(arg_search_result->SR_flags))
+  if (is_sr_le_alpha(arg_search_result->SR_flags))
   {
     if (arg_search_result->SR_score > arg_my_alpha)
       err = 3;
@@ -1436,7 +1439,7 @@ local void inline check_search_result(score_t arg_my_alpha,
       err = 4;
   }
 
-  if (IS_SR_TRUE_SCORE(arg_search_result->SR_flags))
+  if (is_sr_true_score(arg_search_result->SR_flags))
   {
     if ((arg_search_result->SR_score <= arg_my_alpha) or
         (arg_search_result->SR_score >= arg_my_beta))
@@ -1483,9 +1486,9 @@ local void quiescence(search_t *arg_with_search,
 
   HARDBUG(arg_node_type == 0)
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
+  HARDBUG(is_minimal_window(arg_node_type) and is_pv(arg_node_type))
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
+  HARDBUG(is_minimal_window(arg_node_type) and
           ((arg_my_beta - arg_my_alpha) != 1))
 
   if ((arg_with_search->S_board.B_inode -
@@ -1590,7 +1593,7 @@ local void quiescence(search_t *arg_with_search,
 
   score_t endgame_score = return_endgame_score(arg_with_search);
 
-  if (!IS_SCORE_NAN(endgame_score))
+  if (!is_score_nan(endgame_score))
   {
     *arg_best_score = endgame_score;
 
@@ -1647,7 +1650,7 @@ local void quiescence(search_t *arg_with_search,
 
     for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
     {
-      if (MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[imove]))
+      if (move_extend_in_quiescence(arg_moves_list->ML_move_flags[imove]))
         ++nmoves;
     }
   }
@@ -1679,7 +1682,7 @@ local void quiescence(search_t *arg_with_search,
 
     if (nmoves < arg_moves_list->ML_nmoves)
     {
-      if (!MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[jmove]))
+      if (!move_extend_in_quiescence(arg_moves_list->ML_move_flags[jmove]))
         continue;
     }
 
@@ -1694,7 +1697,7 @@ local void quiescence(search_t *arg_with_search,
 
     ui32_t node_type = arg_node_type;
 
-    if (IS_PV(arg_node_type) and (imove > 0))
+    if (is_pv(arg_node_type) and (imove > 0))
     {
       temp_beta = temp_alpha + 1;
 
@@ -1717,7 +1720,7 @@ local void quiescence(search_t *arg_with_search,
 
       flip_score(&temp_score);
 
-      if (IS_SCORE_NAN(temp_score))
+      if (is_score_nan(temp_score))
       {
         undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
@@ -1729,7 +1732,7 @@ local void quiescence(search_t *arg_with_search,
       if (ipass == 2)
         break;
 
-      if (IS_MINIMAL_WINDOW(arg_node_type) or (temp_score < temp_beta) or
+      if (is_minimal_window(arg_node_type) or (temp_score < temp_beta) or
           (temp_score >= arg_my_beta))
         break;
 
@@ -1759,7 +1762,7 @@ local void quiescence(search_t *arg_with_search,
 
 label_return:
 
-  if (!IS_SCORE_NAN(*arg_best_score) and (*arg_best_score >= arg_my_beta))
+  if (!is_score_nan(*arg_best_score) and (*arg_best_score >= arg_my_beta))
     *arg_best_score = arg_my_beta;
 
   END_BLOCK
@@ -1807,9 +1810,9 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
   HARDBUG(arg_node_type == 0)
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
+  HARDBUG(is_minimal_window(arg_node_type) and is_pv(arg_node_type))
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
+  HARDBUG(is_minimal_window(arg_node_type) and
           ((arg_my_beta - arg_my_alpha) != 1))
 
   ++(arg_with_search->S_ntotal_nodes);
@@ -1862,7 +1865,7 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
     ui32_t node_type = arg_node_type;
 
-    if (IS_PV(arg_node_type) and (imove > 0))
+    if (is_pv(arg_node_type) and (imove > 0))
     {
       temp_beta = temp_alpha + 1;
 
@@ -1915,7 +1918,7 @@ local void alpha_beta_captures(search_t *arg_with_search,
                       jmove,
                       &temp_result);
 
-      if (IS_SCORE_NAN(temp_result.SR_score))
+      if (is_score_nan(temp_result.SR_score))
       {
         undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
@@ -1930,7 +1933,7 @@ local void alpha_beta_captures(search_t *arg_with_search,
       if (ipass == 2)
         break;
 
-      if (IS_MINIMAL_WINDOW(arg_node_type) or
+      if (is_minimal_window(arg_node_type) or
           (temp_result.SR_score < temp_beta) or
           (temp_result.SR_score >= arg_my_beta))
         break;
@@ -1977,7 +1980,7 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
 label_return:
 
-  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+  if (!is_score_nan(arg_search_result->SR_score))
   {
     HARDBUG(arg_search_result->SR_depth < arg_my_depth)
   }
@@ -2028,7 +2031,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
   HARDBUG(arg_node_type == 0)
 
-  HARDBUG(!IS_MINIMAL_WINDOW(arg_node_type))
+  HARDBUG(!is_minimal_window(arg_node_type))
 
   HARDBUG((arg_my_beta - arg_my_alpha) != 1)
 
@@ -2055,8 +2058,8 @@ local void alpha_beta_minimal(search_t *arg_with_search,
     (arg_singular_adjustment <= 0) and (arg_moves_list->ML_ncaptx == 0) and
     (arg_moves_list->ML_nmoves > options.reduction_moves_threshold) and
     (your_depth >= options.reduction_depth_leaf) and
-    (arg_reduction_depth_root == 0) and !IS_SCORE_LOST(arg_my_alpha) and
-    !IS_SCORE_WON(arg_my_beta);
+    (arg_reduction_depth_root == 0) and !is_score_lost(arg_my_alpha) and
+    !is_score_won(arg_my_beta);
 
   ui32_t your_tweaks = 0;
 
@@ -2138,7 +2141,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
         if ((ipass == 1) and allow_reductions and (singular_adjustment == 0) and
             (nmoves_searched_at_full_depth >= options.reduction_full_min) and
-            !MOVE_DO_NOT_REDUCE(arg_moves_list->ML_move_flags[jmove]))
+            !move_do_not_reduce(arg_moves_list->ML_move_flags[jmove]))
         {
           reduced_depth = (your_depth * options.reduction_percentage) / 100;
 
@@ -2192,7 +2195,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
                         jmove,
                         &temp_result);
 
-        if (IS_SCORE_NAN(temp_result.SR_score))
+        if (is_score_nan(temp_result.SR_score))
           break;
 
         if (reduced_depth == your_depth)
@@ -2243,7 +2246,7 @@ local void alpha_beta_minimal(search_t *arg_with_search,
 
       undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
-      if (IS_SCORE_NAN(temp_result.SR_score))
+      if (is_score_nan(temp_result.SR_score))
       {
         construct_search_result(arg_search_result,
                                 SCORE_NOT_A_NUMBER,
@@ -2306,7 +2309,7 @@ label_break:
 
 label_return:
 
-  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+  if (!is_score_nan(arg_search_result->SR_score))
   {
     HARDBUG(arg_search_result->SR_depth < arg_my_depth)
   }
@@ -2357,7 +2360,7 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
   HARDBUG(arg_node_type == 0)
 
-  HARDBUG(!IS_PV(arg_node_type))
+  HARDBUG(!is_pv(arg_node_type))
 
   ++(arg_with_search->S_ntotal_nodes);
 
@@ -2444,7 +2447,7 @@ local void alpha_beta_pv(search_t *arg_with_search,
       {
         int reduced_depth = your_depth;
 
-        if (IS_MINIMAL_WINDOW(node_type) and (jpass < NPASS_PV_SEARCH))
+        if (is_minimal_window(node_type) and (jpass < NPASS_PV_SEARCH))
           reduced_depth = your_depth / 2;
 
         TRACE_AB_WINDOW(trace_key,
@@ -2484,7 +2487,7 @@ local void alpha_beta_pv(search_t *arg_with_search,
                         jmove,
                         &temp_result);
 
-        if (IS_SCORE_NAN(temp_result.SR_score))
+        if (is_score_nan(temp_result.SR_score))
         {
           undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
@@ -2591,7 +2594,7 @@ label_break:
 
 label_return:
 
-  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+  if (!is_score_nan(arg_search_result->SR_score))
   {
     HARDBUG(arg_search_result->SR_depth < arg_my_depth)
   }
@@ -2642,9 +2645,9 @@ local void alpha_beta(search_t *arg_with_search,
 
   HARDBUG(arg_node_type == 0)
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
+  HARDBUG(is_minimal_window(arg_node_type) and is_pv(arg_node_type))
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
+  HARDBUG(is_minimal_window(arg_node_type) and
           ((arg_my_beta - arg_my_alpha) != 1))
 
 #ifdef DEBUG
@@ -2678,7 +2681,7 @@ local void alpha_beta(search_t *arg_with_search,
 
   colour_enum my_colour;
 
-  if (IS_WHITE(arg_with_search->S_board.B_colour2move))
+  if (is_white(arg_with_search->S_board.B_colour2move))
     my_colour = WHITE_ENUM;
   else
     my_colour = BLACK_ENUM;
@@ -2793,7 +2796,8 @@ local void alpha_beta(search_t *arg_with_search,
   {
     alpha_beta_cache_entry_t *entry =
       alpha_beta_cache[arg_with_search->S_network_id][my_colour] +
-      FAST_MODULO64(arg_with_search->S_board.B_key, nalpha_beta_cache_entries);
+      return_fast_modulo64(arg_with_search->S_board.B_key,
+                           nalpha_beta_cache_entries);
 
     compat_prefetch_read(entry);
   }
@@ -2814,16 +2818,16 @@ local void alpha_beta(search_t *arg_with_search,
 
   score_t endgame_score = return_endgame_score(arg_with_search);
 
-  if (!IS_SCORE_NAN(endgame_score))
+  if (!is_score_nan(endgame_score))
   {
-    if (IS_SCORE_WON(endgame_score))
+    if (is_score_won(endgame_score))
     {
       construct_search_result(arg_search_result,
                               endgame_score,
                               endgame_score,
                               SR_WON_BIT);
     }
-    else if (IS_SCORE_LOST(endgame_score))
+    else if (is_score_lost(endgame_score))
     {
       construct_search_result(arg_search_result,
                               endgame_score,
@@ -2906,7 +2910,7 @@ local void alpha_beta(search_t *arg_with_search,
       &alpha_beta_cache_slot,
       FALSE);
 
-    if (IS_PV(arg_node_type) and !alpha_beta_cache_hit and (arg_my_depth >= 4))
+    if (is_pv(arg_node_type) and !alpha_beta_cache_hit and (arg_my_depth >= 4))
     {
       search_result_t temp_result;
 
@@ -2922,7 +2926,7 @@ local void alpha_beta(search_t *arg_with_search,
                  0,
                  &temp_result);
 
-      if (IS_SCORE_NAN(temp_result.SR_score))
+      if (is_score_nan(temp_result.SR_score))
       {
         construct_search_result(arg_search_result,
                                 SCORE_NOT_A_NUMBER,
@@ -2943,7 +2947,7 @@ local void alpha_beta(search_t *arg_with_search,
     {
       ++(arg_with_search->S_ntotal_alpha_beta_cache_hits);
 
-      if (!IS_PV(arg_node_type) and
+      if (!is_pv(arg_node_type) and
           (alpha_beta_cache_slot.ABCS_depth >= arg_my_depth))
       {
         ++(arg_with_search->S_ntotal_alpha_beta_cache_depth_hits);
@@ -3060,7 +3064,7 @@ local void alpha_beta(search_t *arg_with_search,
 
       sort->S_history =
         (const int(*)[HISTORY_NFIELDS])arg_with_search
-          ->S_history[IS_WHITE(arg_with_search->S_board.B_colour2move) ? 0 : 1];
+          ->S_history[is_white(arg_with_search->S_board.B_colour2move) ? 0 : 1];
     }
   }
 
@@ -3070,13 +3074,13 @@ local void alpha_beta(search_t *arg_with_search,
 
   if ((options.prob_cut_depth > 0) and
       (arg_my_depth >= options.prob_cut_depth) and
-      IS_MINIMAL_WINDOW(arg_node_type) and (arg_singular_adjustment == 0) and
+      is_minimal_window(arg_node_type) and (arg_singular_adjustment == 0) and
       !(arg_my_tweaks & TWEAK_MOVE_REDUCED_BIT) and
       !(arg_my_tweaks & TWEAK_MOVE_EXTENDED_BIT) and
       !(arg_my_tweaks & TWEAK_PROB_CUT_BIT) and
       (arg_moves_list->ML_ncaptx == 0) and
       (arg_moves_list->ML_nmoves > options.mobility_moves_threshold) and
-      !IS_SCORE_LOST(arg_my_alpha) and !IS_SCORE_WON(arg_my_beta))
+      !is_score_lost(arg_my_alpha) and !is_score_won(arg_my_beta))
   {
     int prob_cut_depth = (arg_my_depth * options.prob_cut_percentage) / 100;
 
@@ -3135,7 +3139,7 @@ local void alpha_beta(search_t *arg_with_search,
 
       arg_with_search->S_ntotal_prob_cut_nodes += prob_cut_nodes;
 
-      if (IS_SCORE_NAN(prob_cut_result.SR_score))
+      if (is_score_nan(prob_cut_result.SR_score))
       {
         ++(arg_with_search->S_ntotal_prob_cut_aborted_probes);
 
@@ -3178,8 +3182,8 @@ local void alpha_beta(search_t *arg_with_search,
     if (alpha_beta_cache_hit and
         (alpha_beta_cache_slot.ABCS_depth >= arg_my_depth) and
         !(alpha_beta_cache_slot.ABCS_flags & ABCS_SCORE_LE_ALPHA_BIT) and
-        !IS_SCORE_WON(alpha_beta_cache_slot.ABCS_score) and
-        !IS_SCORE_LOST(alpha_beta_cache_slot.ABCS_score))
+        !is_score_won(alpha_beta_cache_slot.ABCS_score) and
+        !is_score_lost(alpha_beta_cache_slot.ABCS_score))
     {
       ++(arg_with_search->S_ntotal_singular_extension_probes);
 
@@ -3214,7 +3218,7 @@ local void alpha_beta(search_t *arg_with_search,
                  DEPTH_MAX,
                  &singular_probe_result);
 
-      if (IS_SCORE_NAN(singular_probe_result.SR_score))
+      if (is_score_nan(singular_probe_result.SR_score))
         goto label_return;
 
       if (singular_probe_result.SR_score <= singular_probe_alpha)
@@ -3258,7 +3262,7 @@ local void alpha_beta(search_t *arg_with_search,
                         singular_adjustment,
                         arg_search_result);
 
-    if (IS_SCORE_NAN(arg_search_result->SR_score))
+    if (is_score_nan(arg_search_result->SR_score))
       goto label_return;
 
     goto label_store;
@@ -3303,7 +3307,7 @@ local void alpha_beta(search_t *arg_with_search,
     goto label_return;
   }
 
-  if (IS_MINIMAL_WINDOW(arg_node_type))
+  if (is_minimal_window(arg_node_type))
   {
     alpha_beta_minimal(arg_with_search,
                        arg_my_alpha,
@@ -3317,7 +3321,7 @@ local void alpha_beta(search_t *arg_with_search,
                        singular_adjustment,
                        arg_search_result);
 
-    if (IS_SCORE_NAN(arg_search_result->SR_score))
+    if (is_score_nan(arg_search_result->SR_score))
       goto label_return;
   }
   else
@@ -3334,7 +3338,7 @@ local void alpha_beta(search_t *arg_with_search,
                   singular_adjustment,
                   arg_search_result);
 
-    if (IS_SCORE_NAN(arg_search_result->SR_score))
+    if (is_score_nan(arg_search_result->SR_score))
       goto label_return;
   }
 
@@ -3366,7 +3370,7 @@ label_store:
 #endif
 
   if (FALSE and (options.alpha_beta_cache_size > 0) and
-      IS_SR_DRAW_BY_REP(arg_search_result->SR_flags))
+      is_sr_draw_by_rep(arg_search_result->SR_flags))
   {
     // HARDBUG(arg_search_result->SR_score != 0)
 
@@ -3375,7 +3379,7 @@ label_store:
 
   if ((options.alpha_beta_cache_size > 0) and
       (arg_singular_adjustment != DEPTH_MAX) and
-      !IS_SR_DRAW_BY_REP(arg_search_result->SR_flags) and
+      !is_sr_draw_by_rep(arg_search_result->SR_flags) and
       (options.cache_draw_results or (arg_search_result->SR_score != 0)))
   {
     HARDBUG(arg_search_result->SR_score > SCORE(SCORE_PLUS_INFINITY))
@@ -3404,7 +3408,7 @@ label_store:
 
     if (arg_search_result->SR_score <= arg_my_alpha)
     {
-      HARDBUG(IS_SR_GE_BETA(arg_search_result->SR_flags))
+      HARDBUG(is_sr_ge_beta(arg_search_result->SR_flags))
 
       ++(arg_with_search->S_ntotal_alpha_beta_cache_le_alpha_stored_entries);
 
@@ -3414,7 +3418,7 @@ label_store:
     }
     else if (arg_search_result->SR_score >= arg_my_beta)
     {
-      HARDBUG(IS_SR_LE_ALPHA(arg_search_result->SR_flags))
+      HARDBUG(is_sr_le_alpha(arg_search_result->SR_flags))
 
       ++(arg_with_search->S_ntotal_alpha_beta_cache_ge_beta_stored_entries);
 
@@ -3454,7 +3458,7 @@ label_store:
 
 label_return:
 
-  if (!IS_SCORE_NAN(arg_search_result->SR_score))
+  if (!is_score_nan(arg_search_result->SR_score))
   {
     HARDBUG(arg_search_result->SR_depth < arg_my_depth)
   }
@@ -3724,7 +3728,7 @@ local int pv_equal(search_t *arg_with_search,
 
     int my_colour;
 
-    if (IS_WHITE(arg_with_search->S_board.B_colour2move))
+    if (is_white(arg_with_search->S_board.B_colour2move))
       my_colour = WHITE_ENUM;
     else
       my_colour = BLACK_ENUM;
@@ -4003,7 +4007,7 @@ void do_search(search_t *arg_with_search,
              0,
              &temp_result);
 
-  if (IS_SCORE_NAN(temp_result.SR_score))
+  if (is_score_nan(temp_result.SR_score))
   {
     arg_with_search->S_root_score = return_score(arg_with_search);
 
@@ -4159,7 +4163,7 @@ void do_search(search_t *arg_with_search,
         score_t my_alpha;
         score_t my_beta;
 
-        if (IS_PV(node_type))
+        if (is_pv(node_type))
         {
           my_alpha = arg_with_search->S_best_score - margin_alpha;
 
@@ -4233,7 +4237,7 @@ void do_search(search_t *arg_with_search,
 
           undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
-          if (IS_SCORE_NAN(temp_result.SR_score))
+          if (is_score_nan(temp_result.SR_score))
             goto label_limit;
 
           move_score = temp_result.SR_score;
@@ -4245,14 +4249,14 @@ void do_search(search_t *arg_with_search,
           // move_score=1.963999987 my_alpha=1.962000012 my_beta=2.961999893
 
           if ((move_score <= my_alpha) or
-              ((move_score < my_beta) and IS_MINIMAL_WINDOW(node_type)))
+              ((move_score < my_beta) and is_minimal_window(node_type)))
 #else
 #error unknown SCORE_T
 #endif
           {
             // if a minimal-window search fails low we are done
 
-            if (IS_MINIMAL_WINDOW(node_type))
+            if (is_minimal_window(node_type))
               goto label_next_move;
 
             // if we already have a true score and the current move fails low
@@ -4272,7 +4276,7 @@ void do_search(search_t *arg_with_search,
               // this seems to be a very bad move
               // we search the next move with a PV window
 
-              HARDBUG(!IS_PV(node_type))
+              HARDBUG(!is_pv(node_type))
 
               goto label_next_move;
             }
@@ -4321,7 +4325,7 @@ void do_search(search_t *arg_with_search,
           {
             // we have a true score
 
-            HARDBUG(!IS_PV(node_type))
+            HARDBUG(!is_pv(node_type))
 
             if ((best_score_margin > 0) and ((move_score + best_score_margin) <=
                                              arg_with_search->S_best_score))
@@ -4347,7 +4351,7 @@ void do_search(search_t *arg_with_search,
           }
         }
 
-        HARDBUG(!IS_PV(node_type))
+        HARDBUG(!is_pv(node_type))
 
         // if we do not have a best score yet we always accept the score
         // otherwise only if the best score improves
@@ -4441,10 +4445,10 @@ void do_search(search_t *arg_with_search,
       label_next_move:;
       } // for (int imove)
 
-      if (IS_SCORE_WON(arg_with_search->S_best_score))
+      if (is_score_won(arg_with_search->S_best_score))
         goto label_limit;
 
-      if (IS_SCORE_LOST(arg_with_search->S_best_score))
+      if (is_score_lost(arg_with_search->S_best_score))
         goto label_limit;
 
       if (nbest_moves > 0)

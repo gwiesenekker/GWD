@@ -13,10 +13,15 @@ _Static_assert((sizeof(float) == 4) and (FLT_RADIX == 2) and
 #define USE_RSQRT
 #define MM256_LOAD_PS _mm256_loadu_ps
 
+#ifdef USE_AVX2_INTRINSICS
+local inline __m256 mm256_madd_ps(__m256 arg_a, __m256 arg_b, __m256 arg_c)
+{
 #ifdef USE_FMA
-#define MM256_MADD_PS(a, b, c) _mm256_fmadd_ps((a), (b), (c))
+  return (_mm256_fmadd_ps(arg_a, arg_b, arg_c));
 #else
-#define MM256_MADD_PS(a, b, c) _mm256_add_ps(_mm256_mul_ps((a), (b)), (c))
+  return (_mm256_add_ps(_mm256_mul_ps(arg_a, arg_b), arg_c));
+#endif
+}
 #endif
 
 #define NPIECES_PERCENTILE (INVALID)
@@ -395,7 +400,7 @@ local scaled_double_t dot_scaled(int arg_nvalues,
       __m256 vector_a = MM256_LOAD_PS(arg_a);
       __m256 vector_b = MM256_LOAD_PS(arg_b);
 
-      vector_sum = MM256_MADD_PS(vector_a, vector_b, vector_sum);
+      vector_sum = mm256_madd_ps(vector_a, vector_b, vector_sum);
     }
 
     ALIGN64(float lanes[8]);
@@ -472,7 +477,7 @@ local inline void dense_fixed_x8(const float *arg_inputs,
         __m256 weights = _mm256_loadu_ps(
           arg_weights + (size_t)(ioutput + joutput) * (8 * arg_nchunks) +
           8 * ichunk);
-        sums[joutput] = MM256_MADD_PS(inputs[ichunk], weights, sums[joutput]);
+        sums[joutput] = mm256_madd_ps(inputs[ichunk], weights, sums[joutput]);
       }
     }
 
@@ -2140,7 +2145,7 @@ local void activation_geluv2_scaled(int arg_nvalues,
 
       __m256 vy2 = _mm256_mul_ps(vy, vy);
 
-      __m256 vy2qp = MM256_MADD_PS(vy, vy, qp);
+      __m256 vy2qp = mm256_madd_ps(vy, vy, qp);
 
       __m256 rsqrt = _mm256_rsqrt_ps(vy2qp);
 
@@ -2159,7 +2164,7 @@ local void activation_geluv2_scaled(int arg_nvalues,
                       _mm256_mul_ps(_mm256_mul_ps(half, vy2qp), rsqrt2)));
 #endif
 
-      __m256 vg = MM256_MADD_PS(vy2, rsqrt, vy);
+      __m256 vg = mm256_madd_ps(vy2, rsqrt, vy);
 
       _mm256_store_ps(arg_outputs, vg);
     }
@@ -2842,7 +2847,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
     fen2board(with_board, bdata(bfen));
 
-    HARDBUG(IS_BLACK(with_board->B_colour2move))
+    HARDBUG(is_black(with_board->B_colour2move))
 
     int nwhite_men = BIT_COUNT(with_board->B_white_men_bb);
     int nblack_men = BIT_COUNT(with_board->B_black_men_bb);
@@ -3244,7 +3249,7 @@ local void append_fen(const board_t *arg_with_board,
 
   // always WTM
 
-  HARDBUG(IS_BLACK(arg_with_board->B_colour2move))
+  HARDBUG(is_black(arg_with_board->B_colour2move))
 
   int nwhite_men = BIT_COUNT(arg_with_board->B_white_men_bb);
   int nblack_men = BIT_COUNT(arg_with_board->B_black_men_bb);
@@ -3689,7 +3694,7 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
     CDESTROY(cfen)
 
-    if (IS_BLACK(with_board->B_colour2move))
+    if (is_black(with_board->B_colour2move))
     {
       if (label_white2move)
         result = -result;
@@ -3763,7 +3768,7 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
       double result_wtm = result;
 
-      if (IS_BLACK(with_board->B_colour2move))
+      if (is_black(with_board->B_colour2move))
         result_wtm = -result_wtm;
 
       append_fbuffer_fmt(&fdata,

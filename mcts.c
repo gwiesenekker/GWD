@@ -5,7 +5,7 @@ mcts_globals_t mcts_globals;
 
 local void inline flip_score(score_t *arg_score)
 {
-  if (!IS_SCORE_NAN(*arg_score))
+  if (!is_score_nan(*arg_score))
     *arg_score = -*arg_score;
 }
 
@@ -27,9 +27,9 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
   HARDBUG(arg_node_type == 0)
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and IS_PV(arg_node_type))
+  HARDBUG(is_minimal_window(arg_node_type) and is_pv(arg_node_type))
 
-  HARDBUG(IS_MINIMAL_WINDOW(arg_node_type) and
+  HARDBUG(is_minimal_window(arg_node_type) and
           ((arg_my_beta - arg_my_alpha) != 1))
 
   *arg_best_score = SCORE_NOT_A_NUMBER;
@@ -79,7 +79,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
   score_t endgame_score = return_endgame_score(arg_with_search);
 
-  if (!IS_SCORE_NAN(endgame_score))
+  if (!is_score_nan(endgame_score))
   {
     *arg_best_score = endgame_score;
 
@@ -123,7 +123,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
       for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
       {
-        if (MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[imove]))
+        if (move_extend_in_quiescence(arg_moves_list->ML_move_flags[imove]))
           nextend++;
       }
 
@@ -173,7 +173,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
     if (!all_moves)
     {
-      if (!MOVE_EXTEND_IN_QUIESCENCE(arg_moves_list->ML_move_flags[jmove]))
+      if (!move_extend_in_quiescence(arg_moves_list->ML_move_flags[jmove]))
         continue;
     }
 
@@ -188,7 +188,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
     ui32_t node_type = arg_node_type;
 
-    if (IS_PV(arg_node_type) and (imove > 0))
+    if (is_pv(arg_node_type) and (imove > 0))
     {
       temp_beta = temp_alpha + 1;
 
@@ -215,7 +215,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
       HARDBUG(temp_score == SCORE(SCORE_MINUS_INFINITY))
 
-      if (IS_SCORE_NAN(temp_score))
+      if (is_score_nan(temp_score))
       {
         undo_move(&(arg_with_search->S_board), jmove, arg_moves_list);
 
@@ -227,7 +227,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
       if (ipass == 2)
         break;
 
-      if (IS_MINIMAL_WINDOW(arg_node_type) or (temp_score < temp_beta) or
+      if (is_minimal_window(arg_node_type) or (temp_score < temp_beta) or
           (temp_score >= arg_my_beta))
         break;
 
@@ -287,7 +287,7 @@ void mcts_search(search_t *arg_with_search,
 
   score_t endgame_score = return_endgame_score(arg_with_search);
 
-  if (!IS_SCORE_NAN(endgame_score))
+  if (!is_score_nan(endgame_score))
   {
     *arg_best_score = endgame_score;
 
@@ -346,7 +346,7 @@ void mcts_search(search_t *arg_with_search,
 
         flip_score(&temp_score);
 
-        if (IS_SCORE_NAN(temp_score))
+        if (is_score_nan(temp_score))
         {
           HARDBUG(mcts_globals.mcts_globals_time_limit == 0.0)
 
@@ -371,7 +371,7 @@ void mcts_search(search_t *arg_with_search,
 
         if (temp_score <= my_alpha)
         {
-          if (IS_MINIMAL_WINDOW(node_type))
+          if (is_minimal_window(node_type))
             break;
 
           my_beta = my_alpha;
@@ -398,7 +398,7 @@ void mcts_search(search_t *arg_with_search,
 
       if ((imove == 0) or (temp_score > *arg_best_score))
       {
-        HARDBUG(!IS_PV(node_type))
+        HARDBUG(!is_pv(node_type))
 
         if (imove > 0)
         {
@@ -446,10 +446,10 @@ void mcts_search(search_t *arg_with_search,
     }
     // #endif
 
-    if (IS_SCORE_WON(*arg_best_score))
+    if (is_score_won(*arg_best_score))
       goto label_break;
 
-    if (IS_SCORE_LOST(*arg_best_score))
+    if (is_score_lost(*arg_best_score))
       goto label_break;
 
     if (my_depth >= arg_mcts_depth)
@@ -540,7 +540,7 @@ local void mcts_shoot_out(search_t *arg_with_search,
               arg_best_score,
               arg_verbose);
 
-  if (IS_SCORE_NAN(*arg_best_score))
+  if (is_score_nan(*arg_best_score))
     goto label_return;
 
   int jmove = arg_sort[0];
@@ -683,7 +683,7 @@ double mcts_shoot_outs(search_t *arg_with_search,
                    &temp_score,
                    arg_verbose);
 
-    if (IS_SCORE_NAN(temp_score))
+    if (is_score_nan(temp_score))
     {
       HARDBUG(arg_mcts_time_limit >= 0.0)
 

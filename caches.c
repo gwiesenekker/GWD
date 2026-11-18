@@ -3,9 +3,12 @@
 
 #undef ALIGN8
 
-#define CACHE_ENTRY_SIZE(P)                                              \
-  (P->C_entry_key_size + P->C_entry_key_nalign + P->C_entry_value_size + \
-   P->C_entry_value_nalign)
+local inline size_t return_cache_entry_size(const cache_t *arg_with_cache)
+{
+  return (
+    arg_with_cache->C_entry_key_size + arg_with_cache->C_entry_key_nalign +
+    arg_with_cache->C_entry_value_size + arg_with_cache->C_entry_value_nalign);
+}
 
 local void printf_cache(const cache_t *arg_with_cache)
 {
@@ -57,7 +60,7 @@ local void printf_cache(const cache_t *arg_with_cache)
        icache_entry++)
   {
     void *cache_entry = (i8_t *)arg_with_cache->C_entry_values +
-                        CACHE_ENTRY_SIZE(arg_with_cache) * icache_entry;
+                        return_cache_entry_size(arg_with_cache) * icache_entry;
 
     if (memcmp(cache_entry,
                arg_with_cache->C_entry_key_default,
@@ -89,7 +92,7 @@ int check_entry_in_cache(cache_t *arg_with_cache,
     i64_t icache_entry = key % arg_with_cache->C_nentries;
 
     cache_entry = (i8_t *)arg_with_cache->C_entry_values +
-                  CACHE_ENTRY_SIZE(arg_with_cache) * icache_entry;
+                  return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
   {
@@ -100,7 +103,7 @@ int check_entry_in_cache(cache_t *arg_with_cache,
     i64_t icache_entry = key % arg_with_cache->C_nentries;
 
     cache_entry = (i8_t *)arg_with_cache->C_entry_values +
-                  CACHE_ENTRY_SIZE(arg_with_cache) * icache_entry;
+                  return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
   {
@@ -111,7 +114,7 @@ int check_entry_in_cache(cache_t *arg_with_cache,
     i64_t icache_entry = key % arg_with_cache->C_nentries;
 
     cache_entry = (i8_t *)arg_with_cache->C_entry_values +
-                  CACHE_ENTRY_SIZE(arg_with_cache) * icache_entry;
+                  return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else
     FATAL("unknown C_entry_key_type", EXIT_FAILURE)
@@ -150,7 +153,7 @@ int store_entry_in_cache(cache_t *arg_with_cache,
     i64_t icache_entry = key % arg_with_cache->C_nentries;
 
     cache_entry = (i8_t *)arg_with_cache->C_entry_values +
-                  CACHE_ENTRY_SIZE(arg_with_cache) * icache_entry;
+                  return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
   {
@@ -161,7 +164,7 @@ int store_entry_in_cache(cache_t *arg_with_cache,
     i64_t icache_entry = key % arg_with_cache->C_nentries;
 
     cache_entry = (i8_t *)arg_with_cache->C_entry_values +
-                  CACHE_ENTRY_SIZE(arg_with_cache) * icache_entry;
+                  return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
   {
@@ -172,7 +175,7 @@ int store_entry_in_cache(cache_t *arg_with_cache,
     i64_t icache_entry = key % arg_with_cache->C_nentries;
 
     cache_entry = (i8_t *)arg_with_cache->C_entry_values +
-                  CACHE_ENTRY_SIZE(arg_with_cache) * icache_entry;
+                  return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else
     FATAL("unknown C_entry_key_type", EXIT_FAILURE)
@@ -213,7 +216,7 @@ void clear_cache(cache_t *arg_with_cache)
   while (itarget < arg_with_cache->C_nentries)
   {
     void *target = (i8_t *)arg_with_cache->C_entry_values +
-                   CACHE_ENTRY_SIZE(arg_with_cache) * itarget;
+                   return_cache_entry_size(arg_with_cache) * itarget;
 
     while ((itarget + nsource) > arg_with_cache->C_nentries)
       nsource--;
@@ -278,13 +281,13 @@ void construct_cache(cache_t *arg_with_cache,
 #endif
 
   arg_with_cache->C_nentries =
-    first_prime_below(arg_cache_size / CACHE_ENTRY_SIZE(arg_with_cache));
+    first_prime_below(arg_cache_size / return_cache_entry_size(arg_with_cache));
 
   HARDBUG(arg_with_cache->C_nentries < 3)
 
   MY_MALLOC_BY_TYPE(arg_with_cache->C_entry_values,
                     i8_t,
-                    CACHE_ENTRY_SIZE(arg_with_cache) *
+                    return_cache_entry_size(arg_with_cache) *
                       arg_with_cache->C_nentries)
 
   memcpy(arg_with_cache->C_entry_values,
@@ -303,12 +306,12 @@ void construct_cache(cache_t *arg_with_cache,
   while (itarget < arg_with_cache->C_nentries)
   {
     void *target = (i8_t *)arg_with_cache->C_entry_values +
-                   CACHE_ENTRY_SIZE(arg_with_cache) * itarget;
+                   return_cache_entry_size(arg_with_cache) * itarget;
 
     while ((itarget + nsource) > arg_with_cache->C_nentries)
       nsource--;
 
-    memcpy(target, source, CACHE_ENTRY_SIZE(arg_with_cache) * nsource);
+    memcpy(target, source, return_cache_entry_size(arg_with_cache) * nsource);
 
     itarget += nsource;
 

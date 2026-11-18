@@ -434,7 +434,7 @@ void board2fen(const board_t *arg_with_board,
   if (arg_brackets)
     HARDBUG(bcatcstr(arg_bfen, "[FEN \"") == BSTR_ERR)
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
     HARDBUG(bcatcstr(arg_bfen, "W") == BSTR_ERR)
   else
     HARDBUG(bcatcstr(arg_bfen, "B") == BSTR_ERR)
@@ -525,9 +525,9 @@ void print_board(const board_t *arg_with_board)
             BIT_COUNT(arg_with_board->B_white_kings_bb),
             BIT_COUNT(arg_with_board->B_black_kings_bb));
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
     my_printf(arg_with_board->B_my_printf, " WHITE to move\n");
-  else if (IS_BLACK(arg_with_board->B_colour2move))
+  else if (is_black(arg_with_board->B_colour2move))
     my_printf(arg_with_board->B_my_printf, " BLACK to move\n");
   else
     FATAL("arg_with_board->B_colour2move error", EXIT_FAILURE)
@@ -547,7 +547,7 @@ board2string(const board_t *arg_with_board, int arg_hub, bstring arg_string)
   HARDBUG(bassigncstr(arg_string, "?") == BSTR_ERR)
   HARDBUG(bpattern(arg_string, 51) == BSTR_ERR)
 
-  if (IS_WHITE(arg_with_board->B_colour2move))
+  if (is_white(arg_with_board->B_colour2move))
   {
     if (!arg_hub)
       bdata(arg_string)[0] = 'w';

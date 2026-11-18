@@ -20,9 +20,20 @@ enum
 
 #define SCORE_NOT_A_NUMBER SCORE(40000)
 
-#define IS_SCORE_WON(S) ((S) >= SCORE(SCORE_WON - NODE_MAX))
-#define IS_SCORE_LOST(S) ((S) <= SCORE(SCORE_LOST + NODE_MAX))
-#define IS_SCORE_NAN(S) ((S) == SCORE_NOT_A_NUMBER)
+static inline int is_score_won(score_t arg_score)
+{
+  return (arg_score >= SCORE(SCORE_WON - NODE_MAX));
+}
+
+static inline int is_score_lost(score_t arg_score)
+{
+  return (arg_score <= SCORE(SCORE_LOST + NODE_MAX));
+}
+
+static inline int is_score_nan(score_t arg_score)
+{
+  return (arg_score == SCORE_NOT_A_NUMBER);
+}
 
 score_t return_score_from_board(board_t *, double_t *);
 score_t return_score(search_t *);
