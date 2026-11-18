@@ -28,8 +28,9 @@ static void test_large_allocations(void)
       unsigned char *bytes =
         compat_large_alloc(sizes[isize], iprefer, &allocation);
 
-      assert(bytes != NULL && (uintptr_t)bytes % 64 == 0);
-      assert(bytes == allocation.pointer && allocation.size >= sizes[isize]);
+      assert((bytes != NULL) && ((uintptr_t)bytes % 64 == 0));
+      assert((bytes == allocation.pointer) &&
+             (allocation.size >= sizes[isize]));
 
       if (!iprefer)
         assert(allocation.page_mode == COMPAT_PAGES_REGULAR);
@@ -41,7 +42,7 @@ static void test_large_allocations(void)
 
       compat_large_free(&allocation);
 
-      assert(allocation.pointer == NULL && allocation.size == 0);
+      assert((allocation.pointer == NULL) && (allocation.size == 0));
 
       compat_large_free(&allocation);
     }
@@ -61,12 +62,12 @@ int main(void)
 {
   test_large_allocations();
 
-  if (compat_mulhi_u64(0, UINT64_MAX) != 0 ||
-      compat_mulhi_u64(1, UINT64_MAX) != 0 ||
-      compat_mulhi_u64(UINT64_MAX, UINT64_MAX) != UINT64_MAX - 1 ||
-      compat_mulhi_u64(UINT64_C(1) << 63, 2) != 1 ||
-      compat_mulhi_u64(UINT64_C(1) << 32, UINT64_C(1) << 32) != 1)
-    return 1;
+  if ((compat_mulhi_u64(0, UINT64_MAX) != 0) ||
+      (compat_mulhi_u64(1, UINT64_MAX) != 0) ||
+      (compat_mulhi_u64(UINT64_MAX, UINT64_MAX) != UINT64_MAX - 1) ||
+      (compat_mulhi_u64(UINT64_C(1) << 63, 2) != 1) ||
+      (compat_mulhi_u64(UINT64_C(1) << 32, UINT64_C(1) << 32) != 1))
+    return (1);
 #if defined(__SIZEOF_INT128__)
   uint64_t value = UINT64_C(0x123456789abcdef0);
 
@@ -78,7 +79,7 @@ int main(void)
 
     if (compat_mulhi_u64(value, other) !=
         (uint64_t)(((__uint128_t)value * other) >> 64))
-      return 1;
+      return (1);
   }
 #endif
   int prefetch_value = 0;
@@ -97,7 +98,7 @@ int main(void)
     FREE(heap)
     fputs("compat alignment test failed\n", stderr);
 
-    return 1;
+    return (1);
   }
   heap[128] = 42;
   FREE(heap)
@@ -105,8 +106,8 @@ int main(void)
   /* Repeating the test also checks cleanup/reinitialization. */
   for (int iinit = 0; iinit < 3; ++iinit)
     if (compat_init() != 0)
-      return 1;
+      return (1);
   puts("compat initialization tests passed");
 
-  return 0;
+  return (0);
 }

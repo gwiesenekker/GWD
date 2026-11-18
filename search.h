@@ -7,7 +7,7 @@
 #define NPV_SLOTS 4
 #define NPV_ENTRIES 64
 
-_Static_assert(NPV_ENTRIES > 0 && (NPV_ENTRIES & (NPV_ENTRIES - 1)) == 0,
+_Static_assert((NPV_ENTRIES > 0) and ((NPV_ENTRIES & (NPV_ENTRIES - 1)) == 0),
                "PV entry count must be a power of two");
 
 #define MINIMAL_WINDOW_BIT BIT(0)

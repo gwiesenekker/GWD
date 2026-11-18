@@ -167,12 +167,12 @@ typedef struct
 } alpha_beta_cache_slot_t;
 
 _Static_assert(sizeof(score_t) == 4, "TT score must occupy four bytes");
-_Static_assert(offsetof(alpha_beta_cache_slot_t, ABCS_data) == 8 &&
-                 offsetof(alpha_beta_cache_slot_t, ABCS_score) == 8 &&
-                 offsetof(alpha_beta_cache_slot_t, ABCS_depth) == 12 &&
-                 offsetof(alpha_beta_cache_slot_t, ABCS_flags) == 13 &&
-                 offsetof(alpha_beta_cache_slot_t, ABCS_moves) == 14 &&
-                 NABCS_MOVES == 2,
+_Static_assert((offsetof(alpha_beta_cache_slot_t, ABCS_data) == 8) and
+                 (offsetof(alpha_beta_cache_slot_t, ABCS_score) == 8) and
+                 (offsetof(alpha_beta_cache_slot_t, ABCS_depth) == 12) and
+                 (offsetof(alpha_beta_cache_slot_t, ABCS_flags) == 13) and
+                 (offsetof(alpha_beta_cache_slot_t, ABCS_moves) == 14) and
+                 (NABCS_MOVES == 2),
                "TT fields must fit the existing 64-bit payload layout");
 #ifdef DEBUG
 _Static_assert(sizeof(alpha_beta_cache_slot_t) == 24,
@@ -269,7 +269,7 @@ local inline void publish_nodes(search_t *arg_with_search)
 local i64_t published_global_nodes(search_t *arg_with_search)
 {
   if (arg_with_search->S_thread == NULL)
-    return arg_with_search->S_ntotal_nodes;
+    return (arg_with_search->S_ntotal_nodes);
 
   publish_nodes(arg_with_search);
 
@@ -279,7 +279,7 @@ local i64_t published_global_nodes(search_t *arg_with_search)
     nodes += atomic_load_explicit(&threads[ithread].T_npublished_nodes,
                                   memory_order_relaxed);
 
-  return nodes;
+  return (nodes);
 }
 
 #undef LAZY_STATS
@@ -3706,7 +3706,7 @@ local int pv_equal(search_t *arg_with_search,
       return (FALSE);
   }
 
-  HARDBUG(arg_jmove >= arg_moves_list->ML_nmoves);
+  HARDBUG(arg_jmove >= arg_moves_list->ML_nmoves)
 
   if (arg_erase)
   {
@@ -4313,8 +4313,8 @@ void do_search(search_t *arg_with_search,
 
             HARDBUG(!IS_PV(node_type))
 
-            if ((best_score_margin > 0) and (move_score + best_score_margin) <=
-                                              arg_with_search->S_best_score)
+            if ((best_score_margin > 0) and ((move_score + best_score_margin) <=
+                                             arg_with_search->S_best_score))
             {
               // this seems to be a very bad move
               // we search the next move with a minimal window
@@ -4661,7 +4661,7 @@ void construct_search(search_t *arg_with_search,
   }
 
   HARDBUG(
-    !gwdegtb_wdl_probe_create(256 * MBYTE, &(arg_with_search->S_wdl_probe)));
+    !gwdegtb_wdl_probe_create(256 * MBYTE, &(arg_with_search->S_wdl_probe)))
 }
 
 void init_search(void)

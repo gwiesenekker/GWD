@@ -16,10 +16,10 @@ typedef struct
   };
 } score_cache_slot_t;
 
-_Static_assert(sizeof(score_cache_slot_t) == 16 &&
-                 offsetof(score_cache_slot_t, SCS_data) == 8 &&
-                 offsetof(score_cache_slot_t, SCS_score) == 8 &&
-                 offsetof(score_cache_slot_t, SCS_crc32) == 12,
+_Static_assert((sizeof(score_cache_slot_t) == 16) and
+                 (offsetof(score_cache_slot_t, SCS_data) == 8) and
+                 (offsetof(score_cache_slot_t, SCS_score) == 8) and
+                 (offsetof(score_cache_slot_t, SCS_crc32) == 12),
                "score-cache slot must retain its 16-byte layout");
 
 typedef struct

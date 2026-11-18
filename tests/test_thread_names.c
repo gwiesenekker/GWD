@@ -38,7 +38,7 @@ static void *worker(void *arg_argument)
     assert(name_stack->nnames == 0);
   }
 
-  return NULL;
+  return (NULL);
 }
 
 int main(int argc, char **argv)
@@ -70,5 +70,5 @@ int main(int argc, char **argv)
 
   puts("thread-local name stack tests passed");
 
-  return 0;
+  return (0);
 }

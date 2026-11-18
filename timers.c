@@ -295,7 +295,7 @@ void finalize_progress(progress_t *arg_progress)
                      MPI_SUM,
                      my_mpi_globals.MMG_slave_comm);
 
-    HARDBUG(ntotal_mpi < arg_progress->P_ntotal);
+    HARDBUG(ntotal_mpi < arg_progress->P_ntotal)
 
     if (ntotal_mpi > arg_progress->P_ntotal)
     {
@@ -333,32 +333,32 @@ void construct_time_control(time_control_t *arg_with_time_control)
 
 double return_time_used(const time_control_t *arg_with_time_control)
 {
-  return arg_with_time_control->TC_time_used;
+  return (arg_with_time_control->TC_time_used);
 }
 
 double return_time_left(const time_control_t *arg_with_time_control)
 {
   HARDBUG(arg_with_time_control->TC_ngame_moves == INVALID)
 
-  return (arg_with_time_control->TC_game_time -
-          arg_with_time_control->TC_time_used) +
-         (arg_with_time_control->TC_nmoves_done *
-          arg_with_time_control->TC_increment);
+  return ((arg_with_time_control->TC_game_time -
+           arg_with_time_control->TC_time_used) +
+          (arg_with_time_control->TC_nmoves_done *
+           arg_with_time_control->TC_increment));
 }
 
 int is_configured_time_control(const time_control_t *arg_with_time_control)
 {
-  return arg_with_time_control->TC_ngame_moves != INVALID;
+  return (arg_with_time_control->TC_ngame_moves != INVALID);
 }
 
 int is_rolling_time_control(const time_control_t *arg_with_time_control)
 {
-  return arg_with_time_control->TC_rolling;
+  return (arg_with_time_control->TC_rolling);
 }
 
 int return_moves_done(const time_control_t *arg_with_time_control)
 {
-  return arg_with_time_control->TC_nmoves_done;
+  return (arg_with_time_control->TC_nmoves_done);
 }
 
 // Signed so callers can count moves played beyond the agreed control.
@@ -367,16 +367,16 @@ int return_moves_left(const time_control_t *arg_with_time_control)
   HARDBUG(arg_with_time_control->TC_ngame_moves == INVALID)
 
   if (arg_with_time_control->TC_rolling)
-    return arg_with_time_control->TC_ngame_moves;
+    return (arg_with_time_control->TC_ngame_moves);
 
-  return arg_with_time_control->TC_ngame_moves -
-         arg_with_time_control->TC_nmoves_done;
+  return (arg_with_time_control->TC_ngame_moves -
+          arg_with_time_control->TC_nmoves_done);
 }
 
 local double gaussian_cdf(int arg_imove)
 {
-  return 0.5 * (1.0 + erf((arg_imove - options.time_control_mean) /
-                          (sqrt(2.0) * options.time_control_sigma)));
+  return (0.5 * (1.0 + erf((arg_imove - options.time_control_mean) /
+                           (sqrt(2.0) * options.time_control_sigma))));
 }
 
 // Return the unassigned weight for redistribution over the schedule.
@@ -395,7 +395,7 @@ gaussian_weights(int arg_first_move, int arg_nweights, double *arg_weights)
     previous = current;
   }
 
-  return weight_left;
+  return (weight_left);
 }
 
 local double
@@ -440,7 +440,7 @@ geometric_weights(int arg_first_move, int arg_nweights, double *arg_weights)
       arg_weights[islot] = weight;
   }
 
-  return weight_left;
+  return (weight_left);
 }
 
 #define ROLLING_GAME_MOVES 40

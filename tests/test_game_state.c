@@ -115,5 +115,5 @@ int main(int argc, char **argv)
 
   puts("Game-state tests passed; DEBUG temporary stack empty");
 
-  return 0;
+  return (0);
 }

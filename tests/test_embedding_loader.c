@@ -27,7 +27,7 @@ void *my_malloc(const char *arg_name,
   (void)arg_func;
   (void)arg_line;
 
-  return malloc(arg_size);
+  return (malloc(arg_size));
 }
 void my_free(void *arg_pointer) { free(arg_pointer); }
 void register_heap(const char *arg_name,
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
                        iorientation & 1 ? &rows : NULL,
                        iorientation & 2 ? &columns : NULL);
 
-    assert(nrows == 2 && ncols == 3);
+    assert((nrows == 2) and (ncols == 3));
 
     for (int irow = 0; irow < nrows; irow++)
     {
@@ -121,5 +121,5 @@ int main(int argc, char **argv)
   cJSON_Delete(csv);
   puts("Contiguous rows, transposed columns and both orientations PASS");
 
-  return 0;
+  return (0);
 }

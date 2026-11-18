@@ -18,12 +18,12 @@ local int is_go_message(int arg_message_id)
 local dtm_policy_t go_dtm_policy(int arg_message_id)
 {
   if (arg_message_id == MESSAGE_GO_SHORT_CLOCK)
-    return DTM_ROOT_IF_OPEN;
+    return (DTM_ROOT_IF_OPEN);
 
   if (arg_message_id == MESSAGE_GO_TIMED)
-    return DTM_ROOT_ONLY;
+    return (DTM_ROOT_ONLY);
 
-  return DTM_ROOT_AND_PV;
+  return (DTM_ROOT_AND_PV);
 }
 
 /* The previous search may still be unwinding. Acknowledge GO only after

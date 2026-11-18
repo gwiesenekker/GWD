@@ -31,7 +31,7 @@ void *my_malloc(const char *arg_name,
 
   assert(posix_memalign(&pointer, 64, arg_size) == 0);
 
-  return pointer;
+  return (pointer);
 }
 void my_free(void *arg_pointer) { free(arg_pointer); }
 void register_heap(const char *arg_name,
@@ -91,7 +91,7 @@ static float *make_values(size_t arg_count, int arg_seed)
   for (size_t icell = 0; icell < arg_count; icell++)
     values[icell] = (float)((int)((icell * 13 + arg_seed) % 31) - 15) / 64.0f;
 
-  return values;
+  return (values);
 }
 
 static void test_cache(int arg_nembed, int arg_concat)
@@ -102,9 +102,9 @@ static void test_cache(int arg_nembed, int arg_concat)
   network.N_material_architecture =
     arg_concat ? NETWORK_ARCHITECTURE_CONCAT : NETWORK_ARCHITECTURE_ADD;
   network.N_material_dense_network_16x8_kernel =
-    !arg_concat && arg_nembed == 16;
+    !arg_concat and (arg_nembed == 16);
   network.N_material_dense_network_64x16_kernel =
-    !arg_concat && arg_nembed == 64;
+    !arg_concat and (arg_nembed == 64);
   network.N_shared_materials.MSS_nmaterials = arg_concat ? 4 : 5;
 
   dense_network_shared_t *dense = &network.N_shared_material_dense_network;
@@ -138,7 +138,7 @@ static void test_cache(int arg_nembed, int arg_concat)
     layer->LS_ninputs =
       ilayer == 0 ? dense->DNS_ninputs : dense->DNS_layers[0].LS_noutputs;
     layer->LS_noutputs =
-      ilayer == 0 && arg_nembed == 64 && !arg_concat ? 16 : 8;
+      (ilayer == 0) and (arg_nembed == 64) and !arg_concat ? 16 : 8;
     layer->LS_weights_noutputsxninputs =
       make_values(layer->LS_ninputs * layer->LS_noutputs, 3);
     layer->LS_bias = make_values(layer->LS_noutputs, 1);
@@ -256,5 +256,5 @@ int main(int argc, char **argv)
   test_cache(64, FALSE);
   test_cache(4, TRUE);
 
-  return 0;
+  return (0);
 }

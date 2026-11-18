@@ -539,7 +539,7 @@ void play_game(const char *arg_name,
                 "main/play_game");
       }
 
-      if (!automatic and options.sync_clock and (ndone % 9) == 0)
+      if (!automatic and options.sync_clock and ((ndone % 9) == 0))
       {
         PRINTF("\nMinutes remaining "
                " (press <ENTER> to accept the default (%s)?\n",
@@ -2176,7 +2176,7 @@ local void parse_parameters(void)
     {
       cJSON *cjson_value = cJSON_GetObjectItem(parameter, "value");
 
-      HARDBUG(!cJSON_IsString(cjson_value));
+      HARDBUG(!cJSON_IsString(cjson_value))
 
       char *svalue = cJSON_GetStringValue(cjson_value);
 

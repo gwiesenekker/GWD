@@ -87,5 +87,5 @@ int main(int argc, char **argv)
   puts("Hash-PV tests passed: empty slots, matching keys, both colours and "
        "replacement.");
 
-  return 0;
+  return (0);
 }

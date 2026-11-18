@@ -388,7 +388,7 @@ void *my_large_malloc(const char *arg_name,
          : arg_allocation->page_mode == COMPAT_PAGES_ADVISED ? "advised"
                                                              : "regular");
 
-  return (char *)heap + NPAD;
+  return ((char *)heap + NPAD);
 }
 
 void my_large_free(void *arg_pointer, compat_large_allocation_t *arg_allocation)
@@ -426,7 +426,7 @@ local my_name_stack_t *return_name_stack(void)
     name_stack = stack;
   }
 
-  return name_stack;
+  return (name_stack);
 }
 
 local int print_name_stack(my_name_stack_t *arg_stack)
@@ -451,7 +451,7 @@ local int print_name_stack(my_name_stack_t *arg_stack)
            snapshot[iname].MN_line,
            snapshot[iname].MN_pthread_self);
 
-  return nnames;
+  return (nnames);
 }
 
 local int print_all_name_stacks(void)
@@ -468,7 +468,7 @@ local int print_all_name_stacks(void)
   for (; stack != NULL; stack = stack->next)
     nnames += print_name_stack(stack);
 
-  return nnames;
+  return (nnames);
 }
 
 void print_my_names(int arg_all)
@@ -516,14 +516,14 @@ void pop_name(const char *arg_name,
 
   int empty = stack->nnames == 0;
   int mismatch =
-    !empty && strcmp(stack->names[stack->nnames - 1].MN_name, arg_name) != 0;
+    !empty and (strcmp(stack->names[stack->nnames - 1].MN_name, arg_name) != 0);
 
-  if (!empty && !mismatch)
+  if (!empty and !mismatch)
     --stack->nnames;
 
   HARDBUG(compat_mutex_unlock(&stack->mutex) != 0)
 
-  if (empty || mismatch)
+  if (empty or mismatch)
   {
     PRINTF("POP_NAME name=%s file=%s func=%s line=%d pthread_self=%#lX\n",
            arg_name,

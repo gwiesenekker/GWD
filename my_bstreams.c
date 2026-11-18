@@ -5,10 +5,10 @@
 size_t
 my_bread(void *arg_buffer, size_t arg_size, size_t arg_count, void *arg_file)
 {
-  return fread(arg_buffer, arg_size, arg_count, (FILE *)arg_file);
+  return (fread(arg_buffer, arg_size, arg_count, (FILE *)arg_file));
 }
 
-local int my_bgetc(void *arg_file) { return fgetc((FILE *)arg_file); }
+local int my_bgetc(void *arg_file) { return (fgetc((FILE *)arg_file)); }
 
 void construct_my_bstream(my_bstream_t *arg_with_my_bstream,
                           const char *arg_name)
@@ -92,7 +92,7 @@ int my_breadline(bstring arg_line, FILE *arg_file)
   HARDBUG(result == BSTR_ERR)
   HARDBUG(ferror(arg_file))
 
-  return result == 0;
+  return (result == 0);
 }
 
 void my_bcpu_flags(bstring arg_flags)

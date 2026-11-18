@@ -266,7 +266,7 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
 
     destroy_progress(&progress);
 
-    BDESTROY(bsql);
+    BDESTROY(bsql)
 
     return (rc);
   }

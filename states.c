@@ -607,7 +607,7 @@ void test_states(void)
   {
     value = pop_state(&state);
 
-    HARDBUG(state.S_icurrent != istate);
+    HARDBUG(state.S_icurrent != istate)
 
     HARDBUG(*value != istate)
   }

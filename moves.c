@@ -279,7 +279,8 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
  * never form 1ULL << a possibly negative scalar square number. */
 local inline ui64_t move_shift(ui64_t arg_bb, int arg_direction)
 {
-  return arg_direction > 0 ? arg_bb << arg_direction : arg_bb >> -arg_direction;
+  return (arg_direction > 0 ? arg_bb << arg_direction
+                            : arg_bb >> -arg_direction);
 }
 
 local inline void append_bb_move(moves_list_t *arg_moves_list,
@@ -515,7 +516,7 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
     const move_t *move = &with_moves_list->ML_moves[imove];
 
     with_moves_list->ML_move_flags[imove] =
-      (men_bb & BITULL(move->M_move_from)) && rows[move->M_move_to] >= 9
+      (men_bb & BITULL(move->M_move_from)) and (rows[move->M_move_to] >= 9)
         ? MOVE_DO_NOT_REDUCE_BIT | MOVE_EXTEND_IN_QUIESCENCE_BIT
         : 0;
   }
@@ -655,7 +656,7 @@ void do_move(board_t *arg_with_board,
   BEGIN_BLOCK(__FUNC__)
 
   if (arg_moves_list != NULL)
-    HARDBUG(arg_imove >= arg_moves_list->ML_nmoves);
+    HARDBUG(arg_imove >= arg_moves_list->ML_nmoves)
 
   colour_enum my_colour;
   colour_enum your_colour;
@@ -798,7 +799,7 @@ void undo_move(board_t *arg_with_board,
   BEGIN_BLOCK(__FUNC__)
 
   if (arg_moves_list != NULL)
-    HARDBUG(arg_imove >= arg_moves_list->ML_nmoves);
+    HARDBUG(arg_imove >= arg_moves_list->ML_nmoves)
 
   if (IS_WHITE(arg_with_board->B_colour2move))
     arg_with_board->B_colour2move = BLACK_ENUM;

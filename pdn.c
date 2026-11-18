@@ -155,7 +155,7 @@ get_next_token(const_bstring arg_bstring, int *arg_ichar, bstring arg_btoken)
 
 void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
 {
-  BSTRING(string);
+  BSTRING(string)
 
   file2bstring(arg_pdn_name, string);
 
@@ -477,7 +477,7 @@ void auto_play(const char *arg_txt_name, i64_t arg_npositions)
     PRINTF("auto_play seed=%llX\n", seed);
   }
 
-  BSTRING(btxt_name);
+  BSTRING(btxt_name)
 
   HARDBUG(bassigncstr(btxt_name, arg_txt_name) == BSTR_ERR)
 

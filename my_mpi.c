@@ -1279,7 +1279,7 @@ void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
 
   int semid;
 
-  HARDBUG((semid = my_semget(arg_semkey, NSEMS, 0600)) == -1);
+  HARDBUG((semid = my_semget(arg_semkey, NSEMS, 0600)) == -1)
 
   PRINTF("%s::acquiring lock iproc=%d arg_semkey=%d semid=%d\n$",
          __FUNC__,
@@ -1312,7 +1312,7 @@ void my_mpi_release_semaphore_v3(MPI_Comm arg_comm, int arg_semkey)
 
   int semid;
 
-  HARDBUG((semid = my_semget(arg_semkey, NSEMS, 0600)) == -1);
+  HARDBUG((semid = my_semget(arg_semkey, NSEMS, 0600)) == -1)
 
   HARDBUG(my_semop(semid, SEM_MUTEX, 1, 0) != 0)
 

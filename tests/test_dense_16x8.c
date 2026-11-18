@@ -22,7 +22,7 @@ static float sample(void)
 {
   rng = rng * 1664525u + 1013904223u;
 
-  return ldexpf((float)((int)(rng >> 16) - 32768), -(int)(rng % 20));
+  return (ldexpf((float)((int)(rng >> 16) - 32768), -(int)(rng % 20)));
 }
 
 static void select_kernel(dense_network_shared_t *arg_dense, int arg_enabled)
@@ -30,8 +30,10 @@ static void select_kernel(dense_network_shared_t *arg_dense, int arg_enabled)
   int ninputs = arg_dense->DNS_layers[0].LS_ninputs;
   int noutputs = arg_dense->DNS_layers[0].LS_noutputs;
 
-  arg_dense->DNS_16x8_kernel = arg_enabled && ninputs == 16 && noutputs == 8;
-  arg_dense->DNS_32x8_kernel = arg_enabled && ninputs == 32 && noutputs == 8;
+  arg_dense->DNS_16x8_kernel =
+    arg_enabled and (ninputs == 16) and (noutputs == 8);
+  arg_dense->DNS_32x8_kernel =
+    arg_enabled and (ninputs == 32) and (noutputs == 8);
 }
 
 static void test_shape(int arg_ninputs, int arg_noutputs)
@@ -121,5 +123,5 @@ int main(int argc, char **argv)
   test_shape(16, 8);
   test_shape(32, 8);
 
-  return 0;
+  return (0);
 }

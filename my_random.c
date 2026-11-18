@@ -40,7 +40,7 @@ local ui64_t rotl(ui64_t arg_value, int arg_nbits)
 {
   HARDBUG((arg_nbits < 0) or (arg_nbits > 63))
 
-  return (arg_value << arg_nbits) | (arg_value >> (64 - arg_nbits));
+  return ((arg_value << arg_nbits) | (arg_value >> (64 - arg_nbits)));
 }
 
 void shuffle(int *arg_array,
@@ -183,7 +183,7 @@ ui64_t return_my_random(my_random_t *arg_with_my_random)
   arg_with_my_random->MR_state[2] ^= t;
   arg_with_my_random->MR_state[3] = rotl(arg_with_my_random->MR_state[3], 45);
 
-  return result;
+  return (result);
 }
 
 #define TEST_NBITS 16

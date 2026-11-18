@@ -167,5 +167,5 @@ int main(int argc, char **argv)
   puts("Bstring I/O tests passed: long lines, append, EOF, Hub fragments and "
        "DXP framing");
 
-  return 0;
+  return (0);
 }

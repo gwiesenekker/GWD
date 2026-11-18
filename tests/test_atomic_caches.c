@@ -29,7 +29,7 @@ static score_cache_slot_t make_score(uint64_t arg_key, score_t arg_score)
 
   value.SCS_crc32 = ~HW_CRC32_U32(crc, arg_score);
 
-  return value;
+  return (value);
 }
 
 static search_t *new_search(void)
@@ -40,7 +40,7 @@ static search_t *new_search(void)
 
   memset(search, 0, sizeof(*search));
 
-  return search;
+  return (search);
 }
 
 static void *worker(void *arg_argument)
@@ -74,19 +74,20 @@ static void *worker(void *arg_argument)
     {
       assert(found.ABCS_key == key);
       assert(found.ABCS_score == (score_t)(key * 100));
-      assert(found.ABCS_depth == 12 && found.ABCS_moves[1] == 7);
+      assert((found.ABCS_depth == 12) and (found.ABCS_moves[1] == 7));
     }
     update_score_cache(search, &sc, &score);
 
     score_cache_slot_t readback;
 
     if (probe_score_cache(search, &sc, &readback))
-      assert(readback.SCS_key == key && readback.SCS_score == score.SCS_score);
+      assert((readback.SCS_key == key) and
+             (readback.SCS_score == score.SCS_score));
   }
   publish_nodes(search);
   compat_aligned_free(search);
 
-  return NULL;
+  return (NULL);
 }
 
 int main(int argc, char **argv)
@@ -124,8 +125,8 @@ int main(int argc, char **argv)
 
     load_alpha_beta_cache_slot(&readback, &tt.ABCE_slots[0]);
 
-    assert(readback.ABCS_key == value.ABCS_key &&
-           readback.ABCS_data == value.ABCS_data);
+    assert((readback.ABCS_key == value.ABCS_key) and
+           (readback.ABCS_data == value.ABCS_data));
   }
 
   for (unsigned key = 1; key <= 6; ++key)
@@ -139,7 +140,8 @@ int main(int argc, char **argv)
     assert(hit == (key >= 3));
 
     if (hit)
-      assert(found.ABCS_score == -(score_t)key && found.ABCS_moves[0] == -1);
+      assert((found.ABCS_score == -(score_t)key) and
+             (found.ABCS_moves[0] == -1));
   }
   search->S_board.B_key = 6;
 
@@ -181,7 +183,7 @@ int main(int argc, char **argv)
         atomic_load_explicit(&publication_threads[ithread].T_npublished_nodes,
                              memory_order_relaxed);
 
-      assert(nodes >= 0 && nodes <= 50000);
+      assert((nodes >= 0) and (nodes <= 50000));
     }
 
   for (int ithread = 0; ithread < 4; ++ithread)
@@ -194,5 +196,5 @@ int main(int argc, char **argv)
 
   puts("atomic cache tests passed");
 
-  return 0;
+  return (0);
 }

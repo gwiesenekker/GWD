@@ -74,7 +74,7 @@ int main(int argc, char **argv)
         {
           int jmove = return_next_sort(&probe);
 
-          assert(jmove >= 0 && jmove < nmoves);
+          assert((jmove >= 0) and (jmove < nmoves));
           assert(!found[jmove]++);
 
           if (imove < prefix)
@@ -85,8 +85,8 @@ int main(int argc, char **argv)
 
         assert(return_next_sort(&probe) == INVALID);
         assert(return_next_sort(&probe) == INVALID);
-        assert(sort.S_ninitialized == prefix ||
-               (prefix == 0 && sort.S_ninitialized == INVALID));
+        assert((sort.S_ninitialized == prefix) or
+               ((prefix == 0) and (sort.S_ninitialized == INVALID)));
 
         // Child searches cannot change the parent's or probe's private RNG.
         for (int idraw = 0; idraw < 10; idraw++)
@@ -99,7 +99,7 @@ int main(int argc, char **argv)
         if (kmove != INVALID)
           assert(order[0] == kmove);
 
-        if (!irandom && kmove == INVALID)
+        if (!irandom and (kmove == INVALID))
           for (int imove = 0; imove < nmoves; imove++)
             assert(order[imove] == imove);
 
@@ -163,7 +163,7 @@ int main(int argc, char **argv)
   construct_sort(&singular, 0, NULL, INVALID);
   copy_sort(&singular, &parent);
 
-  assert(parent.S_scored && singular.S_scored);
+  assert(parent.S_scored and singular.S_scored);
 
   for (int imove = 0; imove < moves.ML_nmoves; imove++)
     history[6][11 + imove] = -imove * 100;
@@ -199,5 +199,5 @@ int main(int argc, char **argv)
   puts("Sort tests passed: preferred move, permutations, exhaustion, replay "
        "and independent probes.");
 
-  return 0;
+  return (0);
 }

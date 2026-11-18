@@ -16,7 +16,7 @@ local double monotonic_seconds(void)
 
   HARDBUG(compat_monotonic(&now) != 0)
 
-  return (double)now.tv_sec + now.tv_nsec * 1e-9;
+  return ((double)now.tv_sec + now.tv_nsec * 1e-9);
 }
 
 double search_clock_used(my_timer_t *arg_timer)
@@ -26,13 +26,13 @@ double search_clock_used(my_timer_t *arg_timer)
     double start = atomic_load_explicit(&ponder_start, memory_order_relaxed);
 
     if (start == 0.0)
-      return -1.0;
+      return (-1.0);
 
     if (start > 0.0)
-      return monotonic_seconds() - start;
+      return (monotonic_seconds() - start);
   }
 
-  return return_my_timer(arg_timer, FALSE);
+  return (return_my_timer(arg_timer, FALSE));
 }
 
 typedef struct
@@ -132,7 +132,7 @@ local void line2command(char *arg_line, command_t *arg_with_command)
         while ((*character != '\0') and (*character != '"'))
           character++;
 
-        HARDBUG(*character == '\0');
+        HARDBUG(*character == '\0')
 
         *character = '\0';
         character++;
@@ -179,7 +179,7 @@ local int read_hub_line(bstring arg_line, bstring arg_input, int arg_wait)
     {
       HARDBUG(btrunc(arg_input, 0) == BSTR_ERR)
 
-      return INVALID;
+      return (INVALID);
     }
 
     HARDBUG(bconchar(arg_input, character) == BSTR_ERR)
@@ -191,16 +191,16 @@ local int read_hub_line(bstring arg_line, bstring arg_input, int arg_wait)
 
       PRINTF("read_from_hub: %s", bdata(arg_line));
 
-      return TRUE;
+      return (TRUE);
     }
   }
 
-  return FALSE;
+  return (FALSE);
 }
 
 local int read_from_hub(bstring arg_line, bstring arg_input)
 {
-  return read_hub_line(arg_line, arg_input, TRUE);
+  return (read_hub_line(arg_line, arg_input, TRUE));
 }
 
 local int hub_input(void) { return (compat_poll()); }

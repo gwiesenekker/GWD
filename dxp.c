@@ -50,7 +50,7 @@ double format_dxp_increment(double arg_increment, char arg_field[7])
 
   HARDBUG(my_sscanf(arg_field, "%lf", &increment) != 1)
 
-  return increment;
+  return (increment);
 }
 
 local void
@@ -446,7 +446,7 @@ char decode(int arg_nbuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
 
     BDESTROY(string)
 
-    return arg_buffer[0];
+    return (arg_buffer[0]);
   }
   else if (arg_buffer[0] == DXP_GAMEACC)
   {

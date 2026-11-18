@@ -84,7 +84,7 @@ static ui64_t random64(void)
   rng ^= rng >> 7;
   rng ^= rng << 17;
 
-  return rng;
+  return (rng);
 }
 
 static unsigned long long tested, roundtrips;
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
 
           occupied |= bit;
 
-          int king = random64() % 3 == 0 ||
+          int king = (random64() % 3 == 0) or
                      (side == WHITE_ENUM ? square <= 5 : square > 45);
           board.B_bit_boards[side][king ? KING_ENUM : MAN_ENUM] |= bit;
         }
@@ -231,5 +231,5 @@ int main(int argc, char **argv)
       roundtrips);
   }
 
-  return 0;
+  return (0);
 }

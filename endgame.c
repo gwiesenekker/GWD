@@ -35,7 +35,7 @@ void init_endgame(void)
     HARDBUG(!gwdegtb_wdl_compressed_info_threads(bdata(options.egtb_dir_wdl),
                                                  endgame_name,
                                                  &egtb_size,
-                                                 4));
+                                                 4))
 
     if (egtb_size == 0)
     {
@@ -67,7 +67,7 @@ void init_endgame(void)
                                                    endgame_name,
                                                    pendgame,
                                                    egtb_size,
-                                                   4));
+                                                   4))
 #else
       HARDBUG(!gwdegtb_wdl_decompress_threads(bdata(options.egtb_dir_wdl),
                                               endgame_name,
@@ -87,7 +87,7 @@ void init_endgame(void)
     my_mpi_sync_shared(my_mpi_globals.MMG_global_comm, wendgame, "WDL EGTB");
 
 #ifdef USE_COMPRESSED_WDL
-    HARDBUG(!gwdegtb_wdl_compressed_attach(endgame_name, pendgame, egtb_size));
+    HARDBUG(!gwdegtb_wdl_compressed_attach(endgame_name, pendgame, egtb_size))
 
 #else
     HARDBUG(!gwdegtb_wdl_attach(endgame_name, pendgame, egtb_size))
@@ -102,7 +102,7 @@ void init_endgame(void)
   size_t wdl_probe_cache = 256 * MBYTE;
 
   HARDBUG(
-    !gwdegtb_wdl_probe_create(wdl_probe_cache, &wdl_probe_alpha_beta_master));
+    !gwdegtb_wdl_probe_create(wdl_probe_cache, &wdl_probe_alpha_beta_master))
 
   PRINTF("EGTB probe cache is %zu MBYTE\n", wdl_probe_cache / MBYTE + 1);
 
@@ -127,7 +127,7 @@ local int probe_dtm(search_t *arg_with_search,
       (BIT_COUNT(with_board->B_white_kings_bb | with_board->B_white_men_bb |
                  with_board->B_black_kings_bb | with_board->B_black_men_bb) >
        EGTB_MAX_PIECES))
-    return ENDGAME_UNKNOWN;
+    return (ENDGAME_UNKNOWN);
 
   GwdegtbSide side = (with_board->B_colour2move == WHITE_ENUM)
                        ? GWDEGTB_WHITE_TO_MOVE
@@ -169,12 +169,12 @@ local int probe_dtm(search_t *arg_with_search,
 
 int read_endgame(search_t *arg_with_search, const char **arg_dtm_missing_name)
 {
-  return probe_dtm(arg_with_search, arg_dtm_missing_name, FALSE);
+  return (probe_dtm(arg_with_search, arg_dtm_missing_name, FALSE));
 }
 
 int read_endgame_if_open(search_t *arg_with_search)
 {
-  return probe_dtm(arg_with_search, NULL, TRUE);
+  return (probe_dtm(arg_with_search, NULL, TRUE));
 }
 
 score_t return_endgame_score(search_t *arg_with_search)

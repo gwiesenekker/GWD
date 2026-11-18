@@ -58,5 +58,5 @@ int main(int argc, char **argv)
   puts("History tests passed: searched moves only, colour, saturation and "
        "captures.");
 
-  return 0;
+  return (0);
 }

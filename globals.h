@@ -41,7 +41,7 @@ _Static_assert(CHAR_BIT == 8, "GWD requires 8-bit bytes");
 typedef long long i64_t;
 typedef unsigned long long ui64_t;
 
-_Static_assert(sizeof(i64_t) == 8 && sizeof(ui64_t) == 8,
+_Static_assert((sizeof(i64_t) == 8) && (sizeof(ui64_t) == 8),
                "GWD requires 64-bit i64_t and ui64_t");
 
 #include "compat.h"

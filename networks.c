@@ -2,8 +2,9 @@
 #include "globals.h"
 #include <float.h>
 
-_Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24 &&
-                 FLT_MIN_EXP == -125 && FLT_MAX_EXP == 128,
+_Static_assert((sizeof(float) == 4) and (FLT_RADIX == 2) and
+                 (FLT_MANT_DIG == 24) and (FLT_MIN_EXP == -125) and
+                 (FLT_MAX_EXP == 128),
                "network files require binary32 float characteristics");
 
 // MPI shared memory does not guarantee 32-byte alignment
@@ -198,7 +199,7 @@ local void read_1d_csv_base64(const cJSON *arg_csv,
 
   cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_DATA_ID);
 
-  HARDBUG(!cJSON_IsString(cjson_value));
+  HARDBUG(!cJSON_IsString(cjson_value))
 
   char *data = cJSON_GetStringValue(cjson_value);
 
@@ -258,7 +259,7 @@ local void read_2d_csv_base64(const cJSON *arg_csv,
 
   cjson_value = cJSON_GetObjectItem(arg_csv, CJSON_FILE_DATA_ID);
 
-  HARDBUG(!cJSON_IsString(cjson_value));
+  HARDBUG(!cJSON_IsString(cjson_value))
 
   char *data = cJSON_GetStringValue(cjson_value);
 
@@ -506,7 +507,7 @@ local void dense_layer0_dot(const dense_network_shared_t *arg_dense,
 #if defined(USE_AVX2_INTRINSICS) && SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
   if (arg_dense->DNS_16x8_kernel)
   {
-    HARDBUG(with_layer->LS_ninputs != 16 || with_layer->LS_noutputs != 8)
+    HARDBUG((with_layer->LS_ninputs != 16) or (with_layer->LS_noutputs != 8))
 
     dense_16x8(arg_inputs, with_layer->LS_weights_noutputsxninputs, arg_dot);
 
@@ -515,7 +516,7 @@ local void dense_layer0_dot(const dense_network_shared_t *arg_dense,
 
   if (arg_dense->DNS_32x8_kernel)
   {
-    HARDBUG(with_layer->LS_ninputs != 32 || with_layer->LS_noutputs != 8)
+    HARDBUG((with_layer->LS_ninputs != 32) or (with_layer->LS_noutputs != 8))
 
     dense_32x8(arg_inputs, with_layer->LS_weights_noutputsxninputs, arg_dot);
 
@@ -725,7 +726,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   cJSON *value_cjson = cJSON_GetObjectItem(directory, CJSON_SHAPE_ID);
 
-  HARDBUG(!cJSON_IsString(value_cjson));
+  HARDBUG(!cJSON_IsString(value_cjson))
 
   char *svalue = cJSON_GetStringValue(value_cjson);
 
@@ -773,12 +774,12 @@ local void construct_network_shared(const char *arg_network_name,
 
     cJSON *cjson_material = cJSON_GetArrayItem(cjson_materials, imaterial);
 
-    HARDBUG(!cJSON_IsObject(cjson_material));
+    HARDBUG(!cJSON_IsObject(cjson_material))
 
     cJSON *cjson_material_name =
       cJSON_GetObjectItem(cjson_material, CJSON_MATERIAL_NAME_ID);
 
-    HARDBUG(!cJSON_IsString(cjson_material_name));
+    HARDBUG(!cJSON_IsString(cjson_material_name))
 
     const char *material_name = cJSON_GetStringValue(cjson_material_name);
 
@@ -883,7 +884,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_ARCHITECTURE_PATTERNS_ID);
 
-  HARDBUG(!cJSON_IsString(value_cjson));
+  HARDBUG(!cJSON_IsString(value_cjson))
 
   svalue = cJSON_GetStringValue(value_cjson);
 
@@ -909,7 +910,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_ARCHITECTURE_MATERIAL_ID);
 
-  HARDBUG(!cJSON_IsString(value_cjson));
+  HARDBUG(!cJSON_IsString(value_cjson))
 
   svalue = cJSON_GetStringValue(value_cjson);
 
@@ -939,7 +940,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_ACTIVATION_INPUTS_ID);
 
-  HARDBUG(!cJSON_IsString(value_cjson));
+  HARDBUG(!cJSON_IsString(value_cjson))
 
   svalue = cJSON_GetStringValue(value_cjson);
 
@@ -980,7 +981,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_ACTIVATION_ID);
 
-  HARDBUG(!cJSON_IsString(value_cjson));
+  HARDBUG(!cJSON_IsString(value_cjson))
 
   svalue = cJSON_GetStringValue(value_cjson);
 
@@ -1017,7 +1018,7 @@ local void construct_network_shared(const char *arg_network_name,
 
   value_cjson = cJSON_GetObjectItem(directory, CJSON_ACTIVATION_LAST_ID);
 
-  HARDBUG(!cJSON_IsString(value_cjson));
+  HARDBUG(!cJSON_IsString(value_cjson))
 
   svalue = cJSON_GetStringValue(value_cjson);
 
@@ -2300,7 +2301,7 @@ int base3_index_v3(const board_t *arg_board, ui64_t arg_pattern_bb)
   uint64_t white_mask = _pext_u64(arg_board->B_white_men_bb, arg_pattern_bb);
   uint64_t black_mask = _pext_u64(arg_board->B_black_men_bb, arg_pattern_bb);
 
-  return base3_table[white_mask | (black_mask << 8)];
+  return (base3_table[white_mask | (black_mask << 8)]);
 }
 
 int base3_index_v4(const board_t *arg_board, ui64_t arg_pattern_bb)
@@ -2314,8 +2315,8 @@ int base3_index_v4(const board_t *arg_board, ui64_t arg_pattern_bb)
 
   HARDBUG((white_mask & black_mask) != 0)
 
-  return (int)(base3_mask_table[white_mask] +
-               2u * base3_mask_table[black_mask]);
+  return (
+    (int)(base3_mask_table[white_mask] + 2u * base3_mask_table[black_mask]));
 }
 
 // assumes inputs have been set
@@ -2515,7 +2516,7 @@ double return_dense_network_score_scaled(
 
     // return (pwin - ploss);
 
-    return (logits2 - logits0) * (pwin + ploss);
+    return ((logits2 - logits0) * (pwin + ploss));
   }
   else
   {
@@ -3634,7 +3635,7 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
                    2 * NPIECES_MAX,
                    BUCKET_LINEAR);
 
-  BSTRING(bdata_name);
+  BSTRING(bdata_name)
 
   HARDBUG(bassigncstr(bdata_name, "/tmp5/gwies/data.csv") == BSTR_ERR)
 

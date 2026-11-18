@@ -28,7 +28,7 @@ void *my_malloc(const char *arg_name,
   (void)arg_func;
   (void)arg_line;
 
-  return compat_aligned_alloc(64, arg_size);
+  return (compat_aligned_alloc(64, arg_size));
 }
 
 int main(int argc, char **argv)
@@ -38,20 +38,23 @@ int main(int argc, char **argv)
   assert(!my_mpi_globals.MMG_init);
   assert(my_mpi_globals.MMG_nglobal == 1);
   assert(my_mpi_globals.MMG_global_id == 0);
-  assert(my_mpi_globals.MMG_is_single && my_mpi_globals.MMG_is_master);
-  assert(!my_mpi_globals.MMG_has_slaves && !my_mpi_globals.MMG_is_slave);
+  assert(my_mpi_globals.MMG_is_single and my_mpi_globals.MMG_is_master);
+  assert(!my_mpi_globals.MMG_has_slaves and !my_mpi_globals.MMG_is_slave);
 
   int size = -1, rank = -1;
 
-  assert(my_mpi_comm_size(MPI_COMM_WORLD, &size) == MPI_SUCCESS && size == 1);
-  assert(my_mpi_comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS && rank == 0);
+  assert((my_mpi_comm_size(MPI_COMM_WORLD, &size) == MPI_SUCCESS) and
+         (size == 1));
+  assert((my_mpi_comm_rank(MPI_COMM_WORLD, &rank) == MPI_SUCCESS) and
+         (rank == 0));
 
   void *data = NULL;
   MPI_Win win;
 
   my_mpi_allocate_shared(MPI_COMM_WORLD, sizeof(int), 257, &data, &win);
 
-  assert(data != NULL && (uintptr_t)data % 64 == 0 && win == MPI_WIN_NULL);
+  assert((data != NULL) and ((uintptr_t)data % 64 == 0) and
+         (win == MPI_WIN_NULL));
 
   int *cells = data;
 
@@ -76,5 +79,5 @@ int main(int argc, char **argv)
 
   puts("no-MPI wrapper tests passed");
 
-  return 0;
+  return (0);
 }

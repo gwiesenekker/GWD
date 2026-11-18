@@ -28,7 +28,7 @@ static int lookup(pv_entries_t *arg_pv, ui64_t arg_key, int arg_colour)
   search.S_board.B_key = arg_key;
   search.S_board.B_colour2move = arg_colour;
 
-  return probe_pv(arg_pv, &search);
+  return (probe_pv(arg_pv, &search));
 }
 
 static void
@@ -77,14 +77,14 @@ int main(int argc, char **argv)
   ui64_t other_key = 0;
   int nkeys = 0;
 
-  for (ui64_t ikey = 1; nkeys < NPV_SLOTS + 1 || other_key == 0; ikey++)
+  for (ui64_t ikey = 1; (nkeys < NPV_SLOTS + 1) or (other_key == 0); ikey++)
   {
     ui64_t key = ikey << 16;
     int ientry = (ui32_t)return_fmix64(key) & (NPV_ENTRIES - 1);
 
-    if (ientry == 0 && nkeys < NPV_SLOTS + 1)
+    if ((ientry == 0) and (nkeys < NPV_SLOTS + 1))
       keys[nkeys++] = key;
-    else if (ientry != 0 && other_key == 0)
+    else if ((ientry != 0) and (other_key == 0))
       other_key = key;
 
     assert(ikey < 1000000);
@@ -151,5 +151,5 @@ int main(int argc, char **argv)
   puts("PV tests passed: misses, per-colour updates, snapshots, collisions and "
        "replacement.");
 
-  return 0;
+  return (0);
 }
