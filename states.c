@@ -1,4 +1,4 @@
-// SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
+// SCU REVISION 8.1299 wo 18 nov 2026 18:02:29 CET
 #include "states.h"
 
 #include "boards.h"
@@ -107,10 +107,9 @@ local void set_starting_position(game_state_t *arg_with_game_state,
   cJSON_SetValuestring(cjson_item, arg_position);
 }
 
-local void
-push_move(game_state_t *arg_with_game_state,
-          const char *arg_move,
-          const char *arg_comment)
+local void push_move(game_state_t *arg_with_game_state,
+                     const char *arg_move,
+                     const char *arg_comment)
 {
   cJSON *cjson_item =
     cJSON_GetObjectItem(arg_with_game_state->cjson_object, CJSON_MOVES_ID);

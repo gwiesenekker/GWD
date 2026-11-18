@@ -1,5 +1,28 @@
 # GWD changelog
 
+## 8.1299
+
+Released 18 November 2026 for Linux and Windows x86-64.
+Changes below are relative to 8.1279.
+
+- Send Hub `ready` only after initialization, so loading time is not charged
+  to the first move.
+- Open DTM endgame tables asynchronously. Timed Hub PV output avoids blocking
+  DTM lookups, and short-clock searches can use WDL while DTM becomes available.
+- Add optional singular reductions of the hash move after a failed singular
+  probe. `singular_reduction=0` remains the default.
+- Replace fixed-size game-state and text buffers with dynamic bstrings.
+  Fix saved-game loading for long games and check bstring operation failures.
+- Modernize the C11 interfaces, constant tables, integer types and const
+  qualifiers, and document consistent formatting and naming in STYLE.md.
+- Make headers self-contained, replace the globals.h umbrella with direct
+  dependencies, and add header and text-I/O regression coverage.
+- Fix the Windows SIZE name collision in the MPI test code.
+
+The C/header/Makefile sources match SCU/8.1299. Building requires updated
+external compat and GWDEGTB sources, including the asynchronous DTM API.
+Release packages include the shared 16x8 network and SHA-1/SHA-256 checksum lists.
+
 ## 8.1279
 
 Released 15 November 2026 for Linux and Windows x86-64.

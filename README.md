@@ -2,7 +2,7 @@
 
 Windows CMake build instructions: [WINDOWS.md](WINDOWS.md).
 
-## Match play in 8.1279
+## Match play in 8.1299
 
 For standard DXP, leave `dxp_game_increment` at its default of zero. A positive
 value selects the Fischer `F` game request when GWD initiates a game. For
@@ -18,16 +18,17 @@ Hub supports clock reports with optional move counts and Fischer increments.
 On a ponder hit, GWD continues the existing search and starts its move clock.
 Hub and DXP both reserve 50 ms for returning the move.
 
-The release source matches SCU/8.1279. Building requires the external `compat`
+The release source matches SCU/8.1299. Building requires the external `compat`
 and `endgame7` (GWDEGTB) source directories; they are not bundled in this repository.
 Use updated compat sources providing `compat_large_alloc()` and
-`compat_large_free()`, and GWDEGTB providing `gwdegtb_dtm_missing_name()`.
+`compat_large_free()`, and GWDEGTB providing asynchronous DTM opening through
+`gwdegtb_dtm_request_open()` and `gwdegtb_dtm_lookup_if_open()`.
 Compact embedding index files are no longer supported; use full embedding
 tables, as provided by the shared release network.
 
-## Latest published release: 8.1279
+## Latest published release: 8.1299
 
-[Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1279).
+[Download Linux and Windows builds](https://github.com/gwiesenekker/GWD/releases/tag/v8.1299).
 Download the archive for your platform and the shared network archive. Extract
 both into the same writable directory, then follow `RELEASE-README.txt`.
 SHA-1 and SHA-256 checksum lists accompany the release assets.
