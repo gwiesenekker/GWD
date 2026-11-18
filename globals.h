@@ -52,21 +52,8 @@ _Static_assert((sizeof(i64_t) == 8) && (sizeof(ui64_t) == 8),
 #define FALSE 0
 #define TRUE 1
 
-#define KBYTE 1024
 #define MBYTE 1048576
-#define GBYTE 1073741824LL
-// #define TBYTE   1099511627776LL
-#define S_MAX 32767
-#define S_MIN (-S_MAX)
-#define L_MAX 2147483647L
-#define L_MIN (-L_MAX)
-#define LL_MAX 9223372036854775807LL
-#define LL_MIN (-LL_MAX)
-#define UL_MAX 4294967296ULL
 #define ULL_MAX 18446744073709551615ULL
-
-#define EPS_REAL 1.0e-3
-#define EPS_DOUBLE 1.0e-6
 
 // specific defines
 
@@ -105,8 +92,6 @@ enum
 #define CJSON_MOVE_STRING_ID "move_string"
 #define CJSON_COMMENT_STRING_ID "comment_string"
 
-#define CJSON_HUB_PV_ID "hub_pv"
-
 #define CJSON_CSV_ID "csv"
 #define CJSON_CSV_PATH_ID "path"
 #define CJSON_CSV_COLUMNS_ID "columns"
@@ -125,9 +110,6 @@ enum
 #define and &&
 #define or ||
 #define index DO_NOT_USE_INDEX
-
-#define cat2(x, y) x##y
-#define cat3(x, y, z) x##y##z
 
 #define __FUNC__ __func__
 
@@ -164,10 +146,6 @@ enum
 
 #define FREAD(F, P, T, N) HARDBUG(fread(P, sizeof(T), N, F) != N)
 #define FWRITE(F, P, T, N) HARDBUG(fwrite(P, sizeof(T), N, F) != N)
-#define FSEEKO(F, N) HARDBUG(compat_fseeko(F, N, SEEK_SET) != 0)
-#define FBOFO(F) HARDBUG(compat_fseeko(F, 0, SEEK_SET) != 0)
-#define FEOFO(F) HARDBUG(compat_fseeko(F, 0, SEEK_END) != 0)
-#define FTELLO(F, X) HARDBUG(((X) = ftello(F)) < 0)
 #define FCLOSE(F)                        \
   {                                      \
     HARDBUG(fclose(F) == EOF)(F) = NULL; \
@@ -204,7 +182,6 @@ typedef i32_t scaled_double_t;
 
 #if SCORE_T == SCORE_T_INT
 typedef i32_t score_t;
-#define SCANF_SCORE_T "%d"
 #define PRINTF_SCORE_T "%d"
 #define SCANF_SCORE_T_RAW "%d"
 #define PRINTF_SCORE_T_RAW "%d"
@@ -213,7 +190,6 @@ typedef i32_t score_t;
 #define SCORE2PRINTF(S) (S)
 #elif SCORE_T == SCORE_T_FLOAT
 typedef i32_t score_t;
-#define SCANF_SCORE_T "%d"
 #define PRINTF_SCORE_T "%.3f"
 #define SCANF_SCORE_T_RAW "%d"
 #define PRINTF_SCORE_T_RAW "%d"

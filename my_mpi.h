@@ -21,11 +21,9 @@ typedef ptrdiff_t MPI_Aint;
 typedef void *MPI_Win;
 
 #define MPI_SUCCESS 0
-#define MPI_ERRCODES_IGNORE NULL
 
 #define MPI_COMM_WORLD NULL
 #define MPI_COMM_NULL NULL
-#define MPI_COMM_SELF NULL
 
 #define MPI_INFO_NULL NULL
 

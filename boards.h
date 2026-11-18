@@ -13,14 +13,12 @@ enum
 #define bO_hub "b"
 #define bX_hub "B"
 #define nn_hub "e"
-#define NN_hub "E"
 
 #define wO "o"
 #define wX "x"
 #define bO "O"
 #define bX "X"
 #define nn "."
-#define NN "E"
 
 #define STARTING_POSITION "wOOOOOOOOOOOOOOOOOOOO..........oooooooooooooooooooo"
 #define STARTING_POSITION2FEN                                                 \
@@ -66,12 +64,6 @@ static inline int is_black(int arg_colour)
 {
   return (arg_colour == BLACK_ENUM);
 }
-
-static inline int is_empty(int arg_piece) { return (arg_piece == 0); }
-
-static inline int is_man(int arg_piece) { return (arg_piece == MAN_ENUM); }
-
-static inline int is_king(int arg_piece) { return (arg_piece == KING_ENUM); }
 
 typedef struct
 {

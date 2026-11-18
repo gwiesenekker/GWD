@@ -2,8 +2,6 @@
 #ifndef UtilsH
 #define UtilsH
 
-#define NANO_SECONDS 1000000000
-#define DECI_SECOND 0.1
 #define CENTI_SECOND 0.01
 #define MILLI_SECOND 0.001
 #define MICRO_SECOND 0.000001

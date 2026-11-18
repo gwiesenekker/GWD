@@ -4,11 +4,6 @@
 
 #define sscanf do_not_use_sscanf_but_my_sscanf
 
-static inline int my_isspace(int arg_character)
-{
-  return (isspace((unsigned char)arg_character));
-}
-
 int my_sscanf(const char *, const char *, ...) COMPAT_FORMAT(scanf, 2, 3);
 
 #endif

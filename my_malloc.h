@@ -2,8 +2,6 @@
 #ifndef MyMallocH
 #define MyMallocH
 
-#define NSTACK_MAX 1024
-
 #define MARK_ARRAY_READ_ONLY(P, S) \
   register_heap(#P, __FILE__, __FUNC__, __LINE__, P, S, FALSE, TRUE);
 
