@@ -1,5 +1,13 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "my_printf.h"
+
+#include "bstrlib.h"
+#include "common.h"
+#include "main.h"
+#include "my_bstreams.h"
+#include "my_malloc.h"
+#include "my_mpi.h"
+#include "records.h"
 
 #define LOG_PREFIX_ID "LOG_prefix_id"
 #define LOG_OBJECT_ID "LOG_object_id"

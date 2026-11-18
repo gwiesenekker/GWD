@@ -1,5 +1,8 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "my_bstreams.h"
+
+#include "bstrlib.h"
+#include "common.h"
 
 // fread adapter with the exact bstrlib callback signature.
 size_t

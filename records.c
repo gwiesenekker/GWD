@@ -1,5 +1,11 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "records.h"
+
+#include "bstrlib.h"
+#include "cJSON.h"
+#include "common.h"
+#include "my_malloc.h"
+#include "my_printf.h"
 
 #define CJSON_FIELDS_ID "fields"
 #define CJSON_FIELD_NAME_ID "field_name"

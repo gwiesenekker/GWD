@@ -3,6 +3,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 build_dir=$(mktemp -d /tmp/gwd8-headers-XXXXXX)
 echo "Test artifacts: $build_dir"
+# Production units must not regain a dependency on the umbrella header.
+if grep -nE '^[[:space:]]*#[[:space:]]*include[[:space:]]*["<]globals\.h[">]' -- *.c; then
+  echo "Production source includes globals.h" >&2
+  exit 1
+fi
 flags=(-std=c11 -D_GNU_SOURCE -Werror -fsyntax-only
        -I. -I"${COMPAT_DIR:-../compat}" -I"${EGTB_INCLUDE:-../endgame7}")
 headers=()

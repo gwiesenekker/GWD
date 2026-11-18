@@ -1,7 +1,9 @@
 /* Standalone differential test; no networks, MPI runtime, or EGTB required.
  * Compile with function/data sections and link with --gc-sections, moves.c,
  * Test stubs below are deliberately not part of the engine. */
-#include "../globals.h"
+#include "../moves.h"
+#include "../boards.h"
+#include "../common.h"
 #include <assert.h>
 #undef clock
 

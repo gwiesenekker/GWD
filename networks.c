@@ -1,5 +1,27 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "networks.h"
+
+#include "boards.h"
+#include "bstrlib.h"
+#include "buckets.h"
+#include "cJSON.h"
+#include "common.h"
+#include "fbuffer.h"
+#include "main.h"
+#include "moves.h"
+#include "my_bstreams.h"
+#include "my_cjson.h"
+#include "my_malloc.h"
+#include "my_mpi.h"
+#include "my_printf.h"
+#include "my_random.h"
+#include "my_safec.h"
+#include "patterns.h"
+#include "profile.h"
+#include "score.h"
+#include "stats.h"
+#include "timers.h"
+#include "utils.h"
 #include <float.h>
 
 _Static_assert((sizeof(float) == 4) and (FLT_RADIX == 2) and

@@ -1,4 +1,7 @@
-#include "../globals.h"
+#include "../sort.h"
+#include "../common.h"
+#include "../moves.h"
+#include "../my_random.h"
 #include <assert.h>
 
 int zzzzzz_invocation;

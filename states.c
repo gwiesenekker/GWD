@@ -1,5 +1,14 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "states.h"
+
+#include "boards.h"
+#include "bstrlib.h"
+#include "cJSON.h"
+#include "common.h"
+#include "my_bstreams.h"
+#include "my_cjson.h"
+#include "my_malloc.h"
+#include "my_printf.h"
 
 // the game state is maintained in a cJSON object
 

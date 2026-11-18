@@ -1,5 +1,11 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "classes.h"
+
+#include "bstrlib.h"
+#include "common.h"
+#include "my_bstreams.h"
+#include "my_malloc.h"
+#include "my_printf.h"
 
 // objects are derived from a class
 

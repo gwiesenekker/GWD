@@ -1,5 +1,12 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "my_random.h"
+
+#include "common.h"
+#include "moves.h"
+#include "my_printf.h"
+#include "my_valgrind.h"
+#include "sort.h"
+#include "stats.h"
 
 void copy_my_random(my_random_t *arg_to, const my_random_t *arg_from)
 {

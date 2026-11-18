@@ -178,6 +178,9 @@ BDESTROY(bname)
   engine headers so those headers can include it without cycles.
 - Keep `globals.h` as the application umbrella; do not include it from other
   project headers to hide missing dependencies.
+- Include a source file's own header first, followed by the headers whose
+  declarations it uses. Production `.c` files should not depend on the
+  `globals.h` umbrella; account for DEBUG and other conditional paths too.
 - Preserve third-party headers. Check standalone and reordered includes with
   `tests/run-headers.sh` after changing header dependencies.
 

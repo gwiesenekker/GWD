@@ -1,5 +1,10 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "stats.h"
+
+#include "bstrlib.h"
+#include "common.h"
+#include "my_mpi.h"
+#include "my_printf.h"
 #include <float.h>
 
 void clear_stats(stats_t *arg_with_stats)

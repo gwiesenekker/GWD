@@ -2,20 +2,13 @@
 #ifndef GlobalsH
 #define GlobalsH
 
-#define REVISION "8.1286"
+#include "revision.h"
 
 #include "common.h"
 
 // specific includes
 
-#ifdef USE_VALGRIND
-#include <valgrind/valgrind.h>
-#include <valgrind/memcheck.h>
-#include <sys/syscall.h>
-#else
-#define RUNNING_ON_VALGRIND 0
-#define VALGRIND_CHECK_MEM_IS_DEFINED
-#endif
+#include "my_valgrind.h"
 
 #ifdef USE_OPENMPI
 #include <mpi.h>

@@ -1,6 +1,12 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 
-#include "globals.h"
+#include "patterns.h"
+
+#include "boards.h"
+#include "bstrlib.h"
+#include "common.h"
+#include "my_malloc.h"
+#include "my_printf.h"
 
 local const int map_row_col[10][10] = {
   {-1, 1, -1, 2, -1, 3, -1, 4, -1, 5},

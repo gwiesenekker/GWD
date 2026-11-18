@@ -1,5 +1,12 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "caches.h"
+
+#include "bstrlib.h"
+#include "common.h"
+#include "my_malloc.h"
+#include "my_printf.h"
+#include "my_random.h"
+#include "utils.h"
 
 #undef ALIGN8
 

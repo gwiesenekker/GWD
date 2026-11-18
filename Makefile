@@ -148,6 +148,8 @@ $(TARGET): $(OBJS) $(COMPATOBJS) $(ENDGAME7OBJS)
 
 HEADERS=boards.h\
   common.h\
+  revision.h\
+  my_valgrind.h\
   sort.h\
   bstrlib.h\
   cJSON.h\

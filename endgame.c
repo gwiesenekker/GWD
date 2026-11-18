@@ -1,6 +1,18 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 
-#include "globals.h"
+#include "endgame.h"
+
+#include "boards.h"
+#include "bstrlib.h"
+#include "cJSON.h"
+#include "common.h"
+#include "gwdegtb.h"
+#include "main.h"
+#include "my_mpi.h"
+#include "my_printf.h"
+#include "my_threads.h"
+#include "score.h"
+#include "search.h"
 #include "material.h" // GWDEGTB's EGTB_MAX_PIECES
 
 GwdegtbWdlProbe *wdl_probe_alpha_beta_master;

@@ -1,5 +1,28 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "pdn.h"
+
+#include "boards.h"
+#include "bstrlib.h"
+#include "buckets.h"
+#include "cJSON.h"
+#include "common.h"
+#include "endgame.h"
+#include "fbuffer.h"
+#include "main.h"
+#include "mcts.h"
+#include "moves.h"
+#include "my_cjson.h"
+#include "my_malloc.h"
+#include "my_mpi.h"
+#include "my_printf.h"
+#include "my_random.h"
+#include "my_sqlite3.h"
+#include "networks.h"
+#include "score.h"
+#include "search.h"
+#include "states.h"
+#include "timers.h"
+#include "utils.h"
 
 enum
 {

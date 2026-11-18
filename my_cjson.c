@@ -1,5 +1,10 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "my_cjson.h"
+
+#include "bstrlib.h"
+#include "cJSON.h"
+#include "common.h"
+#include "my_printf.h"
 
 void construct_my_cjson(my_cjson_t *arg_with_my_cjson)
 {

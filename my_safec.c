@@ -1,5 +1,8 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "my_safec.h"
+
+#include <stdarg.h>
+#include <stdio.h>
 
 #undef sscanf
 

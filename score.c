@@ -1,5 +1,15 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "score.h"
+
+#include "boards.h"
+#include "common.h"
+#include "main.h"
+#include "my_malloc.h"
+#include "my_printf.h"
+#include "networks.h"
+#include "patterns.h"
+#include "search.h"
+#include "utils.h"
 #include <stdatomic.h>
 
 typedef struct

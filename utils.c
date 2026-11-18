@@ -1,5 +1,16 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "utils.h"
+
+#include "bstrlib.h"
+#include "cJSON.h"
+#include "common.h"
+#include "main.h"
+#include "my_bstreams.h"
+#include "my_malloc.h"
+#include "my_mpi.h"
+#include "my_printf.h"
+#include "profile.h"
+#include "revision.h"
 
 #if COMPAT_ARCH == COMPAT_ARCH_X86_64
 #define POLYNOMIAL_CRC32 0x82F63B78UL

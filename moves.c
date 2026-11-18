@@ -1,5 +1,13 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "moves.h"
+
+#include "boards.h"
+#include "bstrlib.h"
+#include "common.h"
+#include "my_malloc.h"
+#include "my_printf.h"
+#include "my_safec.h"
+#include "profile.h"
 
 local const int white_dir[4] = {-6, -5, 5, 6};
 local const int black_dir[4] = {5, 6, -6, -5};

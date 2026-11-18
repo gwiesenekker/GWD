@@ -1,5 +1,21 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
-#include "globals.h"
+#include "mcts.h"
+
+#include "boards.h"
+#include "bstrlib.h"
+#include "common.h"
+#include "endgame.h"
+#include "main.h"
+#include "moves.h"
+#include "my_malloc.h"
+#include "my_printf.h"
+#include "my_random.h"
+#include "my_threads.h"
+#include "profile.h"
+#include "queues.h"
+#include "score.h"
+#include "search.h"
+#include "timers.h"
 
 mcts_globals_t mcts_globals;
 

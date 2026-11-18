@@ -1,4 +1,5 @@
 /* Exercise the real DEBUG name stack as well as game-state ownership. */
+#include "../states.h"
 #include "../my_malloc.c"
 #include <assert.h>
 
