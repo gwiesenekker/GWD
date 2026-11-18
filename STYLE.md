@@ -89,6 +89,7 @@ int my_breadline(bstring arg_line, FILE *arg_file)
 - Follow GWD's use of `and`, `or`, `TRUE`, `FALSE`, and `INVALID` where
   appropriate. Use a named sentinel rather than a literal value that happens to
   represent it.
+- Use the standard `<iso646.h>` definitions of `and` and `or`.
 - Prefer parenthesized return expressions, such as `return (result);`.
 - Use `HARDBUG` for violated invariants and failed operations that must succeed.
   Its condition describes the error, not success.
@@ -156,6 +157,8 @@ BDESTROY(bname)
   Do not cast away const to make a call compile.
 - Name parameters in public prototypes, using the same descriptive names as
   their implementations so callers can understand the argument order.
+- Use `(void)` for functions that take no arguments, not an empty parameter
+  list, which leaves the arguments unspecified in C11.
 
 ## Table initializers
 

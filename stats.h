@@ -48,6 +48,6 @@ void mean_sigma(stats_t *arg_with_stats);
 void printf_stats(const stats_t *arg_with_stats);
 void my_stats_aggregate(stats_t *arg_with_stats, MPI_Comm arg_comm);
 
-void test_stats();
+void test_stats(void);
 
 #endif

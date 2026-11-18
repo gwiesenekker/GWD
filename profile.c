@@ -1,5 +1,6 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "profile.h"
+#include <iso646.h>
 
 #ifdef PROFILE
 
@@ -13,7 +14,6 @@
 #define local static
 #define FALSE 0
 #define TRUE 1
-#define or ||
 
 #define NAME_MAX 32
 #define BLOCK_MAX 200

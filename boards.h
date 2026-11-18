@@ -127,7 +127,7 @@ void board2fen(const board_t *arg_with_board,
                bstring arg_bfen,
                int arg_brackets);
 void print_board(const board_t *arg_with_board);
-void init_boards();
+void init_boards(void);
 void state2board(board_t *arg_with_board, const game_state_t *arg_game);
 char *
 board2string(const board_t *arg_with_board, int arg_hub, bstring arg_string);

@@ -125,15 +125,10 @@ void my_mpi_release_semaphore_v2(MPI_Comm arg_comm);
 void my_mpi_flush_semaphore_v2(MPI_Comm arg_comm);
 void my_mpi_semaphore_server_v2(MPI_Comm arg_comm);
 
-int my_mpi_construct_semaphore_v3(MPI_Comm arg_comm, int arg_semkey);
 void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey);
 void my_mpi_release_semaphore_v3(MPI_Comm arg_comm, int arg_semkey);
 
 void my_mpi_barrier_v3(const char *arg_info,
-                       MPI_Comm arg_comm,
-                       int arg_semkey,
-                       int arg_verbose);
-void my_mpi_barrier_v4(const char *arg_info,
                        MPI_Comm arg_comm,
                        int arg_semkey,
                        int arg_verbose);

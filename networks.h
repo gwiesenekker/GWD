@@ -122,7 +122,6 @@ extern network_t networks[NETWORKS_MAX];
 void construct_network_state(network_state_t *arg_with_network_state,
                              int arg_network_id,
                              int arg_verbose);
-int base3_index(const int32_t *arg_states, int arg_nstates);
 int base3_index_v2(const board_t *arg_board, my_uint64_t arg_pattern_bb);
 int base3_index_v3(const board_t *arg_board, my_uint64_t arg_pattern_bb);
 int base3_index_v4(const board_t *arg_board, my_uint64_t arg_pattern_bb);

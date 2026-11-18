@@ -15,6 +15,7 @@
 #include <math.h>
 #include <stdarg.h>
 #include <limits.h>
+#include <iso646.h>
 
 _Static_assert(CHAR_BIT == 8, "GWD requires 8-bit bytes");
 
@@ -70,8 +71,6 @@ enum
 // generic macro's
 
 #define local static
-#define and &&
-#define or ||
 #define index DO_NOT_USE_INDEX
 
 #define __FUNC__ __func__
