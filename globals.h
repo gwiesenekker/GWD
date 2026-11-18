@@ -52,7 +52,11 @@ _Static_assert((sizeof(i64_t) == 8) && (sizeof(ui64_t) == 8),
 #define FALSE 0
 #define TRUE 1
 
-#define MBYTE 1048576
+enum
+{
+  MBYTE = 1048576
+};
+
 #define ULL_MAX 18446744073709551615ULL
 
 // specific defines

@@ -186,10 +186,18 @@ ui64_t return_my_random(my_random_t *arg_with_my_random)
   return (result);
 }
 
-#define TEST_NBITS 16
+enum
+{
+  TEST_NBITS = 16
+};
+
 #define TEST_MASK (~(~0ULL << TEST_NBITS))
 #define TEST_NBUCKETS (TEST_MASK + 1)
-#define TEST_NFILL 100
+
+enum
+{
+  TEST_NFILL = 100
+};
 
 local i64_t buckets[TEST_NBUCKETS];
 

@@ -1,8 +1,6 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #include "globals.h"
 
-#define SA struct sockaddr
-
 enum
 {
   DXP_GAMEREQ = 'R',
@@ -1621,8 +1619,9 @@ void dxp_server(void)
   server_address.sin_addr.s_addr = htonl(INADDR_ANY);
   server_address.sin_port = htons(options.dxp_port);
 
-  HARDBUG((bind(sockfd, (SA *)&server_address, sizeof(server_address))) ==
-          INVALID)
+  HARDBUG((bind(sockfd,
+                (struct sockaddr *)&server_address,
+                sizeof(server_address))) == INVALID)
 
   HARDBUG((listen(sockfd, 5)) == INVALID)
 
@@ -1634,8 +1633,9 @@ void dxp_server(void)
 
   PRINTF("server waiting for connection..\n");
 
-  HARDBUG((connfd = accept(sockfd, (SA *)&client_address, &address_size)) ==
-          COMPAT_INVALID_SOCKET)
+  HARDBUG((connfd = accept(sockfd,
+                           (struct sockaddr *)&client_address,
+                           &address_size)) == COMPAT_INVALID_SOCKET)
 
   HARDBUG(address_size > sizeof(client_address))
 
@@ -1668,8 +1668,9 @@ void dxp_client(void)
   server_address.sin_addr.s_addr = inet_addr(bdata(options.dxp_server_ip));
   server_address.sin_port = htons(options.dxp_port);
 
-  HARDBUG(connect(sockfd, (SA *)&server_address, sizeof(server_address)) ==
-          INVALID)
+  HARDBUG(connect(sockfd,
+                  (struct sockaddr *)&server_address,
+                  sizeof(server_address)) == INVALID)
 
   if (options.dxp_initiator)
     dxp_game_initiator(sockfd);

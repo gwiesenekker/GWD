@@ -2,9 +2,9 @@
 #ifndef UtilsH
 #define UtilsH
 
-#define CENTI_SECOND 0.01
-#define MILLI_SECOND 0.001
-#define MICRO_SECOND 0.000001
+static const double CENTI_SECOND = 0.01;
+static const double MILLI_SECOND = 0.001;
+static const double MICRO_SECOND = 0.000001;
 
 extern int zzzzzz_invocation;
 

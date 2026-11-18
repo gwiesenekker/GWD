@@ -24,7 +24,10 @@ local inline __m256 mm256_madd_ps(__m256 arg_a, __m256 arg_b, __m256 arg_c)
 }
 #endif
 
-#define NPIECES_PERCENTILE (INVALID)
+enum
+{
+  NPIECES_PERCENTILE = (INVALID)
+};
 
 #undef USE_RECIPROCAL
 #define USE_ERF

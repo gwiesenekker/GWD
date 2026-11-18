@@ -3,7 +3,10 @@
 
 #include <zstd.h>
 
-#define BLOCK_LENGTH 1024
+enum
+{
+  BLOCK_LENGTH = 1024
+};
 
 enum
 {
@@ -11,9 +14,7 @@ enum
   ZSTD_LEVEL = 9
 };
 
-#if ((BLOCK_LENGTH % 8) != 0)
-#error "BLOCK_LENGTH must be a multiple of 8"
-#endif
+_Static_assert((BLOCK_LENGTH % 8) == 0, "BLOCK_LENGTH must be a multiple of 8");
 
 typedef struct
 {
