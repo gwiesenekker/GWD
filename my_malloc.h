@@ -2,6 +2,9 @@
 #ifndef MyMallocH
 #define MyMallocH
 
+#include "common.h"
+#include "bstrlib.h"
+
 #define MARK_ARRAY_READ_ONLY(P, S) \
   register_heap(#P, __FILE__, __FUNC__, __LINE__, P, S, FALSE, TRUE);
 

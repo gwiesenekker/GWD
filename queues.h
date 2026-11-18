@@ -2,6 +2,11 @@
 #ifndef QueuesH
 #define QueuesH
 
+#include "common.h"
+#include "bstrlib.h"
+#include "my_printf.h"
+#include "my_random.h"
+
 enum
 {
   NMESSAGES_MAX = 1024

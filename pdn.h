@@ -2,6 +2,9 @@
 #ifndef PdnH
 #define PdnH
 
+#include "common.h"
+#include "my_sqlite3.h"
+
 void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name);
 void auto_play(const char *arg_txt_name, my_int64_t arg_npositions);
 void gen_db(my_sqlite3_t *arg_db,

@@ -2,6 +2,9 @@
 #ifndef ScoreH
 #define ScoreH
 
+#include "common.h"
+#include "search.h"
+
 enum
 {
   SCORE_MAN = 100,

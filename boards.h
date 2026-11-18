@@ -2,6 +2,11 @@
 #ifndef BoardsH
 #define BoardsH
 
+#include "common.h"
+#include "my_printf.h"
+#include "networks.h"
+#include "states.h"
+
 enum
 {
   BOARD_MAX = 66,

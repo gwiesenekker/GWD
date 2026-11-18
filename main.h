@@ -2,6 +2,12 @@
 #ifndef MainH
 #define MainH
 
+#include "common.h"
+#include "cJSON.h"
+#include "bstrlib.h"
+#include "my_random.h"
+#include "queues.h"
+
 // options
 
 enum

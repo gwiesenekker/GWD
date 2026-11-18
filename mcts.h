@@ -2,6 +2,10 @@
 #ifndef MctsH
 #define MctsH
 
+#include "common.h"
+#include "search.h"
+#include "score.h"
+
 #define MCTS_THRESHOLD_LOST (-2 * SCORE_MAN)
 #define MCTS_THRESHOLD_WON (2 * SCORE_MAN)
 

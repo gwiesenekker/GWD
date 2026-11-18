@@ -2,6 +2,9 @@
 #ifndef My_cjsonH
 #define My_cjsonH
 
+#include "bstrlib.h"
+#include "cJSON.h"
+
 #define CJSON_PRAGMA_ID "pragma"
 #define CJSON_PARAMETERS_ID "parameters"
 #define CJSON_SHAPE_ID "shape"

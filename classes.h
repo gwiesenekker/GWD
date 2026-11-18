@@ -2,6 +2,8 @@
 #ifndef ClassesH
 #define ClassesH
 
+#include "compat.h"
+
 // class methods
 
 typedef void *(*ctor_t)(void);

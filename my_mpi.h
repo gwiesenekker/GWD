@@ -2,6 +2,8 @@
 #ifndef MpiH
 #define MpiH
 
+#include "common.h"
+
 enum
 {
   MY_MPI_NGLOBAL_MAX = 128

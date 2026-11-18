@@ -2,6 +2,9 @@
 #ifndef CachesH
 #define CachesH
 
+#include "common.h"
+#include "bstrlib.h"
+
 enum
 {
   CACHE_ENTRY_KEY_TYPE_UI32_T = 1,

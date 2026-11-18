@@ -2,6 +2,10 @@
 #ifndef EndgameH
 #define EndgameH
 
+#include "common.h"
+#include "gwdegtb.h"
+#include "search.h"
+
 #define USE_COMPRESSED_WDL
 
 enum

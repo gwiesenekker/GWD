@@ -2,6 +2,10 @@
 #ifndef StatesH
 #define StatesH
 
+#include <stddef.h>
+#include "bstrlib.h"
+#include "cJSON.h"
+
 typedef struct game_state
 {
   cJSON *cjson_object;

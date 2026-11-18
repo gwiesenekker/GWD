@@ -2,6 +2,10 @@
 #ifndef MovesH
 #define MovesH
 
+#include "common.h"
+#include "bstrlib.h"
+#include "my_printf.h"
+
 enum
 {
   NMOVES_MAX = 128

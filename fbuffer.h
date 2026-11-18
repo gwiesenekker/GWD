@@ -2,6 +2,9 @@
 #ifndef FBUFFER_H
 #define FBUFFER_H
 
+#include "common.h"
+#include "bstrlib.h"
+
 typedef struct
 {
   size_t FB_nfbuffer;

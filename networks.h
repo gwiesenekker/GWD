@@ -2,6 +2,9 @@
 #ifndef NetworksH
 #define NetworksH
 
+#include "common.h"
+#include "patterns.h"
+
 // networks.c
 
 enum

@@ -2,6 +2,10 @@
 #ifndef TimersH
 #define TimersH
 
+#include "common.h"
+#include "bstrlib.h"
+#include "my_printf.h"
+
 typedef struct
 {
   bstring MT_bname;

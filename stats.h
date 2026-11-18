@@ -2,7 +2,9 @@
 #ifndef StatsH
 #define StatsH
 
-#include "stats.h"
+#include "common.h"
+#include "bstrlib.h"
+#include "my_mpi.h"
 
 typedef struct
 {

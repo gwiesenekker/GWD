@@ -147,6 +147,7 @@ $(TARGET): $(OBJS) $(COMPATOBJS) $(ENDGAME7OBJS)
         cp $(TARGET) gwd.json overrides.json network0.json ballot2.fen /tmp2/gwies/ZGUI/engine12
 
 HEADERS=boards.h\
+  common.h\
   sort.h\
   bstrlib.h\
   cJSON.h\

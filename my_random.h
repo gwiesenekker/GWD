@@ -2,6 +2,8 @@
 #ifndef RandomH
 #define RandomH
 
+#include "common.h"
+
 typedef struct
 {
   my_uint64_t MR_state[4];

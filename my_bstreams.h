@@ -2,6 +2,9 @@
 #ifndef BstreamsH
 #define BstreamsH
 
+#include "common.h"
+#include "bstrlib.h"
+
 typedef struct
 {
   FILE *BS_file;

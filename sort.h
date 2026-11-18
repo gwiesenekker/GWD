@@ -2,6 +2,10 @@
 #ifndef SortH
 #define SortH
 
+#include "common.h"
+#include "moves.h"
+#include "my_random.h"
+
 enum
 {
   HISTORY_NFIELDS = 64,

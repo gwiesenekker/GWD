@@ -2,6 +2,9 @@
 #ifndef MyPrintfH
 #define MyPrintfH
 
+#include "common.h"
+#include "bstrlib.h"
+
 typedef struct
 {
   int MP2stdout;
@@ -22,6 +25,10 @@ typedef struct
 
   int MP_paused;
 } my_printf_t;
+
+extern void *STDOUT;
+
+#define PRINTF(...) my_printf(STDOUT, __VA_ARGS__)
 
 extern bstring my_printf_logs_dir;
 

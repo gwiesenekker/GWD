@@ -1,6 +1,12 @@
 // SCU REVISION 8.1286 di 17 nov 2026 23:39:48 CET
 #ifndef ThreadsH
 #define ThreadsH
+
+#include "common.h"
+#include "queues.h"
+#include "search.h"
+#include "timers.h"
+#include "my_printf.h"
 #include <stdatomic.h>
 
 enum

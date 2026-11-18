@@ -2,6 +2,10 @@
 #ifndef BookH
 #define BookH
 
+#include "common.h"
+#include "moves.h"
+#include "my_sqlite3.h"
+
 void init_book(void);
 
 void open_book(void);

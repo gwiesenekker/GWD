@@ -2,6 +2,15 @@
 #ifndef SearchH
 #define SearchH
 
+#include "common.h"
+#include "gwdegtb.h"
+#include "boards.h"
+#include "moves.h"
+#include "sort.h"
+#include "timers.h"
+#include "my_random.h"
+#include "my_printf.h"
+
 enum
 {
   DEPTH_MAX = 127

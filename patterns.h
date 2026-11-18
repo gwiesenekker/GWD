@@ -2,6 +2,9 @@
 #ifndef PatternsH
 #define PatternsH
 
+#include "common.h"
+#include "bstrlib.h"
+
 enum
 {
   NPATTERNS_MAX = 32,

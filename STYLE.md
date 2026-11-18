@@ -168,6 +168,19 @@ BDESTROY(bname)
   as board geometry, ordered move directions, or numerical matrices.
 - Preserve every entry and its value when converting an existing table.
 
+## Header dependencies
+
+- Each project header must compile when included first, without relying on
+  `globals.h` or a caller's include order.
+- Include the headers that supply the types, constants and functions used by
+  declarations, inline functions and macros. Keep include guards.
+- Put shared basic types and facilities in `common.h`. Keep it independent of
+  engine headers so those headers can include it without cycles.
+- Keep `globals.h` as the application umbrella; do not include it from other
+  project headers to hide missing dependencies.
+- Preserve third-party headers. Check standalone and reordered includes with
+  `tests/run-headers.sh` after changing header dependencies.
+
 ## Comments and changes
 
 - Use short comments to explain intent, invariants, ownership, or a non-obvious

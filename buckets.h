@@ -2,6 +2,10 @@
 #ifndef BucketsH
 #define BucketsH
 
+#include "common.h"
+#include "bstrlib.h"
+#include "my_mpi.h"
+
 enum
 {
   BUCKET_LINEAR = 1,

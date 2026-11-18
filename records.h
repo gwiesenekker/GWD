@@ -2,6 +2,9 @@
 #ifndef RecordsH
 #define RecordsH
 
+#include "bstrlib.h"
+#include "cJSON.h"
+
 enum
 {
   FIELD_TYPE_INT = 0,

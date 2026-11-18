@@ -2,17 +2,14 @@
 #ifndef UtilsH
 #define UtilsH
 
+#include "common.h"
+#include "bstrlib.h"
+#include "cJSON.h"
+
 static const double CENTI_SECOND = 0.01;
 static const double MILLI_SECOND = 0.001;
 static const double MICRO_SECOND = 0.000001;
 
-extern int zzzzzz_invocation;
-
-_Noreturn void zzzzzz(const char *arg_file,
-                      const char *arg_func,
-                      long arg_line,
-                      const char *arg_error,
-                      int arg_code);
 int fexists(const char *arg_name);
 
 my_int64_t first_prime_below(my_int64_t arg_number);

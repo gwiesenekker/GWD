@@ -2,6 +2,10 @@
 #ifndef DbaseH
 #define DbaseH
 
+#include "common.h"
+#include "bstrlib.h"
+#include "my_mpi.h"
+
 #ifdef USE_SQLITE3
 
 #if COMPAT_OS == COMPAT_OS_WINDOWS
