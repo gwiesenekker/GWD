@@ -4,6 +4,7 @@
 
 #define sscanf do_not_use_sscanf_but_my_sscanf
 
-int my_sscanf(const char *, const char *, ...) COMPAT_FORMAT(scanf, 2, 3);
+int my_sscanf(const char *arg_string, const char *arg_format, ...)
+  COMPAT_FORMAT(scanf, 2, 3);
 
 #endif

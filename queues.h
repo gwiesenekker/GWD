@@ -55,10 +55,14 @@ typedef struct
   my_random_t Q_my_random;
 } queue_t;
 
-void construct_queue(queue_t *, const char *, my_printf_t *);
-void enqueue(queue_t *, int, const char *);
-int poll_queue(queue_t *);
-int dequeue(queue_t *, message_t *);
+void construct_queue(queue_t *arg_with_queue,
+                     const char *arg_queue_name,
+                     my_printf_t *arg_queue_my_printf);
+void enqueue(queue_t *arg_with_queue,
+             int arg_message_id,
+             const char *arg_message_text);
+int poll_queue(queue_t *arg_with_queue);
+int dequeue(queue_t *arg_with_queue, message_t *arg_message);
 
 void test_queues(void);
 

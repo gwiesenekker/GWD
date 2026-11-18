@@ -71,14 +71,14 @@ typedef struct
 
 extern profile_global_t profile_global[THREAD_MAX];
 
-int return_pid(int);
-void init_block(int[RECURSE_MAX]);
-int new_block(int, const char *, int *);
-void begin_block(int, int);
-void end_block(int);
+int return_pid(int arg_tid);
+void init_block(int arg_block_id[RECURSE_MAX]);
+int new_block(int pid, const char *arg_name, int *arg_invocation_pointer);
+void begin_block(int pid, int arg_block_id);
+void end_block(int pid);
 void init_profile(void);
 void clear_profile(void);
-void dump_profile(int, int);
+void dump_profile(int pid, int arg_verbose);
 
 #define GET_COUNTER_BEGIN(P) \
   {                          \

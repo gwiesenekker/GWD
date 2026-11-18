@@ -114,17 +114,22 @@ extern const int black_row[BOARD_MAX];
 
 extern hash_key_t hash_keys[NCOLOUR_ENUM][NPIECE_ENUM][BOARD_MAX];
 
-void construct_board(board_t *, my_printf_t *, int);
-void push_board_state(board_t *);
-void pop_board_state(board_t *);
+void construct_board(board_t *arg_with_board,
+                     my_printf_t *arg_my_printf,
+                     int arg_network_id);
+void push_board_state(board_t *arg_with_board);
+void pop_board_state(board_t *arg_with_board);
 
-hash_key_t return_key_from_bb(const board_t *);
-void string2board(board_t *, const char *);
-void fen2board(board_t *, const char *);
-void board2fen(const board_t *, bstring, int);
-void print_board(const board_t *);
+hash_key_t return_key_from_bb(const board_t *arg_with_board);
+void string2board(board_t *arg_with_board, const char *arg_position);
+void fen2board(board_t *arg_with_board, const char *arg_fen);
+void board2fen(const board_t *arg_with_board,
+               bstring arg_bfen,
+               int arg_brackets);
+void print_board(const board_t *arg_with_board);
 void init_boards();
-void state2board(board_t *, const game_state_t *);
-char *board2string(const board_t *, int, bstring);
+void state2board(board_t *arg_with_board, const game_state_t *arg_game);
+char *
+board2string(const board_t *arg_with_board, int arg_hub, bstring arg_string);
 
 #endif

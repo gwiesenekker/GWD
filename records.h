@@ -16,12 +16,19 @@ typedef struct record
   bstring R_string;
 } record_t;
 
-void construct_record(record_t *);
-void add_field(record_t *, const char *, int, const void *);
-void set_field(record_t *, const char *, const void *);
-void get_field(const record_t *, const char *, void *);
-void set_record(record_t *, const_bstring);
-bstring get_record(record_t *);
+void construct_record(record_t *arg_with_record);
+void add_field(record_t *arg_with_record,
+               const char *arg_field_name,
+               int arg_field_type,
+               const void *arg_field_value);
+void set_field(record_t *arg_with_record,
+               const char *arg_field_name,
+               const void *arg_value);
+void get_field(const record_t *arg_with_record,
+               const char *arg_field_name,
+               void *arg_value);
+void set_record(record_t *arg_with_record, const_bstring arg_bstring);
+bstring get_record(record_t *arg_with_record);
 
 void test_records(void);
 

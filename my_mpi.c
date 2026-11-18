@@ -43,11 +43,14 @@ enum
   TAG_FLUSH_LOCK = 4
 };
 
-const char *const tag2string[] = {"TAG_INVALID",
-                                  "TAG_REQUEST_LOCK",
-                                  "TAG_LOCK_GRANTED",
-                                  "TAG_RELEASE_LOCK",
-                                  "TAG_FLUSH_LOCK"};
+const char *const tag2string[] =
+{
+  [0] = "TAG_INVALID",
+  [TAG_REQUEST_LOCK] = "TAG_REQUEST_LOCK",
+  [TAG_LOCK_GRANTED] = "TAG_LOCK_GRANTED",
+  [TAG_RELEASE_LOCK] = "TAG_RELEASE_LOCK",
+  [TAG_FLUSH_LOCK] = "TAG_FLUSH_LOCK"
+};
 
 #ifndef SEMS_USE_SHM
 local my_semkey_t my_semkeys[NMY_SEMKEYS];

@@ -48,17 +48,26 @@ typedef struct
   bstring MCJ_bstring;
 } my_cjson_t;
 
-void construct_my_cjson(my_cjson_t *);
+void construct_my_cjson(my_cjson_t *arg_with_my_cjson);
 
-void my_cjson_add_int(my_cjson_t *, const char *, int);
-void my_cjson_set_int(my_cjson_t *, const char *, int);
-int my_cjson_get_int(const my_cjson_t *, const char *);
+void my_cjson_add_int(my_cjson_t *arg_with_my_cjson,
+                      const char *arg_id,
+                      int arg_int);
+void my_cjson_set_int(my_cjson_t *arg_with_my_cjson,
+                      const char *arg_id,
+                      int arg_int);
+int my_cjson_get_int(const my_cjson_t *arg_with_my_cjson, const char *arg_id);
 
-void my_cjson_add_cstring(my_cjson_t *, const char *, const char *);
-void my_cjson_set_cstring(my_cjson_t *, const char *, const char *);
-char *my_cjson_get_cstring(const my_cjson_t *, const char *);
+void my_cjson_add_cstring(my_cjson_t *arg_with_my_cjson,
+                          const char *arg_id,
+                          const char *arg_cstring);
+void my_cjson_set_cstring(my_cjson_t *arg_with_my_cjson,
+                          const char *arg_id,
+                          const char *arg_cstring);
+char *my_cjson_get_cstring(const my_cjson_t *arg_with_my_cjson,
+                           const char *arg_id);
 
-char *my_cjson2cstring(my_cjson_t *);
+char *my_cjson2cstring(my_cjson_t *arg_with_my_cjson);
 
 void test_my_cjson(void);
 

@@ -49,38 +49,49 @@
   POP_NAME(#C) free(C); \
   C = NULL;
 
-my_uint64_t return_XXH3_64(const void *, size_t);
+my_uint64_t return_XXH3_64(const void *arg_data, size_t arg_nbytes);
 
-void mark_pointer_read_only(void *);
-void register_heap(const char *,
-                   const char *,
-                   const char *,
-                   int,
-                   void *,
-                   size_t,
-                   int,
-                   int);
-void *deregister_heap(void *);
+void mark_pointer_read_only(void *arg_pointer);
+void register_heap(const char *arg_name,
+                   const char *arg_file,
+                   const char *arg_func,
+                   int arg_line,
+                   void *arg_heap,
+                   size_t arg_size,
+                   int arg_pad,
+                   int arg_read_only);
+void *deregister_heap(void *arg_pointer);
 
-void *my_malloc(const char *, const char *, const char *, int, size_t);
-void my_free(void *);
+void *my_malloc(const char *arg_name,
+                const char *arg_file,
+                const char *arg_func,
+                int arg_line,
+                size_t arg_size);
+void my_free(void *arg_pointer);
 
-void *my_large_malloc(const char *,
-                      const char *,
-                      const char *,
-                      int,
-                      size_t,
-                      compat_large_allocation_t *);
-void my_large_free(void *, compat_large_allocation_t *);
+void *my_large_malloc(const char *arg_name,
+                      const char *arg_file,
+                      const char *arg_func,
+                      int arg_line,
+                      size_t arg_size,
+                      compat_large_allocation_t *arg_allocation);
+void my_large_free(void *arg_pointer,
+                   compat_large_allocation_t *arg_allocation);
 
-void print_my_names(int);
-void push_name(const char *, const char *, const char *, int);
-void pop_name(const char *, const char *, const char *, int);
+void print_my_names(int arg_all);
+void push_name(const char *arg_name,
+               const char *arg_file,
+               const char *arg_func,
+               int arg_line);
+void pop_name(const char *arg_name,
+              const char *arg_file,
+              const char *arg_func,
+              int arg_line);
 
 void init_my_malloc(void);
 
 void check_my_malloc(void);
 
-void fin_my_malloc(int);
+void fin_my_malloc(int arg_verbose);
 
 #endif

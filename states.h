@@ -46,13 +46,14 @@ typedef struct
   void *S_current;
 } state_t;
 
-void construct_game_state(game_state_t *);
-void destroy_game_state(game_state_t *);
+void construct_game_state(game_state_t *arg_with_game_state);
+void destroy_game_state(game_state_t *arg_with_game_state);
 
-void *construct_state(state_t *, size_t, int);
-void *push_state(state_t *);
-void *pop_state(state_t *);
-void *reset_state(state_t *);
+void *
+construct_state(state_t *arg_with_state, size_t arg_size, int arg_nstates);
+void *push_state(state_t *arg_with_state);
+void *pop_state(state_t *arg_with_state);
+void *reset_state(state_t *arg_with_state);
 
 void test_states(void);
 

@@ -27,10 +27,13 @@ extern bstring my_printf_logs_dir;
 
 // my_printf.c
 
-void construct_my_printf(my_printf_t *, const char *, int);
-void my_printf(my_printf_t *, const char *, ...) COMPAT_FORMAT(printf, 2, 3);
-void pause_my_printf(my_printf_t *);
-void resume_my_printf(my_printf_t *);
+void construct_my_printf(my_printf_t *arg_with_my_printf,
+                         const char *arg_prefix,
+                         int arg_to_stdout);
+void my_printf(my_printf_t *arg_with_my_printf, const char *arg_format, ...)
+  COMPAT_FORMAT(printf, 2, 3);
+void pause_my_printf(my_printf_t *arg_with_my_printf);
+void resume_my_printf(my_printf_t *arg_with_my_printf);
 void init_my_printf(void);
 void test_my_printf(void);
 

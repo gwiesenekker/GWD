@@ -8,17 +8,22 @@ static const double MICRO_SECOND = 0.000001;
 
 extern int zzzzzz_invocation;
 
-_Noreturn void zzzzzz(const char *, const char *, long, const char *, int);
-int fexists(const char *);
+_Noreturn void zzzzzz(const char *arg_file,
+                      const char *arg_func,
+                      long arg_line,
+                      const char *arg_error,
+                      int arg_code);
+int fexists(const char *arg_name);
 
-my_int64_t first_prime_below(my_int64_t);
-void init_crc32(uint32_t *);
-void update_crc32(uint32_t *, const void *, uint32_t);
-uint32_t return_crc32(const void *, uint32_t);
-my_uint64_t return_crc64(const void *, my_uint64_t, int);
-void file2bstring(const char *, bstring);
-void file2cjson(const char *, cJSON **);
-cJSON *cJSON_FindItemInObject(const cJSON *, const char *);
+my_int64_t first_prime_below(my_int64_t arg_number);
+void init_crc32(uint32_t *arg_crc);
+void update_crc32(uint32_t *arg_crc, const void *arg_data, uint32_t arg_nbytes);
+uint32_t return_crc32(const void *arg_data, uint32_t arg_nbytes);
+my_uint64_t
+return_crc64(const void *arg_data, my_uint64_t arg_nbytes, int arg_flip);
+void file2bstring(const char *arg_name, bstring arg_bstring);
+void file2cjson(const char *arg_name, cJSON **arg_cjson);
+cJSON *cJSON_FindItemInObject(const cJSON *arg_cjson, const char *arg_name);
 
 void init_utils(void);
 void test_utils(void);

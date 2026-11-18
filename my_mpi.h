@@ -78,44 +78,65 @@ typedef struct
 
 extern my_mpi_globals_t my_mpi_globals;
 
-void my_mpi_init(int *, char ***, int);
-int my_mpi_comm_size(MPI_Comm, int *);
-int my_mpi_comm_rank(MPI_Comm, int *);
+void my_mpi_init(int *arg_nargs, char ***arg_argv, int arg_physical_memory);
+int my_mpi_comm_size(MPI_Comm arg_comm, int *arg_size);
+int my_mpi_comm_rank(MPI_Comm arg_comm, int *arg_rank);
 
-int my_mpi_allreduce(const void *, void *, int, MPI_Datatype, MPI_Op, MPI_Comm);
+int my_mpi_allreduce(const void *arg_sendbuf,
+                     void *arg_recvbuf,
+                     int arg_count,
+                     MPI_Datatype arg_datatype,
+                     MPI_Op arg_op,
+                     MPI_Comm arg_comm);
 
-int my_mpi_win_allocate_shared(MPI_Aint,
-                               int,
-                               MPI_Info,
-                               MPI_Comm,
-                               void *,
-                               MPI_Win *);
-int my_mpi_win_shared_query(MPI_Win, int, MPI_Aint *, int *, void *);
-int my_mpi_win_fence(MPI_Comm, int, MPI_Win);
-void my_mpi_allocate_shared(MPI_Comm, size_t, size_t, void **, MPI_Win *);
-void my_mpi_sync_shared(MPI_Comm, MPI_Win, const char *);
+int my_mpi_win_allocate_shared(MPI_Aint arg_size,
+                               int arg_disp_unit,
+                               MPI_Info arg_info,
+                               MPI_Comm arg_comm,
+                               void *arg_baseptr,
+                               MPI_Win *arg_win);
+int my_mpi_win_shared_query(MPI_Win arg_win,
+                            int arg_rank,
+                            MPI_Aint *arg_size,
+                            int *arg_disp_unit,
+                            void *arg_baseptr);
+int my_mpi_win_fence(MPI_Comm arg_comm, int arg_assert, MPI_Win arg_win);
+void my_mpi_allocate_shared(MPI_Comm arg_comm,
+                            size_t arg_element_size,
+                            size_t arg_nelements,
+                            void **arg_shared,
+                            MPI_Win *arg_win);
+void my_mpi_sync_shared(MPI_Comm arg_comm,
+                        MPI_Win arg_win,
+                        const char *arg_info);
 
-int my_mpi_win_free(MPI_Win *);
+int my_mpi_win_free(MPI_Win *arg_win);
 
 int my_mpi_finalize(void);
-int my_mpi_abort(MPI_Comm, int);
+int my_mpi_abort(MPI_Comm arg_comm, int arg_errorcode);
 
-void my_mpi_barrier(const char *, MPI_Comm, int);
+void my_mpi_barrier(const char *arg_info, MPI_Comm arg_comm, int arg_verbose);
 
-void my_mpi_acquire_semaphore(MPI_Comm, MPI_Win);
-void my_mpi_release_semaphore(MPI_Comm, MPI_Win);
+void my_mpi_acquire_semaphore(MPI_Comm arg_comm, MPI_Win arg_win);
+void my_mpi_release_semaphore(MPI_Comm arg_comm, MPI_Win arg_win);
 
-void my_mpi_acquire_semaphore_v2(MPI_Comm);
-void my_mpi_release_semaphore_v2(MPI_Comm);
-void my_mpi_flush_semaphore_v2(MPI_Comm);
-void my_mpi_semaphore_server_v2(MPI_Comm);
+void my_mpi_acquire_semaphore_v2(MPI_Comm arg_comm);
+void my_mpi_release_semaphore_v2(MPI_Comm arg_comm);
+void my_mpi_flush_semaphore_v2(MPI_Comm arg_comm);
+void my_mpi_semaphore_server_v2(MPI_Comm arg_comm);
 
-int my_mpi_construct_semaphore_v3(MPI_Comm, int);
-void my_mpi_acquire_semaphore_v3(MPI_Comm, int);
-void my_mpi_release_semaphore_v3(MPI_Comm, int);
+int my_mpi_construct_semaphore_v3(MPI_Comm arg_comm, int arg_semkey);
+void my_mpi_acquire_semaphore_v3(MPI_Comm arg_comm, int arg_semkey);
+void my_mpi_release_semaphore_v3(MPI_Comm arg_comm, int arg_semkey);
 
-void my_mpi_barrier_v3(const char *, MPI_Comm, int, int);
-void my_mpi_barrier_v4(const char *, MPI_Comm, int, int);
+void my_mpi_barrier_v3(const char *arg_info,
+                       MPI_Comm arg_comm,
+                       int arg_semkey,
+                       int arg_verbose);
+void my_mpi_barrier_v4(const char *arg_info,
+                       MPI_Comm arg_comm,
+                       int arg_semkey,
+                       int arg_verbose);
 
 void test_my_mpi(void);
 

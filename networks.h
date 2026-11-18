@@ -119,32 +119,42 @@ _Static_assert(_Alignof(network_state_t) == 64,
 
 extern network_t networks[NETWORKS_MAX];
 
-void construct_network_state(network_state_t *, int, int);
-int base3_index(const int32_t *, int);
-int base3_index_v2(const board_t *, my_uint64_t);
-int base3_index_v3(const board_t *, my_uint64_t);
-int base3_index_v4(const board_t *, my_uint64_t);
+void construct_network_state(network_state_t *arg_with_network_state,
+                             int arg_network_id,
+                             int arg_verbose);
+int base3_index(const int32_t *arg_states, int arg_nstates);
+int base3_index_v2(const board_t *arg_board, my_uint64_t arg_pattern_bb);
+int base3_index_v3(const board_t *arg_board, my_uint64_t arg_pattern_bb);
+int base3_index_v4(const board_t *arg_board, my_uint64_t arg_pattern_bb);
 
-void vcopy_a2b(int arg_nvalues, const scaled_double_t *, scaled_double_t *);
-void vadd_ab2a(int, scaled_double_t *restrict, const scaled_double_t *restrict);
-void vmul_ab2a(int, scaled_double_t *restrict, const scaled_double_t *restrict);
-void vmul_ab2c(int,
-               const scaled_double_t *restrict,
-               const scaled_double_t *restrict,
-               scaled_double_t *restrict);
-double return_dense_network_score_scaled(const dense_network_shared_t *,
-                                         dense_network_state_t *);
-double return_dense_network_score_double(const dense_network_shared_t *,
-                                         dense_network_state_t *);
-void evaluate_material_network(const network_t *,
-                               dense_network_state_t *,
-                               int,
-                               int,
-                               int,
-                               int,
-                               int);
-void fen2network(const char *, my_int64_t);
-void fen2csv(const char *, int, int);
+void vcopy_a2b(int arg_nvalues,
+               const scaled_double_t *arg_a,
+               scaled_double_t *arg_b);
+void vadd_ab2a(int arg_nvalues,
+               scaled_double_t *restrict arg_a,
+               const scaled_double_t *restrict arg_b);
+void vmul_ab2a(int arg_nvalues,
+               scaled_double_t *restrict arg_a,
+               const scaled_double_t *restrict arg_b);
+void vmul_ab2c(int arg_nvalues,
+               const scaled_double_t *restrict arg_a,
+               const scaled_double_t *restrict arg_b,
+               scaled_double_t *restrict arg_c);
+double return_dense_network_score_scaled(
+  const dense_network_shared_t *arg_dense_network_shared,
+  dense_network_state_t *arg_dense_network_state);
+double return_dense_network_score_double(
+  const dense_network_shared_t *arg_dense_network_shared,
+  dense_network_state_t *arg_dense_network_state);
+void evaluate_material_network(const network_t *arg_with_network,
+                               dense_network_state_t *arg_state,
+                               int arg_nwhite_men,
+                               int arg_nblack_men,
+                               int arg_nwhite_kings,
+                               int arg_nblack_kings,
+                               int arg_inputs);
+void fen2network(const char *arg_name, my_int64_t arg_npositions);
+void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max);
 void init_networks(void);
 void test_networks(void);
 

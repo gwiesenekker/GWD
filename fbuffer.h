@@ -10,15 +10,20 @@ typedef struct
   bstring FB_bstring;
 } fbuffer_t;
 
-void flush_fbuffer(fbuffer_t *, int);
+void flush_fbuffer(fbuffer_t *arg_with_fbuffer, int arg_nfbuffer);
 
-void append_fbuffer_fmt(fbuffer_t *, const char *, ...);
+void append_fbuffer_fmt(fbuffer_t *arg_with_fbuffer, const char *arg_fmt, ...);
 
-void append_fbuffer_bin(fbuffer_t *, const void *, size_t);
+void append_fbuffer_bin(fbuffer_t *arg_with_fbuffer,
+                        const void *arg_data,
+                        size_t arg_nbytes);
 
-bstring return_fbuffer_bname(const fbuffer_t *);
+bstring return_fbuffer_bname(const fbuffer_t *arg_with_fbuffer);
 
-void construct_fbuffer(fbuffer_t *, const_bstring, const char *, int);
+void construct_fbuffer(fbuffer_t *arg_with_fbuffer,
+                       const_bstring arg_bname,
+                       const char *arg_suffix,
+                       int arg_remove);
 
 void test_fbuffer(void);
 

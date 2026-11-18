@@ -39,56 +39,79 @@ typedef struct
   int MSQL_verbose;
 } my_sqlite3_t;
 
-const char *my_sqlite3_errmsg(sqlite3 *);
+const char *my_sqlite3_errmsg(sqlite3 *arg_db);
 
-int my_sqlite3_open(const char *, sqlite3 **);
+int my_sqlite3_open(const char *arg_db_name, sqlite3 **arg_db);
 
-int my_sqlite3_open_v2(const char *, sqlite3 **, int, const char *);
+int my_sqlite3_open_v2(const char *arg_db_name,
+                       sqlite3 **arg_db,
+                       int arg_flags,
+                       const char *arg_zvfs);
 
-int my_sqlite3_bind_int(sqlite3_stmt *, int, int);
-int my_sqlite3_bind_int64(sqlite3_stmt *, int, my_int64_t);
+int my_sqlite3_bind_int(sqlite3_stmt *arg_stmt, int arg_index, int arg_value);
+int my_sqlite3_bind_int64(sqlite3_stmt *arg_stmt,
+                          int arg_index,
+                          my_int64_t arg_value);
 
-int my_sqlite3_step(sqlite3_stmt *);
+int my_sqlite3_step(sqlite3_stmt *arg_stmt);
 
-int my_sqlite3_exec(sqlite3 *,
-                    const char *,
-                    int (*)(void *, int, char **, char **),
-                    void *,
-                    char **);
+int my_sqlite3_exec(sqlite3 *arg_db,
+                    const char *arg_sql,
+                    int (*arg_callback)(void *, int, char **, char **),
+                    void *arg_void,
+                    char **arg_errmsg);
 
-int my_sqlite3_column_int(sqlite3_stmt *, int);
+int my_sqlite3_column_int(sqlite3_stmt *arg_stmt, int arg_icol);
 
-my_int64_t my_sqlite3_column_int64(sqlite3_stmt *, int);
+my_int64_t my_sqlite3_column_int64(sqlite3_stmt *arg_stmt, int arg_icol);
 
-const unsigned char *my_sqlite3_column_text(sqlite3_stmt *, int);
+const unsigned char *my_sqlite3_column_text(sqlite3_stmt *arg_stmt,
+                                            int arg_icol);
 
-int my_sqlite3_finalize(sqlite3_stmt *);
+int my_sqlite3_finalize(sqlite3_stmt *arg_stmt);
 
-int my_sqlite3_close(sqlite3 *);
+int my_sqlite3_close(sqlite3 *arg_db);
 
-void my_sqlite3_prepare_v2(sqlite3 *, const char *, sqlite3_stmt **);
+void my_sqlite3_prepare_v2(sqlite3 *arg_db,
+                           const char *arg_sql,
+                           sqlite3_stmt **arg_stmt);
 
-int execute_sql(sqlite3 *, const void *, int);
+int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step);
 
-void create_tables(sqlite3 *);
+void create_tables(sqlite3 *arg_db);
 
-int query_position_fen(sqlite3 *, my_int64_t, bstring, int *);
+int query_position_fen(sqlite3 *arg_db,
+                       my_int64_t arg_position_id,
+                       bstring arg_bfen,
+                       int *arg_flags);
 
-my_int64_t query_position_id(sqlite3 *, const char *, int, int *);
+my_int64_t query_position_id(sqlite3 *arg_db,
+                             const char *arg_fen,
+                             int arg_frequency,
+                             int *arg_flags);
 
-my_int64_t query_move(sqlite3 *, my_int64_t, const char *, int, int *);
+my_int64_t query_move(sqlite3 *arg_db,
+                      my_int64_t arg_position_id,
+                      const char *arg_move,
+                      int arg_frequency,
+                      int *arg_flags);
 
-score_t query_evaluation(sqlite3 *, my_int64_t, int *);
+score_t
+query_evaluation(sqlite3 *arg_db, my_int64_t arg_move_id, int *arg_flags);
 
-void backup_db(sqlite3 *, const char *);
+void backup_db(sqlite3 *arg_in_memory_db, const char *arg_file_name);
 
-void append_sql_buffer(my_sqlite3_t *, const char *, ...);
+void append_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3,
+                       const char *arg_fmt,
+                       ...);
 
-void flush_sql_buffer(my_sqlite3_t *, int);
+void flush_sql_buffer(my_sqlite3_t *arg_with_my_sqlite3, int arg_nsql_buffer);
 
-void construct_my_sqlite3(my_sqlite3_t *, const char *, MPI_Comm);
+void construct_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3,
+                          const char *arg_db_name,
+                          MPI_Comm arg_comm);
 
-void close_my_sqlite3(my_sqlite3_t *);
+void close_my_sqlite3(my_sqlite3_t *arg_with_my_sqlite3);
 
 void test_dbase(void);
 

@@ -19,7 +19,7 @@ typedef struct
   double S_sigma;
 } stats_t;
 
-void clear_stats(stats_t *);
+void clear_stats(stats_t *arg_with_stats);
 
 inline local void update_stats(stats_t *arg_with_stats, double arg_sample)
 {
@@ -43,10 +43,10 @@ inline local void update_stats(stats_t *arg_with_stats, double arg_sample)
   arg_with_stats->S_sum2 += arg_sample * arg_sample;
 }
 
-void construct_stats(stats_t *, const char *);
-void mean_sigma(stats_t *);
-void printf_stats(const stats_t *);
-void my_stats_aggregate(stats_t *, MPI_Comm);
+void construct_stats(stats_t *arg_with_stats, const char *arg_name);
+void mean_sigma(stats_t *arg_with_stats);
+void printf_stats(const stats_t *arg_with_stats);
+void my_stats_aggregate(stats_t *arg_with_stats, MPI_Comm arg_comm);
 
 void test_stats();
 

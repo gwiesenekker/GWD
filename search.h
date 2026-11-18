@@ -198,14 +198,22 @@ typedef struct
   GwdegtbWdlProbe *S_wdl_probe;
 } search_t;
 
-int draw_by_repetition(board_t *, int);
-int move_repetition(board_t *);
-void clear_totals(search_t *);
-void print_totals(search_t *);
-int probe_pv(pv_entries_t *, search_t *);
-void do_search(search_t *, moves_list_t *, int, int, score_t, my_random_t *);
+int draw_by_repetition(board_t *arg_with_board, int arg_strict);
+int move_repetition(board_t *arg_with_board);
+void clear_totals(search_t *arg_with_search);
+void print_totals(search_t *arg_with_search);
+int probe_pv(pv_entries_t *arg_pv, search_t *arg_with_search);
+void do_search(search_t *arg_with_search,
+               moves_list_t *arg_moves_list,
+               int arg_depth_min,
+               int arg_depth_max,
+               score_t arg_root_score,
+               my_random_t *arg_shuffle);
 void clear_caches(void);
-void construct_search(search_t *, my_printf_t *, void *, int);
+void construct_search(search_t *arg_with_search,
+                      my_printf_t *arg_my_printf,
+                      void *arg_thread,
+                      int arg_network_id);
 void init_search(void);
 void fin_search(void);
 

@@ -4,6 +4,6 @@
 
 void init_hub(void);
 void hub(void);
-double search_clock_used(my_timer_t *);
+double search_clock_used(my_timer_t *arg_timer);
 
 #endif

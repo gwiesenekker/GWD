@@ -41,9 +41,12 @@ typedef struct class
   my_mutex_t objects_mutex;
 } class_t;
 
-class_t *init_class(int, ctor_t, dtor_t, iter_t);
+class_t *init_class(int arg_nobjects_max,
+                    ctor_t arg_ctor,
+                    dtor_t arg_dtor,
+                    iter_t arg_iter);
 
-void iterate_class(class_t *);
+void iterate_class(class_t *arg_self);
 
 void test_my_object_class(void);
 

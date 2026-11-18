@@ -35,11 +35,12 @@ static inline int is_score_nan(score_t arg_score)
   return (arg_score == SCORE_NOT_A_NUMBER);
 }
 
-score_t return_score_from_board(board_t *, double_t *);
-score_t return_score(search_t *);
+score_t return_score_from_board(board_t *arg_with_board,
+                                double_t *arg_network_score_scaled);
+score_t return_score(search_t *arg_with_search);
 
-int return_npieces(const board_t *);
-score_t return_material_score(const board_t *);
+int return_npieces(const board_t *arg_with_board);
+score_t return_material_score(const board_t *arg_with_board);
 
 void init_score(void);
 

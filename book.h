@@ -6,12 +6,18 @@ void init_book(void);
 
 void open_book(void);
 
-void return_book_move(board_t *, moves_list_t *, bstring);
+void return_book_move(board_t *arg_with_board,
+                      moves_list_t *arg_moves_list,
+                      bstring arg_bbook_move);
 
-void add_evaluations2book(my_sqlite3_t *, int, int);
+void add_evaluations2book(my_sqlite3_t *arg_db,
+                          int arg_centi_seconds,
+                          int arg_add_moves);
 
-void expand_book(my_sqlite3_t *, const char *, int);
+void expand_book(my_sqlite3_t *arg_db,
+                 const char *arg_fen,
+                 int arg_centi_seconds);
 
-void walk_book(const char *, const char *);
+void walk_book(const char *arg_db_name, const char *arg_fen);
 
 #endif

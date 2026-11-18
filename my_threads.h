@@ -34,7 +34,7 @@ extern thread_t threads[NTHREADS_MAX];
 
 extern thread_t *thread_alpha_beta_master;
 
-queue_t *return_thread_queue(void *);
+queue_t *return_thread_queue(void *arg_self);
 
 void start_threads(void);
 void join_threads(void);

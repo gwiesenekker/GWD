@@ -11,13 +11,16 @@ typedef struct
   bstring BS_empty;
 } my_bstream_t;
 
-void construct_my_bstream(my_bstream_t *, const char *);
-int my_bstream_readln(my_bstream_t *, int);
-void destroy_my_bstream(my_bstream_t *);
+void construct_my_bstream(my_bstream_t *arg_with_my_bstream,
+                          const char *arg_name);
+int my_bstream_readln(my_bstream_t *arg_with_my_bstream,
+                      int arg_remove_newline);
+void destroy_my_bstream(my_bstream_t *arg_with_my_bstream);
 
-size_t my_bread(void *, size_t, size_t, void *);
-void my_bstrftime(bstring, const char *, time_t);
-int my_breadline(bstring, FILE *);
-void my_bcpu_flags(bstring);
+size_t
+my_bread(void *arg_buffer, size_t arg_size, size_t arg_count, void *arg_file);
+void my_bstrftime(bstring arg_string, const char *arg_format, time_t arg_time);
+int my_breadline(bstring arg_line, FILE *arg_file);
+void my_bcpu_flags(bstring arg_flags);
 
 #endif

@@ -125,7 +125,7 @@ extern queue_t main_queue;
 
 extern cJSON *gwd_json;
 
-void results2csv(int, int, int, int);
+void results2csv(int arg_nwon, int arg_ndraw, int arg_nlost, int arg_nunknown);
 int main(int argc, char **argv);
 
 #endif

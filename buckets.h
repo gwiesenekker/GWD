@@ -24,12 +24,17 @@ typedef struct
   my_int64_t *buckets;
 } bucket_t;
 
-void clear_bucket(bucket_t *);
-void update_bucket(bucket_t *, double);
-void printf_bucket(const bucket_t *);
-void construct_bucket(bucket_t *, const char *, double, double, double, int);
+void clear_bucket(bucket_t *arg_with_bucket);
+void update_bucket(bucket_t *arg_with_bucket, double arg_value);
+void printf_bucket(const bucket_t *arg_with_bucket);
+void construct_bucket(bucket_t *arg_with_bucket,
+                      const char *arg_bucket_name,
+                      double arg_bucket_size,
+                      double arg_bucket_min,
+                      double arg_bucket_max,
+                      int arg_bucket_scale);
 
-void my_mpi_bucket_aggregate(bucket_t *, MPI_Comm);
+void my_mpi_bucket_aggregate(bucket_t *arg_with_bucket, MPI_Comm arg_comm);
 
 void test_buckets(void);
 

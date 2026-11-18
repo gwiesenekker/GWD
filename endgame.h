@@ -12,9 +12,9 @@ enum
 extern GwdegtbWdlProbe *wdl_probe_alpha_beta_master;
 
 void init_endgame(void);
-int read_endgame(search_t *, const char **);
-int read_endgame_if_open(search_t *);
-score_t return_endgame_score(search_t *);
+int read_endgame(search_t *arg_with_search, const char **arg_dtm_missing_name);
+int read_endgame_if_open(search_t *arg_with_search);
+score_t return_endgame_score(search_t *arg_with_search);
 void fin_endgame(void);
 
 #endif

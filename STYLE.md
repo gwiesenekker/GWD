@@ -154,6 +154,16 @@ BDESTROY(bname)
   update cached serialization or other internal state still take mutable objects.
 - Keep declarations, definitions and function-pointer signatures consistent.
   Do not cast away const to make a call compile.
+- Name parameters in public prototypes, using the same descriptive names as
+  their implementations so callers can understand the argument order.
+
+## Table initializers
+
+- Use designated initializers for tables indexed by named IDs or enum values,
+  such as `[TAG_REQUEST_LOCK] = "TAG_REQUEST_LOCK"`.
+- Keep positional initializers where the layout itself conveys meaning, such
+  as board geometry, ordered move directions, or numerical matrices.
+- Preserve every entry and its value when converting an existing table.
 
 ## Comments and changes
 

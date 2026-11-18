@@ -2,7 +2,7 @@
 #ifndef DxpH
 #define DxpH
 
-double format_dxp_increment(double, char[7]);
+double format_dxp_increment(double arg_increment, char arg_field[7]);
 void dxp_server(void);
 void dxp_client(void);
 

@@ -38,16 +38,20 @@ typedef struct
   my_int64_t C_noverwrites;
 } cache_t;
 
-int check_entry_in_cache(cache_t *, const void *, void *);
-int store_entry_in_cache(cache_t *, const void *, const void *);
-void clear_cache(cache_t *);
-void construct_cache(cache_t *,
-                     const char *,
-                     my_int64_t,
-                     int,
-                     const void *,
-                     size_t,
-                     const void *);
+int check_entry_in_cache(cache_t *arg_with_cache,
+                         const void *arg_entry_key,
+                         void *arg_entry_value);
+int store_entry_in_cache(cache_t *arg_with_cache,
+                         const void *arg_entry_key,
+                         const void *arg_entry_value);
+void clear_cache(cache_t *arg_with_cache);
+void construct_cache(cache_t *arg_with_cache,
+                     const char *arg_cache_name,
+                     my_int64_t arg_cache_size,
+                     int arg_entry_key_type,
+                     const void *arg_entry_key_default,
+                     size_t arg_entry_value_size,
+                     const void *arg_entry_value_default);
 
 void test_caches(void);
 

@@ -37,18 +37,27 @@ typedef struct
   uint32_t ML_move_flags[NMOVES_MAX];
 } moves_list_t;
 
-void gen_moves(board_t *, moves_list_t *);
-void gen_moves_legacy(board_t *, moves_list_t *);
-int can_capture(const board_t *, int);
-void do_move(board_t *, int, const moves_list_t *);
-void undo_move(board_t *, int, const moves_list_t *);
-void check_moves(board_t *, moves_list_t *);
+void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list);
+void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list);
+int can_capture(const board_t *arg_with_board, int arg_kings);
+void do_move(board_t *arg_with_board,
+             int arg_imove,
+             const moves_list_t *arg_moves_list);
+void undo_move(board_t *arg_with_board,
+               int arg_imove,
+               const moves_list_t *arg_moves_list);
+void check_moves(board_t *arg_with_board, moves_list_t *arg_moves_list);
 
-void move2bstring(const moves_list_t *, int, bstring);
-int search_move(const moves_list_t *, const_bstring);
+void move2bstring(const moves_list_t *arg_with_moves_list,
+                  int arg_imove,
+                  bstring arg_bmove_string);
+int search_move(const moves_list_t *arg_with_moves_list,
+                const_bstring arg_bmove);
 
-void construct_moves_list(moves_list_t *);
+void construct_moves_list(moves_list_t *arg_with_moves_list);
 
-void fprintf_moves_list(const moves_list_t *, my_printf_t *, int);
+void fprintf_moves_list(const moves_list_t *arg_with_moves_list,
+                        my_printf_t *arg_my_printf,
+                        int arg_verbose);
 
 #endif
