@@ -7,7 +7,7 @@
 typedef struct
 {
   bstring S_name;
-  i64_t S_nsamples;
+  my_int64_t S_nsamples;
 
   double S_min;
   double S_max;

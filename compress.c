@@ -18,22 +18,22 @@ _Static_assert((BLOCK_LENGTH % 8) == 0, "BLOCK_LENGTH must be a multiple of 8");
 
 typedef struct
 {
-  ui32_t CB_crc32_data;
-  i64_t CB_offset;
-  i16_t CB_ldata_compressed;
-  i8_t *CB_data_compressed;
+  uint32_t CB_crc32_data;
+  my_int64_t CB_offset;
+  int16_t CB_ldata_compressed;
+  int8_t *CB_data_compressed;
 } compressed_block_t;
 
 typedef struct
 {
-  i64_t CF_nblocks;
+  my_int64_t CF_nblocks;
   compressed_block_t *CF_blocks;
-  i8_t *CF_data_compressed;
+  int8_t *CF_data_compressed;
 } compressed_file_t;
 
-local ui32_t return_crc32_data(ui64_t *arg_words)
+local uint32_t return_crc32_data(my_uint64_t *arg_words)
 {
-  ui32_t crc32 = 0xFFFFFFFF;
+  uint32_t crc32 = 0xFFFFFFFF;
 
   for (int iword = 0; iword < (BLOCK_LENGTH / 8); iword++)
     crc32 = HW_CRC32_U64(crc32, arg_words[iword]);
@@ -45,7 +45,7 @@ local ui32_t return_crc32_data(ui64_t *arg_words)
 
 local void
 construct_compressed_file(compressed_file_t *arg_with_compressed_file,
-                          i64_t arg_nblocks)
+                          my_int64_t arg_nblocks)
 {
   HARDBUG(arg_nblocks < 1)
 
@@ -55,7 +55,7 @@ construct_compressed_file(compressed_file_t *arg_with_compressed_file,
                     compressed_block_t,
                     arg_with_compressed_file->CF_nblocks)
 
-  for (i64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
+  for (my_int64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
        iblock++)
   {
     compressed_block_t *with_compressed_block =
@@ -70,8 +70,8 @@ construct_compressed_file(compressed_file_t *arg_with_compressed_file,
 }
 
 local void add_block(compressed_file_t *arg_with_compressed_file,
-                     i64_t arg_iblock,
-                     i8_t *arg_data)
+                     my_int64_t arg_iblock,
+                     int8_t *arg_data)
 {
   HARDBUG(arg_iblock < 0)
   HARDBUG(arg_iblock >= arg_with_compressed_file->CF_nblocks)
@@ -82,9 +82,10 @@ local void add_block(compressed_file_t *arg_with_compressed_file,
   HARDBUG(with_compressed_block->CB_ldata_compressed != 0)
   HARDBUG(with_compressed_block->CB_data_compressed != NULL)
 
-  with_compressed_block->CB_crc32_data = return_crc32_data((ui64_t *)arg_data);
+  with_compressed_block->CB_crc32_data =
+    return_crc32_data((my_uint64_t *)arg_data);
 
-  i8_t data_compressed[2 * BLOCK_LENGTH];
+  int8_t data_compressed[2 * BLOCK_LENGTH];
 
   HARDBUG(ZSTD_compressBound(BLOCK_LENGTH) > sizeof(data_compressed))
 
@@ -99,7 +100,7 @@ local void add_block(compressed_file_t *arg_with_compressed_file,
   int ldata_compressed = zstd_size;
 
   MY_MALLOC_BY_TYPE(with_compressed_block->CB_data_compressed,
-                    i8_t,
+                    int8_t,
                     ldata_compressed);
 
   with_compressed_block->CB_ldata_compressed = ldata_compressed;
@@ -122,7 +123,7 @@ local void save_compressed_file(compressed_file_t *arg_with_compressed_file,
 
   arg_with_compressed_file->CF_blocks[0].CB_offset = 0;
 
-  for (i64_t iblock = 1; iblock < arg_with_compressed_file->CF_nblocks;
+  for (my_int64_t iblock = 1; iblock < arg_with_compressed_file->CF_nblocks;
        iblock++)
   {
     arg_with_compressed_file->CF_blocks[iblock].CB_offset =
@@ -130,7 +131,7 @@ local void save_compressed_file(compressed_file_t *arg_with_compressed_file,
       arg_with_compressed_file->CF_blocks[iblock - 1].CB_ldata_compressed;
   }
 
-  i64_t ldata_compressed =
+  my_int64_t ldata_compressed =
     arg_with_compressed_file
       ->CF_blocks[arg_with_compressed_file->CF_nblocks - 1]
       .CB_offset +
@@ -142,17 +143,17 @@ local void save_compressed_file(compressed_file_t *arg_with_compressed_file,
 
   // header
 
-  i8_t version = COMPRESSED_VERSION;
+  int8_t version = COMPRESSED_VERSION;
 
-  FWRITE(fcompressed, &version, i8_t, 1)
+  FWRITE(fcompressed, &version, int8_t, 1)
 
-  i8_t level = ZSTD_LEVEL;
+  int8_t level = ZSTD_LEVEL;
 
-  FWRITE(fcompressed, &level, i8_t, 1)
+  FWRITE(fcompressed, &level, int8_t, 1)
 
-  FWRITE(fcompressed, &(arg_with_compressed_file->CF_nblocks), i64_t, 1)
+  FWRITE(fcompressed, &(arg_with_compressed_file->CF_nblocks), my_int64_t, 1)
 
-  FWRITE(fcompressed, &ldata_compressed, i64_t, 1)
+  FWRITE(fcompressed, &ldata_compressed, my_int64_t, 1)
 
   // data
 
@@ -161,11 +162,11 @@ local void save_compressed_file(compressed_file_t *arg_with_compressed_file,
          compressed_block_t,
          arg_with_compressed_file->CF_nblocks)
 
-  for (i64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
+  for (my_int64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
        iblock++)
     FWRITE(fcompressed,
            arg_with_compressed_file->CF_blocks[iblock].CB_data_compressed,
-           i8_t,
+           int8_t,
            arg_with_compressed_file->CF_blocks[iblock].CB_ldata_compressed);
 
   FCLOSE(fcompressed)
@@ -180,25 +181,25 @@ local void load_compressed_file(compressed_file_t *arg_with_compressed_file,
 
   // header
 
-  i8_t version;
+  int8_t version;
 
-  FREAD(fcompressed, &version, i8_t, 1)
+  FREAD(fcompressed, &version, int8_t, 1)
 
   HARDBUG(version != COMPRESSED_VERSION)
 
-  i8_t level;
+  int8_t level;
 
-  FREAD(fcompressed, &level, i8_t, 1)
+  FREAD(fcompressed, &level, int8_t, 1)
 
   HARDBUG(level != ZSTD_LEVEL)
 
-  FREAD(fcompressed, &(arg_with_compressed_file->CF_nblocks), i64_t, 1)
+  FREAD(fcompressed, &(arg_with_compressed_file->CF_nblocks), my_int64_t, 1)
 
   HARDBUG(arg_with_compressed_file->CF_nblocks < 1)
 
-  i64_t ldata_compressed;
+  my_int64_t ldata_compressed;
 
-  FREAD(fcompressed, &ldata_compressed, i64_t, 1)
+  FREAD(fcompressed, &ldata_compressed, my_int64_t, 1)
 
   HARDBUG(ldata_compressed < 1)
 
@@ -212,22 +213,22 @@ local void load_compressed_file(compressed_file_t *arg_with_compressed_file,
         arg_with_compressed_file->CF_nblocks)
 
   MY_MALLOC_BY_TYPE(arg_with_compressed_file->CF_data_compressed,
-                    i8_t,
+                    int8_t,
                     ldata_compressed)
 
   FREAD(fcompressed,
         arg_with_compressed_file->CF_data_compressed,
-        i8_t,
+        int8_t,
         ldata_compressed)
 
   FCLOSE(fcompressed)
 
   PRINTF("verifying..\n");
 
-  for (i64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
+  for (my_int64_t iblock = 0; iblock < arg_with_compressed_file->CF_nblocks;
        iblock++)
   {
-    i8_t data_uncompressed[BLOCK_LENGTH];
+    int8_t data_uncompressed[BLOCK_LENGTH];
 
     size_t zstd_size = ZSTD_decompress(
       data_uncompressed,
@@ -240,21 +241,21 @@ local void load_compressed_file(compressed_file_t *arg_with_compressed_file,
 
     HARDBUG(zstd_size != BLOCK_LENGTH)
 
-    HARDBUG(return_crc32_data((ui64_t *)data_uncompressed) !=
+    HARDBUG(return_crc32_data((my_uint64_t *)data_uncompressed) !=
             arg_with_compressed_file->CF_blocks[iblock].CB_crc32_data)
   }
 
   PRINTF("..OK\n");
 }
 
-local i8_t read_compressed_file(compressed_file_t *arg_with_compressed_file,
-                                i64_t arg_where)
+local int8_t read_compressed_file(compressed_file_t *arg_with_compressed_file,
+                                  my_int64_t arg_where)
 {
-  i64_t iblock = arg_where / BLOCK_LENGTH;
+  my_int64_t iblock = arg_where / BLOCK_LENGTH;
 
   // uncompress iblock
 
-  i8_t data_uncompressed[BLOCK_LENGTH];
+  int8_t data_uncompressed[BLOCK_LENGTH];
 
   size_t zstd_size = ZSTD_decompress(
     data_uncompressed,
@@ -267,7 +268,7 @@ local i8_t read_compressed_file(compressed_file_t *arg_with_compressed_file,
 
   HARDBUG(zstd_size != BLOCK_LENGTH)
 
-  HARDBUG(return_crc32_data((ui64_t *)data_uncompressed) !=
+  HARDBUG(return_crc32_data((my_uint64_t *)data_uncompressed) !=
           arg_with_compressed_file->CF_blocks[iblock].CB_crc32_data)
 
   return (data_uncompressed[arg_where % BLOCK_LENGTH]);
@@ -277,7 +278,7 @@ local void compress_file(bstring arg_bwdl)
 {
   // get file stats
 
-  i64_t size;
+  my_int64_t size;
 
   HARDBUG((size = compat_size(bdata(arg_bwdl))) == -1)
 
@@ -287,9 +288,9 @@ local void compress_file(bstring arg_bwdl)
 
   HARDBUG((fwdl = fopen(bdata(arg_bwdl), "rb")) == NULL)
 
-  i8_t wdl_version;
+  int8_t wdl_version;
 
-  HARDBUG(fread(&wdl_version, sizeof(i8_t), 1, fwdl) != 1)
+  HARDBUG(fread(&wdl_version, sizeof(int8_t), 1, fwdl) != 1)
 
   PRINTF("wdl_version=%d\n", wdl_version);
 
@@ -299,7 +300,7 @@ local void compress_file(bstring arg_bwdl)
 
   PRINTF("size %% 128=%lld\n", size % 128);
 
-  i64_t nblocks = size / BLOCK_LENGTH;
+  my_int64_t nblocks = size / BLOCK_LENGTH;
 
   if (nblocks * BLOCK_LENGTH < size)
     ++nblocks;
@@ -312,13 +313,13 @@ local void compress_file(bstring arg_bwdl)
 
   construct_compressed_file(&compressed_file, nblocks);
 
-  i8_t data[BLOCK_LENGTH];
+  int8_t data[BLOCK_LENGTH];
 
   int ldata;
 
-  i64_t iblock = 0;
+  my_int64_t iblock = 0;
 
-  while ((ldata = fread(data, sizeof(i8_t), BLOCK_LENGTH, fwdl)) > 0)
+  while ((ldata = fread(data, sizeof(int8_t), BLOCK_LENGTH, fwdl)) > 0)
   {
     HARDBUG(iblock >= nblocks)
 

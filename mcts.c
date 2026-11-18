@@ -186,7 +186,7 @@ local void mcts_alpha_beta(search_t *arg_with_search,
 
     score_t temp_beta = arg_my_beta;
 
-    ui32_t node_type = arg_node_type;
+    uint32_t node_type = arg_node_type;
 
     if (is_pv(arg_node_type) and (imove > 0))
     {
@@ -317,7 +317,7 @@ void mcts_search(search_t *arg_with_search,
 
       score_t my_beta = my_alpha + 1;
 
-      ui32_t node_type = MINIMAL_WINDOW_BIT;
+      uint32_t node_type = MINIMAL_WINDOW_BIT;
 
       if (imove == 0)
       {

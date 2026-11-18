@@ -83,10 +83,10 @@ typedef struct
 
   int sync_clock;
 
-  i64_t alpha_beta_cache_size;
+  my_int64_t alpha_beta_cache_size;
   int cache_draw_results;
 
-  i64_t score_cache_size;
+  my_int64_t score_cache_size;
 
   int nthreads_alpha_beta;
 
@@ -97,7 +97,7 @@ typedef struct
   bstring egtb_ram;
   bstring egtb_ram_wdl;
 
-  i64_t egtb_entry_cache_size;
+  my_int64_t egtb_entry_cache_size;
 
   bstring dxp_server_ip;
   int dxp_port;

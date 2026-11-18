@@ -38,11 +38,11 @@ _Static_assert(CHAR_BIT == 8, "GWD requires 8-bit bytes");
 #undef LINE_MAX // dirent.h
 #define LINE_MAX do_not_use_LINE_MAX
 
-typedef long long i64_t;
-typedef unsigned long long ui64_t;
+typedef long long my_int64_t;
+typedef unsigned long long my_uint64_t;
 
-_Static_assert((sizeof(i64_t) == 8) && (sizeof(ui64_t) == 8),
-               "GWD requires 64-bit i64_t and ui64_t");
+_Static_assert((sizeof(my_int64_t) == 8) && (sizeof(my_uint64_t) == 8),
+               "GWD requires 64-bit my_int64_t and my_uint64_t");
 
 #include "compat.h"
 
@@ -57,8 +57,6 @@ enum
   MBYTE = 1048576
 };
 
-#define ULL_MAX 18446744073709551615ULL
-
 // specific defines
 
 #define USE_HARDWARE_CRC32
@@ -68,45 +66,6 @@ enum
 {
   NODE_MAX = 1024
 };
-
-#define CJSON_PRAGMA_ID "pragma"
-#define CJSON_PARAMETERS_ID "parameters"
-#define CJSON_SHAPE_ID "shape"
-#define CJSON_NETWORK2MATERIAL_SCORE_ID "network2material_score"
-#define CJSON_MATERIALS_ID "materials"
-#define CJSON_MATERIAL_NAME_ID "name"
-#define CJSON_ARCHITECTURE_PATTERNS_ID "architecture_patterns"
-#define CJSON_ARCHITECTURE_MATERIAL_ID "architecture_material"
-#define CJSON_ACTIVATION_INPUTS_ID "activation_inputs"
-#define CJSON_ACTIVATION_ID "activation"
-#define CJSON_ACTIVATION_LAST_ID "activation_last"
-#define CJSON_NMAN_MIN_ID "nman_min"
-#define CJSON_NMAN_MAX_ID "nman_max"
-
-#define CJSON_EVENT_ID "event"
-#define CJSON_DATE_ID "date"
-#define CJSON_WHITE_ID "white"
-#define CJSON_BLACK_ID "black"
-#define CJSON_RESULT_ID "result"
-#define CJSON_STARTING_POSITION_ID "FEN"
-#define CJSON_TIME_ID "time"
-#define CJSON_DEPTH_ID "depth"
-
-#define CJSON_MOVES_ID "moves"
-#define CJSON_MOVE_STRING_ID "move_string"
-#define CJSON_COMMENT_STRING_ID "comment_string"
-
-#define CJSON_CSV_ID "csv"
-#define CJSON_CSV_PATH_ID "path"
-#define CJSON_CSV_COLUMNS_ID "columns"
-
-#define CJSON_DIRECTORIES_ID "directories"
-#define CJSON_DIRECTORY_NAME_ID "name"
-#define CJSON_FILES_ID "files"
-#define CJSON_FILE_NAME_ID "name"
-#define CJSON_FILE_ROWS_ID "rows"
-#define CJSON_FILE_COLS_ID "cols"
-#define CJSON_FILE_DATA_ID "data"
 
 // generic macro's
 
@@ -155,18 +114,9 @@ enum
     HARDBUG(fclose(F) == EOF)(F) = NULL; \
   }
 
-// generic typedefs
-
-typedef int8_t i8_t;
-typedef uint8_t ui8_t;
-typedef int16_t i16_t;
-typedef uint16_t ui16_t;
-typedef int32_t i32_t;
-typedef uint32_t ui32_t;
-
 // specific typedefs
 
-typedef ui64_t hash_key_t;
+typedef my_uint64_t hash_key_t;
 typedef struct board board_t;
 
 #define SCALED_DOUBLE_FLOAT 1
@@ -176,7 +126,7 @@ typedef struct board board_t;
 #if SCALED_DOUBLE_T == SCALED_DOUBLE_FLOAT
 typedef float scaled_double_t;
 #else
-typedef i32_t scaled_double_t;
+typedef int32_t scaled_double_t;
 #endif
 
 #define SCORE_T_INT 1
@@ -185,7 +135,7 @@ typedef i32_t scaled_double_t;
 #define SCORE_T SCORE_T_FLOAT
 
 #if SCORE_T == SCORE_T_INT
-typedef i32_t score_t;
+typedef int32_t score_t;
 #define PRINTF_SCORE_T "%d"
 #define SCANF_SCORE_T_RAW "%d"
 #define PRINTF_SCORE_T_RAW "%d"
@@ -193,7 +143,7 @@ typedef i32_t score_t;
 #define SCORE(S) ((score_t)(S))
 #define SCORE2PRINTF(S) (S)
 #elif SCORE_T == SCORE_T_FLOAT
-typedef i32_t score_t;
+typedef int32_t score_t;
 #define PRINTF_SCORE_T "%.3f"
 #define SCANF_SCORE_T_RAW "%d"
 #define PRINTF_SCORE_T_RAW "%d"

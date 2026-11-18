@@ -59,10 +59,10 @@ network_t networks[NETWORKS_MAX];
 
 // for binary fen
 
-typedef i32_t bin_t;
+typedef int32_t bin_t;
 
-local i8_t base64_table[256];
-local ui16_t base3_table[65536];
+local int8_t base64_table[256];
+local uint16_t base3_table[65536];
 
 local void init_base64_table(void)
 {
@@ -135,7 +135,7 @@ void decode_base64(size_t arg_nsource,
                    size_t arg_ntarget,
                    unsigned char *arg_target)
 {
-  ui32_t bits = 0;
+  uint32_t bits = 0;
   int nbits = -8;
 
   size_t itarget = 0;
@@ -144,7 +144,7 @@ void decode_base64(size_t arg_nsource,
        (isource < arg_nsource) and (arg_source[isource] != '=');
        isource++)
   {
-    i8_t digit = base64_table[(unsigned char)arg_source[isource]];
+    int8_t digit = base64_table[(unsigned char)arg_source[isource]];
 
     HARDBUG(digit == INVALID)
 
@@ -417,7 +417,7 @@ local scaled_double_t dot_scaled(int arg_nvalues,
     __m256i s64_lo = _mm256_setzero_si256();
     __m256i s64_hi = _mm256_setzero_si256();
 
-    for (const i32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+    for (const int32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
          arg_a += 8, arg_b += 8)
     {
       __m256i ta = _mm256_load_si256((const __m256i *)arg_a);
@@ -433,14 +433,14 @@ local scaled_double_t dot_scaled(int arg_nvalues,
       s64_hi = _mm256_add_epi64(s64_hi, _mm256_mul_epi32(ta_hi, tb_hi));
     }
 
-    ALIGN64(i64_t r64_lo[4]);
-    ALIGN64(i64_t r64_hi[4]);
+    ALIGN64(my_int64_t r64_lo[4]);
+    ALIGN64(my_int64_t r64_hi[4]);
 
     _mm256_store_si256((__m256i *)r64_lo, s64_lo);
     _mm256_store_si256((__m256i *)r64_hi, s64_hi);
 
-    i64_t s64 = r64_lo[0] + r64_lo[1] + r64_lo[2] + r64_lo[3] + r64_hi[0] +
-                r64_hi[1] + r64_hi[2] + r64_hi[3];
+    my_int64_t s64 = r64_lo[0] + r64_lo[1] + r64_lo[2] + r64_lo[3] + r64_hi[0] +
+                     r64_hi[1] + r64_hi[2] + r64_hi[3];
 
     sum = s64 / SCALED_DOUBLE_FACTOR;
 #endif
@@ -1627,7 +1627,7 @@ void vcopy_a2b(int arg_nvalues,
       _mm256_store_ps(arg_b, vector_a);
     }
 #else
-    for (const i32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+    for (const int32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
          arg_a += 8, arg_b += 8)
     {
       __m256i vector_a = _mm256_load_si256((const __m256i *)arg_a);
@@ -1768,7 +1768,7 @@ void vadd_ab2a(int arg_nvalues,
       _mm256_store_ps(arg_a, vector_sum);
     }
 #else
-    for (const i32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+    for (const int32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
          arg_a += 8, arg_b += 8)
     {
       const __m256i vector_a = _mm256_load_si256((const __m256i *)arg_a);
@@ -1816,7 +1816,7 @@ void vmul_ab2a(int arg_nvalues,
       _mm256_store_ps(arg_a, vector_sum);
     }
 #else
-    for (const i32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
+    for (const int32_t *end_a = arg_a + arg_nvalues; arg_a < end_a;
          arg_a += 8, arg_b += 8)
     {
       const __m256i vector_a = _mm256_load_si256((const __m256i *)arg_a);
@@ -2287,15 +2287,15 @@ local double return_sigmoid(double arg_input)
   return (2.0 / (1.0 + exp(-arg_input)) - 1.0);
 }
 
-int base3_index_v2(const board_t *arg_board, ui64_t arg_pattern_bb)
+int base3_index_v2(const board_t *arg_board, my_uint64_t arg_pattern_bb)
 {
   BEGIN_BLOCK(__func__)
 
   int result = 0;
   int power = 1;
 
-  ui64_t white_man_bb = arg_board->B_white_men_bb;
-  ui64_t black_man_bb = arg_board->B_black_men_bb;
+  my_uint64_t white_man_bb = arg_board->B_white_men_bb;
+  my_uint64_t black_man_bb = arg_board->B_black_men_bb;
 
   while (arg_pattern_bb != 0)
   {
@@ -2314,7 +2314,7 @@ int base3_index_v2(const board_t *arg_board, ui64_t arg_pattern_bb)
   return (result);
 }
 
-int base3_index_v3(const board_t *arg_board, ui64_t arg_pattern_bb)
+int base3_index_v3(const board_t *arg_board, my_uint64_t arg_pattern_bb)
 {
   uint64_t white_mask = _pext_u64(arg_board->B_white_men_bb, arg_pattern_bb);
   uint64_t black_mask = _pext_u64(arg_board->B_black_men_bb, arg_pattern_bb);
@@ -2322,7 +2322,7 @@ int base3_index_v3(const board_t *arg_board, ui64_t arg_pattern_bb)
   return (base3_table[white_mask | (black_mask << 8)]);
 }
 
-int base3_index_v4(const board_t *arg_board, ui64_t arg_pattern_bb)
+int base3_index_v4(const board_t *arg_board, my_uint64_t arg_pattern_bb)
 {
   // HARDBUG(BIT_COUNT(arg_pattern_bb) > BASE3_PATTERN_BITS)
 
@@ -2654,10 +2654,11 @@ double return_dense_network_score_double(
   return (SCALED2DOUBLE(with_thread->LT_outputs[0]));
 }
 
-local void
-heap_sort_double(i64_t arg_nvalues, i64_t *arg_order, double *arg_values)
+local void heap_sort_double(my_int64_t arg_nvalues,
+                            my_int64_t *arg_order,
+                            double *arg_values)
 {
-  i64_t iparent, ichild, iroot, saved_index;
+  my_int64_t iparent, ichild, iroot, saved_index;
 
   if (arg_nvalues < 2)
     return;
@@ -2734,7 +2735,7 @@ local void update_mean_sigma(long long arg_nsamples,
 
 static inline uint64_t mirror_bb(uint64_t arg_bb)
 {
-  ui64_t result;
+  my_uint64_t result;
 
   result = (arg_bb >> 6);
 
@@ -2742,7 +2743,7 @@ static inline uint64_t mirror_bb(uint64_t arg_bb)
 
   result = (result << 6);
 
-  ui64_t debug = 0;
+  my_uint64_t debug = 0;
 
   while (arg_bb)
   {
@@ -2758,7 +2759,7 @@ static inline uint64_t mirror_bb(uint64_t arg_bb)
   return (result);
 }
 
-void fen2network(const char *arg_name, i64_t arg_npositions)
+void fen2network(const char *arg_name, my_int64_t arg_npositions)
 {
   board_t board;
 
@@ -2770,7 +2771,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
   construct_my_bstream(&my_bstream, arg_name);
 
-  i64_t nfen = 0;
+  my_int64_t nfen = 0;
 
   while (my_bstream_readln(&my_bstream, TRUE) == BSTR_OK)
   {
@@ -2784,11 +2785,11 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
   PRINTF("nfen=%lld\n", nfen);
 
-  i64_t *npieces_fen;
+  my_int64_t *npieces_fen;
 
-  MY_MALLOC_BY_TYPE(npieces_fen, i64_t, nfen)
+  MY_MALLOC_BY_TYPE(npieces_fen, my_int64_t, nfen)
 
-  for (i64_t ifen = 0; ifen < nfen; ifen++)
+  for (my_int64_t ifen = 0; ifen < nfen; ifen++)
     npieces_fen[ifen] = 0;
 
   double *score_scaled, *score_double;
@@ -2796,7 +2797,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
   MY_MALLOC_BY_TYPE(score_scaled, double, nfen)
   MY_MALLOC_BY_TYPE(score_double, double, nfen)
 
-  for (i64_t ifen = 0; ifen < nfen; ifen++)
+  for (my_int64_t ifen = 0; ifen < nfen; ifen++)
     score_scaled[ifen] = score_double[ifen] = 0.0;
 
   double *delta_scaled, *delta_double;
@@ -2804,7 +2805,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
   MY_MALLOC_BY_TYPE(delta_scaled, double, nfen)
   MY_MALLOC_BY_TYPE(delta_double, double, nfen)
 
-  for (i64_t ifen = 0; ifen < nfen; ifen++)
+  for (my_int64_t ifen = 0; ifen < nfen; ifen++)
     delta_scaled[ifen] = delta_double[ifen] = 0.0;
 
   double mse_vs_draw_scaled = 0.0;
@@ -2826,7 +2827,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
   fcsv = fopen("xyz.csv", "w");
 
-  for (i64_t ifen = 0; ifen < nfen; ifen++)
+  for (my_int64_t ifen = 0; ifen < nfen; ifen++)
   {
     HARDBUG(my_bstream_readln(&my_bstream, TRUE) == BSTR_ERR)
 
@@ -3007,7 +3008,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
   for (int ipiece = 1; ipiece <= 2 * NPIECES_MAX + 1; ipiece++)
   {
-    i64_t ndelta = 0;
+    my_int64_t ndelta = 0;
     double delta_scaled_max = 0.0;
     double delta_scaled_mean = 0.0;
     double delta_scaled_sigma = 0.0;
@@ -3015,7 +3016,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
     double delta_double_mean = 0.0;
     double delta_double_sigma = 0.0;
 
-    for (i64_t ifen = 0; ifen < nfen; ifen++)
+    for (my_int64_t ifen = 0; ifen < nfen; ifen++)
     {
       if (npieces_fen[ifen] != ipiece)
         continue;
@@ -3046,9 +3047,9 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
            sqrt(delta_double_sigma / ndelta));
   }
 
-  i64_t *pdelta_scaled;
+  my_int64_t *pdelta_scaled;
 
-  MY_MALLOC_BY_TYPE(pdelta_scaled, i64_t, nfen)
+  MY_MALLOC_BY_TYPE(pdelta_scaled, my_int64_t, nfen)
 
   heap_sort_double(nfen, pdelta_scaled, delta_scaled);
 
@@ -3062,7 +3063,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
   for (int ipercentile = 1; ipercentile <= 99; ++ipercentile)
   {
-    i64_t ifen = round(ipercentile / 100.0 * nfen);
+    my_int64_t ifen = round(ipercentile / 100.0 * nfen);
 
     HARDBUG(ifen >= nfen)
 
@@ -3095,7 +3096,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
   PRINTF("error_max_scaled_vs_double=%.6f\n", error_max_scaled_vs_double);
 
-  i64_t ipercentile = round(90 / 100.0 * nfen);
+  my_int64_t ipercentile = round(90 / 100.0 * nfen);
   double percentile = delta_scaled[pdelta_scaled[ipercentile]];
 
   PRINTF("percentile=%.6f\n", percentile);
@@ -3104,7 +3105,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
 
   construct_progress(&progress, "fen2network:factor", nfen, 10);
 
-  i64_t nfactor[NPIECES_MAX + 1];
+  my_int64_t nfactor[NPIECES_MAX + 1];
   double factor[NPIECES_MAX + 1];
   double score[NPIECES_MAX + 1];
 
@@ -3115,7 +3116,7 @@ void fen2network(const char *arg_name, i64_t arg_npositions)
     score[ipiece] = 0;
   }
 
-  for (i64_t ifen = 0; ifen < nfen; ifen++)
+  for (my_int64_t ifen = 0; ifen < nfen; ifen++)
   {
     HARDBUG(my_bstream_readln(&my_bstream, TRUE) == BSTR_ERR)
 
@@ -3364,7 +3365,7 @@ local void append_fen(const board_t *arg_with_board,
   }
   else if (with_network->N_final_activation == NETWORK_ACTIVATION_LOGITS)
   {
-    i32_t result = INVALID;
+    int32_t result = INVALID;
 
     if (fabs(arg_result - (-1.0)) < 1.0e-3)
       result = 0;
@@ -3375,7 +3376,7 @@ local void append_fen(const board_t *arg_with_board,
     else
       FATAL("unknown arg_result", EXIT_FAILURE)
 
-    append_fbuffer_bin(arg_fcsv, &result, sizeof(i32_t));
+    append_fbuffer_bin(arg_fcsv, &result, sizeof(int32_t));
   }
   else if (with_network->N_final_activation == NETWORK_ACTIVATION_2HEADS)
   {
@@ -3406,7 +3407,7 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
     construct_my_random(&fen2csv_random, NULL);
   else
   {
-    ui64_t seed;
+    my_uint64_t seed;
 
     construct_my_random(&fen2csv_random, &seed);
 
@@ -3526,7 +3527,7 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
   construct_my_bstream(&my_bstream, arg_name);
 
-  i64_t nfen = 0;
+  my_int64_t nfen = 0;
 
   int label_white2move = FALSE;
 
@@ -3669,7 +3670,7 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
 
   construct_progress(&progress, "fen2csv", nfen, 10);
 
-  for (i64_t ifen = 0; ifen < nfen; ifen++)
+  for (my_int64_t ifen = 0; ifen < nfen; ifen++)
   {
     HARDBUG(my_bstream_readln(&my_bstream, TRUE) == BSTR_ERR)
 
@@ -3702,10 +3703,10 @@ void fen2csv(const char *arg_name, int arg_npieces_min, int arg_npieces_max)
       if (label_white2move)
         result = -result;
 
-      ui64_t white_man_bb = mirror_bb(with_board->B_black_men_bb);
-      ui64_t black_man_bb = mirror_bb(with_board->B_white_men_bb);
-      ui64_t white_king_bb = mirror_bb(with_board->B_black_kings_bb);
-      ui64_t black_king_bb = mirror_bb(with_board->B_white_kings_bb);
+      my_uint64_t white_man_bb = mirror_bb(with_board->B_black_men_bb);
+      my_uint64_t black_man_bb = mirror_bb(with_board->B_white_men_bb);
+      my_uint64_t white_king_bb = mirror_bb(with_board->B_black_kings_bb);
+      my_uint64_t black_king_bb = mirror_bb(with_board->B_white_kings_bb);
 
       with_board->B_white_men_bb = white_man_bb;
       with_board->B_black_men_bb = black_man_bb;

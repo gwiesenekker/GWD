@@ -93,7 +93,7 @@ void my_printf(my_printf_t *arg_with_my_printf, const char *arg_format, ...)
 
     my_bstrftime(time_stamp, "%H:%M:%S-%d/%m/%Y", current_time);
 
-    i64_t pid = compat_getpid();
+    my_int64_t pid = compat_getpid();
 
     if (arg_with_my_printf->MP_fsize > MAX_SIZE)
     {
@@ -339,7 +339,7 @@ void construct_my_printf(my_printf_t *arg_with_my_printf,
 
   my_bstrftime(time_stamp, "%H:%M:%S-%d/%m/%Y", current_time);
 
-  i64_t pid = compat_getpid();
+  my_int64_t pid = compat_getpid();
 
   int nchar = fprintf(arg_with_my_printf->MP_flog,
                       "%s|%lld@ PTHREAD_SELF=%#lX LOG FILE OPENED\n\n",

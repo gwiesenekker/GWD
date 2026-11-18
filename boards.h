@@ -73,8 +73,8 @@ typedef struct
 
 typedef struct
 {
-  ui64_t BS_key;
-  ui64_t BS_bit_boards[NCOLOUR_ENUM][NPIECE_ENUM];
+  my_uint64_t BS_key;
+  my_uint64_t BS_bit_boards[NCOLOUR_ENUM][NPIECE_ENUM];
   int BS_npieces;
 } board_state_t;
 
@@ -84,11 +84,11 @@ typedef struct board
 
   int B_network_id;
 
-  ui64_t B_valid_bb;
+  my_uint64_t B_valid_bb;
 
   colour_enum B_colour2move;
 
-  ui64_t B_bit_boards[NCOLOUR_ENUM][NPIECE_ENUM];
+  my_uint64_t B_bit_boards[NCOLOUR_ENUM][NPIECE_ENUM];
 
   hash_key_t B_key;
 

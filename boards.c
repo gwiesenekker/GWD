@@ -115,7 +115,7 @@ void push_board_state(board_t *arg_with_board)
 
   memcpy(state->BS_bit_boards,
          arg_with_board->B_bit_boards,
-         sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
+         sizeof(my_uint64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
   state->BS_npieces = BIT_COUNT(arg_with_board->B_white_men_bb) +
                       BIT_COUNT(arg_with_board->B_white_kings_bb) +
@@ -137,7 +137,7 @@ void pop_board_state(board_t *arg_with_board)
 
   memcpy(arg_with_board->B_bit_boards,
          state->BS_bit_boards,
-         sizeof(ui64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
+         sizeof(my_uint64_t) * NCOLOUR_ENUM * NPIECE_ENUM);
 
   HARDBUG(state->BS_npieces != (BIT_COUNT(arg_with_board->B_white_men_bb) +
                                 BIT_COUNT(arg_with_board->B_white_kings_bb) +
@@ -149,7 +149,7 @@ hash_key_t return_key_from_bb(const board_t *arg_with_board)
 {
   hash_key_t result = 0;
 
-  ui64_t pieces_bb = arg_with_board->B_white_men_bb;
+  my_uint64_t pieces_bb = arg_with_board->B_white_men_bb;
 
   while (pieces_bb != 0)
   {
@@ -439,10 +439,10 @@ void board2fen(const board_t *arg_with_board,
   else
     HARDBUG(bcatcstr(arg_bfen, "B") == BSTR_ERR)
 
-  ui64_t white_bb =
+  my_uint64_t white_bb =
     arg_with_board->B_white_men_bb | arg_with_board->B_white_kings_bb;
 
-  ui64_t black_bb =
+  my_uint64_t black_bb =
     arg_with_board->B_black_men_bb | arg_with_board->B_black_kings_bb;
 
   for (int isquare = 1; isquare <= 50; ++isquare)

@@ -46,7 +46,7 @@ local void help_walk_book_alpha_beta(sqlite3 *arg_db,
     return;
   }
 
-  i64_t position_id = INVALID;
+  my_int64_t position_id = INVALID;
 
   if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
   {
@@ -116,7 +116,7 @@ local void help_walk_book_alpha_beta(sqlite3 *arg_db,
 
       move2bstring(&moves_list, imove, bmove);
 
-      i64_t move_id;
+      my_int64_t move_id;
       int flags;
 
       move_id = query_move(arg_db,
@@ -191,7 +191,7 @@ local void help_walk_book(sqlite3 *arg_db,
 
   HARDBUG(moves_list.ML_nmoves == 0)
 
-  i64_t position_id = INVALID;
+  my_int64_t position_id = INVALID;
 
   if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
   {
@@ -254,7 +254,7 @@ local void help_walk_book(sqlite3 *arg_db,
     {
       HARDBUG(position_id == INVALID)
 
-      i64_t move_id;
+      my_int64_t move_id;
       int flags;
 
       move_id = query_move(arg_db,
@@ -470,7 +470,7 @@ void return_book_move(board_t *arg_with_board,
   if (moves_list.ML_nmoves == 0)
     return;
 
-  i64_t position_id = INVALID;
+  my_int64_t position_id = INVALID;
 
   if ((moves_list.ML_ncaptx == 0) and (moves_list.ML_nmoves > 1))
   {
@@ -541,7 +541,7 @@ void return_book_move(board_t *arg_with_board,
 
       move2bstring(&moves_list, jmove, bmove);
 
-      i64_t move_id;
+      my_int64_t move_id;
       int flags;
 
       move_id = query_move(book,
@@ -618,12 +618,12 @@ void return_book_move(board_t *arg_with_board,
   }
 }
 
-local i64_t npositions;
-local i64_t *position_ids;
+local my_int64_t npositions;
+local my_int64_t *position_ids;
 
 local void query_positions(sqlite3 *arg_db)
 {
-  MY_MALLOC_BY_TYPE(position_ids, i64_t, NPOSITIONS_MAX)
+  MY_MALLOC_BY_TYPE(position_ids, my_int64_t, NPOSITIONS_MAX)
 
   char *sql = "SELECT id, flags FROM positions ORDER BY id ASC;";
 
@@ -635,7 +635,7 @@ local void query_positions(sqlite3 *arg_db)
 
   while (execute_sql(arg_db, stmt, TRUE) == SQLITE_ROW)
   {
-    i64_t id = my_sqlite3_column_int64(stmt, 0);
+    my_int64_t id = my_sqlite3_column_int64(stmt, 0);
 
     int flags = my_sqlite3_column_int(stmt, 1);
 
@@ -655,7 +655,7 @@ local void query_positions(sqlite3 *arg_db)
 }
 
 local void return_position_moves(sqlite3 *arg_db,
-                                 i64_t arg_position_id,
+                                 my_int64_t arg_position_id,
                                  board_t *arg_board,
                                  moves_list_t *arg_moves_list)
 {
@@ -677,11 +677,11 @@ local void return_position_moves(sqlite3 *arg_db,
 
 local void add_evaluations(my_sqlite3_t *arg_db,
                            search_t *arg_search,
-                           i64_t arg_position_id,
+                           my_int64_t arg_position_id,
                            moves_list_t *arg_moves_list,
                            int arg_centi_seconds)
 {
-  i64_t move_ids[NMOVES_MAX];
+  my_int64_t move_ids[NMOVES_MAX];
   bstring bmoves[NMOVES_MAX];
 
   for (int imove = 0; imove < NMOVES_MAX; imove++)
@@ -794,12 +794,12 @@ local void add_evaluations2book_worker(my_sqlite3_t *arg_db,
 
   construct_progress(&progress, "add_evaluations2book_worker", npositions, 10);
 
-  for (i64_t iposition = 0; iposition < npositions; iposition++)
+  for (my_int64_t iposition = 0; iposition < npositions; iposition++)
   {
     if (!make_progress(&progress, iposition))
       continue;
 
-    i64_t position_id = position_ids[iposition];
+    my_int64_t position_id = position_ids[iposition];
 
     HARDBUG(position_id < 1)
 
@@ -818,7 +818,7 @@ local void add_evaluations2book_worker(my_sqlite3_t *arg_db,
                     &moves_list,
                     arg_centi_seconds);
 
-  } // for (i64_t iposition
+  } // for (my_int64_t iposition
 
   finalize_progress(&progress);
 
@@ -839,9 +839,9 @@ local void add_or_update_moves(my_sqlite3_t *arg_db, board_t *arg_board)
 
   BSTRING(bmove)
 
-  for (i64_t iposition = 0; iposition < npositions; iposition++)
+  for (my_int64_t iposition = 0; iposition < npositions; iposition++)
   {
-    i64_t position_id = position_ids[iposition];
+    my_int64_t position_id = position_ids[iposition];
 
     HARDBUG(query_position_fen(arg_db->MSQL_db, position_id, bfen, FLAG_NULL) ==
             INVALID)
@@ -877,7 +877,7 @@ void add_evaluations2book(my_sqlite3_t *arg_db,
                           int arg_centi_seconds,
                           int arg_add_moves)
 {
-  ui64_t seed = return_my_random(&book_random);
+  my_uint64_t seed = return_my_random(&book_random);
 
   PRINTF("seed=%llX\n", seed);
 
@@ -944,7 +944,7 @@ local void add_position(my_sqlite3_t *arg_db, search_t *arg_search)
 }
 
 local void expand_book_worker(my_sqlite3_t *arg_db,
-                              i64_t arg_position_id,
+                              my_int64_t arg_position_id,
                               search_t *arg_search,
                               int arg_centi_seconds)
 {
@@ -1008,7 +1008,7 @@ local void expand_book_worker(my_sqlite3_t *arg_db,
 
   HARDBUG(my_sqlite3_bind_int64(stmt, 1, arg_position_id) != SQLITE_OK)
 
-  i64_t move_ids[NMOVES_MAX];
+  my_int64_t move_ids[NMOVES_MAX];
   bstring bmoves[NMOVES_MAX];
   score_t evaluations[NMOVES_MAX];
 
@@ -1184,7 +1184,7 @@ void expand_book(my_sqlite3_t *arg_db,
 
   construct_progress(&progress, "expand_book", npositions, 10);
 
-  for (i64_t iposition = 0; iposition < npositions; iposition++)
+  for (my_int64_t iposition = 0; iposition < npositions; iposition++)
   {
     if (!make_progress(&progress, iposition))
       continue;

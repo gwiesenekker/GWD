@@ -265,7 +265,7 @@ local void solve_problems_mcts(const char *arg_name,
 
   construct_my_bstream(&my_bstream, arg_name);
 
-  i64_t nfen = 0;
+  my_int64_t nfen = 0;
 
   while (my_bstream_readln(&my_bstream, TRUE) == BSTR_OK)
   {
@@ -292,7 +292,7 @@ local void solve_problems_mcts(const char *arg_name,
 
   BSTRING(bfen)
 
-  for (i64_t ifen = 0; ifen < nfen; ifen++)
+  for (my_int64_t ifen = 0; ifen < nfen; ifen++)
   {
     HARDBUG(my_bstream_readln(&my_bstream, TRUE) == BSTR_ERR)
 
@@ -956,7 +956,7 @@ local int add_man_random(int arg_nwhite_men,
 
       while (TRUE)
       {
-        double probability = return_my_random(arg_random) / (double)ULL_MAX;
+        double probability = return_my_random(arg_random) / (double)ULLONG_MAX;
 
         int irow = 9 - weibull_sample_row(probability, arg_shape, arg_scale);
         int icol = return_my_random(arg_random) % 5;
@@ -980,7 +980,8 @@ local int add_man_random(int arg_nwhite_men,
 
       while (TRUE)
       {
-        double probability = (return_my_random(arg_random) / (double)ULL_MAX);
+        double probability =
+          (return_my_random(arg_random) / (double)ULLONG_MAX);
 
         int irow = weibull_sample_row(probability, arg_shape, arg_scale);
         int icol = return_my_random(arg_random) % 5;
@@ -1093,8 +1094,8 @@ local int add_kings_random(int arg_nwhite_kings,
                            int arg_nblack_kings,
                            my_random_t *arg_random,
                            search_t *arg_with_search,
-                           ui64_t *arg_white_kings_mask,
-                           ui64_t *arg_black_kings_mask,
+                           my_uint64_t *arg_white_kings_mask,
+                           my_uint64_t *arg_black_kings_mask,
                            char *arg_position,
                            score_t *arg_best_score)
 {
@@ -1114,7 +1115,7 @@ local int add_kings_random(int arg_nwhite_kings,
 
   reset_my_timer(&timer);
 
-  ui64_t empty = 0;
+  my_uint64_t empty = 0;
 
   for (int isquare = 1; isquare <= 50; ++isquare)
     if (arg_position[isquare] == *nn)
@@ -1343,7 +1344,7 @@ local int add_kings_random(int arg_nwhite_kings,
 }
 
 local void gen_random(const char *arg_fen_name,
-                      i64_t arg_npositions_max,
+                      my_int64_t arg_npositions_max,
                       int arg_nkings_max,
                       double arg_time_limit)
 {
@@ -1353,7 +1354,7 @@ local void gen_random(const char *arg_fen_name,
     construct_my_random(&temp_random, NULL);
   else
   {
-    ui64_t seed;
+    my_uint64_t seed;
 
     construct_my_random(&temp_random, &seed);
 
@@ -1391,7 +1392,7 @@ local void gen_random(const char *arg_fen_name,
 
   search_t *with_search = &search;
 
-  i64_t npositions = arg_npositions_max;
+  my_int64_t npositions = arg_npositions_max;
 
   if (my_mpi_globals.MMG_has_slaves)
   {
@@ -1405,8 +1406,8 @@ local void gen_random(const char *arg_fen_name,
 
   PRINTF("npositions=%lld\n", npositions);
 
-  i64_t iposition = 0;
-  i64_t iposition_prev = 0;
+  my_int64_t iposition = 0;
+  my_int64_t iposition_prev = 0;
 
   bucket_t bucket_root_score;
 
@@ -1482,7 +1483,7 @@ local void gen_random(const char *arg_fen_name,
 
   while (iposition < npositions)
   {
-    double probability = return_my_random(&temp_random) / (double)ULL_MAX;
+    double probability = return_my_random(&temp_random) / (double)ULLONG_MAX;
 
     int npieces = INVALID;
     int nwhite = INVALID;
@@ -1535,7 +1536,7 @@ local void gen_random(const char *arg_fen_name,
       {
         while (TRUE)
         {
-          probability = return_my_random(&temp_random) / (double)ULL_MAX;
+          probability = return_my_random(&temp_random) / (double)ULLONG_MAX;
 
           cumulative_probability = 1.0 - probability_one_king(nwhite_men);
 
@@ -1554,7 +1555,7 @@ local void gen_random(const char *arg_fen_name,
             cumulative_probability += delta_probability;
           }
 
-          probability = return_my_random(&temp_random) / (double)ULL_MAX;
+          probability = return_my_random(&temp_random) / (double)ULLONG_MAX;
 
           cumulative_probability = 1.0 - probability_one_king(nblack_men);
 
@@ -1652,8 +1653,8 @@ local void gen_random(const char *arg_fen_name,
       continue;
     }
 
-    ui64_t white_kings_mask = 0;
-    ui64_t black_kings_mask = 0;
+    my_uint64_t white_kings_mask = 0;
+    my_uint64_t black_kings_mask = 0;
 
     int nsame = 0;
 
@@ -2970,9 +2971,9 @@ int main(int argc, char **argv)
 
   PRINTF("Version is %s\n", REVISION);
 
-  PRINTF("sizeof(int)=%lld\n", (i64_t)sizeof(int));
-  PRINTF("sizeof(long)=%lld\n", (i64_t)sizeof(long));
-  PRINTF("sizeof(long long)=%lld\n", (i64_t)sizeof(long long));
+  PRINTF("sizeof(int)=%lld\n", (my_int64_t)sizeof(int));
+  PRINTF("sizeof(long)=%lld\n", (my_int64_t)sizeof(long));
+  PRINTF("sizeof(long long)=%lld\n", (my_int64_t)sizeof(long long));
 
 #if SCORE_T == SCORE_T_INT
   PRINTF("score_t is an INT\n");
@@ -3383,7 +3384,7 @@ int main(int argc, char **argv)
 
     HARDBUG(argv[iarg] == NULL)
 
-    i64_t npositions_max;
+    my_int64_t npositions_max;
 
     HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions_max) != 1)
 
@@ -3549,7 +3550,7 @@ int main(int argc, char **argv)
 
     HARDBUG(argv[iarg] == NULL)
 
-    i64_t npositions;
+    my_int64_t npositions;
 
     HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
 
@@ -3588,7 +3589,7 @@ int main(int argc, char **argv)
 
     HARDBUG(argv[iarg] == NULL)
 
-    i64_t npositions;
+    my_int64_t npositions;
 
     HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
 
@@ -3818,7 +3819,7 @@ int main(int argc, char **argv)
 
     HARDBUG(argv[iarg] == NULL)
 
-    i64_t npositions;
+    my_int64_t npositions;
 
     HARDBUG(my_sscanf(argv[iarg], "%lld", &npositions) != 1)
 

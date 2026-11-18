@@ -15,11 +15,11 @@ uint64_t splitmix64_next(uint64_t* state) {
 }
 */
 
-local ui64_t splitmix64(ui64_t *arg_seed)
+local my_uint64_t splitmix64(my_uint64_t *arg_seed)
 {
   *arg_seed += 0x9e3779b97f4a7c15ULL;
 
-  ui64_t result = *arg_seed;
+  my_uint64_t result = *arg_seed;
 
   result = (result ^ (result >> 30)) * 0xbf58476d1ce4e5b9ULL;
 
@@ -36,7 +36,7 @@ uint64_t rotl(const uint64_t x, int k) {
 }
 */
 
-local ui64_t rotl(ui64_t arg_value, int arg_nbits)
+local my_uint64_t rotl(my_uint64_t arg_value, int arg_nbits)
 {
   HARDBUG((arg_nbits < 0) or (arg_nbits > 63))
 
@@ -57,7 +57,7 @@ void shuffle(int *arg_array,
     {
       // int j = return_my_random(r) % (i + 1);
       int jsort = (int)compat_mulhi_u64(return_my_random(arg_my_random),
-                                        (ui64_t)(isort + 1));
+                                        (my_uint64_t)(isort + 1));
 
       HARDBUG(jsort > isort)
 
@@ -121,15 +121,15 @@ void shuffle(int *arg_array,
 #endif
 }
 
-void seed_my_random(my_random_t *arg_with_my_random, ui64_t arg_seed)
+void seed_my_random(my_random_t *arg_with_my_random, my_uint64_t arg_seed)
 {
   for (int istate = 0; istate < 4; istate++)
     arg_with_my_random->MR_state[istate] = splitmix64(&arg_seed);
 }
 
-void construct_my_random(my_random_t *arg_with_my_random, ui64_t *arg_seed)
+void construct_my_random(my_random_t *arg_with_my_random, my_uint64_t *arg_seed)
 {
-  ui64_t seed;
+  my_uint64_t seed;
 
   if (arg_seed == NULL)
   {
@@ -166,14 +166,14 @@ uint64_t xoshiro256pp(void) {
 }
 */
 
-ui64_t return_my_random(my_random_t *arg_with_my_random)
+my_uint64_t return_my_random(my_random_t *arg_with_my_random)
 {
-  ui64_t result =
+  my_uint64_t result =
     rotl(arg_with_my_random->MR_state[0] + arg_with_my_random->MR_state[3],
          23) +
     arg_with_my_random->MR_state[0];
 
-  ui64_t t = arg_with_my_random->MR_state[1] << 17;
+  my_uint64_t t = arg_with_my_random->MR_state[1] << 17;
 
   arg_with_my_random->MR_state[2] ^= arg_with_my_random->MR_state[0];
   arg_with_my_random->MR_state[3] ^= arg_with_my_random->MR_state[1];
@@ -199,7 +199,7 @@ enum
   TEST_NFILL = 100
 };
 
-local i64_t buckets[TEST_NBUCKETS];
+local my_int64_t buckets[TEST_NBUCKETS];
 
 void test_my_random(void)
 {
@@ -208,7 +208,7 @@ void test_my_random(void)
 
   for (int ishift = 0; ishift <= (64 - TEST_NBITS); ++ishift)
   {
-    for (i64_t ibucket = 0; ibucket < TEST_NBUCKETS; ibucket++)
+    for (my_int64_t ibucket = 0; ibucket < TEST_NBUCKETS; ibucket++)
       buckets[ibucket] = 0;
 
     my_random_t test_random;
@@ -224,7 +224,7 @@ void test_my_random(void)
     if (RUNNING_ON_VALGRIND)
       nsamples = TEST_NBUCKETS;
 
-    for (i64_t isample = 0; isample < nsamples; isample++)
+    for (my_int64_t isample = 0; isample < nsamples; isample++)
     {
       int random_value = (return_my_random(&test_random) >> ishift) & TEST_MASK;
 
@@ -233,10 +233,10 @@ void test_my_random(void)
       update_stats(&stats, random_value);
     }
 
-    i64_t min = buckets[0];
-    i64_t max = buckets[0];
+    my_int64_t min = buckets[0];
+    my_int64_t max = buckets[0];
 
-    for (i64_t ibucket = 1; ibucket < TEST_NBUCKETS; ibucket++)
+    for (my_int64_t ibucket = 1; ibucket < TEST_NBUCKETS; ibucket++)
     {
       if (buckets[ibucket] < min)
         min = buckets[ibucket];

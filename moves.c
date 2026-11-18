@@ -35,10 +35,10 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
   arg_moves_list->ML_nmoves = 0;
   arg_moves_list->ML_ncaptx = 0;
 
-  ui64_t my_bb = (arg_with_board->my_men_bb | arg_with_board->my_kings_bb);
-  ui64_t your_bb =
+  my_uint64_t my_bb = (arg_with_board->my_men_bb | arg_with_board->my_kings_bb);
+  my_uint64_t your_bb =
     (arg_with_board->your_men_bb | arg_with_board->your_kings_bb);
-  ui64_t empty_bb = arg_with_board->B_valid_bb & ~(my_bb | your_bb);
+  my_uint64_t empty_bb = arg_with_board->B_valid_bb & ~(my_bb | your_bb);
 
   while (my_bb != 0)
   {
@@ -114,7 +114,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
           int ncapt = 0;
 
-          ui64_t captures_bb = 0;
+          my_uint64_t captures_bb = 0;
 
         label_next_capt:
 
@@ -277,7 +277,7 @@ void gen_moves_legacy(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
 /* One-hot padded squares: shifting off the board is harmless. In particular,
  * never form 1ULL << a possibly negative scalar square number. */
-local inline ui64_t move_shift(ui64_t arg_bb, int arg_direction)
+local inline my_uint64_t move_shift(my_uint64_t arg_bb, int arg_direction)
 {
   return (arg_direction > 0 ? arg_bb << arg_direction
                             : arg_bb >> -arg_direction);
@@ -285,8 +285,8 @@ local inline ui64_t move_shift(ui64_t arg_bb, int arg_direction)
 
 local inline void append_bb_move(moves_list_t *arg_moves_list,
                                  int arg_from_field,
-                                 ui64_t arg_to_bb,
-                                 ui64_t arg_captures_bb,
+                                 my_uint64_t arg_to_bb,
+                                 my_uint64_t arg_captures_bb,
                                  int arg_ncaptures)
 {
   if (arg_ncaptures < arg_moves_list->ML_ncaptx)
@@ -313,10 +313,10 @@ local inline void append_bb_move(moves_list_t *arg_moves_list,
  * then straight ahead. Do not deduplicate different capture routes. */
 local void capture_man_bb(moves_list_t *arg_moves_list,
                           int arg_from_field,
-                          ui64_t arg_current_bb,
-                          ui64_t arg_empty_bb,
-                          ui64_t arg_opponents_bb,
-                          ui64_t arg_captures_bb,
+                          my_uint64_t arg_current_bb,
+                          my_uint64_t arg_empty_bb,
+                          my_uint64_t arg_opponents_bb,
+                          my_uint64_t arg_captures_bb,
                           int arg_ncaptures,
                           int arg_incoming_direction)
 {
@@ -328,13 +328,13 @@ local void capture_man_bb(moves_list_t *arg_moves_list,
 
   int perpendicular = 11 - abs(arg_incoming_direction);
   int directions[3] = {perpendicular, -perpendicular, arg_incoming_direction};
-  ui64_t available_bb = arg_opponents_bb & ~arg_captures_bb;
+  my_uint64_t available_bb = arg_opponents_bb & ~arg_captures_bb;
 
   for (int idirection = 0; idirection < 3; ++idirection)
   {
-    ui64_t victim_bb =
+    my_uint64_t victim_bb =
       move_shift(arg_current_bb, directions[idirection]) & available_bb;
-    ui64_t landing_bb =
+    my_uint64_t landing_bb =
       move_shift(victim_bb, directions[idirection]) & arg_empty_bb;
 
     if (landing_bb)
@@ -351,15 +351,15 @@ local void capture_man_bb(moves_list_t *arg_moves_list,
 
 local void capture_king_bb(moves_list_t *arg_moves_list,
                            int arg_from_field,
-                           ui64_t arg_current_bb,
-                           ui64_t arg_empty_bb,
-                           ui64_t arg_opponents_bb,
-                           ui64_t arg_captures_bb,
+                           my_uint64_t arg_current_bb,
+                           my_uint64_t arg_empty_bb,
+                           my_uint64_t arg_opponents_bb,
+                           my_uint64_t arg_captures_bb,
                            int arg_ncaptures,
                            int arg_incoming_direction)
 {
   int perpendicular = 11 - abs(arg_incoming_direction);
-  ui64_t available_bb = arg_opponents_bb & ~arg_captures_bb;
+  my_uint64_t available_bb = arg_opponents_bb & ~arg_captures_bb;
 
   do
   {
@@ -372,13 +372,13 @@ local void capture_king_bb(moves_list_t *arg_moves_list,
     for (int direction = perpendicular; direction != 0;
          direction = direction > 0 ? -direction : 0)
     {
-      ui64_t victim_bb = move_shift(arg_current_bb, direction);
+      my_uint64_t victim_bb = move_shift(arg_current_bb, direction);
 
       while (victim_bb & arg_empty_bb)
         victim_bb = move_shift(victim_bb, direction);
       victim_bb &= available_bb;
 
-      ui64_t landing_bb = move_shift(victim_bb, direction) & arg_empty_bb;
+      my_uint64_t landing_bb = move_shift(victim_bb, direction) & arg_empty_bb;
 
       if (landing_bb)
         capture_king_bb(arg_moves_list,
@@ -393,8 +393,8 @@ local void capture_king_bb(moves_list_t *arg_moves_list,
     arg_current_bb = move_shift(arg_current_bb, arg_incoming_direction);
   } while (arg_current_bb & arg_empty_bb);
 
-  ui64_t victim_bb = arg_current_bb & available_bb;
-  ui64_t landing_bb =
+  my_uint64_t victim_bb = arg_current_bb & available_bb;
+  my_uint64_t landing_bb =
     move_shift(victim_bb, arg_incoming_direction) & arg_empty_bb;
 
   if (landing_bb)
@@ -418,41 +418,41 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
   colour_enum your_colour = white ? BLACK_ENUM : WHITE_ENUM;
   const int *directions = white ? white_dir : black_dir;
   const int *rows = white ? white_row : black_row;
-  ui64_t men_bb = arg_with_board->my_men_bb;
-  ui64_t kings_bb = arg_with_board->my_kings_bb;
-  ui64_t opponents_bb =
+  my_uint64_t men_bb = arg_with_board->my_men_bb;
+  my_uint64_t kings_bb = arg_with_board->my_kings_bb;
+  my_uint64_t opponents_bb =
     arg_with_board->your_men_bb | arg_with_board->your_kings_bb;
-  ui64_t empty_bb =
+  my_uint64_t empty_bb =
     arg_with_board->B_valid_bb & ~(men_bb | kings_bb | opponents_bb);
   moves_list_t *with_moves_list = arg_moves_list;
 
   with_moves_list->ML_nmoves = with_moves_list->ML_ncaptx = 0;
 
   /* Test all men simultaneously, without visiting non-capturing pieces. */
-  ui64_t sources_bb = men_bb & (((opponents_bb >> 5) & (empty_bb >> 10)) |
-                                ((opponents_bb >> 6) & (empty_bb >> 12)) |
-                                ((opponents_bb << 5) & (empty_bb << 10)) |
-                                ((opponents_bb << 6) & (empty_bb << 12)));
+  my_uint64_t sources_bb = men_bb & (((opponents_bb >> 5) & (empty_bb >> 10)) |
+                                     ((opponents_bb >> 6) & (empty_bb >> 12)) |
+                                     ((opponents_bb << 5) & (empty_bb << 10)) |
+                                     ((opponents_bb << 6) & (empty_bb << 12)));
   sources_bb |= kings_bb;
 
   while (sources_bb)
   {
     int from_field = white ? BIT_CTZ(sources_bb) : 63 - BIT_CLZ(sources_bb);
-    ui64_t origin_bb = BITULL(from_field);
+    my_uint64_t origin_bb = BITULL(from_field);
 
     sources_bb &= ~origin_bb;
 
     for (int idirection = 0; idirection < 4; ++idirection)
     {
       int direction = directions[idirection];
-      ui64_t victim_bb = move_shift(origin_bb, direction);
+      my_uint64_t victim_bb = move_shift(origin_bb, direction);
 
       if (origin_bb & kings_bb)
         while (victim_bb & empty_bb)
           victim_bb = move_shift(victim_bb, direction);
       victim_bb &= opponents_bb;
 
-      ui64_t landing_bb = move_shift(victim_bb, direction) & empty_bb;
+      my_uint64_t landing_bb = move_shift(victim_bb, direction) & empty_bb;
 
       if (!landing_bb)
         continue;
@@ -487,7 +487,7 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
     while (sources_bb)
     {
       int from_field = white ? BIT_CTZ(sources_bb) : 63 - BIT_CLZ(sources_bb);
-      ui64_t origin_bb = BITULL(from_field);
+      my_uint64_t origin_bb = BITULL(from_field);
 
       sources_bb &= ~origin_bb;
 
@@ -495,7 +495,7 @@ void gen_moves(board_t *arg_with_board, moves_list_t *arg_moves_list)
 
       for (int idirection = 0; idirection < (king ? 4 : 2); ++idirection)
       {
-        ui64_t landing_bb =
+        my_uint64_t landing_bb =
           move_shift(origin_bb, directions[idirection]) & empty_bb;
 
         while (landing_bb)
@@ -548,10 +548,10 @@ int can_capture(const board_t *arg_with_board, int arg_kings)
 
   result = TRUE;
 
-  ui64_t my_bb = (arg_with_board->my_men_bb | arg_with_board->my_kings_bb);
-  ui64_t your_bb =
+  my_uint64_t my_bb = (arg_with_board->my_men_bb | arg_with_board->my_kings_bb);
+  my_uint64_t your_bb =
     (arg_with_board->your_men_bb | arg_with_board->your_kings_bb);
-  ui64_t empty_bb = arg_with_board->B_valid_bb & ~(my_bb | your_bb);
+  my_uint64_t empty_bb = arg_with_board->B_valid_bb & ~(my_bb | your_bb);
 
   while (my_bb != 0)
   {
@@ -681,7 +681,7 @@ void do_move(board_t *arg_with_board,
 
   node_t *node = arg_with_board->B_nodes + arg_with_board->B_inode;
 
-  ui64_t move_key = 0;
+  my_uint64_t move_key = 0;
 
   if (arg_moves_list == NULL)
     goto label_null;
@@ -731,7 +731,7 @@ void do_move(board_t *arg_with_board,
     }
   }
 
-  ui64_t captures_bb = move->M_captures_bb;
+  my_uint64_t captures_bb = move->M_captures_bb;
 
   while (captures_bb != 0)
   {
@@ -812,7 +812,7 @@ void undo_move(board_t *arg_with_board,
 
   pop_board_state(arg_with_board);
 
-  ui64_t captures_bb = move->M_captures_bb;
+  my_uint64_t captures_bb = move->M_captures_bb;
 
   while (captures_bb != 0)
   {
@@ -883,7 +883,7 @@ void move2bstring(const moves_list_t *arg_with_moves_list,
 
   HARDBUG(btrunc(arg_bmove_string, 0) == BSTR_ERR)
 
-  ui64_t captures_bb = move->M_captures_bb;
+  my_uint64_t captures_bb = move->M_captures_bb;
 
   if (captures_bb == 0)
     HARDBUG(bformata(arg_bmove_string, "%s-%s", nota[ifield], nota[kfield]) ==

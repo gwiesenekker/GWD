@@ -161,7 +161,7 @@ void destroy_my_timer(my_timer_t *arg_with_my_timer)
 
 void construct_progress(progress_t *arg_progress,
                         const char *arg_name,
-                        i64_t arg_ntotal,
+                        my_int64_t arg_ntotal,
                         double arg_seconds)
 {
   HARDBUG((arg_progress->P_bname = bfromcstr(arg_name)) == NULL)
@@ -178,8 +178,8 @@ void construct_progress(progress_t *arg_progress,
   }
   else
   {
-    i64_t nslaves = my_mpi_globals.MMG_nslaves;
-    i64_t id_slave = my_mpi_globals.MMG_slave_id;
+    my_int64_t nslaves = my_mpi_globals.MMG_nslaves;
+    my_int64_t id_slave = my_mpi_globals.MMG_slave_id;
 
     arg_progress->P_ntodo = (arg_ntotal + nslaves - 1 - id_slave) / nslaves;
 
@@ -204,7 +204,7 @@ void construct_progress(progress_t *arg_progress,
   }
 }
 
-int make_progress(progress_t *arg_progress, i64_t arg_idone)
+int make_progress(progress_t *arg_progress, my_int64_t arg_idone)
 {
   if ((arg_progress->P_ntotal > 0) and (arg_idone > 0) and
       (my_mpi_globals.MMG_is_slave) and
@@ -249,7 +249,7 @@ int make_progress(progress_t *arg_progress, i64_t arg_idone)
 
       if (arg_progress->P_ntodo > 0)
       {
-        i64_t nremaining = arg_progress->P_ntodo - arg_progress->P_ndone;
+        my_int64_t nremaining = arg_progress->P_ntodo - arg_progress->P_ndone;
 
         PRINTF("arg_progress->P_bname=%s"
                " nremaining=%lld"
@@ -289,7 +289,7 @@ void finalize_progress(progress_t *arg_progress)
 
   if (arg_progress->P_ntotal > 0)
   {
-    i64_t ntotal_mpi = arg_progress->P_ndone;
+    my_int64_t ntotal_mpi = arg_progress->P_ndone;
 
     my_mpi_allreduce(MPI_IN_PLACE,
                      &ntotal_mpi,
@@ -320,11 +320,11 @@ void destroy_progress(progress_t *arg_progress)
   destroy_my_timer(&(arg_progress->P_timer));
 }
 
-i64_t return_ndone(const progress_t *arg_progress)
+my_int64_t return_ndone(const progress_t *arg_progress)
 {
   return (arg_progress->P_ndone);
 }
-i64_t return_ntodo(const progress_t *arg_progress)
+my_int64_t return_ntodo(const progress_t *arg_progress)
 {
   return (arg_progress->P_ntodo);
 }

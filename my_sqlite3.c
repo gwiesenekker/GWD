@@ -60,7 +60,7 @@ int my_sqlite3_bind_int(sqlite3_stmt *arg_stmt, int arg_index, int arg_value)
 
 int my_sqlite3_bind_int64(sqlite3_stmt *arg_stmt,
                           int arg_index,
-                          i64_t arg_value)
+                          my_int64_t arg_value)
 {
 #ifdef USE_SQLITE3
   return (sqlite3_bind_int64(arg_stmt, arg_index, arg_value));
@@ -100,7 +100,7 @@ int my_sqlite3_column_int(sqlite3_stmt *arg_stmt, int arg_icol)
 #endif
 }
 
-i64_t my_sqlite3_column_int64(sqlite3_stmt *arg_stmt, int arg_icol)
+my_int64_t my_sqlite3_column_int64(sqlite3_stmt *arg_stmt, int arg_icol)
 {
 #ifdef USE_SQLITE3
   return (sqlite3_column_int64(arg_stmt, arg_icol));
@@ -171,7 +171,7 @@ int execute_sql(sqlite3 *arg_db, const void *arg_sql, int arg_step)
 
   if (!retry_random_init)
   {
-    ui64_t seed;
+    my_uint64_t seed;
 
     construct_my_random(&retry_random, &seed);
 
@@ -371,7 +371,7 @@ void create_tables(sqlite3 *arg_db)
 }
 
 int query_position_fen(sqlite3 *arg_db,
-                       i64_t arg_position_id,
+                       my_int64_t arg_position_id,
                        bstring arg_bfen,
                        int *arg_flags)
 {
@@ -406,10 +406,10 @@ int query_position_fen(sqlite3 *arg_db,
 #endif
 }
 
-i64_t query_position_id(sqlite3 *arg_db,
-                        const char *arg_fen,
-                        int arg_frequency,
-                        int *arg_flags)
+my_int64_t query_position_id(sqlite3 *arg_db,
+                             const char *arg_fen,
+                             int arg_frequency,
+                             int *arg_flags)
 {
 #ifdef USE_SQLITE3
   const char *sql = "SELECT id, flags FROM positions WHERE "
@@ -430,7 +430,7 @@ i64_t query_position_id(sqlite3 *arg_db,
     return (INVALID);
   }
 
-  i64_t id = sqlite3_column_int64(stmt, 0);
+  my_int64_t id = sqlite3_column_int64(stmt, 0);
 
   if (arg_flags != NULL)
     *arg_flags = sqlite3_column_int(stmt, 1);
@@ -443,11 +443,11 @@ i64_t query_position_id(sqlite3 *arg_db,
 #endif
 }
 
-i64_t query_move(sqlite3 *arg_db,
-                 i64_t arg_position_id,
-                 const char *arg_move,
-                 int arg_frequency,
-                 int *arg_flags)
+my_int64_t query_move(sqlite3 *arg_db,
+                      my_int64_t arg_position_id,
+                      const char *arg_move,
+                      int arg_frequency,
+                      int *arg_flags)
 {
 #ifdef USE_SQLITE3
   const char *sql = "SELECT id, flags FROM moves WHERE "
@@ -470,7 +470,7 @@ i64_t query_move(sqlite3 *arg_db,
     return (INVALID);
   }
 
-  i64_t id = sqlite3_column_int64(stmt, 0);
+  my_int64_t id = sqlite3_column_int64(stmt, 0);
 
   if (arg_flags != NULL)
     *arg_flags = sqlite3_column_int(stmt, 1);
@@ -483,7 +483,8 @@ i64_t query_move(sqlite3 *arg_db,
 #endif
 }
 
-score_t query_evaluation(sqlite3 *arg_db, i64_t arg_move_id, int *arg_flags)
+score_t
+query_evaluation(sqlite3 *arg_db, my_int64_t arg_move_id, int *arg_flags)
 {
 #ifdef USE_SQLITE3
   const char *sql =
@@ -839,10 +840,10 @@ void test_dbase(void)
 
   create_tables(db.MSQL_db);
 
-  i64_t position_id = 0;
-  i64_t move_id = 0;
+  my_int64_t position_id = 0;
+  my_int64_t move_id = 0;
 
-  for (i64_t iposition = 0; iposition < NTEST_POSITIONS; iposition++)
+  for (my_int64_t iposition = 0; iposition < NTEST_POSITIONS; iposition++)
   {
     ++position_id;
 
@@ -852,7 +853,7 @@ void test_dbase(void)
                       position_id,
                       position_id);
 
-    for (i64_t imove = 0; imove < NTEST_MOVES; imove++)
+    for (my_int64_t imove = 0; imove < NTEST_MOVES; imove++)
     {
       ++move_id;
 

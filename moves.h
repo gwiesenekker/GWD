@@ -10,12 +10,12 @@ enum
 #define MOVE_DO_NOT_REDUCE_BIT BIT(0)
 #define MOVE_EXTEND_IN_QUIESCENCE_BIT BIT(1)
 
-static inline ui32_t move_do_not_reduce(ui32_t arg_flags)
+static inline uint32_t move_do_not_reduce(uint32_t arg_flags)
 {
   return (arg_flags & MOVE_DO_NOT_REDUCE_BIT);
 }
 
-static inline ui32_t move_extend_in_quiescence(ui32_t arg_flags)
+static inline uint32_t move_extend_in_quiescence(uint32_t arg_flags)
 {
   return (arg_flags & MOVE_EXTEND_IN_QUIESCENCE_BIT);
 }
@@ -24,7 +24,7 @@ typedef struct
 {
   int M_move_from;
   int M_move_to;
-  ui64_t M_captures_bb;
+  my_uint64_t M_captures_bb;
 } move_t;
 
 typedef struct
@@ -34,7 +34,7 @@ typedef struct
 
   move_t ML_moves[NMOVES_MAX];
 
-  ui32_t ML_move_flags[NMOVES_MAX];
+  uint32_t ML_move_flags[NMOVES_MAX];
 } moves_list_t;
 
 void gen_moves(board_t *, moves_list_t *);

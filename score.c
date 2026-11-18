@@ -4,14 +4,14 @@
 
 typedef struct
 {
-  ui64_t SCS_key;
+  my_uint64_t SCS_key;
   union
   {
-    ui64_t SCS_data;
+    my_uint64_t SCS_data;
     struct
     {
       score_t SCS_score;
-      ui32_t SCS_crc32;
+      uint32_t SCS_crc32;
     };
   };
 } score_cache_slot_t;
@@ -60,7 +60,7 @@ local inline void init_score_cache_slot(score_cache_shared_slot_t *arg_target,
   atomic_init(&arg_target->SCS_data, arg_source->SCS_data);
 }
 
-local i64_t nscore_cache_entries;
+local my_int64_t nscore_cache_entries;
 local score_cache_slot_t score_cache_slot_default;
 local score_cache_shared_slot_t *score_cache[NCOLOUR_ENUM];
 
@@ -74,7 +74,7 @@ local int probe_score_cache(search_t *arg_with_search,
     arg_score_cache_slot,
     &arg_score_cache[arg_with_search->S_board.B_key % nscore_cache_entries]);
 
-  ui32_t crc32 = 0xFFFFFFFF;
+  uint32_t crc32 = 0xFFFFFFFF;
 
   crc32 = HW_CRC32_U64(crc32, arg_score_cache_slot->SCS_key);
   crc32 = HW_CRC32_U32(crc32, arg_score_cache_slot->SCS_score);
@@ -107,7 +107,7 @@ local void update_score_cache(search_t *arg_with_search,
 
 static inline uint64_t mirror_bb(uint64_t arg_bb)
 {
-  ui64_t result;
+  my_uint64_t result;
 
   result = (arg_bb >> 6);
 
@@ -116,7 +116,7 @@ static inline uint64_t mirror_bb(uint64_t arg_bb)
   result = (result << 6);
 
 #ifdef DEBUG
-  ui64_t debug = 0;
+  my_uint64_t debug = 0;
 
   while (arg_bb)
   {
@@ -142,10 +142,10 @@ score_t return_score_from_board(board_t *arg_with_board,
 
   if (is_black(arg_with_board->B_colour2move))
   {
-    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_men_bb);
-    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_men_bb);
-    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_kings_bb);
-    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_kings_bb);
+    my_uint64_t white_man_bb = mirror_bb(arg_with_board->B_black_men_bb);
+    my_uint64_t black_man_bb = mirror_bb(arg_with_board->B_white_men_bb);
+    my_uint64_t white_king_bb = mirror_bb(arg_with_board->B_black_kings_bb);
+    my_uint64_t black_king_bb = mirror_bb(arg_with_board->B_white_kings_bb);
 
     arg_with_board->B_white_men_bb = white_man_bb;
     arg_with_board->B_black_men_bb = black_man_bb;
@@ -364,10 +364,10 @@ score_t return_score_from_board(board_t *arg_with_board,
 
   if (mirror)
   {
-    ui64_t white_man_bb = mirror_bb(arg_with_board->B_black_men_bb);
-    ui64_t black_man_bb = mirror_bb(arg_with_board->B_white_men_bb);
-    ui64_t white_king_bb = mirror_bb(arg_with_board->B_black_kings_bb);
-    ui64_t black_king_bb = mirror_bb(arg_with_board->B_white_kings_bb);
+    my_uint64_t white_man_bb = mirror_bb(arg_with_board->B_black_men_bb);
+    my_uint64_t black_man_bb = mirror_bb(arg_with_board->B_white_men_bb);
+    my_uint64_t white_king_bb = mirror_bb(arg_with_board->B_black_kings_bb);
+    my_uint64_t black_king_bb = mirror_bb(arg_with_board->B_white_kings_bb);
 
     arg_with_board->B_white_men_bb = white_man_bb;
     arg_with_board->B_black_men_bb = black_man_bb;
@@ -449,7 +449,7 @@ score_t return_score(search_t *arg_with_search)
       score_cache_slot.SCS_key = arg_with_search->S_board.B_key;
       score_cache_slot.SCS_score = result;
 
-      ui32_t crc32 = 0xFFFFFFFF;
+      uint32_t crc32 = 0xFFFFFFFF;
 
       crc32 = HW_CRC32_U64(crc32, score_cache_slot.SCS_key);
       crc32 = HW_CRC32_U32(crc32, score_cache_slot.SCS_score);
@@ -495,11 +495,11 @@ local void initialize_score_caches(void)
 {
   PRINTF("clear_score_caches..\n");
 
-  for (i64_t ientry = 0; ientry < nscore_cache_entries; ientry++)
+  for (my_int64_t ientry = 0; ientry < nscore_cache_entries; ientry++)
     init_score_cache_slot(&score_cache[WHITE_ENUM][ientry],
                           &score_cache_slot_default);
 
-  for (i64_t ientry = 0; ientry < nscore_cache_entries; ientry++)
+  for (my_int64_t ientry = 0; ientry < nscore_cache_entries; ientry++)
     init_score_cache_slot(&score_cache[BLACK_ENUM][ientry],
                           &score_cache_slot_default);
 
@@ -515,7 +515,7 @@ local void initialize_score_caches(void)
 void init_score(void)
 {
   PRINTF("sizeof(score_cache_slot_t)=%lld\n",
-         (i64_t)sizeof(score_cache_slot_t));
+         (my_int64_t)sizeof(score_cache_slot_t));
 
   score_cache[WHITE_ENUM] = NULL;
   score_cache[BLACK_ENUM] = NULL;
@@ -524,7 +524,7 @@ void init_score(void)
 
   if (options.score_cache_size > 0)
   {
-    i64_t score_cache_size = options.score_cache_size * MBYTE / 2;
+    my_int64_t score_cache_size = options.score_cache_size * MBYTE / 2;
 
     nscore_cache_entries =
       first_prime_below(roundf(score_cache_size / sizeof(score_cache_slot_t)));
@@ -536,7 +536,7 @@ void init_score(void)
     score_cache_slot_default.SCS_key = 0;
     score_cache_slot_default.SCS_score = SCORE_MINUS_INFINITY;
 
-    ui32_t crc32 = 0xFFFFFFFF;
+    uint32_t crc32 = 0xFFFFFFFF;
 
     crc32 = HW_CRC32_U64(crc32, score_cache_slot_default.SCS_key);
     crc32 = HW_CRC32_U32(crc32, score_cache_slot_default.SCS_score);

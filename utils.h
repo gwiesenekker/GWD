@@ -11,11 +11,11 @@ extern int zzzzzz_invocation;
 _Noreturn void zzzzzz(const char *, const char *, long, const char *, int);
 int fexists(const char *);
 
-i64_t first_prime_below(i64_t);
-void init_crc32(ui32_t *);
-void update_crc32(ui32_t *, const void *, ui32_t);
-ui32_t return_crc32(const void *, ui32_t);
-ui64_t return_crc64(const void *, ui64_t, int);
+my_int64_t first_prime_below(my_int64_t);
+void init_crc32(uint32_t *);
+void update_crc32(uint32_t *, const void *, uint32_t);
+uint32_t return_crc32(const void *, uint32_t);
+my_uint64_t return_crc64(const void *, my_uint64_t, int);
 void file2bstring(const char *, bstring);
 void file2cjson(const char *, cJSON **);
 cJSON *cJSON_FindItemInObject(const cJSON *, const char *);

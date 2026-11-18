@@ -19,7 +19,7 @@ int main(int argc, char **argv)
 
   static search_t search;
   moves_list_t moves = {0};
-  ui8_t found[NMOVES_MAX] = {0};
+  uint8_t found[NMOVES_MAX] = {0};
 
   search.S_board.B_colour2move = WHITE_ENUM;
   moves.ML_nmoves = 4;

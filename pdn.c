@@ -213,8 +213,8 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
                      NMOVES_MAX,
                      BUCKET_LINEAR);
 
-  i64_t ngames = 0;
-  i64_t nerrors = 0;
+  my_int64_t ngames = 0;
+  my_int64_t nerrors = 0;
 
   game_state_t game_state;
 
@@ -466,7 +466,7 @@ void read_games(my_sqlite3_t *arg_db, const char *arg_pdn_name)
   PRINTF("ngames=%lld nerrors=%lld\n", ngames, nerrors);
 }
 
-void auto_play(const char *arg_txt_name, i64_t arg_npositions)
+void auto_play(const char *arg_txt_name, my_int64_t arg_npositions)
 {
 #ifdef DEBUG
   arg_npositions = 1000;
@@ -479,7 +479,7 @@ void auto_play(const char *arg_txt_name, i64_t arg_npositions)
     construct_my_random(&auto_play_random, NULL);
   else
   {
-    ui64_t seed;
+    my_uint64_t seed;
 
     construct_my_random(&auto_play_random, &seed);
 
@@ -514,8 +514,8 @@ void auto_play(const char *arg_txt_name, i64_t arg_npositions)
 
   construct_progress(&progress, "auto_play", arg_npositions, 10);
 
-  i64_t ngames = 0;
-  i64_t ngames_failed = 0;
+  my_int64_t ngames = 0;
+  my_int64_t ngames_failed = 0;
 
   BSTRING(bmove_string)
 
@@ -761,7 +761,7 @@ void auto_play(const char *arg_txt_name, i64_t arg_npositions)
   printf_bucket(&bucket_result0);
 }
 
-void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
+void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, my_int64_t arg_npositions)
 {
 #ifdef DEBUG
   arg_npositions = 1000;
@@ -784,8 +784,8 @@ void gen_db(my_sqlite3_t *arg_db, int arg_mcts_depth, i64_t arg_npositions)
 
   construct_progress(&progress, "gen_db", arg_npositions, 10);
 
-  i64_t ngames = 0;
-  i64_t ngames_failed = 0;
+  my_int64_t ngames = 0;
+  my_int64_t ngames_failed = 0;
 
   BSTRING(bmove_string)
 
@@ -1005,7 +1005,7 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 
   FILE *fids;
 
-  i64_t npositions = 0;
+  my_int64_t npositions = 0;
 
   if (my_mpi_globals.MMG_is_lead_slave)
   {
@@ -1025,9 +1025,9 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 
     while ((rc = execute_sql(arg_db->MSQL_db, stmt, TRUE)) == SQLITE_ROW)
     {
-      i64_t id = my_sqlite3_column_int64(stmt, 0);
+      my_int64_t id = my_sqlite3_column_int64(stmt, 0);
 
-      FWRITE(fids, &id, i64_t, 1)
+      FWRITE(fids, &id, my_int64_t, 1)
 
       npositions++;
     }
@@ -1071,11 +1071,11 @@ void update_db(my_sqlite3_t *arg_db, int arg_mcts_depth, int arg_frequency)
 
   HARDBUG((fids = fopen(IDS_NAME, "rb")) == NULL)
 
-  for (i64_t iposition = 0; iposition < npositions; iposition++)
+  for (my_int64_t iposition = 0; iposition < npositions; iposition++)
   {
-    i64_t id;
+    my_int64_t id;
 
-    FREAD(fids, &id, i64_t, 1)
+    FREAD(fids, &id, my_int64_t, 1)
 
     if (!make_progress(&progress, iposition))
       continue;

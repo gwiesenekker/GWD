@@ -121,9 +121,9 @@ extern network_t networks[NETWORKS_MAX];
 
 void construct_network_state(network_state_t *, int, int);
 int base3_index(const int32_t *, int);
-int base3_index_v2(const board_t *, ui64_t);
-int base3_index_v3(const board_t *, ui64_t);
-int base3_index_v4(const board_t *, ui64_t);
+int base3_index_v2(const board_t *, my_uint64_t);
+int base3_index_v3(const board_t *, my_uint64_t);
+int base3_index_v4(const board_t *, my_uint64_t);
 
 void vcopy_a2b(int arg_nvalues, const scaled_double_t *, scaled_double_t *);
 void vadd_ab2a(int, scaled_double_t *restrict, const scaled_double_t *restrict);
@@ -143,7 +143,7 @@ void evaluate_material_network(const network_t *,
                                int,
                                int,
                                int);
-void fen2network(const char *, i64_t);
+void fen2network(const char *, my_int64_t);
 void fen2csv(const char *, int, int);
 void init_networks(void);
 void test_networks(void);

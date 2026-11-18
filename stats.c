@@ -120,7 +120,7 @@ void test_stats(void)
 
   clear_stats(&stats);
 
-  for (i64_t isample = 0; isample < N; isample++)
+  for (my_int64_t isample = 0; isample < N; isample++)
     update_stats(&stats, isample);
 
   mean_sigma(&stats);

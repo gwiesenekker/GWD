@@ -20,21 +20,21 @@ typedef struct
   bstring MM_file;
   bstring MM_func;
   int MM_line;
-  i64_t MM_size;
+  my_int64_t MM_size;
 
   void *MM_heap;
   void *MM_pointer;
 
   int MM_pad;
 
-  ui8_t *MM_prefix;
-  ui64_t MM_prefix_crc64;
+  uint8_t *MM_prefix;
+  my_uint64_t MM_prefix_crc64;
 
-  ui8_t *MM_postfix;
-  ui64_t MM_postfix_crc64;
+  uint8_t *MM_postfix;
+  my_uint64_t MM_postfix_crc64;
 
   int MM_read_only;
-  ui64_t MM_crc64;
+  my_uint64_t MM_crc64;
 } my_malloc_t;
 
 // cannot use something dynamic like bstrings of course
@@ -73,7 +73,7 @@ local my_mutex_t my_names_mutex;
 #include "xxhash.h"
 
 // Function to hash an array using XXH3_64bits
-ui64_t return_XXH3_64(const void *arg_data, size_t arg_nbytes)
+my_uint64_t return_XXH3_64(const void *arg_data, size_t arg_nbytes)
 {
   // Allocate a state struct
 
@@ -214,7 +214,7 @@ void register_heap(const char *arg_name,
     with_my_malloc->MM_pointer = (char *)arg_heap + NPAD;
 
     with_my_malloc->MM_postfix =
-      (ui8_t *)((char *)arg_heap + NPAD + with_my_malloc->MM_size);
+      (uint8_t *)((char *)arg_heap + NPAD + with_my_malloc->MM_size);
 
     for (int ibyte = 0; ibyte < NPAD; ibyte++)
       with_my_malloc->MM_postfix[ibyte] =
@@ -557,7 +557,7 @@ void init_my_malloc(void)
   char *text = "The quick brown fox jumps over the lazy dog";
   BSTRING(bchecksum)
 
-  ui64_t checksum = return_XXH3_64(text, strlen(text));
+  my_uint64_t checksum = return_XXH3_64(text, strlen(text));
 
   HARDBUG(bassignformat(bchecksum, "%#llX", checksum) == BSTR_ERR)
 
@@ -568,10 +568,12 @@ void init_my_malloc(void)
   BDESTROY(bchecksum)
 }
 
-local void heap_sort_i64(i64_t arg_nvalues, i64_t *arg_order, i64_t *arg_values)
+local void heap_sort_i64(my_int64_t arg_nvalues,
+                         my_int64_t *arg_order,
+                         my_int64_t *arg_values)
 {
-  i64_t nvalues = arg_nvalues;
-  i64_t iparent, ichild, iroot, saved_index;
+  my_int64_t nvalues = arg_nvalues;
+  my_int64_t iparent, ichild, iroot, saved_index;
 
   if (arg_nvalues < 2)
     return;
@@ -696,17 +698,17 @@ void fin_my_malloc(int arg_verbose)
 {
   int corrupt = FALSE;
 
-  i64_t S_total_size = 0;
+  my_int64_t S_total_size = 0;
 
   // gather sizes
 
-  i64_t *sizes, *psizes;
+  my_int64_t *sizes, *psizes;
 
-  COMPAT_MALLOC(sizes, nmy_mallocs * sizeof(i64_t))
+  COMPAT_MALLOC(sizes, nmy_mallocs * sizeof(my_int64_t))
 
   HARDBUG(sizes == NULL)
 
-  COMPAT_MALLOC(psizes, nmy_mallocs * sizeof(i64_t))
+  COMPAT_MALLOC(psizes, nmy_mallocs * sizeof(my_int64_t))
 
   HARDBUG(psizes == NULL)
 

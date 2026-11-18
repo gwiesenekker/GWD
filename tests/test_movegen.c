@@ -77,8 +77,8 @@ void zzzzzz(const char *arg_file,
   exit(arg_code);
 }
 
-static ui64_t rng = 0x123456789abcdefULL;
-static ui64_t random64(void)
+static my_uint64_t rng = 0x123456789abcdefULL;
+static my_uint64_t random64(void)
 {
   rng ^= rng << 13;
   rng ^= rng >> 7;
@@ -133,7 +133,8 @@ static void compare(board_t *arg_board, moves_list_t *arg_moves)
 static void play(board_t *arg_board, const move_t *arg_move)
 {
   int side = arg_board->B_colour2move;
-  ui64_t from = BITULL(arg_move->M_move_from), to = BITULL(arg_move->M_move_to);
+  my_uint64_t from = BITULL(arg_move->M_move_from),
+              to = BITULL(arg_move->M_move_to);
   int king = (arg_board->B_bit_boards[side][KING_ENUM] & from) != 0;
 
   arg_board->B_bit_boards[side][king ? KING_ENUM : MAN_ENUM] &= ~from;
@@ -179,7 +180,7 @@ int main(int argc, char **argv)
     }
     else
     {
-      ui64_t occupied = 0;
+      my_uint64_t occupied = 0;
 
       for (int side = 0; side < 2; ++side)
         for (int ipiece = 0, npieces = 1 + random64() % 15; ipiece < npieces;
@@ -192,7 +193,7 @@ int main(int argc, char **argv)
             square = 1 + random64() % 50;
           } while (occupied & BITULL(square2field[square]));
 
-          ui64_t bit = BITULL(square2field[square]);
+          my_uint64_t bit = BITULL(square2field[square]);
 
           occupied |= bit;
 

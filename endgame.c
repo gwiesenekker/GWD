@@ -55,7 +55,7 @@ void init_endgame(void)
     MPI_Win wendgame;
 
     my_mpi_allocate_shared(my_mpi_globals.MMG_global_comm,
-                           sizeof(ui8_t),
+                           sizeof(uint8_t),
                            egtb_size,
                            &pendgame,
                            &wendgame);

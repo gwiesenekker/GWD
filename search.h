@@ -89,7 +89,7 @@ typedef enum
 
 typedef struct
 {
-  ui64_t PVE_slots[NPV_SLOTS];
+  my_uint64_t PVE_slots[NPV_SLOTS];
 } pv_entry_t;
 
 typedef struct
@@ -101,7 +101,7 @@ typedef struct
 {
   score_t SR_raw_score;
   score_t SR_score;
-  ui32_t SR_flags;
+  uint32_t SR_flags;
   int SR_depth;
   pv_entries_t SR_pv;
 } search_result_t;
@@ -137,63 +137,63 @@ typedef struct
   int S_best_depth;
   pv_entries_t S_best_pv;
 
-  i64_t S_ntotal_move_repetitions;
+  my_int64_t S_ntotal_move_repetitions;
 
-  i64_t S_ntotal_nodes;
-  i64_t S_ntotal_alpha_beta_nodes;
-  i64_t S_ntotal_alpha_beta_single_move_nodes;
-  i64_t S_ntotal_capture_nodes;
-  i64_t S_ntotal_minimal_window_nodes;
-  i64_t S_ntotal_pv_nodes;
-  i64_t S_ntotal_quiescence_nodes;
-  i64_t S_ntotal_quiescence_single_move_nodes;
+  my_int64_t S_ntotal_nodes;
+  my_int64_t S_ntotal_alpha_beta_nodes;
+  my_int64_t S_ntotal_alpha_beta_single_move_nodes;
+  my_int64_t S_ntotal_capture_nodes;
+  my_int64_t S_ntotal_minimal_window_nodes;
+  my_int64_t S_ntotal_pv_nodes;
+  my_int64_t S_ntotal_quiescence_nodes;
+  my_int64_t S_ntotal_quiescence_single_move_nodes;
 
-  i64_t S_ntotal_reductions;
-  i64_t S_ntotal_lost_reductions;
-  i64_t S_ntotal_le_alpha_reductions;
-  i64_t S_ntotal_ge_beta_reductions;
+  my_int64_t S_ntotal_reductions;
+  my_int64_t S_ntotal_lost_reductions;
+  my_int64_t S_ntotal_le_alpha_reductions;
+  my_int64_t S_ntotal_ge_beta_reductions;
 
-  i64_t S_ntotal_prob_cut_probes;
-  i64_t S_ntotal_prob_cut_le_alpha_probes;
-  i64_t S_ntotal_prob_cut_ge_beta_probes;
-  i64_t S_ntotal_prob_cut_nodes;
-  i64_t S_ntotal_prob_cut_le_alpha_nodes;
-  i64_t S_ntotal_prob_cut_ge_beta_nodes;
-  i64_t S_ntotal_prob_cut_aborted_probes;
-  i64_t S_ntotal_prob_cut_aborted_nodes;
+  my_int64_t S_ntotal_prob_cut_probes;
+  my_int64_t S_ntotal_prob_cut_le_alpha_probes;
+  my_int64_t S_ntotal_prob_cut_ge_beta_probes;
+  my_int64_t S_ntotal_prob_cut_nodes;
+  my_int64_t S_ntotal_prob_cut_le_alpha_nodes;
+  my_int64_t S_ntotal_prob_cut_ge_beta_nodes;
+  my_int64_t S_ntotal_prob_cut_aborted_probes;
+  my_int64_t S_ntotal_prob_cut_aborted_nodes;
 
-  i64_t S_ntotal_singular_extension_probes;
-  i64_t S_ntotal_singular_extension_le_alpha_probes;
-  i64_t S_ntotal_singular_extension_ge_beta_probes;
-  i64_t S_ntotal_singular_extensions;
-  i64_t S_ntotal_singular_reductions;
+  my_int64_t S_ntotal_singular_extension_probes;
+  my_int64_t S_ntotal_singular_extension_le_alpha_probes;
+  my_int64_t S_ntotal_singular_extension_ge_beta_probes;
+  my_int64_t S_ntotal_singular_extensions;
+  my_int64_t S_ntotal_singular_reductions;
 
-  i64_t S_ntotal_evaluations;
-  i64_t S_ntotal_lazy_alpha_evaluations;
-  i64_t S_ntotal_lazy_beta_evaluations;
-  i64_t S_ntotal_material_only_evaluations;
-  i64_t S_ntotal_network_evaluations;
+  my_int64_t S_ntotal_evaluations;
+  my_int64_t S_ntotal_lazy_alpha_evaluations;
+  my_int64_t S_ntotal_lazy_beta_evaluations;
+  my_int64_t S_ntotal_material_only_evaluations;
+  my_int64_t S_ntotal_network_evaluations;
 
-  i64_t S_ntotal_alpha_beta_cache_updates;
-  i64_t S_ntotal_alpha_beta_cache_aged_entries;
-  i64_t S_ntotal_alpha_beta_cache_hits;
-  i64_t S_ntotal_alpha_beta_cache_depth_hits;
-  i64_t S_ntotal_alpha_beta_cache_le_alpha_hits;
-  i64_t S_ntotal_alpha_beta_cache_le_alpha_cutoffs;
-  i64_t S_ntotal_alpha_beta_cache_ge_beta_hits;
-  i64_t S_ntotal_alpha_beta_cache_ge_beta_cutoffs;
-  i64_t S_ntotal_alpha_beta_cache_true_score_hits;
-  i64_t S_ntotal_alpha_beta_cache_le_alpha_stored_entries;
-  i64_t S_ntotal_alpha_beta_cache_ge_beta_stored_entries;
-  i64_t S_ntotal_alpha_beta_cache_true_score_stored_entries;
-  i64_t S_ntotal_alpha_beta_cache_nmoves_errors;
-  i64_t S_ntotal_alpha_beta_cache_probes;
-  i64_t S_ntotal_alpha_beta_cache_memory_hits;
-  i64_t S_ntotal_alpha_beta_cache_local_hits;
-  i64_t S_ntotal_alpha_beta_cache_crc_errors;
+  my_int64_t S_ntotal_alpha_beta_cache_updates;
+  my_int64_t S_ntotal_alpha_beta_cache_aged_entries;
+  my_int64_t S_ntotal_alpha_beta_cache_hits;
+  my_int64_t S_ntotal_alpha_beta_cache_depth_hits;
+  my_int64_t S_ntotal_alpha_beta_cache_le_alpha_hits;
+  my_int64_t S_ntotal_alpha_beta_cache_le_alpha_cutoffs;
+  my_int64_t S_ntotal_alpha_beta_cache_ge_beta_hits;
+  my_int64_t S_ntotal_alpha_beta_cache_ge_beta_cutoffs;
+  my_int64_t S_ntotal_alpha_beta_cache_true_score_hits;
+  my_int64_t S_ntotal_alpha_beta_cache_le_alpha_stored_entries;
+  my_int64_t S_ntotal_alpha_beta_cache_ge_beta_stored_entries;
+  my_int64_t S_ntotal_alpha_beta_cache_true_score_stored_entries;
+  my_int64_t S_ntotal_alpha_beta_cache_nmoves_errors;
+  my_int64_t S_ntotal_alpha_beta_cache_probes;
+  my_int64_t S_ntotal_alpha_beta_cache_memory_hits;
+  my_int64_t S_ntotal_alpha_beta_cache_local_hits;
+  my_int64_t S_ntotal_alpha_beta_cache_crc_errors;
 
-  i64_t S_ntotal_score_cache_hits;
-  i64_t S_ntotal_score_cache_crc_errors;
+  my_int64_t S_ntotal_score_cache_hits;
+  my_int64_t S_ntotal_score_cache_crc_errors;
 
   GwdegtbWdlProbe *S_wdl_probe;
 } search_t;

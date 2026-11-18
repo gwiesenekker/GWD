@@ -179,7 +179,7 @@ int main(int argc, char **argv)
   for (int isample = 0; isample < 50000; ++isample)
     for (int ithread = 0; ithread < 4; ++ithread)
     {
-      i64_t nodes =
+      my_int64_t nodes =
         atomic_load_explicit(&publication_threads[ithread].T_npublished_nodes,
                              memory_order_relaxed);
 

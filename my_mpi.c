@@ -307,7 +307,7 @@ void my_mpi_init(int *arg_nargs, char ***arg_argv, int arg_physical_memory)
     HARDBUG(bformata(with_my_semkey->MS_bname, SEMKEYS_DIR "/semkey%d", ikey) ==
             BSTR_ERR)
 
-    ui64_t seed;
+    my_uint64_t seed;
 
     construct_my_random(&(with_my_semkey->MS_random), &seed);
 
@@ -611,7 +611,7 @@ void my_mpi_sync_shared(MPI_Comm arg_comm,
 
     MPI_Comm_rank(arg_comm, &iproc);
 
-    ui64_t xxh3_64 = 0;
+    my_uint64_t xxh3_64 = 0;
 
     if (iproc == 0)
       xxh3_64 = return_XXH3_64(baseptr, ssize);
@@ -987,12 +987,12 @@ void my_mpi_semaphore_server_v2(MPI_Comm arg_comm)
   for (iproc = 0; iproc < nprocs; iproc++)
     wall[iproc] = compat_time();
 
-  i64_t nread = 0;
-  i64_t nwrite = -1;
+  my_int64_t nread = 0;
+  my_int64_t nwrite = -1;
   int length_max = 0;
 
-  i64_t nprobes = 0;
-  i64_t nmessages = 0;
+  my_int64_t nprobes = 0;
+  my_int64_t nmessages = 0;
 
   int locked = FALSE;
 
@@ -1460,7 +1460,7 @@ void test_my_mpi(void)
 #ifdef USE_OPENMPI
   my_random_t test_random;
 
-  ui64_t seed;
+  my_uint64_t seed;
 
   construct_my_random(&test_random, &seed);
 
@@ -1508,7 +1508,7 @@ void test_my_mpi(void)
 
   PRINTF("Process %d is testing semaphores..\n$", my_mpi_globals.MMG_global_id);
 
-  for (i64_t imessage = 1; imessage <= NMESSAGES; ++imessage)
+  for (my_int64_t imessage = 1; imessage <= NMESSAGES; ++imessage)
   {
     HARDBUG(compat_sleep(MILLI_SECOND) != 0)
 

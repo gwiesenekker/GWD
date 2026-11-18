@@ -27,15 +27,15 @@ typedef struct
 
   void *C_entry_values;
 
-  i64_t C_nentries;
+  my_int64_t C_nentries;
 
-  i64_t C_nhits;
+  my_int64_t C_nhits;
 
-  i64_t C_nstored;
+  my_int64_t C_nstored;
 
-  i64_t C_nupdates;
+  my_int64_t C_nupdates;
 
-  i64_t C_noverwrites;
+  my_int64_t C_noverwrites;
 } cache_t;
 
 int check_entry_in_cache(cache_t *, const void *, void *);
@@ -43,7 +43,7 @@ int store_entry_in_cache(cache_t *, const void *, const void *);
 void clear_cache(cache_t *);
 void construct_cache(cache_t *,
                      const char *,
-                     i64_t,
+                     my_int64_t,
                      int,
                      const void *,
                      size_t,

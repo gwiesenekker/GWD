@@ -54,12 +54,12 @@ local void printf_cache(const cache_t *arg_with_cache)
          bdata(arg_with_cache->C_name),
          arg_with_cache->C_noverwrites);
 
-  i64_t nunused = 0;
+  my_int64_t nunused = 0;
 
-  for (i64_t icache_entry = 0; icache_entry < arg_with_cache->C_nentries;
+  for (my_int64_t icache_entry = 0; icache_entry < arg_with_cache->C_nentries;
        icache_entry++)
   {
-    void *cache_entry = (i8_t *)arg_with_cache->C_entry_values +
+    void *cache_entry = (int8_t *)arg_with_cache->C_entry_values +
                         return_cache_entry_size(arg_with_cache) * icache_entry;
 
     if (memcmp(cache_entry,
@@ -85,35 +85,35 @@ int check_entry_in_cache(cache_t *arg_with_cache,
 
   if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI32_T)
   {
-    ui32_t key;
+    uint32_t key;
 
-    memcpy(&key, arg_entry_key, sizeof(ui32_t));
+    memcpy(&key, arg_entry_key, sizeof(uint32_t));
 
-    i64_t icache_entry = key % arg_with_cache->C_nentries;
+    my_int64_t icache_entry = key % arg_with_cache->C_nentries;
 
-    cache_entry = (i8_t *)arg_with_cache->C_entry_values +
+    cache_entry = (int8_t *)arg_with_cache->C_entry_values +
                   return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
   {
-    i64_t key;
+    my_int64_t key;
 
-    memcpy(&key, arg_entry_key, sizeof(i64_t));
+    memcpy(&key, arg_entry_key, sizeof(my_int64_t));
 
-    i64_t icache_entry = key % arg_with_cache->C_nentries;
+    my_int64_t icache_entry = key % arg_with_cache->C_nentries;
 
-    cache_entry = (i8_t *)arg_with_cache->C_entry_values +
+    cache_entry = (int8_t *)arg_with_cache->C_entry_values +
                   return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
   {
-    ui64_t key;
+    my_uint64_t key;
 
-    memcpy(&key, arg_entry_key, sizeof(ui64_t));
+    memcpy(&key, arg_entry_key, sizeof(my_uint64_t));
 
-    i64_t icache_entry = key % arg_with_cache->C_nentries;
+    my_int64_t icache_entry = key % arg_with_cache->C_nentries;
 
-    cache_entry = (i8_t *)arg_with_cache->C_entry_values +
+    cache_entry = (int8_t *)arg_with_cache->C_entry_values +
                   return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else
@@ -126,7 +126,7 @@ int check_entry_in_cache(cache_t *arg_with_cache,
     if (arg_entry_value != NULL)
     {
       memcpy(arg_entry_value,
-             (i8_t *)cache_entry + arg_with_cache->C_entry_key_size,
+             (int8_t *)cache_entry + arg_with_cache->C_entry_key_size,
              arg_with_cache->C_entry_value_size);
     }
 
@@ -146,35 +146,35 @@ int store_entry_in_cache(cache_t *arg_with_cache,
 
   if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI32_T)
   {
-    ui32_t key;
+    uint32_t key;
 
-    memcpy(&key, arg_entry_key, sizeof(ui32_t));
+    memcpy(&key, arg_entry_key, sizeof(uint32_t));
 
-    i64_t icache_entry = key % arg_with_cache->C_nentries;
+    my_int64_t icache_entry = key % arg_with_cache->C_nentries;
 
-    cache_entry = (i8_t *)arg_with_cache->C_entry_values +
+    cache_entry = (int8_t *)arg_with_cache->C_entry_values +
                   return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
   {
-    i64_t key;
+    my_int64_t key;
 
-    memcpy(&key, arg_entry_key, sizeof(i64_t));
+    memcpy(&key, arg_entry_key, sizeof(my_int64_t));
 
-    i64_t icache_entry = key % arg_with_cache->C_nentries;
+    my_int64_t icache_entry = key % arg_with_cache->C_nentries;
 
-    cache_entry = (i8_t *)arg_with_cache->C_entry_values +
+    cache_entry = (int8_t *)arg_with_cache->C_entry_values +
                   return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
   {
-    ui64_t key;
+    my_uint64_t key;
 
-    memcpy(&key, arg_entry_key, sizeof(ui64_t));
+    memcpy(&key, arg_entry_key, sizeof(my_uint64_t));
 
-    i64_t icache_entry = key % arg_with_cache->C_nentries;
+    my_int64_t icache_entry = key % arg_with_cache->C_nentries;
 
-    cache_entry = (i8_t *)arg_with_cache->C_entry_values +
+    cache_entry = (int8_t *)arg_with_cache->C_entry_values +
                   return_cache_entry_size(arg_with_cache) * icache_entry;
   }
   else
@@ -196,7 +196,7 @@ int store_entry_in_cache(cache_t *arg_with_cache,
 
   memcpy(cache_entry, arg_entry_key, arg_with_cache->C_entry_key_size);
 
-  memcpy((i8_t *)cache_entry + arg_with_cache->C_entry_key_size,
+  memcpy((int8_t *)cache_entry + arg_with_cache->C_entry_key_size,
          arg_entry_value,
          arg_with_cache->C_entry_value_size);
 
@@ -210,12 +210,12 @@ void clear_cache(cache_t *arg_with_cache)
          arg_with_cache->C_entry_key_size);
 
   void *source = arg_with_cache->C_entry_values;
-  i64_t itarget = 1;
-  i64_t nsource = 1;
+  my_int64_t itarget = 1;
+  my_int64_t nsource = 1;
 
   while (itarget < arg_with_cache->C_nentries)
   {
-    void *target = (i8_t *)arg_with_cache->C_entry_values +
+    void *target = (int8_t *)arg_with_cache->C_entry_values +
                    return_cache_entry_size(arg_with_cache) * itarget;
 
     while ((itarget + nsource) > arg_with_cache->C_nentries)
@@ -231,7 +231,7 @@ void clear_cache(cache_t *arg_with_cache)
 
 void construct_cache(cache_t *arg_with_cache,
                      const char *arg_cache_name,
-                     i64_t arg_cache_size,
+                     my_int64_t arg_cache_size,
                      int arg_entry_key_type,
                      const void *arg_entry_key_default,
                      size_t arg_entry_value_size,
@@ -242,11 +242,11 @@ void construct_cache(cache_t *arg_with_cache,
   arg_with_cache->C_entry_key_type = arg_entry_key_type;
 
   if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI32_T)
-    arg_with_cache->C_entry_key_size = sizeof(ui32_t);
+    arg_with_cache->C_entry_key_size = sizeof(uint32_t);
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_I64_T)
-    arg_with_cache->C_entry_key_size = sizeof(i64_t);
+    arg_with_cache->C_entry_key_size = sizeof(my_int64_t);
   else if (arg_with_cache->C_entry_key_type == CACHE_ENTRY_KEY_TYPE_UI64_T)
-    arg_with_cache->C_entry_key_size = sizeof(ui64_t);
+    arg_with_cache->C_entry_key_size = sizeof(my_uint64_t);
   else
     FATAL("unknown cache_key_type", EXIT_FAILURE)
 
@@ -261,7 +261,7 @@ void construct_cache(cache_t *arg_with_cache,
   // copy the default key value
 
   MY_MALLOC_BY_TYPE(arg_with_cache->C_entry_key_default,
-                    i8_t,
+                    int8_t,
                     arg_with_cache->C_entry_key_size)
 
   memcpy(arg_with_cache->C_entry_key_default,
@@ -286,7 +286,7 @@ void construct_cache(cache_t *arg_with_cache,
   HARDBUG(arg_with_cache->C_nentries < 3)
 
   MY_MALLOC_BY_TYPE(arg_with_cache->C_entry_values,
-                    i8_t,
+                    int8_t,
                     return_cache_entry_size(arg_with_cache) *
                       arg_with_cache->C_nentries)
 
@@ -294,18 +294,18 @@ void construct_cache(cache_t *arg_with_cache,
          arg_with_cache->C_entry_key_default,
          arg_with_cache->C_entry_key_size);
 
-  memcpy((i8_t *)arg_with_cache->C_entry_values +
+  memcpy((int8_t *)arg_with_cache->C_entry_values +
            arg_with_cache->C_entry_key_size,
          arg_entry_value_default,
          arg_with_cache->C_entry_value_size);
 
   void *source = arg_with_cache->C_entry_values;
-  i64_t itarget = 1;
-  i64_t nsource = 1;
+  my_int64_t itarget = 1;
+  my_int64_t nsource = 1;
 
   while (itarget < arg_with_cache->C_nentries)
   {
-    void *target = (i8_t *)arg_with_cache->C_entry_values +
+    void *target = (int8_t *)arg_with_cache->C_entry_values +
                    return_cache_entry_size(arg_with_cache) * itarget;
 
     while ((itarget + nsource) > arg_with_cache->C_nentries)
@@ -330,7 +330,7 @@ void test_caches(void)
 
   construct_my_random(&test_random, NULL);
 
-  i64_t signed_empty = -1;
+  my_int64_t signed_empty = -1;
 
   cache_t signed_cache;
 
@@ -339,16 +339,16 @@ void test_caches(void)
                   MBYTE,
                   CACHE_ENTRY_KEY_TYPE_I64_T,
                   &signed_empty,
-                  sizeof(i64_t),
+                  sizeof(my_int64_t),
                   &signed_empty);
 
-  for (i64_t ientry = 0; ientry < 100000; ientry++)
+  for (my_int64_t ientry = 0; ientry < 100000; ientry++)
   {
-    i64_t missing_value;
+    my_int64_t missing_value;
 
     HARDBUG(check_entry_in_cache(&signed_cache, &ientry, &missing_value))
 
-    i64_t expected_value = 2 * ientry;
+    my_int64_t expected_value = 2 * ientry;
 
     if (store_entry_in_cache(&signed_cache, &ientry, &expected_value))
     {
@@ -357,7 +357,7 @@ void test_caches(void)
       break;
     }
 
-    i64_t stored_value;
+    my_int64_t stored_value;
 
     HARDBUG(!check_entry_in_cache(&signed_cache, &ientry, &stored_value))
 
@@ -366,15 +366,15 @@ void test_caches(void)
 
   printf_cache(&signed_cache);
 
-  for (i64_t ientry = 0; ientry < 100000; ientry++)
+  for (my_int64_t ientry = 0; ientry < 100000; ientry++)
   {
-    i64_t entry_key = return_my_random(&test_random) % 100000000;
+    my_int64_t entry_key = return_my_random(&test_random) % 100000000;
 
-    i64_t expected_value = 2 * entry_key;
+    my_int64_t expected_value = 2 * entry_key;
 
     store_entry_in_cache(&signed_cache, &entry_key, &expected_value);
 
-    i64_t stored_value;
+    my_int64_t stored_value;
 
     HARDBUG(!check_entry_in_cache(&signed_cache, &entry_key, &stored_value))
 
@@ -383,7 +383,7 @@ void test_caches(void)
 
   printf_cache(&signed_cache);
 
-  ui64_t unsigned_empty = 0;
+  my_uint64_t unsigned_empty = 0;
 
   cache_t unsigned_cache;
 
@@ -392,18 +392,18 @@ void test_caches(void)
                   MBYTE,
                   CACHE_ENTRY_KEY_TYPE_UI64_T,
                   &unsigned_empty,
-                  sizeof(ui64_t),
+                  sizeof(my_uint64_t),
                   &unsigned_empty);
 
-  // for ui64_t the key 0 is not allowed
+  // for my_uint64_t the key 0 is not allowed
 
-  for (ui64_t ientry = 1; ientry < 100000; ientry++)
+  for (my_uint64_t ientry = 1; ientry < 100000; ientry++)
   {
-    ui64_t missing_value;
+    my_uint64_t missing_value;
 
     HARDBUG(check_entry_in_cache(&unsigned_cache, &ientry, &missing_value))
 
-    ui64_t expected_value = 2 * ientry;
+    my_uint64_t expected_value = 2 * ientry;
 
     if (store_entry_in_cache(&unsigned_cache, &ientry, &expected_value))
     {
@@ -412,7 +412,7 @@ void test_caches(void)
       break;
     }
 
-    ui64_t stored_value;
+    my_uint64_t stored_value;
 
     HARDBUG(!check_entry_in_cache(&unsigned_cache, &ientry, &stored_value))
 
@@ -421,15 +421,15 @@ void test_caches(void)
 
   printf_cache(&unsigned_cache);
 
-  for (i64_t ientry = 0; ientry < 100000; ientry++)
+  for (my_int64_t ientry = 0; ientry < 100000; ientry++)
   {
-    ui64_t entry_key = return_my_random(&test_random) % 100000000;
+    my_uint64_t entry_key = return_my_random(&test_random) % 100000000;
 
-    ui64_t expected_value = 2 * entry_key;
+    my_uint64_t expected_value = 2 * entry_key;
 
     store_entry_in_cache(&unsigned_cache, &entry_key, &expected_value);
 
-    ui64_t stored_value;
+    my_uint64_t stored_value;
 
     HARDBUG(!check_entry_in_cache(&unsigned_cache, &entry_key, &stored_value))
 

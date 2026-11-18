@@ -21,10 +21,10 @@ int main(int argc, char **argv)
 
   static search_t search;
   pv_entries_t pv;
-  ui64_t keys[NPV_SLOTS + 1];
+  my_uint64_t keys[NPV_SLOTS + 1];
   int nkeys = 0;
   /* Distinct key signatures deliberately mapped to the same bucket. */
-  for (ui64_t key = 0x1234567800000000ULL; nkeys <= NPV_SLOTS;
+  for (my_uint64_t key = 0x1234567800000000ULL; nkeys <= NPV_SLOTS;
        key += 0x10000ULL)
     if ((return_fmix64(key) & (NPV_ENTRIES - 1)) == 0)
       keys[nkeys++] = key;
@@ -67,9 +67,9 @@ int main(int argc, char **argv)
 
     /* Replacement must initialize the key and clear the evicted moves. */
     int victim =
-      ((ui32_t)return_fmix64(keys[NPV_SLOTS]) >> 30) & (NPV_SLOTS - 1);
+      ((uint32_t)return_fmix64(keys[NPV_SLOTS]) >> 30) & (NPV_SLOTS - 1);
 
-    ui64_t evicted = keys[victim];
+    my_uint64_t evicted = keys[victim];
 
     search.S_board.B_key = keys[NPV_SLOTS];
     update_pv(&pv, &search, 63);

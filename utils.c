@@ -94,7 +94,7 @@ int fexists(const char *arg_name)
     return (FALSE);
 }
 
-local int is_prime(i64_t arg_number)
+local int is_prime(my_int64_t arg_number)
 {
   if (arg_number < 4)
     return (TRUE);
@@ -102,14 +102,14 @@ local int is_prime(i64_t arg_number)
   if ((arg_number % 2) == 0)
     return (FALSE);
 
-  for (i64_t divisor = 3; (divisor * divisor) <= arg_number; divisor += 2)
+  for (my_int64_t divisor = 3; (divisor * divisor) <= arg_number; divisor += 2)
     if ((arg_number % divisor) == 0)
       return (FALSE);
 
   return (TRUE);
 }
 
-i64_t first_prime_below(i64_t arg_number)
+my_int64_t first_prime_below(my_int64_t arg_number)
 {
   if (arg_number < 4)
     return (arg_number);
@@ -117,7 +117,7 @@ i64_t first_prime_below(i64_t arg_number)
   if ((arg_number % 2) == 0)
     --arg_number;
 
-  i64_t candidate;
+  my_int64_t candidate;
 
   for (candidate = arg_number; candidate > 3; candidate -= 2)
     if (is_prime(candidate))
@@ -126,42 +126,43 @@ i64_t first_prime_below(i64_t arg_number)
   return (candidate);
 }
 
-static ui32_t crc_table32[256];
-static ui64_t crc_table64[256];
+static uint32_t crc_table32[256];
+static my_uint64_t crc_table64[256];
 
-void init_crc32(ui32_t *arg_crc) { *arg_crc = 0xFFFFFFFF; }
+void init_crc32(uint32_t *arg_crc) { *arg_crc = 0xFFFFFFFF; }
 
-void update_crc32(ui32_t *arg_crc, const void *arg_data, ui32_t arg_nbytes)
+void update_crc32(uint32_t *arg_crc, const void *arg_data, uint32_t arg_nbytes)
 {
   BEGIN_BLOCK(__FUNC__)
 
-  const i8_t *bytes = (const i8_t *)arg_data;
+  const int8_t *bytes = (const int8_t *)arg_data;
 
-  for (ui32_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
+  for (uint32_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
     *arg_crc = crc_table32[(*arg_crc ^ bytes[ibyte]) & 0xFF] ^ (*arg_crc >> 8);
 
   END_BLOCK
 }
 
-ui32_t return_crc32(const void *arg_data, ui32_t arg_nbytes)
+uint32_t return_crc32(const void *arg_data, uint32_t arg_nbytes)
 {
-  const i8_t *bytes = (const i8_t *)arg_data;
+  const int8_t *bytes = (const int8_t *)arg_data;
 
-  ui32_t crc = 0xFFFFFFFF;
+  uint32_t crc = 0xFFFFFFFF;
 
-  for (ui32_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
+  for (uint32_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
     crc = crc_table32[(crc ^ bytes[ibyte]) & 0xFF] ^ (crc >> 8);
 
   return (~crc);
 }
 
-ui64_t return_crc64(const void *arg_data, ui64_t arg_nbytes, int arg_flip)
+my_uint64_t
+return_crc64(const void *arg_data, my_uint64_t arg_nbytes, int arg_flip)
 {
-  ui64_t crc = 0xFFFFFFFFFFFFFFFFULL;
+  my_uint64_t crc = 0xFFFFFFFFFFFFFFFFULL;
 
-  const i8_t *bytes = (const i8_t *)arg_data;
+  const int8_t *bytes = (const int8_t *)arg_data;
 
-  for (ui64_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
+  for (my_uint64_t ibyte = 0; ibyte < arg_nbytes; ibyte++)
     crc = crc_table64[(crc ^ bytes[ibyte]) & 0xFF] ^ (crc >> 8);
 
   // unfortanely all database checksums have used crc
@@ -174,11 +175,11 @@ ui64_t return_crc64(const void *arg_data, ui64_t arg_nbytes, int arg_flip)
 
 void init_utils(void)
 {
-  for (ui32_t ibyte = 0; ibyte < 256; ibyte++)
+  for (uint32_t ibyte = 0; ibyte < 256; ibyte++)
   {
-    ui32_t part = ibyte;
+    uint32_t part = ibyte;
 
-    for (ui32_t ibit = 0; ibit < 8; ibit++)
+    for (uint32_t ibit = 0; ibit < 8; ibit++)
     {
       if (part & 1)
         part = (part >> 1) ^ POLYNOMIAL_CRC32;
@@ -188,11 +189,11 @@ void init_utils(void)
     crc_table32[ibyte] = part;
   }
 
-  for (ui32_t ibyte = 0; ibyte < 256; ibyte++)
+  for (uint32_t ibyte = 0; ibyte < 256; ibyte++)
   {
-    ui64_t part = ibyte;
+    my_uint64_t part = ibyte;
 
-    for (ui32_t ibit = 0; ibit < 8; ibit++)
+    for (uint32_t ibit = 0; ibit < 8; ibit++)
     {
       if (part & 1)
         part = (part >> 1) ^ 0xC96C5795D7870F42ULL;
@@ -205,13 +206,13 @@ void init_utils(void)
 
 void test_utils(void)
 {
-  ui32_t checksum;
+  uint32_t checksum;
   char *text = "The quick brown fox jumps over the lazy dog";
   BSTRING(bchecksum)
 
   init_crc32(&checksum);
 
-  update_crc32(&checksum, (i8_t *)text, strlen(text));
+  update_crc32(&checksum, (int8_t *)text, strlen(text));
 
   checksum = ~checksum;
 
@@ -231,7 +232,7 @@ void test_utils(void)
 
 void file2bstring(const char *arg_name, bstring arg_bstring)
 {
-  i64_t size;
+  my_int64_t size;
 
   HARDBUG((size = compat_size(arg_name)) == -1)
 
@@ -274,7 +275,7 @@ void file2bstring(const char *arg_name, bstring arg_bstring)
 
 void file2cjson(const char *arg_name, cJSON **arg_cjson)
 {
-  i64_t fsize;
+  my_int64_t fsize;
 
   HARDBUG((fsize = compat_size(arg_name)) == -1)
 

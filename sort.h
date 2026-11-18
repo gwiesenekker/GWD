@@ -100,7 +100,7 @@ static inline void update_sort(sort_t *arg_sort)
   {
     int jsort =
       isort + (int)compat_mulhi_u64(return_my_random(&arg_sort->S_random),
-                                    (ui64_t)(arg_sort->S_narray - isort));
+                                    (my_uint64_t)(arg_sort->S_narray - isort));
 
     if (arg_sort->S_history != NULL)
     {

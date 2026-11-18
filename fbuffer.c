@@ -40,7 +40,8 @@ void append_fbuffer_fmt(fbuffer_t *arg_with_fbuffer, const char *arg_fmt, ...)
     HARDBUG((arg_with_fbuffer->FB_nfbuffer + blength(bbuffer)) >=
             (2 * NFBUFFER))
 
-    memcpy((i8_t *)arg_with_fbuffer->FB_fbuffer + arg_with_fbuffer->FB_nfbuffer,
+    memcpy((int8_t *)arg_with_fbuffer->FB_fbuffer +
+             arg_with_fbuffer->FB_nfbuffer,
            bdata(bbuffer),
            blength(bbuffer));
 
@@ -65,7 +66,7 @@ void append_fbuffer_bin(fbuffer_t *arg_with_fbuffer,
 
   HARDBUG((arg_with_fbuffer->FB_nfbuffer + arg_nbytes) >= (2 * NFBUFFER))
 
-  memcpy((i8_t *)arg_with_fbuffer->FB_fbuffer + arg_with_fbuffer->FB_nfbuffer,
+  memcpy((int8_t *)arg_with_fbuffer->FB_fbuffer + arg_with_fbuffer->FB_nfbuffer,
          arg_data,
          arg_nbytes);
 

@@ -19,7 +19,7 @@ void construct_queue(queue_t *arg_with_queue,
 
   HARDBUG(compat_mutex_init(&(arg_with_queue->Q_mutex)) != 0)
 
-  ui64_t seed;
+  my_uint64_t seed;
 
   construct_my_random(&(arg_with_queue->Q_my_random), &seed);
 

@@ -23,14 +23,14 @@ typedef struct
 {
   bstring P_bname;
   my_timer_t P_timer;
-  i64_t P_ntotal;
-  i64_t P_ntodo;
+  my_int64_t P_ntotal;
+  my_int64_t P_ntodo;
   double P_seconds;
-  i64_t P_ndone;
-  i64_t P_ndone_previous;
+  my_int64_t P_ndone;
+  my_int64_t P_ndone_previous;
   double P_seconds_done;
   double P_seconds_previous;
-  i64_t P_ndelta;
+  my_int64_t P_ndelta;
 } progress_t;
 
 typedef enum
@@ -59,11 +59,11 @@ void stop_my_timer(my_timer_t *);
 void start_my_timer(my_timer_t *);
 void destroy_my_timer(my_timer_t *);
 
-void construct_progress(progress_t *, const char *, i64_t, double);
-int make_progress(progress_t *, i64_t);
+void construct_progress(progress_t *, const char *, my_int64_t, double);
+int make_progress(progress_t *, my_int64_t);
 void finalize_progress(progress_t *);
-i64_t return_ndone(const progress_t *);
-i64_t return_ntodo(const progress_t *);
+my_int64_t return_ndone(const progress_t *);
+my_int64_t return_ntodo(const progress_t *);
 void destroy_progress(progress_t *);
 
 void construct_time_control(time_control_t *);

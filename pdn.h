@@ -3,8 +3,8 @@
 #define PdnH
 
 void read_games(my_sqlite3_t *, const char *);
-void auto_play(const char *, i64_t);
-void gen_db(my_sqlite3_t *, int, i64_t);
+void auto_play(const char *, my_int64_t);
+void gen_db(my_sqlite3_t *, int, my_int64_t);
 void update_db(my_sqlite3_t *, int, int);
 
 #endif

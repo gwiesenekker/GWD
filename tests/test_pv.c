@@ -23,7 +23,7 @@ static void clear_test_pv(pv_entries_t *arg_pv)
       arg_pv->PVE_entries[ientry].PVE_slots[islot] = PV_SLOT_MOVES_MASK;
 }
 
-static int lookup(pv_entries_t *arg_pv, ui64_t arg_key, int arg_colour)
+static int lookup(pv_entries_t *arg_pv, my_uint64_t arg_key, int arg_colour)
 {
   search.S_board.B_key = arg_key;
   search.S_board.B_colour2move = arg_colour;
@@ -32,7 +32,7 @@ static int lookup(pv_entries_t *arg_pv, ui64_t arg_key, int arg_colour)
 }
 
 static void
-store(pv_entries_t *arg_pv, ui64_t arg_key, int arg_colour, int arg_move)
+store(pv_entries_t *arg_pv, my_uint64_t arg_key, int arg_colour, int arg_move)
 {
   search.S_board.B_key = arg_key;
   search.S_board.B_colour2move = arg_colour;
@@ -73,14 +73,15 @@ int main(int argc, char **argv)
   }
 
   /* Find distinct tags hashing into the same bucket, plus an unrelated key. */
-  ui64_t keys[NPV_SLOTS + 1];
-  ui64_t other_key = 0;
+  my_uint64_t keys[NPV_SLOTS + 1];
+  my_uint64_t other_key = 0;
   int nkeys = 0;
 
-  for (ui64_t ikey = 1; (nkeys < NPV_SLOTS + 1) or (other_key == 0); ikey++)
+  for (my_uint64_t ikey = 1; (nkeys < NPV_SLOTS + 1) or (other_key == 0);
+       ikey++)
   {
-    ui64_t key = ikey << 16;
-    int ientry = (ui32_t)return_fmix64(key) & (NPV_ENTRIES - 1);
+    my_uint64_t key = ikey << 16;
+    int ientry = (uint32_t)return_fmix64(key) & (NPV_ENTRIES - 1);
 
     if ((ientry == 0) and (nkeys < NPV_SLOTS + 1))
       keys[nkeys++] = key;

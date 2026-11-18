@@ -365,7 +365,7 @@ void construct_patterns_shared(patterns_shared_t *arg_with_patterns_shared,
            with_pattern_shared->PS_nlinear,
            with_pattern_shared->PS_nstates);
 
-    ui64_t fields_bb = with_pattern_shared->PS_bb;
+    my_uint64_t fields_bb = with_pattern_shared->PS_bb;
 
     while (fields_bb != 0)
     {

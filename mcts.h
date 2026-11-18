@@ -13,7 +13,7 @@ enum
 typedef struct
 {
   double mcts_globals_time_limit;
-  i64_t mcts_globals_nnodes;
+  my_int64_t mcts_globals_nnodes;
 } mcts_globals_t;
 
 extern mcts_globals_t mcts_globals;

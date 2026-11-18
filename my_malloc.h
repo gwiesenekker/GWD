@@ -49,7 +49,7 @@
   POP_NAME(#C) free(C); \
   C = NULL;
 
-ui64_t return_XXH3_64(const void *, size_t);
+my_uint64_t return_XXH3_64(const void *, size_t);
 
 void mark_pointer_read_only(void *);
 void register_heap(const char *,

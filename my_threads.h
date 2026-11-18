@@ -26,7 +26,7 @@ typedef struct
   double T_idle;
 
   /* Keep publication traffic away from the worker's hot private counters. */
-  _Alignas(64) _Atomic(i64_t) T_npublished_nodes;
+  _Alignas(64) _Atomic(my_int64_t) T_npublished_nodes;
   _Atomic(int) T_nodes_ready;
 } thread_t;
 

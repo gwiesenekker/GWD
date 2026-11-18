@@ -5,7 +5,7 @@
 
 void clear_bucket(bucket_t *arg_with_bucket)
 {
-  for (i64_t ibucket = 0; ibucket < arg_with_bucket->nbuckets; ibucket++)
+  for (my_int64_t ibucket = 0; ibucket < arg_with_bucket->nbuckets; ibucket++)
     arg_with_bucket->buckets[ibucket] = 0;
 }
 
@@ -19,8 +19,8 @@ void update_bucket(bucket_t *arg_with_bucket, double arg_value)
   {
     if (arg_with_bucket->bucket_scale == BUCKET_LINEAR)
     {
-      i64_t ibucket = floor((arg_value - arg_with_bucket->bucket_min) /
-                            arg_with_bucket->bucket_size);
+      my_int64_t ibucket = floor((arg_value - arg_with_bucket->bucket_min) /
+                                 arg_with_bucket->bucket_size);
 
       if (ibucket >= arg_with_bucket->nbuckets)
         ibucket = arg_with_bucket->nbuckets - 1;
@@ -29,7 +29,7 @@ void update_bucket(bucket_t *arg_with_bucket, double arg_value)
     }
     else if (arg_with_bucket->bucket_scale == BUCKET_LOG)
     {
-      i64_t ibucket = 0;
+      my_int64_t ibucket = 0;
 
       double bucket_min = arg_with_bucket->bucket_min;
       double bucket_max =
@@ -64,9 +64,9 @@ void printf_bucket(const bucket_t *arg_with_bucket)
   PRINTF("bucket_size=%.2f\n", arg_with_bucket->bucket_size);
   PRINTF("bucket_min=%.2f\n", arg_with_bucket->bucket_min);
   PRINTF("bucket_max=%.2f\n", arg_with_bucket->bucket_max);
-  PRINTF("nbuckets=%lld\n", (i64_t)arg_with_bucket->nbuckets);
+  PRINTF("nbuckets=%lld\n", (my_int64_t)arg_with_bucket->nbuckets);
 
-  i64_t bucket_total_sum = arg_with_bucket->bucket_nlt_min;
+  my_int64_t bucket_total_sum = arg_with_bucket->bucket_nlt_min;
 
   for (int ibucket = 0; ibucket < arg_with_bucket->nbuckets; ibucket++)
     bucket_total_sum += arg_with_bucket->buckets[ibucket];
@@ -75,7 +75,7 @@ void printf_bucket(const bucket_t *arg_with_bucket)
 
   PRINTF("bucket_total_sum=%lld\n", bucket_total_sum);
 
-  i64_t bucket_partial_sum = arg_with_bucket->bucket_nlt_min;
+  my_int64_t bucket_partial_sum = arg_with_bucket->bucket_nlt_min;
 
 #ifndef WEIBULL
   PRINTF("< o-o, %.2f>: %10lld %5.2f %10lld %5.2f\n",
@@ -198,7 +198,9 @@ void construct_bucket(bucket_t *arg_with_bucket,
   else
     FATAL("unknown bucket_scale", EXIT_FAILURE)
 
-  MY_MALLOC_BY_TYPE(arg_with_bucket->buckets, i64_t, arg_with_bucket->nbuckets)
+  MY_MALLOC_BY_TYPE(arg_with_bucket->buckets,
+                    my_int64_t,
+                    arg_with_bucket->nbuckets)
 
   for (int ibucket = 0; ibucket < arg_with_bucket->nbuckets; ibucket++)
     arg_with_bucket->buckets[ibucket] = 0;

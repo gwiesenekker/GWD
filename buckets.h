@@ -17,11 +17,11 @@ typedef struct
   double bucket_max;
   int bucket_scale;
 
-  i64_t bucket_nlt_min;
-  i64_t bucket_nge_max;
+  my_int64_t bucket_nlt_min;
+  my_int64_t bucket_nge_max;
 
   int nbuckets;
-  i64_t *buckets;
+  my_int64_t *buckets;
 } bucket_t;
 
 void clear_bucket(bucket_t *);

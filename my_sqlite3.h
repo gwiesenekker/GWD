@@ -46,7 +46,7 @@ int my_sqlite3_open(const char *, sqlite3 **);
 int my_sqlite3_open_v2(const char *, sqlite3 **, int, const char *);
 
 int my_sqlite3_bind_int(sqlite3_stmt *, int, int);
-int my_sqlite3_bind_int64(sqlite3_stmt *, int, i64_t);
+int my_sqlite3_bind_int64(sqlite3_stmt *, int, my_int64_t);
 
 int my_sqlite3_step(sqlite3_stmt *);
 
@@ -58,7 +58,7 @@ int my_sqlite3_exec(sqlite3 *,
 
 int my_sqlite3_column_int(sqlite3_stmt *, int);
 
-i64_t my_sqlite3_column_int64(sqlite3_stmt *, int);
+my_int64_t my_sqlite3_column_int64(sqlite3_stmt *, int);
 
 const unsigned char *my_sqlite3_column_text(sqlite3_stmt *, int);
 
@@ -72,13 +72,13 @@ int execute_sql(sqlite3 *, const void *, int);
 
 void create_tables(sqlite3 *);
 
-int query_position_fen(sqlite3 *, i64_t, bstring, int *);
+int query_position_fen(sqlite3 *, my_int64_t, bstring, int *);
 
-i64_t query_position_id(sqlite3 *, const char *, int, int *);
+my_int64_t query_position_id(sqlite3 *, const char *, int, int *);
 
-i64_t query_move(sqlite3 *, i64_t, const char *, int, int *);
+my_int64_t query_move(sqlite3 *, my_int64_t, const char *, int, int *);
 
-score_t query_evaluation(sqlite3 *, i64_t, int *);
+score_t query_evaluation(sqlite3 *, my_int64_t, int *);
 
 void backup_db(sqlite3 *, const char *);
 

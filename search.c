@@ -14,7 +14,8 @@ enum
 #define ABCS_SCORE_LE_ALPHA_BIT BIT(1)
 #define ABCS_SCORE_TRUE_SCORE_BIT BIT(2)
 
-local inline ui64_t return_fast_modulo64(ui64_t arg_hash, ui64_t arg_nentries)
+local inline my_uint64_t return_fast_modulo64(my_uint64_t arg_hash,
+                                              my_uint64_t arg_nentries)
 {
   return (compat_mulhi_u64(arg_hash, arg_nentries));
 }
@@ -53,7 +54,7 @@ local inline ui64_t return_fast_modulo64(ui64_t arg_hash, ui64_t arg_nentries)
                  arg_alpha_beta_cache_slot);
 
 #define TRACE_KEY(arg_with_search) \
-  ui64_t trace_key = arg_with_search->S_board.B_key;
+  my_uint64_t trace_key = arg_with_search->S_board.B_key;
 
 #define TRACE_AB_WINDOW(arg_trace_key,  \
                         arg_info,       \
@@ -161,20 +162,20 @@ enum
 
 typedef struct
 {
-  ui64_t ABCS_key;
+  my_uint64_t ABCS_key;
   union
   {
-    ui64_t ABCS_data;
+    my_uint64_t ABCS_data;
     struct
     {
       score_t ABCS_score;
-      i8_t ABCS_depth;
-      ui8_t ABCS_flags;
-      i8_t ABCS_moves[NABCS_MOVES];
+      int8_t ABCS_depth;
+      uint8_t ABCS_flags;
+      int8_t ABCS_moves[NABCS_MOVES];
     };
   };
 #ifdef DEBUG
-  ui64_t ABCS_debug;
+  my_uint64_t ABCS_debug;
 #endif
 } alpha_beta_cache_slot_t;
 
@@ -259,7 +260,7 @@ typedef struct
   alpha_beta_cache_shared_slot_t ABCE_slots[NABCS_SLOTS];
 } alpha_beta_cache_entry_t;
 
-local i64_t nalpha_beta_cache_entries;
+local my_int64_t nalpha_beta_cache_entries;
 local alpha_beta_cache_slot_t alpha_beta_cache_slot_default;
 local alpha_beta_cache_entry_t *alpha_beta_cache[NETWORKS_MAX][NCOLOUR_ENUM];
 local compat_large_allocation_t
@@ -278,14 +279,14 @@ local inline void publish_nodes(search_t *arg_with_search)
                           memory_order_relaxed);
 }
 
-local i64_t published_global_nodes(search_t *arg_with_search)
+local my_int64_t published_global_nodes(search_t *arg_with_search)
 {
   if (arg_with_search->S_thread == NULL)
     return (arg_with_search->S_ntotal_nodes);
 
   publish_nodes(arg_with_search);
 
-  i64_t nodes = 0;
+  my_int64_t nodes = 0;
 
   for (int ithread = 0; ithread < options.nthreads; ithread++)
     nodes += atomic_load_explicit(&threads[ithread].T_npublished_nodes,
@@ -412,9 +413,10 @@ int move_repetition(board_t *arg_with_board)
   return (FALSE);
 }
 
-local inline ui32_t abcs2crc32(ui64_t arg_abcs_key, ui64_t arg_abcs_data)
+local inline uint32_t abcs2crc32(my_uint64_t arg_abcs_key,
+                                 my_uint64_t arg_abcs_data)
 {
-  ui32_t crc32 = 0xFFFFFFFF;
+  uint32_t crc32 = 0xFFFFFFFF;
 
   crc32 = HW_CRC32_U64(crc32, arg_abcs_key);
   crc32 = HW_CRC32_U64(crc32, arg_abcs_data);
@@ -422,9 +424,10 @@ local inline ui32_t abcs2crc32(ui64_t arg_abcs_key, ui64_t arg_abcs_data)
   return (~crc32);
 }
 
-local inline ui64_t abcs2crc64(ui64_t arg_abcs_key, ui64_t arg_abcs_data)
+local inline my_uint64_t abcs2crc64(my_uint64_t arg_abcs_key,
+                                    my_uint64_t arg_abcs_data)
 {
-  ui64_t crc64;
+  my_uint64_t crc64;
 
 #ifdef USE_SPLITMIX64
   crc64 = arg_abcs_key;
@@ -437,7 +440,7 @@ local inline ui64_t abcs2crc64(ui64_t arg_abcs_key, ui64_t arg_abcs_data)
   crc64 *= 0x94d049bb133111ebULL;
   crc64 ^= crc64 >> 31;
 #else
-  ui32_t crc32 = 0xFFFFFFFF;
+  uint32_t crc32 = 0xFFFFFFFF;
 
   crc32 = HW_CRC32_U64(crc32, arg_abcs_key);
   crc32 = HW_CRC32_U64(crc32, arg_abcs_data);
@@ -527,7 +530,7 @@ local inline void update_history_score(int *arg_score, int arg_bonus)
 
 local void update_history(search_t *arg_with_search,
                           moves_list_t *arg_moves_list,
-                          const ui8_t *arg_found,
+                          const uint8_t *arg_found,
                           int arg_jmove,
                           int arg_my_depth)
 {
@@ -648,10 +651,10 @@ local
     load_alpha_beta_cache_slot(arg_alpha_beta_cache_slot,
                                &with_alpha_beta_cache_entry->ABCE_slots[islot]);
 
-    ui64_t abcs_crc64 =
+    my_uint64_t abcs_crc64 =
       arg_alpha_beta_cache_slot->ABCS_key ^ arg_with_search->S_board.B_key;
 
-    ui64_t abcs_data =
+    my_uint64_t abcs_data =
       arg_alpha_beta_cache_slot->ABCS_data ^ arg_with_search->S_board.B_key;
 
     if (abcs2crc64(arg_with_search->S_board.B_key, abcs_data) == abcs_crc64)
@@ -708,9 +711,11 @@ update_alpha_beta_cache(search_t *arg_with_search,
     load_alpha_beta_cache_slot(&abcs_slot,
                                &with_alpha_beta_cache_entry->ABCE_slots[islot]);
 
-    ui64_t abcs_crc64 = abcs_slot.ABCS_key ^ arg_with_search->S_board.B_key;
+    my_uint64_t abcs_crc64 =
+      abcs_slot.ABCS_key ^ arg_with_search->S_board.B_key;
 
-    ui64_t abcs_data = abcs_slot.ABCS_data ^ arg_with_search->S_board.B_key;
+    my_uint64_t abcs_data =
+      abcs_slot.ABCS_data ^ arg_with_search->S_board.B_key;
 
     if (abcs2crc64(arg_with_search->S_board.B_key, abcs_data) == abcs_crc64)
     {
@@ -738,8 +743,8 @@ update_alpha_beta_cache(search_t *arg_with_search,
     --islot;
   }
 
-  ui64_t abcs_crc64 = abcs2crc64(arg_alpha_beta_cache_slot->ABCS_key,
-                                 arg_alpha_beta_cache_slot->ABCS_data);
+  my_uint64_t abcs_crc64 = abcs2crc64(arg_alpha_beta_cache_slot->ABCS_key,
+                                      arg_alpha_beta_cache_slot->ABCS_data);
 
   arg_alpha_beta_cache_slot->ABCS_key ^= abcs_crc64;
   arg_alpha_beta_cache_slot->ABCS_data ^= arg_with_search->S_board.B_key;
@@ -753,7 +758,7 @@ update_alpha_beta_cache(search_t *arg_with_search,
   END_BLOCK
 }
 
-local inline ui64_t return_fmix64(ui64_t arg_key)
+local inline my_uint64_t return_fmix64(my_uint64_t arg_key)
 {
   arg_key ^= arg_key >> 33;
   arg_key *= 0xff51afd7ed558ccdULL;
@@ -768,13 +773,13 @@ int probe_pv(pv_entries_t *arg_pv, search_t *arg_with_search)
 {
   int result = INVALID;
 
-  ui64_t key = arg_with_search->S_board.B_key;
+  my_uint64_t key = arg_with_search->S_board.B_key;
 
-  ui32_t fmix32 = (ui32_t)return_fmix64(key);
+  uint32_t fmix32 = (uint32_t)return_fmix64(key);
 
   int ientry = fmix32 & (NPV_ENTRIES - 1);
 
-  ui64_t *pve_slots = arg_pv->PVE_entries[ientry].PVE_slots;
+  my_uint64_t *pve_slots = arg_pv->PVE_entries[ientry].PVE_slots;
 
   for (int islot = 0; islot < NPV_SLOTS; islot++)
   {
@@ -798,13 +803,13 @@ int probe_pv(pv_entries_t *arg_pv, search_t *arg_with_search)
 local void
 update_pv(pv_entries_t *arg_pv, search_t *arg_with_search, int arg_imove)
 {
-  ui64_t key = arg_with_search->S_board.B_key;
+  my_uint64_t key = arg_with_search->S_board.B_key;
 
-  ui32_t fmix32 = (ui32_t)return_fmix64(key);
+  uint32_t fmix32 = (uint32_t)return_fmix64(key);
 
   int ientry = fmix32 & (NPV_ENTRIES - 1);
 
-  ui64_t *pve_slots = arg_pv->PVE_entries[ientry].PVE_slots;
+  my_uint64_t *pve_slots = arg_pv->PVE_entries[ientry].PVE_slots;
 
   int islot;
 
@@ -827,10 +832,10 @@ update_pv(pv_entries_t *arg_pv, search_t *arg_with_search, int arg_imove)
 
   if (is_white(arg_with_search->S_board.B_colour2move))
     pve_slots[islot] =
-      (pve_slots[islot] & ~PV_SLOT_WHITE_MOVE_MASK) | (ui64_t)arg_imove;
+      (pve_slots[islot] & ~PV_SLOT_WHITE_MOVE_MASK) | (my_uint64_t)arg_imove;
   else
-    pve_slots[islot] =
-      (pve_slots[islot] & ~PV_SLOT_BLACK_MOVE_MASK) | ((ui64_t)arg_imove) << 8;
+    pve_slots[islot] = (pve_slots[islot] & ~PV_SLOT_BLACK_MOVE_MASK) |
+                       ((my_uint64_t)arg_imove) << 8;
 }
 
 local void
@@ -1025,7 +1030,7 @@ local void inline flip_score(score_t *arg_score)
 local void construct_search_result(search_result_t *arg_with_search_result,
                                    score_t arg_raw_score,
                                    score_t arg_score,
-                                   ui32_t arg_flags)
+                                   uint32_t arg_flags)
 {
   arg_with_search_result->SR_raw_score = arg_raw_score;
   arg_with_search_result->SR_score = arg_score;
@@ -1106,7 +1111,7 @@ local void trace_ab_entry(search_t *arg_with_search,
                           int arg_line,
                           score_t arg_my_alpha,
                           score_t arg_my_beta,
-                          ui32_t arg_node_type,
+                          uint32_t arg_node_type,
                           int arg_my_depth)
 {
   for (int idepth = 0; idepth < trace_depth; idepth++)
@@ -1155,7 +1160,7 @@ local void trace_ab_cache(search_t *arg_with_search,
 
   score_t ABCS_score = arg_cache_slot->ABCS_score;
   int ABCS_depth = arg_cache_slot->ABCS_depth;
-  ui32_t ABCS_flags = arg_cache_slot->ABCS_flags;
+  uint32_t ABCS_flags = arg_cache_slot->ABCS_flags;
   int ABCS_move = arg_cache_slot->ABCS_moves[0];
 
   if (ABCS_move == INVALID)
@@ -1193,7 +1198,7 @@ local void trace_ab_cache(search_t *arg_with_search,
   BDESTROY(bmove_string)
 }
 
-local void trace_ab_window(ui64_t arg_trace_key,
+local void trace_ab_window(my_uint64_t arg_trace_key,
                            char *arg_file,
                            const char *arg_func,
                            int arg_line,
@@ -1262,7 +1267,7 @@ local void trace_dedent(void)
   HARDBUG(trace_depth < 0)
 }
 
-local void trace_ab_result(ui64_t arg_trace_key,
+local void trace_ab_result(my_uint64_t arg_trace_key,
                            char *arg_file,
                            const char *arg_func,
                            int arg_line,
@@ -1325,7 +1330,7 @@ local void trace_ab_exit(search_t *arg_with_search,
                          int arg_line,
                          score_t arg_my_alpha,
                          score_t arg_my_beta,
-                         ui32_t arg_node_type,
+                         uint32_t arg_node_type,
                          int arg_my_depth,
                          search_result_t *arg_best_result)
 {
@@ -1473,7 +1478,7 @@ local void inline check_search_result(score_t arg_my_alpha,
 local void quiescence(search_t *arg_with_search,
                       score_t arg_my_alpha,
                       score_t arg_my_beta,
-                      ui32_t arg_node_type,
+                      uint32_t arg_node_type,
                       moves_list_t *arg_moves_list,
                       score_t *arg_best_score,
                       pv_entries_t *arg_best_pv)
@@ -1695,7 +1700,7 @@ local void quiescence(search_t *arg_with_search,
 
     score_t temp_beta = arg_my_beta;
 
-    ui32_t node_type = arg_node_type;
+    uint32_t node_type = arg_node_type;
 
     if (is_pv(arg_node_type) and (imove > 0))
     {
@@ -1774,9 +1779,9 @@ local void alpha_beta(search_t *,
                       score_t,
                       score_t,
                       int,
-                      ui32_t,
+                      uint32_t,
                       int,
-                      ui32_t,
+                      uint32_t,
                       moves_list_t *,
                       sort_t *,
                       int,
@@ -1786,9 +1791,9 @@ local void alpha_beta_captures(search_t *arg_with_search,
                                score_t arg_my_alpha,
                                score_t arg_my_beta,
                                int arg_my_depth,
-                               ui32_t arg_node_type,
+                               uint32_t arg_node_type,
                                int arg_reduction_depth_root,
-                               ui32_t arg_my_tweaks,
+                               uint32_t arg_my_tweaks,
                                moves_list_t *arg_moves_list,
                                sort_t *arg_sort,
                                int arg_singular_adjustment,
@@ -1826,7 +1831,7 @@ local void alpha_beta_captures(search_t *arg_with_search,
                           SCORE(SCORE_MINUS_INFINITY),
                           SR_NULL);
 
-  ui32_t your_tweaks = 0;
+  uint32_t your_tweaks = 0;
 
   search_result_t temp_result;
 
@@ -1863,7 +1868,7 @@ local void alpha_beta_captures(search_t *arg_with_search,
 
     score_t temp_beta = arg_my_beta;
 
-    ui32_t node_type = arg_node_type;
+    uint32_t node_type = arg_node_type;
 
     if (is_pv(arg_node_type) and (imove > 0))
     {
@@ -2007,9 +2012,9 @@ local void alpha_beta_minimal(search_t *arg_with_search,
                               score_t arg_my_alpha,
                               score_t arg_my_beta,
                               int arg_my_depth,
-                              ui32_t arg_node_type,
+                              uint32_t arg_node_type,
                               int arg_reduction_depth_root,
-                              ui32_t arg_my_tweaks,
+                              uint32_t arg_my_tweaks,
                               moves_list_t *arg_moves_list,
                               sort_t *arg_sort,
                               int arg_singular_adjustment,
@@ -2061,13 +2066,13 @@ local void alpha_beta_minimal(search_t *arg_with_search,
     (arg_reduction_depth_root == 0) and !is_score_lost(arg_my_alpha) and
     !is_score_won(arg_my_beta);
 
-  ui32_t your_tweaks = 0;
+  uint32_t your_tweaks = 0;
 
   search_result_t temp_result;
 
   temp_result.SR_pv = arg_search_result->SR_pv;
 
-  ui8_t found[NMOVES_MAX] = {0};
+  uint8_t found[NMOVES_MAX] = {0};
   int stage[NMOVES_MAX];
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
@@ -2336,9 +2341,9 @@ local void alpha_beta_pv(search_t *arg_with_search,
                          score_t arg_my_alpha,
                          score_t arg_my_beta,
                          int arg_my_depth,
-                         ui32_t arg_node_type,
+                         uint32_t arg_node_type,
                          int arg_reduction_depth_root,
-                         ui32_t arg_my_tweaks,
+                         uint32_t arg_my_tweaks,
                          moves_list_t *arg_moves_list,
                          sort_t *arg_sort,
                          int arg_singular_adjustment,
@@ -2375,13 +2380,13 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
   HARDBUG(your_depth < 0)
 
-  ui32_t your_tweaks = 0;
+  uint32_t your_tweaks = 0;
 
   search_result_t temp_result;
 
   temp_result.SR_pv = arg_search_result->SR_pv;
 
-  ui8_t found[NMOVES_MAX] = {0};
+  uint8_t found[NMOVES_MAX] = {0};
   int stage[NMOVES_MAX];
 
   for (int imove = 0; imove < arg_moves_list->ML_nmoves; imove++)
@@ -2425,7 +2430,7 @@ local void alpha_beta_pv(search_t *arg_with_search,
 
       score_t temp_beta = arg_my_beta;
 
-      ui32_t node_type = arg_node_type;
+      uint32_t node_type = arg_node_type;
 
       if (imove > 0)
       {
@@ -2621,9 +2626,9 @@ local void alpha_beta(search_t *arg_with_search,
                       score_t arg_my_alpha,
                       score_t arg_my_beta,
                       int arg_my_depth,
-                      ui32_t arg_node_type,
+                      uint32_t arg_node_type,
                       int arg_reduction_depth_root,
-                      ui32_t arg_my_tweaks,
+                      uint32_t arg_my_tweaks,
                       moves_list_t *arg_moves_list,
                       sort_t *arg_sort,
                       int arg_singular_adjustment,
@@ -3110,8 +3115,9 @@ local void alpha_beta(search_t *arg_with_search,
 
       prob_cut_result.SR_pv = arg_search_result->SR_pv;
 
-      i64_t total_nodes = arg_with_search->S_ntotal_nodes;
-      i64_t total_prob_cut_nodes = arg_with_search->S_ntotal_prob_cut_nodes;
+      my_int64_t total_nodes = arg_with_search->S_ntotal_nodes;
+      my_int64_t total_prob_cut_nodes =
+        arg_with_search->S_ntotal_prob_cut_nodes;
 
       // Same-position probe: do not append the capture history twice.
       // Descendant move searches construct fresh tweaks, as for LMR.
@@ -3131,7 +3137,7 @@ local void alpha_beta(search_t *arg_with_search,
       HARDBUG(arg_with_search->S_ntotal_prob_cut_nodes < total_prob_cut_nodes)
 
       // Attribute each node to its innermost probe, even on interruption.
-      i64_t prob_cut_nodes =
+      my_int64_t prob_cut_nodes =
         (arg_with_search->S_ntotal_nodes - total_nodes) -
         (arg_with_search->S_ntotal_prob_cut_nodes - total_prob_cut_nodes);
 
@@ -3620,7 +3626,7 @@ local void print_pv(search_t *arg_with_search,
 
   if (options.hub)
   {
-    i64_t nglobal_nodes = published_global_nodes(arg_with_search);
+    my_int64_t nglobal_nodes = published_global_nodes(arg_with_search);
 
     HARDBUG(bformata(bpv_string,
                      "depth=%d score=%.3f time=%.2f nps=%.2f pv=\"%s",
@@ -3987,7 +3993,7 @@ void do_search(search_t *arg_with_search,
     }
   }
 
-  ui32_t your_tweaks = 0;
+  uint32_t your_tweaks = 0;
 
   arg_with_search->S_root_simple_score = return_score(arg_with_search);
 
@@ -4128,7 +4134,7 @@ void do_search(search_t *arg_with_search,
     // in that case we double best_score_margin
     // and force the first move to be searched with a PV window
 
-    ui32_t node_type = PV_BIT;
+    uint32_t node_type = PV_BIT;
 
     // best_score_margin determines if the current search
     // should be aborted if the score of the current move drops too low
@@ -4581,7 +4587,7 @@ label_limit:
   if ((arg_with_search->S_thread != NULL) and
       (arg_with_search->S_thread == thread_alpha_beta_master))
   {
-    i64_t nglobal_nodes = published_global_nodes(arg_with_search);
+    my_int64_t nglobal_nodes = published_global_nodes(arg_with_search);
 
     my_printf(arg_with_search->S_my_printf,
               "%lld global_nodes in %.2f seconds\n"
@@ -4623,7 +4629,7 @@ initialize_alpha_beta_cache(alpha_beta_cache_entry_t *arg_alpha_beta_cache)
 {
   PRINTF("clear_alpha_beta_cache..\n");
 
-  for (i64_t ientry = 0; ientry < nalpha_beta_cache_entries; ientry++)
+  for (my_int64_t ientry = 0; ientry < nalpha_beta_cache_entries; ientry++)
     for (int islot = 0; islot < NABCS_SLOTS; islot++)
       init_alpha_beta_cache_slot(
         &arg_alpha_beta_cache[ientry].ABCE_slots[islot],
@@ -4667,7 +4673,7 @@ void construct_search(search_t *arg_with_search,
     construct_my_random(&(arg_with_search->S_random), NULL);
   else
   {
-    ui64_t seed;
+    my_uint64_t seed;
 
     construct_my_random(&(arg_with_search->S_random), &seed);
 
@@ -4681,9 +4687,9 @@ void construct_search(search_t *arg_with_search,
 void init_search(void)
 {
   PRINTF("sizeof(alpha_beta_cache_slot_t)=%lld\n",
-         (i64_t)sizeof(alpha_beta_cache_slot_t));
+         (my_int64_t)sizeof(alpha_beta_cache_slot_t));
   PRINTF("sizeof(alpha_beta_cache_entry_t)=%lld\n",
-         (i64_t)sizeof(alpha_beta_cache_entry_t));
+         (my_int64_t)sizeof(alpha_beta_cache_entry_t));
 
   // alpha_beta cache
 
@@ -4714,8 +4720,9 @@ void init_search(void)
       alpha_beta_cache_slot_default.ABCS_moves[imove] = INVALID;
     alpha_beta_cache_slot_default.ABCS_score = SCORE(SCORE_MINUS_INFINITY);
 
-    ui64_t abcs_crc64 = abcs2crc64(alpha_beta_cache_slot_default.ABCS_key,
-                                   alpha_beta_cache_slot_default.ABCS_data);
+    my_uint64_t abcs_crc64 =
+      abcs2crc64(alpha_beta_cache_slot_default.ABCS_key,
+                 alpha_beta_cache_slot_default.ABCS_data);
 
     alpha_beta_cache_slot_default.ABCS_key ^= abcs_crc64;
     alpha_beta_cache_slot_default.ABCS_data ^= 0;

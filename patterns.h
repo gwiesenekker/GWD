@@ -44,7 +44,7 @@ typedef struct
 {
   bstring PS_bname;
   int PS_id;
-  ui64_t PS_bb;
+  my_uint64_t PS_bb;
   int PS_nlinear;
   int PS_nstates;
   int PS_nembed;

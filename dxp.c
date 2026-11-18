@@ -548,7 +548,7 @@ char decode(int arg_nbuffer, const char *arg_buffer, dxp_t *arg_with_dxp)
 
       int ifield = move->M_move_from;
       int kfield = move->M_move_to;
-      ui64_t captures_bb = move->M_captures_bb;
+      my_uint64_t captures_bb = move->M_captures_bb;
 
       if (ifield != from_field)
         continue;
@@ -683,7 +683,7 @@ local char *secs2string(double arg_secs, bstring arg_string)
   int seconds;
   int centiseconds;
 
-  i64_t secs = (i64_t)round(arg_secs * 100.0);
+  my_int64_t secs = (my_int64_t)round(arg_secs * 100.0);
 
   centiseconds = secs % 100;
 
